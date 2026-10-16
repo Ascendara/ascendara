@@ -1,10 +1,19 @@
 import { dialogTitleClassName } from "@/components/ui/dialog-styles";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  createContext,
+  forwardRef,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import {
   Rocket,
   Shield,
@@ -18,13 +27,13 @@ import {
   CircleCheck,
   Loader,
   XCircle,
-  Globe2,
   ExternalLink,
   ArrowRight,
+  ArrowLeft,
   PlusCircle,
   SquareArrowRight,
   FolderDownIcon,
-  Unplug,
+  HardDrive,
   Wine,
   AlertTriangle,
   Sparkles,
@@ -32,20 +41,8 @@ import {
   Crown,
   Info,
   Gamepad2,
-  ArrowRightLeft,
   Users,
-  Smartphone,
-  MessageCircle,
-  User,
-  CloudIcon,
-  CloudUpload,
-  Trophy,
   RefreshCw,
-  Eye,
-  Puzzle,
-  Infinity as InfinityIcon,
-  ListOrdered,
-  Sparkle,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -66,12 +63,81 @@ import { Input } from "@/components/ui/input";
 import { validateInput } from "@/services/profanityFilterService";
 import ImportGamesDialog from "@/components/ImportGamesDialog";
 
-const executableToLabelMap = {
-  "dotNetFx40_Full_x86_x64.exe": t => ".NET Framework",
-  "dxwebsetup.exe": t => "DirectX",
-  "oalinst.exe": t => "OpenAL",
-  "VC_redist.x64.exe": t => "Visual C++",
-  "xnafx40_redist.msi": t => "XNA Framework",
+const DEPENDENCIES = [
+  {
+    name: ".NET Framework",
+    file: "dotNetFx40_Full_x86_x64.exe",
+    descKey: "welcome.requiredForModernGames",
+  },
+  { name: "DirectX", file: "dxwebsetup.exe", descKey: "welcome.graphicsAndMultimedia" },
+  { name: "OpenAL", file: "oalinst.exe", descKey: "welcome.audioProcessing" },
+  { name: "Visual C++", file: "VC_redist.x64.exe", descKey: "welcome.runtimeComponents" },
+  {
+    name: "XNA Framework",
+    file: "xnafx40_redist.msi",
+    descKey: "welcome.gameDevelopmentFramework",
+  },
+];
+const dependencyByFile = Object.fromEntries(DEPENDENCIES.map(dep => [dep.file, dep]));
+const idleDependencyStatus = () =>
+  Object.fromEntries(DEPENDENCIES.map(dep => [dep.name, "idle"]));
+
+const REFERRAL_SOURCES = [
+  "friend",
+  "tiktok",
+  "reddit",
+  "instagram",
+  "google",
+  "discord",
+  "fmhy",
+  "other",
+  "notsay",
+];
+const REFERRAL_LINK_SOURCES = REFERRAL_SOURCES.filter(
+  source => !["friend", "notsay"].includes(source)
+);
+
+const LOW_SPACE_BYTES = 40 * 1024 * 1024 * 1024;
+const formatGigabytes = bytes => `${Math.floor(bytes / (1024 * 1024 * 1024))} GB`;
+
+const cardClass = "rounded-xl border border-border/60 bg-card/40 p-4";
+const primaryButtonClass =
+  "h-11 bg-primary px-8 text-base font-semibold text-secondary hover:bg-primary/90";
+const secondaryButtonClass =
+  "h-11 px-8 text-base font-semibold text-primary hover:bg-primary/10";
+
+// Steps slide in the direction of travel (1 = next, -1 = back) while the previous
+// step slides out the other way, so moving through setup feels continuous.
+const STEP_OFFSET = 64;
+const stepVariants = {
+  hidden: direction => ({ opacity: 0, x: direction * STEP_OFFSET, scale: 0.98 }),
+  visible: {
+    opacity: 1,
+    x: 0,
+    scale: 1,
+    transition: {
+      x: { type: "spring", stiffness: 260, damping: 30 },
+      opacity: { duration: 0.3, ease: "easeOut" },
+      scale: { duration: 0.35, ease: "easeOut" },
+      staggerChildren: 0.06,
+      delayChildren: 0.05,
+    },
+  },
+  exit: direction => ({
+    opacity: 0,
+    x: direction * -STEP_OFFSET,
+    scale: 0.98,
+    transition: { duration: 0.25, ease: "easeIn" },
+  }),
+};
+
+// Direction of the current step change, read by entering steps (AnimatePresence
+// only hands `custom` to exiting ones).
+const StepDirectionContext = createContext(1);
+
+const stepItemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
 };
 
 const SUPPORTED_LANGUAGES = Object.entries(languages).map(
@@ -198,38 +264,32 @@ const getThemeColors = themeId => {
 
 function ThemeButton({ theme, currentTheme, onSelect }) {
   const colors = getThemeColors(theme.id);
+  const selected = currentTheme === theme.id;
 
   return (
     <button
+      type="button"
       onClick={() => onSelect(theme.id)}
-      className={`group relative overflow-hidden rounded-xl transition-all ${
-        currentTheme === theme.id
-          ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-          : "hover:ring-1 hover:ring-primary/50"
+      className={`group overflow-hidden rounded-xl border text-left transition-all ${
+        selected
+          ? "border-primary ring-2 ring-primary/40"
+          : "border-border/60 hover:border-primary/50"
       }`}
     >
-      <div className={`aspect-[4/3] ${colors.bg} border border-border`}>
-        <div className="h-full p-4">
-          <div className={`h-full rounded-lg ${colors.secondary} p-3 shadow-sm`}>
-            <div className="space-y-2">
-              <div className={`h-3 w-24 rounded-full ${colors.primary} opacity-80`} />
-              <div className={`h-2 w-16 rounded-full ${colors.primary} opacity-40`} />
-            </div>
-            <div className="mt-4 space-y-2">
-              <div className={`h-8 rounded-md ${colors.bg} bg-opacity-50`} />
-              <div className={`h-8 rounded-md ${colors.bg} bg-opacity-30`} />
-            </div>
-          </div>
+      <div className={`${colors.bg} p-2.5`}>
+        <div className={`rounded-md ${colors.secondary} space-y-1.5 p-2 shadow-sm`}>
+          <div className={`h-2 w-3/4 rounded-full ${colors.primary} opacity-80`} />
+          <div className={`h-1.5 w-1/2 rounded-full ${colors.primary} opacity-40`} />
+          <div className={`h-4 rounded ${colors.bg} bg-opacity-50`} />
         </div>
       </div>
-
-      <div
-        className={`absolute bottom-0 left-0 right-0 p-3 ${colors.bg} bg-opacity-80 backdrop-blur-sm`}
-      >
-        <div className="flex items-center justify-between">
-          <span className={`font-medium ${colors.text}`}>{theme.name}</span>
-          <div className={`h-3 w-3 rounded-full ${colors.primary}`} />
-        </div>
+      <div className="flex items-center justify-between gap-2 bg-card/60 px-2.5 py-1.5">
+        <span className="truncate text-xs font-medium">{theme.name}</span>
+        {selected ? (
+          <CircleCheck className="h-3.5 w-3.5 shrink-0 text-primary" />
+        ) : (
+          <div className={`h-2.5 w-2.5 shrink-0 rounded-full ${colors.primary}`} />
+        )}
       </div>
     </button>
   );
@@ -239,6 +299,98 @@ function WelcomeStepIcon({ icon: Icon }) {
   return (
     <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 shadow-lg shadow-primary/10">
       <Icon className="h-8 w-8 text-primary" />
+    </div>
+  );
+}
+
+// Shared layout for every setup step after the terms screen. Steps are sized to
+// fit the window without scrolling; short windows drop the icon and tighten spacing.
+// forwardRef lets AnimatePresence's popLayout mode measure the exiting step.
+const SetupStep = forwardRef(function SetupStep(
+  { icon: Icon, title, subtitle, children, footer, wide = false },
+  ref
+) {
+  const direction = useContext(StepDirectionContext);
+  return (
+    <motion.div
+      ref={ref}
+      custom={direction}
+      className="relative z-10 flex h-screen flex-col items-center justify-center overflow-hidden px-6 pb-16 pt-14 text-center"
+      variants={stepVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+    >
+      <motion.div
+        className="mb-6 max-w-2xl [@media(max-height:760px)]:mb-4"
+        variants={stepItemVariants}
+      >
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 [@media(max-height:760px)]:hidden">
+          <Icon className="h-6 w-6 text-primary" />
+        </div>
+        <h2 className="mb-2 text-3xl font-bold text-primary [@media(max-height:760px)]:text-2xl">
+          {title}
+        </h2>
+        {subtitle && (
+          <p className="text-base leading-relaxed text-muted-foreground [@media(max-height:760px)]:text-sm">
+            {subtitle}
+          </p>
+        )}
+      </motion.div>
+      <motion.div
+        className={`w-full ${wide ? "max-w-4xl" : "max-w-2xl"}`}
+        variants={stepItemVariants}
+      >
+        {children}
+      </motion.div>
+      {footer && (
+        <motion.div
+          className="mt-6 flex flex-col items-center gap-2 [@media(max-height:760px)]:mt-4"
+          variants={stepItemVariants}
+        >
+          {footer}
+        </motion.div>
+      )}
+    </motion.div>
+  );
+});
+
+function SetupProgress({ current, total, onBack, backDisabled, t }) {
+  const label = t("welcome.setup.stepOf", { current: current + 1, total });
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex items-center justify-center px-6 pb-5">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onBack}
+        disabled={backDisabled}
+        className="pointer-events-auto absolute left-6 text-muted-foreground hover:text-primary"
+      >
+        <ArrowLeft className="mr-1 h-4 w-4" />
+        {t("common.back")}
+      </Button>
+      <div
+        className="flex items-center gap-1.5"
+        role="progressbar"
+        aria-valuemin={1}
+        aria-valuemax={total}
+        aria-valuenow={current + 1}
+        aria-label={label}
+        title={label}
+      >
+        {Array.from({ length: total }, (_, index) => (
+          <div
+            key={index}
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              index === current
+                ? "w-6 bg-primary"
+                : index < current
+                  ? "w-1.5 bg-primary/50"
+                  : "w-1.5 bg-muted-foreground/25"
+            }`}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -285,6 +437,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [isV7Welcome, setIsV7Welcome] = useState(welcomeData?.isV7Welcome);
   // Restore step from navigation state if coming back from another page
   const [step, setStep] = useState(location.state?.welcomeStep || "language");
+  const [stepDirection, setStepDirection] = useState(1);
   const [selectedTheme, setSelectedTheme] = useState("purple");
   const [showingLightThemes, setShowingLightThemes] = useState(true);
   const [privacyChecked, setPrivacyChecked] = useState(false);
@@ -292,26 +445,21 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [termsChecked, setTermsChecked] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [showDepsAlert, setShowDepsAlert] = useState(false);
-  const [showSkipAlert, setShowSkipAlert] = useState(false);
-  const [showDepsErrorAlert, setShowDepsErrorAlert] = useState(false);
   const [showManualUpdateConfirm, setShowManualUpdateConfirm] = useState(false);
   const [downloadDirectory, setDownloadDirectory] = useState("");
+  const [freeSpace, setFreeSpace] = useState(null);
   const [protectLoading, setProtectLoading] = useState(false);
-  const [protectError, setProtectError] = useState("");
+  // Result of the last Defender exclusion attempt: { success, reason, error }
+  const [protectResult, setProtectResult] = useState(null);
   const [showNoDefenderWarning, setShowNoDefenderWarning] = useState(false);
-  const [dependencyStatus, setDependencyStatus] = useState({
-    ".NET Framework": { installed: false, icon: null },
-    DirectX: { installed: false, icon: null },
-    OpenAL: { installed: false, icon: null },
-    "Visual C++": { installed: false, icon: null },
-    "XNA Framework": { installed: false, icon: null },
-  });
+  const [dependencyStatus, setDependencyStatus] = useState(idleDependencyStatus);
+  // null until the user installs or skips: "installed" | "partial" | "skipped"
+  const [depsOutcome, setDepsOutcome] = useState(null);
+  const [failedDependencies, setFailedDependencies] = useState([]);
   const [warningMessage, setWarningMessage] = useState("");
+  // Linux/macOS: whether the Python step is done and the runner step is showing
   const [dependenciesInstalled, setDependenciesInstalled] = useState(false);
   const [progress, setProgress] = useState(0);
-  const totalDependencies = 5; // Total number of dependencies
-  const [errorMessage, setErrorMessage] = useState("");
-  const [showErrorDialog, setShowErrorDialog] = useState(false);
   // Set once the game index exists; pendingExit holds an exit waiting on the offline warning
   const indexReadyRef = useRef(false);
   const [pendingExit, setPendingExit] = useState(null);
@@ -321,6 +469,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [referralSource, setReferralSource] = useState("");
   const [customReferral, setCustomReferral] = useState("");
   const [referralSent, setReferralSent] = useState(false);
+  const [referralSending, setReferralSending] = useState(false);
   const [referralLink, setReferralLink] = useState("");
   const [customReferralError, setCustomReferralError] = useState("");
   const [referralLinkError, setReferralLinkError] = useState("");
@@ -337,112 +486,26 @@ const Welcome = ({ welcomeData, onComplete }) => {
   });
   const languagePromptRef = useRef(null);
 
-  const features = useMemo(
+  // Setup steps after the terms screen; drives navigation and the progress bar.
+  const setupSteps = useMemo(
     () => [
-      {
-        icon: <Download className="h-5 w-5" />,
-        title: t("welcome.automaticUpdatesTitle"),
-        description: t("welcome.automaticUpdatesDesc"),
-      },
-      {
-        icon: <Shield className="h-5 w-5" />,
-        title: t("welcome.securityPatchesTitle"),
-        description: t("welcome.securityPatchesDesc"),
-      },
-      {
-        icon: <Zap className="h-5 w-5" />,
-        title: t("welcome.bugFixesTitle"),
-        description: t("welcome.bugFixesDesc"),
-      },
+      "about",
+      "referral",
+      "directory",
+      ...(isOnWindows ? ["protectDirectories", "dependencies"] : ["linuxDeps"]),
+      "personalize",
+      "extras",
+      "finish",
     ],
-    [t]
+    [isOnWindows]
   );
+  const setupIndex = setupSteps.indexOf(step);
 
-  const ascendPremiumFeatures = useMemo(
-    () => [
-      {
-        icon: CloudIcon,
-        title: t("ascend.premium.cloudSync.title"),
-        desc: t("ascend.premium.cloudSync.description"),
-      },
-      {
-        icon: Users,
-        title: t("ascend.premium.friends.title"),
-        desc: t("ascend.premium.friends.description"),
-      },
-      {
-        icon: MessageCircle,
-        title: t("ascend.premium.chat.title"),
-        desc: t("ascend.premium.chat.description"),
-      },
-      {
-        icon: Smartphone,
-        title: t("ascend.premium.webView.title"),
-        desc: t("ascend.premium.webView.description"),
-      },
-      {
-        icon: CloudUpload,
-        title: t("ascend.premium.cloudBackups.title"),
-        desc: t("ascend.premium.cloudBackups.description"),
-      },
-      {
-        icon: Gamepad2,
-        title: t("ascend.premium.retroCloudSaves.title"),
-        desc: t("ascend.premium.retroCloudSaves.description"),
-      },
-      {
-        icon: User,
-        title: t("ascend.premium.profile.title"),
-        desc: t("ascend.premium.profile.description"),
-      },
-      {
-        icon: Trophy,
-        title: t("ascend.premium.leaderboard.title"),
-        desc: t("ascend.premium.leaderboard.description"),
-      },
-      {
-        icon: RefreshCw,
-        title: t("ascend.premium.autoUpdate.title"),
-        desc: t("ascend.premium.autoUpdate.description"),
-      },
-      {
-        icon: Eye,
-        title: t("ascend.premium.upcoming.title"),
-        desc: t("ascend.premium.upcoming.description"),
-      },
-      {
-        icon: Puzzle,
-        title: t("ascend.premium.nexusMods.title"),
-        desc: t("ascend.premium.nexusMods.description"),
-      },
-      {
-        icon: InfinityIcon,
-        title: t("ascend.premium.unlimitedDownloads.title"),
-        desc: t("ascend.premium.unlimitedDownloads.description"),
-      },
-      {
-        icon: Zap,
-        title: t("ascend.premium.flingTrainer.title"),
-        desc: t("ascend.premium.flingTrainer.description"),
-      },
-      {
-        icon: ListOrdered,
-        title: t("ascend.premium.downloadQueue.title"),
-        desc: t("ascend.premium.downloadQueue.description"),
-      },
-      {
-        icon: Sparkles,
-        title: t("ascend.premium.experimentalBranch.title"),
-        desc: t("ascend.premium.experimentalBranch.description"),
-      },
-      {
-        icon: Sparkle,
-        title: t("ascend.premium.moreComing.title"),
-        desc: t("ascend.premium.moreComing.description"),
-      },
-    ],
-    [t]
-  );
+  const protectReasonKey = ["cancelled", "defenderUnavailable", "blocked"].includes(
+    protectResult?.reason
+  )
+    ? protectResult.reason
+    : "failed";
 
   const v7Features = useMemo(
     () => [
@@ -547,46 +610,16 @@ const Welcome = ({ welcomeData, onComplete }) => {
 
   useEffect(() => {
     const handleDependencyStatus = (event, { name, status }) => {
-      const label = executableToLabelMap[name]?.(t);
-      if (!label) return;
-
-      console.log(`Received status for ${label}: ${status}`);
+      const dep = dependencyByFile[name];
+      if (!dep) return;
 
       if (status === "starting") {
-        console.log(`Starting installation of: ${label}`);
-        setDependencyStatus(prevStatus => ({
-          ...prevStatus,
-          [label]: {
-            installed: false,
-            icon: <Loader className="h-5 w-5 animate-spin" />,
-          },
-        }));
-      } else if (status === "finished") {
-        console.log(`Finished installing: ${label}`);
-        setProgress(prev => Math.min(prev + 1, totalDependencies));
-        setDependencyStatus(prevStatus => {
-          const updatedStatus = {
-            ...prevStatus,
-            [label]: {
-              installed: true,
-              icon: <CircleCheck className="h-5 w-5 text-green-500" />,
-            },
-          };
-          const allInstalled = Object.values(updatedStatus).every(dep => dep.installed);
-          if (allInstalled) {
-            setDependenciesInstalled(true);
-          }
-          console.log("Updated dependency status:", updatedStatus);
-          return updatedStatus;
-        });
-      } else if (status === "failed") {
-        console.error(`Failed to install: ${label}`);
-        setDependencyStatus(prevStatus => ({
-          ...prevStatus,
-          [label]: {
-            installed: false,
-            icon: <XCircle className="h-5 w-5 text-red-500" />,
-          },
+        setDependencyStatus(prev => ({ ...prev, [dep.name]: "installing" }));
+      } else if (status === "finished" || status === "failed") {
+        setProgress(prev => Math.min(prev + 1, DEPENDENCIES.length));
+        setDependencyStatus(prev => ({
+          ...prev,
+          [dep.name]: status === "finished" ? "done" : "failed",
         }));
       }
     };
@@ -597,88 +630,74 @@ const Welcome = ({ welcomeData, onComplete }) => {
     return () => {
       unsubscribe();
     };
-  }, [t]);
+  }, []);
+
+  const goToStep = (nextStep, direction) => {
+    setStepDirection(direction);
+    setStep(nextStep);
+  };
 
   const handleNext = () => {
     if (step === "language") {
-      setStep("welcome");
+      goToStep("welcome", 1);
     } else if (step === "welcome") {
-      setStep("noticeAppIsFree");
-    } else if (step === "noticeAppIsFree") {
-      setStep("extension");
-    } else if (step === "extension") {
-      setStep("referral");
-    } else if (step === "referral") {
-      setStep("directory");
-    } else if (step === "directory") {
-      setStep(isOnWindows ? "protectDirectories" : "theme");
-    } else if (step === "protectDirectories") {
-      setStep("theme");
-    } else if (step === "theme") {
-      setStep("importGames");
-    } else if (step === "importGames") {
-      setStep("updates");
-    } else if (step === "updates") {
-      setStep(isOnWindows ? "dependencies" : "linuxDeps");
-    } else if (step === "linuxDeps") {
-      setStep("dependencies");
-    } else if (step === "dependencies") {
-      handleExit(true);
+      goToStep(setupSteps[0], 1);
+    } else if (setupIndex >= 0 && setupIndex < setupSteps.length - 1) {
+      goToStep(setupSteps[setupIndex + 1], 1);
     }
+  };
+
+  const handleBack = () => {
+    goToStep(setupIndex > 0 ? setupSteps[setupIndex - 1] : "welcome", -1);
   };
 
   const handleInstallDependencies = async () => {
     if (isInstalling) return;
-    setDependenciesInstalled(false);
-    setShowErrorDialog(false);
     setIsInstalling(true);
     setProgress(0);
-
-    // Set all dependencies to loading state
-    setDependencyStatus(prevStatus => {
-      const updatedStatus = { ...prevStatus };
-      Object.keys(updatedStatus).forEach(dep => {
-        updatedStatus[dep] = {
-          installed: false,
-          icon: <Loader className="h-5 w-5 animate-spin" />,
-        };
-      });
-      return updatedStatus;
-    });
+    setFailedDependencies([]);
+    setDependencyStatus(idleDependencyStatus());
 
     try {
       const result = await window.electron.installDependencies();
+      const failed = (result?.failed || [])
+        .map(file => dependencyByFile[file]?.name)
+        .filter(Boolean);
+      setFailedDependencies(failed);
+      setDepsOutcome(result?.success ? "installed" : "partial");
       if (!result?.success) {
-        throw new Error(result?.message || t("welcome.failedToInstallDependencies"));
+        console.error("Some dependencies failed to install:", result?.message);
       }
-      setDependenciesInstalled(true);
-      setStep("installationComplete");
     } catch (error) {
       console.error("Failed to install dependencies:", error);
-      setErrorMessage(t("welcome.failedToInstallDependencies"));
-      setShowErrorDialog(true);
+      setDepsOutcome("partial");
     } finally {
       setIsInstalling(false);
-      // Clear pending spinners after download errors or unsuccessful installers.
-      setDependencyStatus(prevStatus =>
+      // Anything still marked installing never reported back (e.g. the download failed).
+      setDependencyStatus(prev =>
         Object.fromEntries(
-          Object.entries(prevStatus).map(([name, status]) => [
+          Object.entries(prev).map(([name, status]) => [
             name,
-            status.installed ? status : { ...status, icon: null },
+            status === "installing" ? "idle" : status,
           ])
         )
       );
     }
   };
 
-  const handleRestart = () => {
-    setShowErrorDialog(false);
-    handleInstallDependencies();
-  };
-
-  const handleSkip = () => {
-    setShowErrorDialog(false);
-    setShowSkipAlert(true);
+  const checkDirectorySpace = async directory => {
+    try {
+      const { freeSpace: bytes } = await window.electron.getDriveSpace(directory);
+      setFreeSpace(bytes);
+      setWarningMessage(
+        bytes < LOW_SPACE_BYTES
+          ? t("welcome.setup.directory.lowSpace", { size: formatGigabytes(bytes) })
+          : ""
+      );
+    } catch (error) {
+      console.error("Failed to check drive space:", error);
+      setFreeSpace(null);
+    }
   };
 
   const handleSelectDirectory = async () => {
@@ -688,57 +707,81 @@ const Welcome = ({ welcomeData, onComplete }) => {
     }
     const canCreateFiles = await window.electron.canCreateFiles(directory);
     if (!canCreateFiles) {
+      setFreeSpace(null);
       setWarningMessage(t("welcome.cannotWriteWarning"));
       return;
     }
-    if (directory) {
-      setDownloadDirectory(directory);
-      const { freeSpace } = await window.electron.getDriveSpace(directory);
-      if (freeSpace < 40 * 1024 * 1024 * 1024) {
-        setWarningMessage(t("welcome.notEnoughSpaceWarning"));
-      } else {
-        setWarningMessage("");
+
+    setDownloadDirectory(directory);
+    // A new folder needs its own Defender exclusion
+    setProtectResult(null);
+    await checkDirectorySpace(directory);
+
+    try {
+      // Update only the download directory while preserving other settings
+      const currentSettings = await window.electron.getSettings();
+      const result = await window.electron.saveSettings(
+        { ...currentSettings, downloadDirectory: directory },
+        directory
+      );
+      if (!result) {
+        console.error("Failed to save settings");
+        setWarningMessage(t("welcome.setup.directory.saveFailed"));
       }
-
-      try {
-        // Get current settings first
-        const currentSettings = await window.electron.getSettings();
-
-        // Update only the download directory while preserving others
-        const updatedSettings = {
-          ...currentSettings,
-          downloadDirectory: directory,
-        };
-
-        const result = await window.electron.saveSettings(updatedSettings, directory);
-
-        if (!result) {
-          console.error("Failed to save settings");
-          setWarningMessage("Failed to save download directory. Please try again.");
-        }
-      } catch (error) {
-        console.error("Error saving settings:", error);
-        setWarningMessage("An error occurred while saving the download directory.");
-      }
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      setWarningMessage(t("welcome.setup.directory.saveFailed"));
     }
   };
 
   const handleEnableProtection = async () => {
     setProtectLoading(true);
-    setProtectError("");
     try {
       const result = await window.electron.folderExclusion(true);
-      if (result && result.success) {
-        handleNext();
-      } else {
-        setProtectError(result?.error || t("welcome.protectDirectoriesFailed"));
-      }
+      setProtectResult(result || { success: false, reason: "failed" });
     } catch (error) {
       console.error("Failed to enable directory protection:", error);
-      setProtectError(t("welcome.protectDirectoriesFailed"));
+      setProtectResult({ success: false, reason: "failed", error: error.message });
     } finally {
       setProtectLoading(false);
     }
+  };
+
+  const handleReferralContinue = async () => {
+    // Only report once, even if the user comes back to this step
+    if (referralSending) return;
+    const sourceToSend =
+      referralSource === "other" ? customReferral || "other" : referralSource;
+    if (sourceToSend && !referralSent) {
+      setReferralSending(true);
+      try {
+        const authHeaders = await window.electron.getAuthHeaders();
+        const tokenResponse = await fetch("https://api.ascendara.app/auth/token", {
+          headers: authHeaders,
+        });
+
+        if (tokenResponse.ok) {
+          const { token } = await tokenResponse.json();
+          const payload = { source: sourceToSend };
+          if (referralLink) {
+            payload.link = referralLink;
+          }
+          await fetch("https://api.ascendara.app/app/downloadedfrom", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+          });
+        }
+      } catch (error) {
+        console.error("Failed to send referral source:", error);
+      }
+      setReferralSent(true);
+      setReferralSending(false);
+    }
+    handleNext();
   };
 
   const containerVariants = {
@@ -776,25 +819,23 @@ const Welcome = ({ welcomeData, onComplete }) => {
     onComplete(showTour);
   };
 
-  const handleUpdateChoice = async enableAutoUpdate => {
+  const saveAutoUpdate = async enableAutoUpdate => {
+    setAutoUpdate(enableAutoUpdate);
     try {
       const currentSettings = await window.electron.getSettings();
-
-      const updatedSettings = {
-        ...currentSettings,
-        autoUpdate: enableAutoUpdate,
-      };
-
       await window.electron.saveSettings(
-        updatedSettings,
+        { ...currentSettings, autoUpdate: enableAutoUpdate },
         currentSettings.downloadDirectory || ""
       );
-
-      setAutoUpdate(enableAutoUpdate);
-      handleNext();
     } catch (error) {
       console.error("Error saving auto-update preference:", error);
     }
+  };
+
+  // Turning updates off asks for confirmation first
+  const handleAutoUpdateToggle = enableAutoUpdate => {
+    if (enableAutoUpdate) saveAutoUpdate(true);
+    else setShowManualUpdateConfirm(true);
   };
 
   const handleLanguageSelect = useCallback(
@@ -881,6 +922,20 @@ const Welcome = ({ welcomeData, onComplete }) => {
       }
     };
     checkPlatform().catch(error => setSetupError(error.message));
+  }, []);
+
+  // Pick up a download folder chosen before an interrupted setup
+  useEffect(() => {
+    window.electron
+      .getSettings()
+      .then(current => {
+        if (current?.downloadDirectory) {
+          setDownloadDirectory(current.downloadDirectory);
+          checkDirectorySpace(current.downloadDirectory);
+        }
+      })
+      .catch(error => console.error("Failed to load saved download folder:", error));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Signal to other parts of the app (e.g. AutomaticIndexRefresher in app.jsx)
@@ -1130,17 +1185,17 @@ const Welcome = ({ welcomeData, onComplete }) => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("welcome.noDefenderWarningTitle")}
+              {t("welcome.setup.protect.skipDialog.title")}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>{t("welcome.noDefenderWarningDesc")}</p>
+                <p>{t("welcome.setup.protect.skipDialog.desc")}</p>
                 <ul className="list-disc space-y-1 pl-5">
                   <li>{t("welcome.noDefenderWarningCorrupted")}</li>
                   <li>{t("welcome.noDefenderWarningDeleted")}</li>
                   <li>{t("welcome.noDefenderWarningFailed")}</li>
                 </ul>
-                <p>{t("welcome.noDefenderWarningAdvice")}</p>
+                <p>{t("welcome.setup.protect.skipDialog.advice")}</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1155,34 +1210,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 handleNext();
               }}
             >
-              {t("welcome.noDefenderWarningConfirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={showSkipAlert} onOpenChange={setShowSkipAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("welcome.skipDependencies")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("welcome.areYouSureYouWantToSkip")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="text-primary">
-              {t("welcome.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-primary text-secondary"
-              onClick={async () => {
-                setShowSkipAlert(false);
-                handleExit(true);
-              }}
-            >
-              {t("welcome.continue")}
+              {t("welcome.setup.protect.skipDialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1238,7 +1266,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
               className="bg-primary text-secondary hover:bg-primary/90"
               onClick={() => {
                 setShowManualUpdateConfirm(false);
-                handleUpdateChoice(true);
+                saveAutoUpdate(true);
               }}
             >
               {t("welcome.manualUpdateConfirm.keepAuto")}
@@ -1247,53 +1275,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
               className="bg-transparent text-muted-foreground hover:bg-muted"
               onClick={() => {
                 setShowManualUpdateConfirm(false);
-                handleUpdateChoice(false);
+                saveAutoUpdate(false);
               }}
             >
               {t("welcome.manualUpdateConfirm.disableAnyway")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={showDepsErrorAlert} onOpenChange={setShowDepsErrorAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("welcome.installationFailed")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("welcome.failedToInstallDependencies")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction
-              className="bg-primary text-secondary"
-              onClick={() => setShowDepsErrorAlert(false)}
-            >
-              {t("welcome.okay")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("welcome.errorInstallingDependencies")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="text-primary" onClick={handleSkip}>
-              {t("welcome.skip")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-primary text-secondary"
-              onClick={handleRestart}
-            >
-              {t("welcome.retryDependencies", "Try again")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1304,1753 +1289,1581 @@ const Welcome = ({ welcomeData, onComplete }) => {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-background" />
         <div className="absolute left-0 top-0 h-32 w-full bg-gradient-to-b from-primary/10 to-transparent" />
 
-        <AnimatePresence mode="wait">
-          {step === "welcome" && (
-            <motion.div
-              key="welcome"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <motion.div
-                className="mb-8 flex items-center justify-center"
-                variants={itemVariants}
-              >
-                <h1 className="text-6xl font-bold">
-                  <div className="relative inline-flex items-center">
-                    <span className="bg-gradient-to-r from-primary to-primary/50 bg-clip-text text-transparent">
-                      {t("welcome.welcomeTo")}&nbsp;
-                    </span>
-                    <span className="relative">
-                      <span className="inline-block animate-shine bg-[linear-gradient(110deg,var(--shine-from),45%,var(--shine-via),55%,var(--shine-to))] bg-[length:200%_100%] bg-clip-text text-transparent">
-                        Ascendara
-                      </span>
-                    </span>
-                  </div>
-                </h1>
-              </motion.div>
-              <motion.p
-                className="mb-12 max-w-4xl text-xl text-foreground/80"
-                variants={itemVariants}
-              >
-                {t("welcome.welcomeToAscendaraDescription2")}
-              </motion.p>
+        {setupIndex >= 0 && (
+          <SetupProgress
+            current={setupIndex}
+            total={setupSteps.length}
+            onBack={handleBack}
+            backDisabled={isInstalling || protectLoading || isExiting}
+            t={t}
+          />
+        )}
 
-              <motion.div className="mb-12 max-w-xl space-y-6" variants={itemVariants}>
-                <div>
-                  <div
-                    className="flex cursor-pointer items-center space-x-3 rounded-lg p-4 transition-colors hover:bg-card/50"
-                    onClick={() => setTermsChecked(checked => !checked)}
-                  >
-                    <Checkbox
-                      id="terms"
-                      checked={termsChecked}
-                      onClick={event => event.stopPropagation()}
-                      onCheckedChange={setTermsChecked}
-                      className="data-[state=checked]:text-primary-foreground data-[state=checked]:bg-primary"
-                    />
-                    <div className="text-base">
-                      <span className="inline">{t("welcome.iHaveReadAndAgreeTo")} </span>
-                      <button
-                        type="button"
-                        onClick={e => {
-                          e.stopPropagation();
-                          window.electron.openURL("https://ascendara.app/terms");
-                        }}
-                        className="inline text-primary hover:underline"
-                      >
-                        {t("welcome.termsOfService")}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div
-                    className="flex cursor-pointer items-center space-x-3 rounded-lg p-4 transition-colors hover:bg-card/50"
-                    onClick={() => setPrivacyChecked(checked => !checked)}
-                  >
-                    <Checkbox
-                      id="privacy"
-                      checked={privacyChecked}
-                      onClick={event => event.stopPropagation()}
-                      onCheckedChange={setPrivacyChecked}
-                      className="data-[state=checked]:text-primary-foreground data-[state=checked]:bg-primary"
-                    />
-                    <div className="text-base">
-                      <span className="inline">{t("welcome.iHaveReadAndAgreeTo")} </span>
-                      <button
-                        type="button"
-                        onClick={e => {
-                          e.stopPropagation();
-                          window.electron.openURL("https://ascendara.app/privacy");
-                        }}
-                        className="inline text-primary hover:underline"
-                      >
-                        {t("welcome.privacyPolicy")}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div variants={itemVariants}>
-                <Button
-                  size="lg"
-                  onClick={handleNext}
-                  disabled={!privacyChecked || !termsChecked}
-                  className="px-8 py-6 text-lg font-semibold text-secondary"
-                >
-                  {t("welcome.getStarted")}
-                </Button>
-              </motion.div>
-            </motion.div>
-          )}
-
-          {step === "language" && (
-            <motion.div
-              key="language"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-background to-background/80 p-8 text-center"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <motion.div className="mb-12 text-center" variants={itemVariants}>
-                <h1 className="mb-4 grid min-h-[1.5em] items-center text-4xl font-bold text-foreground/80">
-                  <span
-                    ref={languagePromptRef}
-                    className="col-start-1 row-start-1 block leading-normal"
-                    lang={langPreferenceMessages[0].lang}
-                    dir="auto"
-                  >
-                    {langPreferenceMessages[0].text}
-                  </span>
-                </h1>
-              </motion.div>
-
-              <motion.div
-                className="mb-12 grid w-full max-w-5xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
-                variants={itemVariants}
-              >
-                {SUPPORTED_LANGUAGES.map(lang => (
-                  <motion.button
-                    key={lang.id}
-                    onClick={() => handleLanguageSelect(lang.id)}
-                    className={`flex items-center space-x-4 rounded-2xl p-6 transition-all duration-300 ${
-                      language === lang.id
-                        ? "scale-105 border-2 border-primary bg-gradient-to-br from-primary/15 via-primary/10 to-transparent shadow-lg shadow-primary/10"
-                        : "hover:scale-102 border border-primary/10 bg-card/40 hover:border-primary/30 hover:bg-card/60"
-                    }`}
-                    whileHover={{ scale: language === lang.id ? 1.05 : 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <div className="text-3xl">{lang.icon}</div>
-                    <span className="text-xl font-medium">{lang.name}</span>
-                  </motion.button>
-                ))}
-              </motion.div>
-
-              <motion.div className="flex justify-center" variants={itemVariants}>
-                <Button
-                  size="lg"
-                  className="w-full bg-primary text-secondary hover:bg-primary/90"
-                  onClick={handleNext}
-                  disabled={!language}
-                >
-                  {t("welcome.next")}
-                </Button>
-              </motion.div>
-
-              <motion.p
-                className="mt-6 text-sm text-muted-foreground"
-                variants={itemVariants}
-              >
-                {t("welcome.youCanChangeThisLater")}&nbsp;
-                <a
-                  className="cursor-pointer hover:underline"
-                  onClick={() => navigate("/extralanguages")}
-                >
-                  {t("welcome.seeEntireList")}
-                  <ArrowRight className="ml-1 inline-block h-3 w-3" />
-                </a>
-              </motion.p>
-            </motion.div>
-          )}
-
-          {step === "noticeAppIsFree" && (
-            <motion.div
-              key="noticeAppIsFree"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <motion.div className="mb-4 text-center" variants={itemVariants}>
-                <WelcomeStepIcon icon={Shield} />
-                <h2 className="mb-2 text-3xl font-bold text-primary">
-                  {t("welcome.noticeAppIsFree.title")}
-                </h2>
-                <p className="text-lg text-muted-foreground">
-                  {t("welcome.noticeAppIsFree.subtitle")}
-                </p>
-              </motion.div>
-
-              <motion.div className="mb-6 w-full max-w-2xl" variants={itemVariants}>
-                <div className="space-y-3 rounded-lg bg-card/30 p-6">
-                  <div className="flex items-start space-x-3 text-left">
-                    <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
-                    <p className="text-md">{t("welcome.noticeAppIsFree.point1")}</p>
-                  </div>
-                  <div className="flex items-start space-x-3 text-left">
-                    <CircleCheck className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
-                    <p>{t("welcome.noticeAppIsFree.point2")}</p>
-                  </div>
-                  <div className="flex items-start space-x-3 text-left">
-                    <Crown className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
-                    <p>{t("welcome.noticeAppIsFree.point3")}</p>
-                  </div>
-                  <div className="flex items-start space-x-3 text-left">
-                    <Shield className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
-                    <p className="text-md">{t("welcome.noticeAppIsFree.point4")}</p>
-                  </div>
-                </div>
-
+        <MotionConfig reducedMotion="user">
+          <StepDirectionContext.Provider value={stepDirection}>
+            <AnimatePresence mode="popLayout" custom={stepDirection}>
+              {step === "welcome" && (
                 <motion.div
-                  className="mt-4 rounded-lg border border-purple-500/30 bg-gradient-to-r from-purple-500/10 to-blue-500/10 p-6"
-                  variants={itemVariants}
+                  key="welcome"
+                  className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="text-left">
-                      <h4 className="mb-2 text-lg font-semibold text-purple-500">
-                        {t("welcome.noticeAppIsFree.ascendTitle")}
-                      </h4>
-                      <p className="mb-3 text-sm text-muted-foreground">
-                        {t("welcome.noticeAppIsFree.ascendDescription")}
-                      </p>
-                      <a
-                        href="https://ascendara.app/ascend"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-2 text-purple-500 transition-colors hover:text-purple-400"
-                      >
-                        <span className="text-sm font-medium">
-                          {t("welcome.noticeAppIsFree.learnMore")}
+                  <motion.div
+                    className="mb-8 flex items-center justify-center"
+                    variants={itemVariants}
+                  >
+                    <h1 className="text-6xl font-bold">
+                      <div className="relative inline-flex items-center">
+                        <span className="bg-gradient-to-r from-primary to-primary/50 bg-clip-text text-transparent">
+                          {t("welcome.welcomeTo")}&nbsp;
                         </span>
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    </div>
-                    <Crown className="h-8 w-8 text-purple-500/50" />
-                  </div>
-
-                  <div
-                    className="group relative mt-4 h-32 overflow-hidden rounded-lg border border-purple-500/20 bg-background/40"
-                    style={{
-                      maskImage:
-                        "linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)",
-                      WebkitMaskImage:
-                        "linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)",
-                    }}
+                        <span className="relative">
+                          <span className="inline-block animate-shine bg-[linear-gradient(110deg,var(--shine-from),45%,var(--shine-via),55%,var(--shine-to))] bg-[length:200%_100%] bg-clip-text text-transparent">
+                            Ascendara
+                          </span>
+                        </span>
+                      </div>
+                    </h1>
+                  </motion.div>
+                  <motion.p
+                    className="mb-12 max-w-4xl text-xl text-foreground/80"
+                    variants={itemVariants}
                   >
-                    <div className="flex animate-marquee-vertical flex-col group-hover:[animation-play-state:paused]">
-                      {[...ascendPremiumFeatures, ...ascendPremiumFeatures].map(
-                        (feature, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center gap-3 px-4 py-2.5 text-left"
+                    {t("welcome.welcomeToAscendaraDescription2")}
+                  </motion.p>
+
+                  <motion.div
+                    className="mb-12 max-w-xl space-y-6"
+                    variants={itemVariants}
+                  >
+                    <div>
+                      <div
+                        className="flex cursor-pointer items-center space-x-3 rounded-lg p-4 transition-colors hover:bg-card/50"
+                        onClick={() => setTermsChecked(checked => !checked)}
+                      >
+                        <Checkbox
+                          id="terms"
+                          checked={termsChecked}
+                          onClick={event => event.stopPropagation()}
+                          onCheckedChange={setTermsChecked}
+                          className="data-[state=checked]:text-primary-foreground data-[state=checked]:bg-primary"
+                        />
+                        <div className="text-base">
+                          <span className="inline">
+                            {t("welcome.iHaveReadAndAgreeTo")}{" "}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation();
+                              window.electron.openURL("https://ascendara.app/terms");
+                            }}
+                            className="inline text-primary hover:underline"
                           >
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-purple-500/10">
-                              <feature.icon className="h-4 w-4 text-purple-500" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium">{feature.title}</p>
-                              <p className="truncate text-xs text-muted-foreground">
-                                {feature.desc}
-                              </p>
-                            </div>
-                          </div>
-                        )
-                      )}
+                            {t("welcome.termsOfService")}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div
+                        className="flex cursor-pointer items-center space-x-3 rounded-lg p-4 transition-colors hover:bg-card/50"
+                        onClick={() => setPrivacyChecked(checked => !checked)}
+                      >
+                        <Checkbox
+                          id="privacy"
+                          checked={privacyChecked}
+                          onClick={event => event.stopPropagation()}
+                          onCheckedChange={setPrivacyChecked}
+                          className="data-[state=checked]:text-primary-foreground data-[state=checked]:bg-primary"
+                        />
+                        <div className="text-base">
+                          <span className="inline">
+                            {t("welcome.iHaveReadAndAgreeTo")}{" "}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation();
+                              window.electron.openURL("https://ascendara.app/privacy");
+                            }}
+                            className="inline text-primary hover:underline"
+                          >
+                            {t("welcome.privacyPolicy")}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              </motion.div>
-
-              <motion.div variants={itemVariants}>
-                <Button
-                  size="lg"
-                  onClick={handleNext}
-                  className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
-                >
-                  {t("welcome.okay")}
-                </Button>
-              </motion.div>
-            </motion.div>
-          )}
-
-          {step === "referral" && (
-            <motion.div
-              key="referral"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <motion.div className="mb-8 text-center" variants={itemVariants}>
-                <WelcomeStepIcon icon={Users} />
-                <h2 className="mb-2 text-3xl font-bold text-primary">
-                  {t("welcome.referral.title")}
-                </h2>
-                <p className="text-lg text-muted-foreground">
-                  {t("welcome.referral.subtitle")}
-                </p>
-              </motion.div>
-
-              <motion.div
-                className="mb-8 w-full max-w-2xl space-y-4"
-                variants={itemVariants}
-              >
-                {referralSource === "friend" && (
-                  <motion.div
-                    className="mb-4 rounded-lg border-2 border-primary bg-primary/5 p-4 text-center"
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <p className="text-sm font-medium text-primary">
-                      {t("welcome.referral.friendThankYou")}
-                    </p>
                   </motion.div>
-                )}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {[
-                    "friend",
-                    "tiktok",
-                    "reddit",
-                    "instagram",
-                    "google",
-                    "discord",
-                    "fmhy",
-                    "other",
-                    "notsay",
-                  ].map(source => (
-                    <motion.button
-                      key={source}
-                      onClick={() => setReferralSource(source)}
-                      className={`flex flex-col items-center justify-center rounded-lg border-2 p-4 transition-all ${
-                        referralSource === source
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50 hover:bg-accent/50"
-                      }`}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      animate={
-                        source === "friend" && referralSource === "friend"
-                          ? {
-                              boxShadow: [
-                                "0 0 0 0 rgba(var(--primary), 0)",
-                                "0 0 0 8px rgba(var(--primary), 0.2)",
-                                "0 0 0 0 rgba(var(--primary), 0)",
-                              ],
-                            }
-                          : {}
-                      }
-                      transition={
-                        source === "friend" && referralSource === "friend"
-                          ? {
-                              boxShadow: {
-                                duration: 1.5,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                              },
-                            }
-                          : {}
-                      }
+
+                  <motion.div variants={itemVariants}>
+                    <Button
+                      size="lg"
+                      onClick={handleNext}
+                      disabled={!privacyChecked || !termsChecked}
+                      className="px-8 py-6 text-lg font-semibold text-secondary"
                     >
-                      <span className="text-sm font-medium">
-                        {t(`welcome.referral.sources.${source}`)}
+                      {t("welcome.getStarted")}
+                    </Button>
+                  </motion.div>
+                </motion.div>
+              )}
+
+              {step === "language" && (
+                <motion.div
+                  key="language"
+                  className="relative z-10 flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-background to-background/80 p-8 text-center"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                >
+                  <motion.div className="mb-12 text-center" variants={itemVariants}>
+                    <h1 className="mb-4 grid min-h-[1.5em] items-center text-4xl font-bold text-foreground/80">
+                      <span
+                        ref={languagePromptRef}
+                        className="col-start-1 row-start-1 block leading-normal"
+                        lang={langPreferenceMessages[0].lang}
+                        dir="auto"
+                      >
+                        {langPreferenceMessages[0].text}
                       </span>
-                    </motion.button>
-                  ))}
-                </div>
-
-                {referralSource === "other" && (
-                  <motion.div
-                    className="mt-4 space-y-2"
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Input
-                      type="text"
-                      placeholder={t("welcome.referral.otherPlaceholder")}
-                      className={`w-full ${customReferralError ? "border-red-500" : ""}`}
-                      value={customReferral}
-                      onChange={async e => {
-                        const value = e.target.value;
-                        setCustomReferral(value);
-                        if (value) {
-                          const validation = await validateInput(value);
-                          if (!validation.valid) {
-                            setCustomReferralError(validation.error);
-                          } else {
-                            setCustomReferralError("");
-                          }
-                        } else {
-                          setCustomReferralError("");
-                        }
-                      }}
-                    />
-                    {customReferralError && (
-                      <p className="text-sm text-red-500">{customReferralError}</p>
-                    )}
+                    </h1>
                   </motion.div>
-                )}
 
-                {[
-                  "tiktok",
-                  "reddit",
-                  "instagram",
-                  "google",
-                  "discord",
-                  "fmhy",
-                  "other",
-                ].includes(referralSource) && (
                   <motion.div
-                    className="mt-4 space-y-2"
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
+                    className="mb-12 grid w-full max-w-5xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+                    variants={itemVariants}
                   >
-                    <Input
-                      type="text"
-                      placeholder={
-                        t("welcome.referral.linkPlaceholder") ||
-                        "Where did you find Ascendara? (optional)"
-                      }
-                      className={`w-full ${referralLinkError ? "border-red-500" : ""}`}
-                      value={referralLink}
-                      onChange={async e => {
-                        const value = e.target.value;
-                        setReferralLink(value);
-                        if (value) {
-                          const validation = await validateInput(value);
-                          if (!validation.valid) {
-                            setReferralLinkError(validation.error);
-                          } else {
-                            setReferralLinkError("");
-                          }
-                        } else {
-                          setReferralLinkError("");
-                        }
-                      }}
-                    />
-                    {referralLinkError && (
-                      <p className="text-sm text-red-500">{referralLinkError}</p>
-                    )}
+                    {SUPPORTED_LANGUAGES.map(lang => (
+                      <motion.button
+                        key={lang.id}
+                        onClick={() => handleLanguageSelect(lang.id)}
+                        className={`flex items-center space-x-4 rounded-2xl p-6 transition-all duration-300 ${
+                          language === lang.id
+                            ? "scale-105 border-2 border-primary bg-gradient-to-br from-primary/15 via-primary/10 to-transparent shadow-lg shadow-primary/10"
+                            : "hover:scale-102 border border-primary/10 bg-card/40 hover:border-primary/30 hover:bg-card/60"
+                        }`}
+                        whileHover={{ scale: language === lang.id ? 1.05 : 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <div className="text-3xl">{lang.icon}</div>
+                        <span className="text-xl font-medium">{lang.name}</span>
+                      </motion.button>
+                    ))}
                   </motion.div>
-                )}
-              </motion.div>
 
-              <motion.div
-                className="flex w-full max-w-2xl justify-center"
-                variants={itemVariants}
-              >
-                <Button
-                  onClick={async () => {
-                    // Prevent double submission
-                    if (referralSent) {
-                      handleNext();
-                      return;
-                    }
-                    setReferralSent(true);
+                  <motion.div className="flex justify-center" variants={itemVariants}>
+                    <Button
+                      size="lg"
+                      className="w-full bg-primary text-secondary hover:bg-primary/90"
+                      onClick={handleNext}
+                      disabled={!language}
+                    >
+                      {t("welcome.next")}
+                    </Button>
+                  </motion.div>
 
-                    // Send referral source to API
-                    const sourceToSend =
-                      referralSource === "other"
-                        ? customReferral || "other"
-                        : referralSource;
-                    if (sourceToSend) {
-                      try {
-                        const authHeaders = await window.electron.getAuthHeaders();
-                        const tokenResponse = await fetch(
-                          "https://api.ascendara.app/auth/token",
-                          {
-                            headers: authHeaders,
-                          }
-                        );
+                  <motion.p
+                    className="mt-6 text-sm text-muted-foreground"
+                    variants={itemVariants}
+                  >
+                    {t("welcome.youCanChangeThisLater")}&nbsp;
+                    <a
+                      className="cursor-pointer hover:underline"
+                      onClick={() => navigate("/extralanguages")}
+                    >
+                      {t("welcome.seeEntireList")}
+                      <ArrowRight className="ml-1 inline-block h-3 w-3" />
+                    </a>
+                  </motion.p>
+                </motion.div>
+              )}
 
-                        if (tokenResponse.ok) {
-                          const { token } = await tokenResponse.json();
-                          const payload = { source: sourceToSend };
-                          if (referralLink) {
-                            payload.link = referralLink;
-                          }
-                          await fetch("https://api.ascendara.app/app/downloadedfrom", {
-                            method: "POST",
-                            headers: {
-                              "Content-Type": "application/json",
-                              Authorization: `Bearer ${token}`,
-                            },
-                            body: JSON.stringify(payload),
-                          });
-                        }
-                      } catch (error) {
-                        console.error("Failed to send referral source:", error);
-                      }
-                    }
-                    handleNext();
-                  }}
-                  className="bg-primary px-8 py-6 text-base font-semibold text-secondary hover:bg-primary/90"
-                  disabled={
-                    referralSent ||
-                    !referralSource ||
-                    (referralSource === "other" && !customReferral) ||
-                    customReferralError ||
-                    referralLinkError
+              {step === "about" && (
+                <SetupStep
+                  key="about"
+                  icon={Sparkles}
+                  title={t("welcome.setup.about.title")}
+                  subtitle={t("welcome.setup.about.subtitle")}
+                  wide
+                  footer={
+                    <Button size="lg" onClick={handleNext} className={primaryButtonClass}>
+                      {t("welcome.continue")}
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
                   }
                 >
-                  {t("welcome.next")}
-                </Button>
-              </motion.div>
-            </motion.div>
-          )}
-
-          {step === "directory" && (
-            <motion.div
-              key="directory"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <motion.div className="mb-8 text-center" variants={itemVariants}>
-                <WelcomeStepIcon icon={FolderDownIcon} />
-                <h2 className="mb-2 text-3xl font-bold text-primary">
-                  {t("welcome.chooseDownloadLocation")}
-                </h2>
-                <p className="text-lg text-muted-foreground">
-                  {t("welcome.selectWhereYouWantYourGamesToBeDownloaded")}
-                </p>
-              </motion.div>
-              <motion.div
-                className="mb-12 max-w-2xl space-y-6 rounded-lg bg-card/30 p-6"
-                variants={itemVariants}
-              >
-                <div className="flex items-center space-x-4">
-                  <input
-                    type="text"
-                    value={downloadDirectory}
-                    readOnly
-                    placeholder={t("welcome.selectADirectory")}
-                    className="text-primary-foreground flex-1 rounded-lg border border-primary/10 bg-background/50 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                  />
-                  <Button className="text-secondary" onClick={handleSelectDirectory}>
-                    {t("welcome.browse")}
-                  </Button>
-                </div>
-
-                {warningMessage && (
-                  <p className="text-sm text-red-500">{warningMessage}</p>
-                )}
-
-                <div className="mt-6 space-y-4 text-left">
-                  <div className="flex items-start space-x-3">
-                    <PackageOpen className="mt-1 h-5 w-5 text-primary" />
-                    <p>{t("welcome.thisIsWhereAllYourDownloadedGamesWillBeStored")}</p>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <Shield className="mt-1 h-5 w-5 text-primary" />
-                    <p>
-                      {t("welcome.makeSureYouHaveEnoughDiskSpaceInTheSelectedLocation")}
-                    </p>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <PlusCircle className="mt-1 h-5 w-5 text-primary" />
-                    <p>{t("welcome.youCanAddMoreLater")}</p>
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div variants={itemVariants}>
-                <Button
-                  size="lg"
-                  onClick={handleNext}
-                  disabled={!downloadDirectory}
-                  className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
-                >
-                  {t("welcome.continue")}
-                </Button>
-              </motion.div>
-            </motion.div>
-          )}
-
-          {step === "protectDirectories" && (
-            <motion.div
-              key="protectDirectories"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <motion.div className="mb-8 text-center" variants={itemVariants}>
-                <WelcomeStepIcon icon={ShieldCheck} />
-                <h2 className="mb-2 text-3xl font-bold text-primary">
-                  {t("welcome.protectDirectoriesTitle")}
-                </h2>
-                <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-                  {t("welcome.protectDirectoriesDesc")}
-                </p>
-              </motion.div>
-              <motion.div
-                className="mb-12 max-w-2xl space-y-4 rounded-lg bg-card/30 p-6 text-left"
-                variants={itemVariants}
-              >
-                <div className="flex items-start space-x-3">
-                  <FolderDownIcon className="mt-1 h-5 w-5 shrink-0 text-primary" />
-                  <p>{t("welcome.protectDirectoriesWhatItDoes")}</p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <CircleCheck className="mt-1 h-5 w-5 shrink-0 text-primary" />
-                  <p>{t("welcome.protectDirectoriesWhy")}</p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <Shield className="mt-1 h-5 w-5 shrink-0 text-primary" />
-                  <p>{t("welcome.protectDirectoriesDefenderOnly")}</p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <Info className="mt-1 h-5 w-5 shrink-0 text-primary" />
-                  <p>
-                    {t("welcome.protectDirectoriesAdminPrompt")}{" "}
-                    <a
-                      className="cursor-pointer text-primary hover:underline"
-                      onClick={() =>
-                        window.electron.openURL(
-                          "https://ascendara.app/docs/features/overview#protecting-directories-from-windows-defender"
-                        )
-                      }
-                    >
-                      {t("common.learnMore")}
-                      <ExternalLink className="mb-1 ml-1 inline-block h-3 w-3" />
-                    </a>
-                  </p>
-                </div>
-
-                {protectError && <p className="text-sm text-red-500">{protectError}</p>}
-              </motion.div>
-
-              <motion.div
-                className="flex flex-wrap justify-center gap-3"
-                variants={itemVariants}
-              >
-                <Button
-                  size="lg"
-                  onClick={handleEnableProtection}
-                  disabled={protectLoading}
-                  className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
-                >
-                  {protectLoading && <Loader className="mr-2 h-5 w-5 animate-spin" />}
-                  {t("welcome.protectDirectoriesEnable")}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={() => setShowNoDefenderWarning(true)}
-                  disabled={protectLoading}
-                  className="px-8 py-6 text-lg font-semibold text-primary hover:bg-primary/10"
-                >
-                  {t("welcome.noWindowsDefender")}
-                </Button>
-              </motion.div>
-
-              <motion.div className="mt-4" variants={itemVariants}>
-                <Button
-                  variant="ghost"
-                  onClick={handleNext}
-                  disabled={protectLoading}
-                  className="text-muted-foreground hover:text-primary"
-                >
-                  {t("welcome.protectDirectoriesSkip")}
-                </Button>
-              </motion.div>
-            </motion.div>
-          )}
-
-          {step === "extension" && (
-            <motion.div
-              key="extension"
-              className="relative z-10 flex min-h-screen items-center justify-center overflow-y-auto bg-gradient-to-br from-primary/10 via-background to-background px-6 py-10"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
-              <div className="relative z-10 w-full max-w-4xl text-center">
-                <motion.div className="mb-8" variants={itemVariants}>
-                  <WelcomeStepIcon icon={PuzzleIcon} />
-                  <span className="inline-flex rounded-full border border-primary/20 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-primary">
-                    {t("welcome.extensionTagline")}
-                  </span>
-                  <h2 className="mt-4 text-3xl font-bold text-primary sm:text-4xl">
-                    {t("welcome.downloadGamesFaster")}
-                  </h2>
-                  <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-                    {t("welcome.getTheAscendaraDownloadHandlerExtension")}
-                  </p>
-                </motion.div>
-
-                <motion.div
-                  className="rounded-2xl border border-primary/20 bg-card/60 p-5 shadow-xl shadow-primary/5 sm:p-7"
-                  variants={itemVariants}
-                >
-                  <h3 className="mb-5 text-left text-lg font-semibold">
-                    {t("welcome.howItWorks")}
-                  </h3>
-                  <div className="grid gap-3 text-left md:grid-cols-3">
+                  <div className="grid gap-3 text-left sm:grid-cols-3">
                     {[
-                      { icon: PuzzleIcon, text: t("welcome.clickTheExtensionIcon") },
-                      { icon: Globe2, text: t("welcome.whenYouClickADownloadLink") },
-                      { icon: FolderDownIcon, text: t("welcome.startTheDownload") },
-                    ].map(({ icon: Icon, text }, index) => (
-                      <div
-                        key={index}
-                        className="rounded-xl border border-primary/10 bg-background/70 p-4"
-                      >
-                        <div className="mb-4 flex items-center justify-between">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            <Icon className="h-5 w-5" />
+                      {
+                        icon: Download,
+                        title: t("welcome.setup.about.gamesTitle"),
+                        desc: t("welcome.setup.about.gamesDesc"),
+                      },
+                      {
+                        icon: Users,
+                        title: t("welcome.setup.about.onlineTitle"),
+                        desc: t("welcome.setup.about.onlineDesc"),
+                      },
+                      {
+                        icon: Shield,
+                        title: t("welcome.setup.about.privacyTitle"),
+                        desc: t("welcome.setup.about.privacyDesc"),
+                      },
+                    ].map(({ icon: Icon, title, desc }) => (
+                      <div key={title} className={cardClass}>
+                        <div className="mb-2 flex items-center gap-2">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <Icon className="h-4 w-4" />
                           </div>
-                          <span className="text-sm font-semibold text-primary/60">
-                            0{index + 1}
+                          <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-semibold text-green-600 dark:text-green-400">
+                            {t("welcome.setup.about.freeBadge")}
                           </span>
                         </div>
-                        <p className="text-sm leading-relaxed text-foreground/80">
-                          {text}
+                        <h3 className="mb-1 font-semibold">{title}</h3>
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          {desc}
                         </p>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-4 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-left">
-                    <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                    <p className="text-sm text-foreground/80">
-                      {t("welcome.theExtensionBlocksKnownProviders")}
-                    </p>
-                  </div>
-                </motion.div>
 
-                <motion.div
-                  className="mt-8 flex flex-wrap justify-center gap-3"
-                  variants={itemVariants}
-                >
-                  <Button
-                    size="lg"
-                    onClick={() =>
-                      window.electron.openURL("https://ascendara.app/extension")
-                    }
-                    className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
-                  >
-                    {t("welcome.getTheExtension")}
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleNext}
-                    size="lg"
-                    className="px-8 py-6 text-lg font-semibold text-primary hover:bg-primary/10"
-                  >
-                    {t("welcome.continue")}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </motion.div>
-              </div>
-            </motion.div>
-          )}
-
-          {step === "theme" && (
-            <div className="relative flex min-h-screen items-center justify-center overflow-y-auto bg-background py-8">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-background" />
-              <div className="absolute left-0 top-0 h-32 w-full bg-gradient-to-b from-primary/10 to-transparent" />
-
-              <motion.div
-                className="relative z-10 mx-auto w-full max-w-4xl px-6 py-4"
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-              >
-                <motion.div className="mb-8 text-center" variants={itemVariants}>
-                  <WelcomeStepIcon icon={Palette} />
-                  <h2 className="mb-4 text-3xl font-bold text-primary">
-                    {t("welcome.chooseYourTheme")}
-                  </h2>
-                  <p className="mb-8 text-lg text-muted-foreground">
-                    {t("welcome.personalizeYourExperience")}
-                  </p>
-                </motion.div>
-
-                <motion.div className="mb-6 flex justify-center" variants={itemVariants}>
-                  <div className="inline-flex rounded-lg bg-card/30 p-1">
-                    <button
-                      onClick={() => setShowingLightThemes(true)}
-                      className={`rounded-md px-4 py-2 transition-all ${
-                        showingLightThemes
-                          ? "bg-primary text-secondary"
-                          : "hover:bg-primary/10"
-                      }`}
-                    >
-                      {t("welcome.lightThemes")}
-                    </button>
-                    <button
-                      onClick={() => setShowingLightThemes(false)}
-                      className={`rounded-md px-4 py-2 transition-all ${
-                        !showingLightThemes
-                          ? "bg-primary text-secondary"
-                          : "hover:bg-primary/10"
-                      }`}
-                    >
-                      {t("welcome.darkThemes")}
-                    </button>
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-3"
-                  variants={itemVariants}
-                >
-                  {themes
-                    .filter(
-                      theme => theme.group === (showingLightThemes ? "light" : "dark")
-                    )
-                    .map(theme => (
-                      <ThemeButton
-                        key={theme.id}
-                        theme={theme}
-                        currentTheme={selectedTheme}
-                        onSelect={handleThemeSelect}
-                      />
-                    ))}
-                </motion.div>
-
-                <motion.div className="flex justify-center" variants={itemVariants}>
-                  <Button
-                    size="lg"
-                    onClick={handleNext}
-                    className="bg-primary px-8 py-6 text-lg text-secondary hover:bg-primary/90"
-                  >
-                    {t("welcome.continue")}
-                  </Button>
-                </motion.div>
-              </motion.div>
-            </div>
-          )}
-
-          {step === "importGames" && (
-            <motion.div
-              key="importGames"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <motion.div className="mb-8 text-center" variants={itemVariants}>
-                <WelcomeStepIcon icon={Gamepad2} />
-                <h2 className="text-4xl font-bold text-primary">
-                  {t("welcome.importGamesTitle")}
-                </h2>
-              </motion.div>
-              <motion.p
-                className="mb-8 max-w-2xl text-xl text-foreground/80"
-                variants={itemVariants}
-              >
-                {t("welcome.importGamesDesc")}
-              </motion.p>
-
-              <motion.div
-                className="mb-12 max-w-2xl space-y-4 rounded-lg bg-card/30 p-6 text-left"
-                variants={itemVariants}
-              >
-                <div className="flex items-start space-x-3">
-                  <Gamepad2 className="mt-1 h-5 w-5 shrink-0 text-primary" />
-                  <p>{t("welcome.importGamesLaunchers")}</p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <Shield className="mt-1 h-5 w-5 shrink-0 text-primary" />
-                  <p>{t("welcome.importGamesNoSignIn")}</p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <PlusCircle className="mt-1 h-5 w-5 shrink-0 text-primary" />
-                  <p>{t("welcome.importGamesLater")}</p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <ArrowRightLeft className="mt-1 h-5 w-5 shrink-0 text-primary" />
-                  <p>{t("welcome.importGamesManagedSwap")}</p>
-                </div>
-              </motion.div>
-
-              <motion.div
-                className="flex justify-center space-x-4"
-                variants={itemVariants}
-              >
-                <Button
-                  size="lg"
-                  onClick={() => setIsImportGamesOpen(true)}
-                  className="bg-primary px-8 py-6 text-lg font-semibold text-secondary hover:bg-primary/90"
-                >
-                  {t("welcome.importGamesButton")}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleNext}
-                  size="lg"
-                  className="px-8 py-6 text-lg font-semibold text-primary hover:bg-primary/10"
-                >
-                  {t("welcome.skip")}
-                </Button>
-              </motion.div>
-
-              <ImportGamesDialog
-                open={isImportGamesOpen}
-                onOpenChange={setIsImportGamesOpen}
-                allowCatalogSwap={false}
-              />
-            </motion.div>
-          )}
-
-          {step === "updates" && (
-            <motion.div
-              key="updates"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <motion.div className="mb-8 text-center" variants={itemVariants}>
-                <WelcomeStepIcon icon={RefreshCw} />
-                <h2 className="text-4xl font-bold text-primary">
-                  {t("welcome.stayUpToDate")}
-                </h2>
-              </motion.div>
-              <motion.p
-                className="mb-8 max-w-2xl text-xl text-foreground/80"
-                variants={itemVariants}
-              >
-                {t("welcome.chooseHowYouWantToReceiveUpdates")}
-              </motion.p>
-
-              <motion.div
-                className="mb-12 grid w-full max-w-4xl grid-cols-1 gap-6 md:grid-cols-2"
-                variants={itemVariants}
-              >
-                {/* Auto Update Option - Recommended */}
-                <motion.div
-                  className="relative flex scale-[1.02] flex-col overflow-hidden rounded-xl border-2 border-primary bg-gradient-to-br from-primary/15 via-primary/10 to-transparent p-6 shadow-lg shadow-primary/10 ring-1 ring-primary/30"
-                  whileHover={{ scale: 1.04 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 22 }}
-                >
-                  {/* Recommended badge */}
-                  <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-bold uppercase tracking-wide text-secondary shadow-md">
-                    <Sparkles className="h-3 w-3" />
-                    {t("welcome.recommended")}
-                  </div>
-                  {/* Animated glow */}
-                  <motion.div
-                    className="pointer-events-none absolute -inset-1 -z-10 rounded-xl bg-primary/20 blur-2xl"
-                    animate={{ opacity: [0.3, 0.55, 0.3] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                  />
-
-                  <div className="mb-4 flex items-center space-x-3">
-                    <div className="rounded-lg bg-primary/20 p-2.5">
-                      <Download className="h-6 w-6 text-primary" />
+                  <div className="mt-3 flex items-start gap-3 rounded-xl border border-border/60 bg-card/20 p-4 text-left">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <Crown className="h-4 w-4" />
                     </div>
-                    <h3 className="text-xl font-semibold text-primary">
-                      {t("welcome.automaticUpdates")}
-                    </h3>
-                  </div>
-                  <div className="mb-6 space-y-4">
-                    {features.map(feature => (
-                      <div key={feature.title} className="flex items-start space-x-2">
-                        <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                        <div className="text-left">
-                          <p className="font-medium text-primary">{feature.title}</p>
-                          <p className="text-sm text-foreground/70">
-                            {feature.description}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    size="lg"
-                    className="mt-auto w-full bg-primary text-secondary shadow-md hover:bg-primary/90"
-                    onClick={() => handleUpdateChoice(true)}
-                  >
-                    {t("welcome.enableAutoUpdates")}
-                  </Button>
-                </motion.div>
-
-                {/* Manual Update Option */}
-                <div className="flex flex-col rounded-xl border border-border bg-card/30 p-6">
-                  <div className="mb-4 flex items-center space-x-3">
-                    <div className="rounded-lg bg-muted p-2">
-                      <Unplug className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-muted-foreground">
-                      {t("welcome.manualUpdates")}
-                    </h3>
-                  </div>
-                  <p className="mb-6 text-left text-muted-foreground">
-                    {t("welcome.chooseWhenToUpdateAscendaraYourself")}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="mt-auto w-full text-muted-foreground"
-                    onClick={() => setShowManualUpdateConfirm(true)}
-                  >
-                    {t("welcome.neverAutomaticallyUpdate")}
-                  </Button>
-                </div>
-              </motion.div>
-
-              <motion.p
-                className="max-w-2xl text-sm text-muted-foreground"
-                variants={itemVariants}
-              >
-                {t("welcome.youCanChangeThisSettingLater")}
-              </motion.p>
-            </motion.div>
-          )}
-
-          {step === "linuxDeps" && (
-            <motion.div
-              key="non-windows-dependencies"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              {!dependenciesInstalled && setupError && (
-                <p role="alert" className="text-destructive mb-4">
-                  {setupError}
-                </p>
-              )}
-              {!dependenciesInstalled ? (
-                <>
-                  <motion.div className="mb-8 text-center" variants={itemVariants}>
-                    <WelcomeStepIcon icon={Download} />
-                    <h2 className="text-4xl font-bold text-primary">
-                      {t("welcome.pythonIsRequired")}
-                    </h2>
-                  </motion.div>
-                  <motion.div
-                    className="mb-12 max-w-3xl space-y-6"
-                    variants={itemVariants}
-                  >
-                    <p className="text-xl text-foreground/80">
-                      {t("welcome.pythonMustBeInstalled")}
-                    </p>
-                    <div className="flex justify-center space-x-4">
-                      <Button
-                        disabled={isInstalling}
-                        onClick={async () => {
-                          setIsInstalling(true);
-                          setSetupError("");
-                          try {
-                            const result = await window.electron.installPython();
-                            if (!result.success) throw new Error(result.message);
-                            setDependenciesInstalled(true);
-                          } catch (error) {
-                            setSetupError(error.message);
-                          } finally {
-                            setIsInstalling(false);
-                          }
-                        }}
-                        size="lg"
-                        className="px-8 py-6 text-secondary"
-                      >
-                        <FolderDownIcon className="mr-2 h-5 w-5" />
-                        {t("welcome.installPython")}
-                      </Button>
-
-                      <Button
-                        onClick={async () => {
-                          setDependenciesInstalled(true);
-                        }}
-                        size="lg"
-                        className="px-8 py-6 text-secondary"
-                      >
-                        <SquareArrowRight className="mr-2 h-5 w-5" />
-                        {t("welcome.havePython")}
-                      </Button>
-                    </div>
-                  </motion.div>
-                </>
-              ) : (
-                /* PROTON & WINE */
-                <>
-                  <motion.div className="mb-8 text-center" variants={itemVariants}>
-                    <WelcomeStepIcon icon={Wine} />
-                    <h2 className="text-4xl font-bold text-primary">
-                      {t("welcome.compatibilityLayer")}
-                    </h2>
-                  </motion.div>
-
-                  <motion.div
-                    className="mb-12 w-full max-w-4xl space-y-6"
-                    variants={itemVariants}
-                  >
-                    {setupError && (
-                      <p
-                        role="alert"
-                        className="border-destructive text-destructive rounded-lg border p-3"
-                      >
-                        {setupError}
+                    <div>
+                      <h3 className="mb-1 font-semibold">
+                        {t("welcome.setup.about.ascendTitle")}
+                      </h3>
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        {t("welcome.setup.about.ascendDesc")}
                       </p>
-                    )}
-                    {!isOnLinux ? (
-                      <div className="space-y-4 rounded-xl border bg-card p-6">
-                        <h3 className="text-xl font-semibold">
-                          {t("welcome.macWineTitle")}
-                        </h3>
-                        <p>{t("welcome.macWineDescription")}</p>
-                        <p>{t("welcome.macWineHomebrewSetup")}</p>
-                        {runnersList.map(runner => (
-                          <p key={runner.path}>
-                            {runner.name}: {runner.version}
-                          </p>
-                        ))}
-                        <div className="flex flex-wrap justify-center gap-3">
-                          <Button
-                            className="text-secondary"
-                            disabled={installingWine}
-                            onClick={installWine}
-                          >
-                            {installingWine
-                              ? t("common.installing")
-                              : t("welcome.installWine")}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => window.electron.openURL("https://brew.sh")}
-                          >
-                            {t("welcome.homebrewInstructions")}
-                          </Button>
-                        </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.electron.openURL("https://ascendara.app/ascend")
+                        }
+                        className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                      >
+                        {t("welcome.setup.about.ascendLearnMore")}
+                        <ExternalLink className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                </SetupStep>
+              )}
+
+              {step === "referral" && (
+                <SetupStep
+                  key="referral"
+                  icon={Users}
+                  title={t("welcome.referral.title")}
+                  subtitle={t("welcome.referral.subtitle")}
+                  footer={
+                    <Button
+                      size="lg"
+                      onClick={handleReferralContinue}
+                      variant={referralSource ? "default" : "outline"}
+                      className={
+                        referralSource ? primaryButtonClass : secondaryButtonClass
+                      }
+                      disabled={
+                        referralSending ||
+                        (referralSource === "other" && !customReferral) ||
+                        !!customReferralError ||
+                        !!referralLinkError
+                      }
+                    >
+                      {referralSource ? t("welcome.continue") : t("welcome.skip")}
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  }
+                >
+                  {referralSource === "friend" && (
+                    <motion.div
+                      className="mb-3 rounded-xl border border-primary/40 bg-primary/5 p-3 text-center"
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <p className="text-sm font-medium text-primary">
+                        {t("welcome.referral.friendThankYou")}
+                      </p>
+                    </motion.div>
+                  )}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {REFERRAL_SOURCES.map(source => (
+                      <motion.button
+                        key={source}
+                        type="button"
+                        onClick={() =>
+                          setReferralSource(current => (current === source ? "" : source))
+                        }
+                        className={`rounded-xl border-2 px-4 py-3 text-sm font-medium transition-colors ${
+                          referralSource === source
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-card/30 hover:border-primary/50 hover:bg-card/60"
+                        }`}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        {t(`welcome.referral.sources.${source}`)}
+                      </motion.button>
+                    ))}
+                  </div>
+
+                  {referralSource === "other" && (
+                    <motion.div
+                      className="mt-3 space-y-2"
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <Input
+                        type="text"
+                        placeholder={t("welcome.referral.otherPlaceholder")}
+                        className={`w-full ${customReferralError ? "border-red-500" : ""}`}
+                        value={customReferral}
+                        onChange={async e => {
+                          const value = e.target.value;
+                          setCustomReferral(value);
+                          setCustomReferralError(
+                            value ? (await validateInput(value)).error || "" : ""
+                          );
+                        }}
+                      />
+                      {customReferralError && (
+                        <p className="text-left text-sm text-red-500">
+                          {customReferralError}
+                        </p>
+                      )}
+                    </motion.div>
+                  )}
+
+                  {REFERRAL_LINK_SOURCES.includes(referralSource) && (
+                    <motion.div
+                      className="mt-3 space-y-2"
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <Input
+                        type="text"
+                        placeholder={t("welcome.referral.linkPlaceholder")}
+                        className={`w-full ${referralLinkError ? "border-red-500" : ""}`}
+                        value={referralLink}
+                        onChange={async e => {
+                          const value = e.target.value;
+                          setReferralLink(value);
+                          setReferralLinkError(
+                            value ? (await validateInput(value)).error || "" : ""
+                          );
+                        }}
+                      />
+                      {referralLinkError && (
+                        <p className="text-left text-sm text-red-500">
+                          {referralLinkError}
+                        </p>
+                      )}
+                    </motion.div>
+                  )}
+                </SetupStep>
+              )}
+
+              {step === "directory" && (
+                <SetupStep
+                  key="directory"
+                  icon={FolderDownIcon}
+                  title={t("welcome.setup.directory.title")}
+                  subtitle={t("welcome.setup.directory.subtitle")}
+                  footer={
+                    <Button
+                      size="lg"
+                      onClick={handleNext}
+                      disabled={!downloadDirectory}
+                      className={primaryButtonClass}
+                    >
+                      {t("welcome.continue")}
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  }
+                >
+                  <div className={`${cardClass} space-y-3`}>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleSelectDirectory}
+                        className="min-w-0 flex-1 truncate rounded-lg border border-primary/15 bg-background/60 px-4 py-2.5 text-left font-mono text-sm transition-colors hover:border-primary/40"
+                        title={downloadDirectory}
+                      >
+                        {downloadDirectory || (
+                          <span className="font-sans text-muted-foreground">
+                            {t("welcome.selectADirectory")}
+                          </span>
+                        )}
+                      </button>
+                      <Button
+                        className="shrink-0 text-secondary"
+                        onClick={handleSelectDirectory}
+                      >
+                        {t("welcome.browse")}
+                      </Button>
+                    </div>
+
+                    {warningMessage ? (
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-left text-sm text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <p>{warningMessage}</p>
                       </div>
                     ) : (
-                      <>
-                        {/* Status Banner */}
-                        {(() => {
-                          const hasProton = runnersList.some(
-                            r =>
-                              r.type === "proton" ||
-                              r.name.toLowerCase().includes("proton")
-                          );
-                          const hasOptimizedProton = runnersList.some(r => {
-                            const n = r.name.toLowerCase();
-                            return (
-                              n.includes("cachyos") ||
-                              n.includes("ge-proton") ||
-                              n.includes("proton-ge")
-                            );
-                          });
-                          const onlySteamProton = hasProton && !hasOptimizedProton;
-                          const bothInstalled = hasOptimizedProton && umuInstalled;
-                          const partialOptimal = onlySteamProton && umuInstalled;
-                          const noneInstalled = !hasProton && !umuInstalled;
-
-                          return (
-                            <div
-                              className={`flex gap-4 rounded-xl border p-5 text-left ${
-                                bothInstalled
-                                  ? "border-green-500/40 bg-green-500/10"
-                                  : noneInstalled
-                                    ? "border-red-500/30 bg-red-500/10"
-                                    : partialOptimal
-                                      ? "border-blue-500/30 bg-blue-500/10"
-                                      : "border-yellow-500/30 bg-yellow-500/10"
-                              }`}
-                            >
-                              {bothInstalled ? (
-                                <CircleCheck className="mt-1 h-7 w-7 shrink-0 text-green-500" />
-                              ) : noneInstalled ? (
-                                <XCircle className="mt-1 h-7 w-7 shrink-0 text-red-500" />
-                              ) : partialOptimal ? (
-                                <Info className="mt-1 h-7 w-7 shrink-0 text-blue-500" />
-                              ) : (
-                                <AlertTriangle className="mt-1 h-7 w-7 shrink-0 text-yellow-500" />
-                              )}
-
-                              <div className="space-y-1">
-                                <h3
-                                  className={`text-lg font-bold ${
-                                    bothInstalled
-                                      ? "text-green-500"
-                                      : noneInstalled
-                                        ? "text-red-500"
-                                        : partialOptimal
-                                          ? "text-blue-500"
-                                          : "text-yellow-500"
-                                  }`}
-                                >
-                                  {bothInstalled
-                                    ? t("welcome.bothInstalled")
-                                    : noneInstalled
-                                      ? t("welcome.noRunnersTitle")
-                                      : partialOptimal
-                                        ? t("welcome.steamProtonDetected")
-                                        : hasProton
-                                          ? t("welcome.partialSetupProton")
-                                          : t("welcome.partialSetupUmu")}
-                                </h3>
-
-                                {runnersList.length > 0 && (
-                                  <div className="rounded-lg border border-border/50 bg-background/40 p-2 font-mono text-sm">
-                                    {runnersList.map(r => (
-                                      <div
-                                        key={r.path}
-                                        className="flex items-center justify-between opacity-90"
-                                      >
-                                        <span className="font-semibold">{r.name}</span>
-                                        <span className="ml-4 truncate text-xs opacity-60">
-                                          {r.path}
-                                        </span>
-                                      </div>
-                                    ))}
-                                    {umuInstalled && (
-                                      <div className="mt-1 flex items-center gap-2 opacity-90">
-                                        <span className="font-semibold text-green-600">
-                                          UMU Launcher
-                                        </span>
-                                        <span className="text-xs text-green-600 opacity-80">
-                                          {t("welcome.installed")}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        {/* ── Recommended ── */}
-                        <div className="space-y-4 rounded-xl border-2 border-green-500/50 bg-green-500/5 p-5">
-                          <div className="mb-1 flex items-center gap-2">
-                            <CircleCheck className="h-5 w-5 text-green-500" />
-                            <span className="text-lg font-bold text-green-600 dark:text-green-400">
-                              {t("welcome.recommendedSetup")}
-                            </span>
-                            <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
-                              {t("welcome.bestCompatibility")}
-                            </span>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {t("welcome.recommendedSetupInfo")}
+                      freeSpace !== null && (
+                        <div className="flex items-center gap-2 text-left text-sm text-green-600 dark:text-green-400">
+                          <HardDrive className="h-4 w-4 shrink-0" />
+                          <p>
+                            {t("welcome.setup.directory.freeSpace", {
+                              size: formatGigabytes(freeSpace),
+                            })}
                           </p>
-
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            {/* UMU Launcher */}
-                            <div
-                              className={`flex flex-col justify-between rounded-xl border-2 p-4 ${umuInstalled ? "border-green-500 bg-green-500/10" : "border-green-500/50 bg-card"}`}
-                            >
-                              <div>
-                                <div className="mb-1 flex items-center gap-2">
-                                  {umuInstalled ? (
-                                    <CircleCheck className="h-5 w-5 text-green-500" />
-                                  ) : (
-                                    <Download className="h-5 w-5 text-green-500" />
-                                  )}
-                                  <span className="font-bold text-foreground">
-                                    UMU Launcher
-                                  </span>
-                                  {umuInstalled && (
-                                    <span className="rounded bg-green-500/20 px-1.5 py-0.5 text-xs font-semibold text-green-600">
-                                      Installed
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="mb-3 text-xs text-muted-foreground">
-                                  {t("welcome.umuLauncherDesc")}
-                                </p>
-                              </div>
-                              <Button
-                                size="sm"
-                                disabled={umuInstalled || isDownloadingUmuLauncher}
-                                className="w-full text-secondary"
-                                onClick={async () => {
-                                  setIsDownloadingUmuLauncher(true);
-                                  try {
-                                    const result =
-                                      await window.electron.downloadUmuLauncher();
-                                    if (!result.success)
-                                      throw new Error(result.message || result.error);
-                                    setUmuInstalled(
-                                      await window.electron.isUmuInstalled()
-                                    );
-                                  } catch (e) {
-                                    setSetupError(e.message);
-                                  }
-                                  setIsDownloadingUmuLauncher(false);
-                                }}
-                              >
-                                {isDownloadingUmuLauncher ? (
-                                  <>
-                                    <Loader className="mr-2 h-4 w-4 animate-spin" />{" "}
-                                    {t("common.installing")}
-                                  </>
-                                ) : umuInstalled ? (
-                                  <>
-                                    <CircleCheck className="mr-2 h-4 w-4" />{" "}
-                                    {t("common.installed")}
-                                  </>
-                                ) : (
-                                  <>
-                                    <Download className="mr-2 h-4 w-4" />{" "}
-                                    {t("welcome.installRecommended")}
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-
-                            {/* Proton CachyOS */}
-                            <div className="flex flex-col justify-between rounded-xl border-2 border-primary bg-primary/5 p-4 shadow-md">
-                              <div>
-                                <div className="mb-1 flex items-center gap-2">
-                                  <Rocket className="h-5 w-5 text-primary" />
-                                  <span className="font-bold text-primary">
-                                    Proton CachyOS
-                                  </span>
-                                </div>
-                                <p className="mb-3 text-xs text-muted-foreground">
-                                  {t("welcome.protonDesc")}
-                                  {protonCachyInfo?.sizeFormatted && (
-                                    <span className="mt-1 block font-mono text-xs opacity-75">
-                                      {t("welcome.protonSize")}{" "}
-                                      {protonCachyInfo.sizeFormatted}
-                                    </span>
-                                  )}
-                                </p>
-                              </div>
-                              <Button
-                                size="sm"
-                                disabled={cachyOsInstalled || isDownloadingProtonCachy}
-                                className="w-full text-secondary"
-                                onClick={async () => {
-                                  if (!protonCachyInfo) {
-                                    setIsDownloadingProtonCachy(true);
-                                    try {
-                                      const info =
-                                        await window.electron.getProtonCachyOSInfo();
-                                      if (!info.success)
-                                        throw new Error(info.error || info.message);
-                                      if (info.success) {
-                                        setProtonCachyInfo(info);
-                                        setShowProtonCachyConfirm(true);
-                                      }
-                                    } catch (e) {
-                                      setSetupError(e.message);
-                                    }
-                                    setIsDownloadingProtonCachy(false);
-                                  } else {
-                                    setShowProtonCachyConfirm(true);
-                                  }
-                                }}
-                              >
-                                {isDownloadingProtonCachy ? (
-                                  <>
-                                    <Loader className="mr-2 h-4 w-4 animate-spin" />{" "}
-                                    {t("welcome.protonChecking")}
-                                  </>
-                                ) : cachyOsInstalled ? (
-                                  <>
-                                    <CircleCheck className="mr-2 h-4 w-4" />{" "}
-                                    {t("common.installed")}
-                                  </>
-                                ) : (
-                                  <>
-                                    <Download className="mr-2 h-4 w-4" />{" "}
-                                    {t("welcome.protonInstallCachy")}
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          </div>
                         </div>
+                      )
+                    )}
 
-                        {/* Alternative (Wine / UMU-Proton) */}
-                        <details className="rounded-xl border border-border bg-card/30 p-4">
-                          <summary className="cursor-pointer select-none text-sm font-medium text-muted-foreground">
-                            {t("welcome.alternatives")}
-                          </summary>
-                          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                            {/* Proton-GE */}
-                            <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4">
-                              <div>
-                                <div className="mb-1 flex items-center gap-2">
-                                  <Rocket className="h-5 w-5 text-muted-foreground" />
-                                  <span className="font-bold text-muted-foreground">
-                                    Proton-GE
-                                  </span>
-                                </div>
-                                <p className="mb-3 text-xs text-muted-foreground">
-                                  {t("welcome.protonGEAltDesc")}
-                                  {protonGEInfo?.sizeFormatted && (
-                                    <span className="mt-1 block font-mono text-xs opacity-75">
-                                      {t("welcome.protonSize")}{" "}
-                                      {protonGEInfo.sizeFormatted}
-                                    </span>
-                                  )}
-                                </p>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={isDownloadingProtonGE}
-                                className="w-full text-muted-foreground"
-                                onClick={async () => {
-                                  if (!protonGEInfo) {
-                                    setIsDownloadingProtonGE(true);
-                                    try {
-                                      const info =
-                                        await window.electron.getProtonGEInfo();
-                                      if (!info.success)
-                                        throw new Error(info.error || info.message);
-                                      if (info.success) {
-                                        if (info.alreadyInstalled) {
-                                          const updated =
-                                            await window.electron.getRunners();
-                                          setRunnersList(updated);
-                                        } else {
-                                          setProtonGEInfo(info);
-                                          setShowProtonGEConfirm(true);
-                                        }
-                                      }
-                                    } catch (e) {
-                                      setSetupError(e.message);
-                                    }
-                                    setIsDownloadingProtonGE(false);
-                                  } else {
-                                    setShowProtonGEConfirm(true);
-                                  }
-                                }}
-                              >
-                                {isDownloadingProtonGE ? (
-                                  <>
-                                    <Loader className="mr-2 h-4 w-4 animate-spin" />{" "}
-                                    {t("welcome.protonChecking")}
-                                  </>
-                                ) : (
-                                  <>
-                                    <Download className="mr-2 h-4 w-4" />{" "}
-                                    {t("common.install")}
-                                  </>
-                                )}
-                              </Button>
-                            </div>
+                    <div className="space-y-1.5 border-t border-border/60 pt-3 text-left text-sm text-muted-foreground">
+                      <div className="flex items-start gap-2">
+                        <PackageOpen className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <p>{t("welcome.setup.directory.ownFolder")}</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <PlusCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <p>{t("welcome.setup.directory.addMore")}</p>
+                      </div>
+                    </div>
+                  </div>
+                </SetupStep>
+              )}
 
-                            {/* Wine */}
-                            <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4">
-                              <div>
-                                <div className="mb-1 flex items-center gap-2">
-                                  <Wine className="h-5 w-5 text-muted-foreground" />
-                                  <span className="font-bold text-muted-foreground">
-                                    {t("welcome.systemWine")}
-                                  </span>
-                                </div>
-                                <p className="mb-3 text-xs text-muted-foreground">
-                                  {t("welcome.systemWineDesc")}
+              {step === "protectDirectories" && (
+                <SetupStep
+                  key="protectDirectories"
+                  icon={ShieldCheck}
+                  title={t("welcome.setup.protect.title")}
+                  subtitle={t("welcome.setup.protect.subtitle")}
+                  footer={
+                    protectResult?.success ||
+                    protectResult?.reason === "defenderUnavailable" ? (
+                      <Button
+                        size="lg"
+                        onClick={handleNext}
+                        className={primaryButtonClass}
+                      >
+                        {t("welcome.continue")}
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          size="lg"
+                          onClick={handleEnableProtection}
+                          disabled={protectLoading}
+                          className={primaryButtonClass}
+                        >
+                          {protectLoading ? (
+                            <>
+                              <Loader className="mr-2 h-5 w-5 animate-spin" />
+                              {t("welcome.setup.protect.working")}
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="mr-2 h-5 w-5" />
+                              {protectResult
+                                ? t("welcome.setup.protect.retry")
+                                : t("welcome.setup.protect.enable")}
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() => setShowNoDefenderWarning(true)}
+                          disabled={protectLoading}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          {t("welcome.setup.protect.skip")}
+                        </Button>
+                      </>
+                    )
+                  }
+                >
+                  <div className={`${cardClass} space-y-3 text-left`}>
+                    <div>
+                      <p className="mb-2 text-sm text-muted-foreground">
+                        {t("welcome.setup.protect.whatItDoes")}
+                      </p>
+                      <div className="flex items-center gap-2 rounded-lg border border-primary/15 bg-background/60 px-3 py-2">
+                        <FolderDownIcon className="h-4 w-4 shrink-0 text-primary" />
+                        <span
+                          className="truncate font-mono text-sm"
+                          title={downloadDirectory}
+                        >
+                          {downloadDirectory}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5 text-sm">
+                      <div className="flex items-start gap-2">
+                        <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <p>{t("welcome.setup.protect.scope")}</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <p>{t("welcome.setup.protect.adminPrompt")}</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <p>
+                          {t("welcome.setup.protect.otherAntivirus")}{" "}
+                          <button
+                            type="button"
+                            className="inline-flex items-center text-primary hover:underline"
+                            onClick={() =>
+                              window.electron.openURL(
+                                "https://ascendara.app/docs/features/overview#protecting-directories-from-windows-defender"
+                              )
+                            }
+                          >
+                            {t("common.learnMore")}
+                            <ExternalLink className="ml-1 h-3 w-3" />
+                          </button>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {protectResult && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`mt-3 flex items-start gap-3 rounded-xl border p-3 text-left ${
+                        protectResult.success
+                          ? "border-green-500/40 bg-green-500/10"
+                          : protectResult.reason === "defenderUnavailable"
+                            ? "border-blue-500/30 bg-blue-500/10"
+                            : "border-amber-500/30 bg-amber-500/10"
+                      }`}
+                    >
+                      {protectResult.success ? (
+                        <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-500" />
+                      ) : protectResult.reason === "defenderUnavailable" ? (
+                        <Info className="mt-0.5 h-5 w-5 shrink-0 text-blue-500" />
+                      ) : (
+                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                      )}
+                      <div className="space-y-1 text-sm">
+                        {protectResult.success ? (
+                          <p className="font-semibold">
+                            {t("welcome.setup.protect.done")}
+                          </p>
+                        ) : (
+                          <>
+                            <p className="font-semibold">
+                              {t(`welcome.setup.protect.errors.${protectReasonKey}Title`)}
+                            </p>
+                            <p className="text-muted-foreground">
+                              {t(`welcome.setup.protect.errors.${protectReasonKey}`)}
+                            </p>
+                            {protectReasonKey === "failed" && protectResult.error && (
+                              <details className="text-xs text-muted-foreground">
+                                <summary className="cursor-pointer select-none">
+                                  {t("welcome.setup.protect.errors.details")}
+                                </summary>
+                                <p className="mt-1 break-words font-mono">
+                                  {protectResult.error}
                                 </p>
-                              </div>
+                              </details>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </SetupStep>
+              )}
+
+              {step === "personalize" && (
+                <SetupStep
+                  key="personalize"
+                  icon={Palette}
+                  title={t("welcome.setup.personalize.title")}
+                  subtitle={t("welcome.setup.personalize.subtitle")}
+                  wide
+                  footer={
+                    <Button size="lg" onClick={handleNext} className={primaryButtonClass}>
+                      {t("welcome.continue")}
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  }
+                >
+                  <div className="mb-4 flex justify-center">
+                    <div className="inline-flex rounded-lg bg-card/40 p-1">
+                      {[true, false].map(light => (
+                        <button
+                          key={String(light)}
+                          type="button"
+                          onClick={() => setShowingLightThemes(light)}
+                          className={`rounded-md px-4 py-1.5 text-sm transition-all ${
+                            showingLightThemes === light
+                              ? "bg-primary text-secondary"
+                              : "hover:bg-primary/10"
+                          }`}
+                        >
+                          {light ? t("welcome.lightThemes") : t("welcome.darkThemes")}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 md:grid-cols-6">
+                    {themes
+                      .filter(
+                        theme => theme.group === (showingLightThemes ? "light" : "dark")
+                      )
+                      .map(theme => (
+                        <ThemeButton
+                          key={theme.id}
+                          theme={theme}
+                          currentTheme={selectedTheme}
+                          onSelect={handleThemeSelect}
+                        />
+                      ))}
+                  </div>
+
+                  <div
+                    className={`${cardClass} mt-4 flex cursor-pointer items-center gap-4 text-left`}
+                    onClick={() => handleAutoUpdateToggle(!autoUpdate)}
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <RefreshCw className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold">
+                        {t("welcome.setup.personalize.autoUpdateTitle")}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {t("welcome.setup.personalize.autoUpdateDesc")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={autoUpdate}
+                      aria-label={t("welcome.setup.personalize.autoUpdateTitle")}
+                      onClick={event => event.stopPropagation()}
+                      onCheckedChange={handleAutoUpdateToggle}
+                    />
+                  </div>
+                </SetupStep>
+              )}
+
+              {step === "extras" && (
+                <SetupStep
+                  key="extras"
+                  icon={PlusCircle}
+                  title={t("welcome.setup.extras.title")}
+                  subtitle={t("welcome.setup.extras.subtitle")}
+                  wide
+                  footer={
+                    <Button size="lg" onClick={handleNext} className={primaryButtonClass}>
+                      {t("welcome.continue")}
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  }
+                >
+                  <div className="grid gap-4 text-left md:grid-cols-2">
+                    <div className={`${cardClass} flex flex-col`}>
+                      <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Gamepad2 className="h-5 w-5" />
+                      </div>
+                      <h3 className="mb-1 font-semibold">
+                        {t("welcome.setup.extras.importTitle")}
+                      </h3>
+                      <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
+                        {t("welcome.setup.extras.importDesc")}
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsImportGamesOpen(true)}
+                        className="mt-auto w-full text-primary hover:bg-primary/10"
+                      >
+                        {t("welcome.setup.extras.importButton")}
+                      </Button>
+                    </div>
+
+                    <div className={`${cardClass} flex flex-col`}>
+                      <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <PuzzleIcon className="h-5 w-5" />
+                      </div>
+                      <h3 className="mb-1 font-semibold">
+                        {t("welcome.setup.extras.extensionTitle")}
+                      </h3>
+                      <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
+                        {t("welcome.setup.extras.extensionDesc")}
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          window.electron.openURL("https://ascendara.app/extension")
+                        }
+                        className="mt-auto w-full text-primary hover:bg-primary/10"
+                      >
+                        {t("welcome.setup.extras.extensionButton")}
+                        <ExternalLink className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <ImportGamesDialog
+                    open={isImportGamesOpen}
+                    onOpenChange={setIsImportGamesOpen}
+                    allowCatalogSwap={false}
+                  />
+                </SetupStep>
+              )}
+
+              {step === "linuxDeps" && (
+                <motion.div
+                  key="non-windows-dependencies"
+                  className="relative z-10 flex min-h-screen flex-col items-center justify-center px-8 pb-8 pt-32 text-center"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                >
+                  {!dependenciesInstalled && setupError && (
+                    <p role="alert" className="text-destructive mb-4">
+                      {setupError}
+                    </p>
+                  )}
+                  {!dependenciesInstalled ? (
+                    <>
+                      <motion.div className="mb-8 text-center" variants={itemVariants}>
+                        <WelcomeStepIcon icon={Download} />
+                        <h2 className="text-4xl font-bold text-primary">
+                          {t("welcome.pythonIsRequired")}
+                        </h2>
+                      </motion.div>
+                      <motion.div
+                        className="mb-12 max-w-3xl space-y-6"
+                        variants={itemVariants}
+                      >
+                        <p className="text-xl text-foreground/80">
+                          {t("welcome.pythonMustBeInstalled")}
+                        </p>
+                        <div className="flex justify-center space-x-4">
+                          <Button
+                            disabled={isInstalling}
+                            onClick={async () => {
+                              setIsInstalling(true);
+                              setSetupError("");
+                              try {
+                                const result = await window.electron.installPython();
+                                if (!result.success) throw new Error(result.message);
+                                setDependenciesInstalled(true);
+                              } catch (error) {
+                                setSetupError(error.message);
+                              } finally {
+                                setIsInstalling(false);
+                              }
+                            }}
+                            size="lg"
+                            className="px-8 py-6 text-secondary"
+                          >
+                            <FolderDownIcon className="mr-2 h-5 w-5" />
+                            {t("welcome.installPython")}
+                          </Button>
+
+                          <Button
+                            onClick={async () => {
+                              setDependenciesInstalled(true);
+                            }}
+                            size="lg"
+                            className="px-8 py-6 text-secondary"
+                          >
+                            <SquareArrowRight className="mr-2 h-5 w-5" />
+                            {t("welcome.havePython")}
+                          </Button>
+                        </div>
+                      </motion.div>
+                    </>
+                  ) : (
+                    /* PROTON & WINE */
+                    <>
+                      <motion.div className="mb-8 text-center" variants={itemVariants}>
+                        <WelcomeStepIcon icon={Wine} />
+                        <h2 className="text-4xl font-bold text-primary">
+                          {t("welcome.compatibilityLayer")}
+                        </h2>
+                      </motion.div>
+
+                      <motion.div
+                        className="mb-12 w-full max-w-4xl space-y-6"
+                        variants={itemVariants}
+                      >
+                        {setupError && (
+                          <p
+                            role="alert"
+                            className="border-destructive text-destructive rounded-lg border p-3"
+                          >
+                            {setupError}
+                          </p>
+                        )}
+                        {!isOnLinux ? (
+                          <div className="space-y-4 rounded-xl border bg-card p-6">
+                            <h3 className="text-xl font-semibold">
+                              {t("welcome.macWineTitle")}
+                            </h3>
+                            <p>{t("welcome.macWineDescription")}</p>
+                            <p>{t("welcome.macWineHomebrewSetup")}</p>
+                            {runnersList.map(runner => (
+                              <p key={runner.path}>
+                                {runner.name}: {runner.version}
+                              </p>
+                            ))}
+                            <div className="flex flex-wrap justify-center gap-3">
                               <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full text-muted-foreground"
+                                className="text-secondary"
                                 disabled={installingWine}
                                 onClick={installWine}
                               >
-                                <FolderDownIcon className="mr-2 h-4 w-4" />{" "}
-                                {t("welcome.installWine")}
+                                {installingWine
+                                  ? t("common.installing")
+                                  : t("welcome.installWine")}
                               </Button>
-                            </div>
-
-                            {/* UMU Proton */}
-                            <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4 opacity-80">
-                              <div>
-                                <div className="mb-1 flex items-center gap-2">
-                                  <Rocket className="h-5 w-5 text-muted-foreground" />
-                                  <span className="font-bold text-muted-foreground">
-                                    UMU-Proton
-                                  </span>
-                                </div>
-                                <p className="mb-3 text-xs text-muted-foreground">
-                                  {t("welcome.umuProtonDesc")}
-                                  {umuProtonInfo?.sizeFormatted && (
-                                    <span className="mt-1 block font-mono text-xs opacity-75">
-                                      {t("welcome.latest")}: {umuProtonInfo.name} ·{" "}
-                                      {umuProtonInfo.sizeFormatted}
-                                    </span>
-                                  )}
-                                </p>
-                              </div>
                               <Button
                                 variant="outline"
-                                size="sm"
-                                disabled={isDownloadingUmuProton}
-                                className="w-full text-muted-foreground"
-                                onClick={async () => {
-                                  setIsDownloadingUmuProton(true);
-                                  try {
-                                    const result =
-                                      await window.electron.downloadUmuProton();
-                                    if (!result.success)
-                                      throw new Error(result.message || result.error);
-                                    if (result.success) {
-                                      const updated = await window.electron.getRunners();
-                                      setRunnersList(updated);
-                                      await window.electron.updateSetting(
-                                        "linuxRunner",
-                                        result.path
-                                      );
-                                      const info =
-                                        await window.electron.getUmuProtonInfo();
-                                      if (info?.success) setUmuProtonInfo(info);
-                                    }
-                                  } catch (e) {
-                                    setSetupError(e.message);
-                                  }
-                                  setIsDownloadingUmuProton(false);
-                                }}
+                                onClick={() => window.electron.openURL("https://brew.sh")}
                               >
-                                {isDownloadingUmuProton ? (
-                                  <>
-                                    <Loader className="mr-2 h-4 w-4 animate-spin" />{" "}
-                                    {t("common.installing")}
-                                  </>
-                                ) : umuProtonInfo?.alreadyInstalled ? (
-                                  <>
-                                    <CircleCheck className="mr-2 h-4 w-4" />{" "}
-                                    {t("common.installed")}
-                                  </>
-                                ) : (
-                                  <>
-                                    <Download className="mr-2 h-4 w-4" />{" "}
-                                    {t("common.install")}
-                                  </>
-                                )}
+                                {t("welcome.homebrewInstructions")}
                               </Button>
                             </div>
                           </div>
-                        </details>
+                        ) : (
+                          <>
+                            {/* Status Banner */}
+                            {(() => {
+                              const hasProton = runnersList.some(
+                                r =>
+                                  r.type === "proton" ||
+                                  r.name.toLowerCase().includes("proton")
+                              );
+                              const hasOptimizedProton = runnersList.some(r => {
+                                const n = r.name.toLowerCase();
+                                return (
+                                  n.includes("cachyos") ||
+                                  n.includes("ge-proton") ||
+                                  n.includes("proton-ge")
+                                );
+                              });
+                              const onlySteamProton = hasProton && !hasOptimizedProton;
+                              const bothInstalled = hasOptimizedProton && umuInstalled;
+                              const partialOptimal = onlySteamProton && umuInstalled;
+                              const noneInstalled = !hasProton && !umuInstalled;
 
-                        {!umuInstalled && runnersList.length > 0 && (
-                          <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-left">
-                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
-                            <p className="text-xs text-yellow-600">
-                              {t("welcome.umuLauncherNotInstalled")}
-                            </p>
-                          </div>
+                              return (
+                                <div
+                                  className={`flex gap-4 rounded-xl border p-5 text-left ${
+                                    bothInstalled
+                                      ? "border-green-500/40 bg-green-500/10"
+                                      : noneInstalled
+                                        ? "border-red-500/30 bg-red-500/10"
+                                        : partialOptimal
+                                          ? "border-blue-500/30 bg-blue-500/10"
+                                          : "border-yellow-500/30 bg-yellow-500/10"
+                                  }`}
+                                >
+                                  {bothInstalled ? (
+                                    <CircleCheck className="mt-1 h-7 w-7 shrink-0 text-green-500" />
+                                  ) : noneInstalled ? (
+                                    <XCircle className="mt-1 h-7 w-7 shrink-0 text-red-500" />
+                                  ) : partialOptimal ? (
+                                    <Info className="mt-1 h-7 w-7 shrink-0 text-blue-500" />
+                                  ) : (
+                                    <AlertTriangle className="mt-1 h-7 w-7 shrink-0 text-yellow-500" />
+                                  )}
+
+                                  <div className="space-y-1">
+                                    <h3
+                                      className={`text-lg font-bold ${
+                                        bothInstalled
+                                          ? "text-green-500"
+                                          : noneInstalled
+                                            ? "text-red-500"
+                                            : partialOptimal
+                                              ? "text-blue-500"
+                                              : "text-yellow-500"
+                                      }`}
+                                    >
+                                      {bothInstalled
+                                        ? t("welcome.bothInstalled")
+                                        : noneInstalled
+                                          ? t("welcome.noRunnersTitle")
+                                          : partialOptimal
+                                            ? t("welcome.steamProtonDetected")
+                                            : hasProton
+                                              ? t("welcome.partialSetupProton")
+                                              : t("welcome.partialSetupUmu")}
+                                    </h3>
+
+                                    {runnersList.length > 0 && (
+                                      <div className="rounded-lg border border-border/50 bg-background/40 p-2 font-mono text-sm">
+                                        {runnersList.map(r => (
+                                          <div
+                                            key={r.path}
+                                            className="flex items-center justify-between opacity-90"
+                                          >
+                                            <span className="font-semibold">
+                                              {r.name}
+                                            </span>
+                                            <span className="ml-4 truncate text-xs opacity-60">
+                                              {r.path}
+                                            </span>
+                                          </div>
+                                        ))}
+                                        {umuInstalled && (
+                                          <div className="mt-1 flex items-center gap-2 opacity-90">
+                                            <span className="font-semibold text-green-600">
+                                              UMU Launcher
+                                            </span>
+                                            <span className="text-xs text-green-600 opacity-80">
+                                              {t("welcome.installed")}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
+                            {/* ── Recommended ── */}
+                            <div className="space-y-4 rounded-xl border-2 border-green-500/50 bg-green-500/5 p-5">
+                              <div className="mb-1 flex items-center gap-2">
+                                <CircleCheck className="h-5 w-5 text-green-500" />
+                                <span className="text-lg font-bold text-green-600 dark:text-green-400">
+                                  {t("welcome.recommendedSetup")}
+                                </span>
+                                <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
+                                  {t("welcome.bestCompatibility")}
+                                </span>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {t("welcome.recommendedSetupInfo")}
+                              </p>
+
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                {/* UMU Launcher */}
+                                <div
+                                  className={`flex flex-col justify-between rounded-xl border-2 p-4 ${umuInstalled ? "border-green-500 bg-green-500/10" : "border-green-500/50 bg-card"}`}
+                                >
+                                  <div>
+                                    <div className="mb-1 flex items-center gap-2">
+                                      {umuInstalled ? (
+                                        <CircleCheck className="h-5 w-5 text-green-500" />
+                                      ) : (
+                                        <Download className="h-5 w-5 text-green-500" />
+                                      )}
+                                      <span className="font-bold text-foreground">
+                                        UMU Launcher
+                                      </span>
+                                      {umuInstalled && (
+                                        <span className="rounded bg-green-500/20 px-1.5 py-0.5 text-xs font-semibold text-green-600">
+                                          Installed
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="mb-3 text-xs text-muted-foreground">
+                                      {t("welcome.umuLauncherDesc")}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    disabled={umuInstalled || isDownloadingUmuLauncher}
+                                    className="w-full text-secondary"
+                                    onClick={async () => {
+                                      setIsDownloadingUmuLauncher(true);
+                                      try {
+                                        const result =
+                                          await window.electron.downloadUmuLauncher();
+                                        if (!result.success)
+                                          throw new Error(result.message || result.error);
+                                        setUmuInstalled(
+                                          await window.electron.isUmuInstalled()
+                                        );
+                                      } catch (e) {
+                                        setSetupError(e.message);
+                                      }
+                                      setIsDownloadingUmuLauncher(false);
+                                    }}
+                                  >
+                                    {isDownloadingUmuLauncher ? (
+                                      <>
+                                        <Loader className="mr-2 h-4 w-4 animate-spin" />{" "}
+                                        {t("common.installing")}
+                                      </>
+                                    ) : umuInstalled ? (
+                                      <>
+                                        <CircleCheck className="mr-2 h-4 w-4" />{" "}
+                                        {t("common.installed")}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Download className="mr-2 h-4 w-4" />{" "}
+                                        {t("welcome.installRecommended")}
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+
+                                {/* Proton CachyOS */}
+                                <div className="flex flex-col justify-between rounded-xl border-2 border-primary bg-primary/5 p-4 shadow-md">
+                                  <div>
+                                    <div className="mb-1 flex items-center gap-2">
+                                      <Rocket className="h-5 w-5 text-primary" />
+                                      <span className="font-bold text-primary">
+                                        Proton CachyOS
+                                      </span>
+                                    </div>
+                                    <p className="mb-3 text-xs text-muted-foreground">
+                                      {t("welcome.protonDesc")}
+                                      {protonCachyInfo?.sizeFormatted && (
+                                        <span className="mt-1 block font-mono text-xs opacity-75">
+                                          {t("welcome.protonSize")}{" "}
+                                          {protonCachyInfo.sizeFormatted}
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    disabled={
+                                      cachyOsInstalled || isDownloadingProtonCachy
+                                    }
+                                    className="w-full text-secondary"
+                                    onClick={async () => {
+                                      if (!protonCachyInfo) {
+                                        setIsDownloadingProtonCachy(true);
+                                        try {
+                                          const info =
+                                            await window.electron.getProtonCachyOSInfo();
+                                          if (!info.success)
+                                            throw new Error(info.error || info.message);
+                                          if (info.success) {
+                                            setProtonCachyInfo(info);
+                                            setShowProtonCachyConfirm(true);
+                                          }
+                                        } catch (e) {
+                                          setSetupError(e.message);
+                                        }
+                                        setIsDownloadingProtonCachy(false);
+                                      } else {
+                                        setShowProtonCachyConfirm(true);
+                                      }
+                                    }}
+                                  >
+                                    {isDownloadingProtonCachy ? (
+                                      <>
+                                        <Loader className="mr-2 h-4 w-4 animate-spin" />{" "}
+                                        {t("welcome.protonChecking")}
+                                      </>
+                                    ) : cachyOsInstalled ? (
+                                      <>
+                                        <CircleCheck className="mr-2 h-4 w-4" />{" "}
+                                        {t("common.installed")}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Download className="mr-2 h-4 w-4" />{" "}
+                                        {t("welcome.protonInstallCachy")}
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Alternative (Wine / UMU-Proton) */}
+                            <details className="rounded-xl border border-border bg-card/30 p-4">
+                              <summary className="cursor-pointer select-none text-sm font-medium text-muted-foreground">
+                                {t("welcome.alternatives")}
+                              </summary>
+                              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                {/* Proton-GE */}
+                                <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4">
+                                  <div>
+                                    <div className="mb-1 flex items-center gap-2">
+                                      <Rocket className="h-5 w-5 text-muted-foreground" />
+                                      <span className="font-bold text-muted-foreground">
+                                        Proton-GE
+                                      </span>
+                                    </div>
+                                    <p className="mb-3 text-xs text-muted-foreground">
+                                      {t("welcome.protonGEAltDesc")}
+                                      {protonGEInfo?.sizeFormatted && (
+                                        <span className="mt-1 block font-mono text-xs opacity-75">
+                                          {t("welcome.protonSize")}{" "}
+                                          {protonGEInfo.sizeFormatted}
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isDownloadingProtonGE}
+                                    className="w-full text-muted-foreground"
+                                    onClick={async () => {
+                                      if (!protonGEInfo) {
+                                        setIsDownloadingProtonGE(true);
+                                        try {
+                                          const info =
+                                            await window.electron.getProtonGEInfo();
+                                          if (!info.success)
+                                            throw new Error(info.error || info.message);
+                                          if (info.success) {
+                                            if (info.alreadyInstalled) {
+                                              const updated =
+                                                await window.electron.getRunners();
+                                              setRunnersList(updated);
+                                            } else {
+                                              setProtonGEInfo(info);
+                                              setShowProtonGEConfirm(true);
+                                            }
+                                          }
+                                        } catch (e) {
+                                          setSetupError(e.message);
+                                        }
+                                        setIsDownloadingProtonGE(false);
+                                      } else {
+                                        setShowProtonGEConfirm(true);
+                                      }
+                                    }}
+                                  >
+                                    {isDownloadingProtonGE ? (
+                                      <>
+                                        <Loader className="mr-2 h-4 w-4 animate-spin" />{" "}
+                                        {t("welcome.protonChecking")}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Download className="mr-2 h-4 w-4" />{" "}
+                                        {t("common.install")}
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+
+                                {/* Wine */}
+                                <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4">
+                                  <div>
+                                    <div className="mb-1 flex items-center gap-2">
+                                      <Wine className="h-5 w-5 text-muted-foreground" />
+                                      <span className="font-bold text-muted-foreground">
+                                        {t("welcome.systemWine")}
+                                      </span>
+                                    </div>
+                                    <p className="mb-3 text-xs text-muted-foreground">
+                                      {t("welcome.systemWineDesc")}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full text-muted-foreground"
+                                    disabled={installingWine}
+                                    onClick={installWine}
+                                  >
+                                    <FolderDownIcon className="mr-2 h-4 w-4" />{" "}
+                                    {t("welcome.installWine")}
+                                  </Button>
+                                </div>
+
+                                {/* UMU Proton */}
+                                <div className="flex flex-col justify-between rounded-xl border border-border bg-card/50 p-4 opacity-80">
+                                  <div>
+                                    <div className="mb-1 flex items-center gap-2">
+                                      <Rocket className="h-5 w-5 text-muted-foreground" />
+                                      <span className="font-bold text-muted-foreground">
+                                        UMU-Proton
+                                      </span>
+                                    </div>
+                                    <p className="mb-3 text-xs text-muted-foreground">
+                                      {t("welcome.umuProtonDesc")}
+                                      {umuProtonInfo?.sizeFormatted && (
+                                        <span className="mt-1 block font-mono text-xs opacity-75">
+                                          {t("welcome.latest")}: {umuProtonInfo.name} ·{" "}
+                                          {umuProtonInfo.sizeFormatted}
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isDownloadingUmuProton}
+                                    className="w-full text-muted-foreground"
+                                    onClick={async () => {
+                                      setIsDownloadingUmuProton(true);
+                                      try {
+                                        const result =
+                                          await window.electron.downloadUmuProton();
+                                        if (!result.success)
+                                          throw new Error(result.message || result.error);
+                                        if (result.success) {
+                                          const updated =
+                                            await window.electron.getRunners();
+                                          setRunnersList(updated);
+                                          await window.electron.updateSetting(
+                                            "linuxRunner",
+                                            result.path
+                                          );
+                                          const info =
+                                            await window.electron.getUmuProtonInfo();
+                                          if (info?.success) setUmuProtonInfo(info);
+                                        }
+                                      } catch (e) {
+                                        setSetupError(e.message);
+                                      }
+                                      setIsDownloadingUmuProton(false);
+                                    }}
+                                  >
+                                    {isDownloadingUmuProton ? (
+                                      <>
+                                        <Loader className="mr-2 h-4 w-4 animate-spin" />{" "}
+                                        {t("common.installing")}
+                                      </>
+                                    ) : umuProtonInfo?.alreadyInstalled ? (
+                                      <>
+                                        <CircleCheck className="mr-2 h-4 w-4" />{" "}
+                                        {t("common.installed")}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Download className="mr-2 h-4 w-4" />{" "}
+                                        {t("common.install")}
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </div>
+                            </details>
+
+                            {!umuInstalled && runnersList.length > 0 && (
+                              <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-left">
+                                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
+                                <p className="text-xs text-yellow-600">
+                                  {t("welcome.umuLauncherNotInstalled")}
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Navigation Buttons */}
+                        <div className="flex justify-center gap-3 pt-4">
+                          <Button
+                            variant="outline"
+                            size="lg"
+                            onClick={async () => {
+                              try {
+                                const runners = await window.electron.getRunners();
+                                setRunnersList(runners);
+                                const hasUmu =
+                                  isOnLinux && (await window.electron.isUmuInstalled());
+                                setUmuInstalled(hasUmu);
+                                setSetupError(
+                                  runners.length || hasUmu
+                                    ? ""
+                                    : t("welcome.noCompatibilityToolsFound")
+                                );
+                              } catch (error) {
+                                setSetupError(error.message);
+                              }
+                            }}
+                          >
+                            {t("welcome.checkAgain")}
+                          </Button>
+                          <Button
+                            onClick={() => handleNext()}
+                            size="lg"
+                            className={`px-12 py-6 text-lg ${runnersList.length > 0 || umuInstalled ? "text-secondary" : "text-foreground"}`}
+                            variant={
+                              runnersList.length > 0 || umuInstalled ? "default" : "ghost"
+                            }
+                          >
+                            {runnersList.length > 0 || umuInstalled
+                              ? t("welcome.continue")
+                              : t("welcome.skip")}
+                            <ArrowRight className="ml-2 h-5 w-5" />
+                          </Button>
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </motion.div>
+              )}
+
+              {step === "dependencies" && (
+                <SetupStep
+                  key="dependencies"
+                  icon={PackageOpen}
+                  title={t("welcome.setup.deps.title")}
+                  subtitle={t("welcome.setup.deps.subtitle")}
+                  wide
+                  footer={
+                    isInstalling ? null : depsOutcome && depsOutcome !== "skipped" ? (
+                      <>
+                        <Button
+                          size="lg"
+                          onClick={handleNext}
+                          className={primaryButtonClass}
+                        >
+                          {t("welcome.continue")}
+                          <ArrowRight className="ml-2 h-5 w-5" />
+                        </Button>
+                        {depsOutcome !== "installed" && (
+                          <Button
+                            variant="ghost"
+                            onClick={() => setShowDepsAlert(true)}
+                            className="text-muted-foreground hover:text-primary"
+                          >
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            {t("welcome.setup.deps.retry")}
+                          </Button>
                         )}
                       </>
-                    )}
-
-                    {/* Navigation Buttons */}
-                    <div className="flex justify-center gap-3 pt-4">
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        onClick={async () => {
-                          try {
-                            const runners = await window.electron.getRunners();
-                            setRunnersList(runners);
-                            const hasUmu =
-                              isOnLinux && (await window.electron.isUmuInstalled());
-                            setUmuInstalled(hasUmu);
-                            setSetupError(
-                              runners.length || hasUmu
-                                ? ""
-                                : t("welcome.noCompatibilityToolsFound")
-                            );
-                          } catch (error) {
-                            setSetupError(error.message);
-                          }
-                        }}
-                      >
-                        {t("welcome.checkAgain")}
-                      </Button>
-                      <Button
-                        onClick={() => handleNext()}
-                        size="lg"
-                        className={`px-12 py-6 text-lg ${runnersList.length > 0 || umuInstalled ? "text-secondary" : "text-foreground"}`}
-                        variant={
-                          runnersList.length > 0 || umuInstalled ? "default" : "ghost"
-                        }
-                      >
-                        {runnersList.length > 0 || umuInstalled
-                          ? t("welcome.continue")
-                          : t("welcome.skip")}
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                      </Button>
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </motion.div>
-          )}
-
-          {step === "dependencies" && (
-            <motion.div
-              key="dependencies"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <motion.div className="mb-8 text-center" variants={itemVariants}>
-                <WelcomeStepIcon icon={PackageOpen} />
-                <h2 className="text-4xl font-bold text-primary">
-                  {t("welcome.essentialDependencies")}
-                </h2>
-              </motion.div>
-              <motion.div className="mb-12 max-w-2xl space-y-6" variants={itemVariants}>
-                <p className="text-xl text-foreground/80">
-                  {t("welcome.dependenciesDesc")}
-                </p>
-                <div className="grid grid-cols-2 gap-4 text-left text-muted-foreground">
-                  {[
-                    {
-                      name: ".NET Framework",
-                      desc: t("welcome.requiredForModernGames"),
-                    },
-                    { name: "DirectX", desc: t("welcome.graphicsAndMultimedia") },
-                    { name: "OpenAL", desc: t("welcome.audioProcessing") },
-                    { name: "Visual C++", desc: t("welcome.runtimeComponents") },
-                    {
-                      name: "XNA Framework",
-                      desc: t("welcome.gameDevelopmentFramework"),
-                    },
-                  ].map(dep => (
-                    <div key={dep.name} className="flex items-start space-x-3 p-4">
-                      {dependencyStatus[dep.name].icon}
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => window.electron.openURL(dep.url)}
-                          className="font-medium transition-colors hover:text-primary"
+                    ) : (
+                      <>
+                        <Button
+                          size="lg"
+                          onClick={() => setShowDepsAlert(true)}
+                          className={primaryButtonClass}
                         >
-                          {dep.name}
-                        </button>
-                        <p className="text-sm text-foreground/60">{dep.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-
-              {isInstalling ? (
-                <motion.div className="w-full max-w-md space-y-4" variants={itemVariants}>
-                  <p className="text-lg text-foreground/80">
-                    {t("welcome.installingDependencies")} {progress}/{totalDependencies}
-                  </p>
-                  <p className="text-sm text-foreground/60">
-                    {t("welcome.pleaseWaitAndRespondToAdminPrompts")}
-                  </p>
-                  <Progress
-                    value={(progress / totalDependencies) * 100}
-                    className="h-2"
-                  />
-                </motion.div>
-              ) : (
-                <motion.div
-                  className="flex flex-col items-center space-y-6"
-                  variants={itemVariants}
+                          <Download className="mr-2 h-5 w-5" />
+                          {t("welcome.setup.deps.install")}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setDepsOutcome("skipped");
+                            handleNext();
+                          }}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          {t("welcome.setup.deps.skip")}
+                        </Button>
+                      </>
+                    )
+                  }
                 >
-                  <div className="flex justify-center space-x-4">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() => setShowDepsAlert(true)}
-                      className="px-8 py-6 text-muted-foreground transition-colors hover:text-primary"
-                    >
-                      {t("welcome.installDependencies")}
-                    </Button>
-
-                    <Button
-                      onClick={() => handleExit(true)}
-                      size="lg"
-                      className="px-8 py-6 text-secondary"
-                    >
-                      <Rocket className="mr-2 h-5 w-5 text-secondary" />
-                      <span className="text-secondary">
-                        {t("welcome.iHaveTheseTakeMeToTheTour")}
-                      </span>
-                    </Button>
+                  <div className="grid gap-2.5 text-left sm:grid-cols-2 lg:grid-cols-3">
+                    {DEPENDENCIES.map(dep => {
+                      const status = dependencyStatus[dep.name];
+                      return (
+                        <div
+                          key={dep.name}
+                          className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
+                            status === "failed"
+                              ? "border-amber-500/40 bg-amber-500/5"
+                              : status === "done"
+                                ? "border-green-500/30 bg-green-500/5"
+                                : "border-border/60 bg-card/30"
+                          }`}
+                        >
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            {status === "installing" ? (
+                              <Loader className="h-5 w-5 animate-spin" />
+                            ) : status === "done" ? (
+                              <CircleCheck className="h-5 w-5 text-green-500" />
+                            ) : status === "failed" ? (
+                              <AlertTriangle className="h-5 w-5 text-amber-500" />
+                            ) : (
+                              <PackageOpen className="h-5 w-5" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium">{dep.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {status === "installing"
+                                ? t("welcome.setup.deps.statusInstalling")
+                                : status === "done"
+                                  ? t("welcome.setup.deps.statusInstalled")
+                                  : status === "failed"
+                                    ? t("welcome.setup.deps.statusFailed")
+                                    : t(dep.descKey)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
 
-                  <button
-                    onClick={() => handleExit(false)}
-                    className="text-sm text-foreground/60 transition-colors hover:text-primary"
-                  >
-                    {t("welcome.skipTheTour")}
-                  </button>
-                </motion.div>
+                  {isInstalling && (
+                    <motion.div
+                      className="mx-auto mt-4 max-w-xl space-y-2"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                    >
+                      <Progress
+                        value={(progress / DEPENDENCIES.length) * 100}
+                        className="h-2"
+                      />
+                      <p className="text-sm font-medium">
+                        {t("welcome.setup.deps.installing", {
+                          done: Math.min(progress + 1, DEPENDENCIES.length),
+                          total: DEPENDENCIES.length,
+                        })}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {t("welcome.setup.deps.adminHint")}
+                      </p>
+                    </motion.div>
+                  )}
+
+                  {!isInstalling && depsOutcome && depsOutcome !== "skipped" && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`mx-auto mt-3 flex max-w-2xl items-start gap-3 rounded-xl border p-3 text-left ${
+                        depsOutcome === "installed"
+                          ? "border-green-500/40 bg-green-500/10"
+                          : "border-amber-500/30 bg-amber-500/10"
+                      }`}
+                    >
+                      {depsOutcome === "installed" ? (
+                        <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-500" />
+                      ) : (
+                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                      )}
+                      <div className="space-y-1 text-sm">
+                        {depsOutcome === "installed" ? (
+                          <p className="font-semibold">
+                            {t("welcome.setup.deps.allDone")}
+                          </p>
+                        ) : (
+                          <>
+                            <p className="font-semibold">
+                              {failedDependencies.length
+                                ? t("welcome.setup.deps.someFailed", {
+                                    names: failedDependencies.join(", "),
+                                  })
+                                : t("welcome.setup.deps.downloadFailed")}
+                            </p>
+                            <p className="text-muted-foreground">
+                              {t("welcome.setup.deps.someFailedDesc")}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </SetupStep>
               )}
-            </motion.div>
-          )}
 
-          {step === "installationComplete" && (
-            <motion.div
-              key="installationComplete"
-              className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8 text-center"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <motion.div className="mb-8 text-center" variants={itemVariants}>
-                <WelcomeStepIcon icon={CircleCheck} />
-                <h2 className="text-4xl font-bold text-primary">
-                  {t("welcome.allRequiredDependenciesHaveBeenInstalledTitle")}
-                </h2>
-              </motion.div>
-              <motion.p
-                className="mb-8 max-w-xl text-xl text-foreground/80"
-                variants={itemVariants}
-              >
-                {t("welcome.allRequiredDependenciesHaveBeenInstalledDesc")}
-              </motion.p>
+              {step === "finish" && (
+                <SetupStep
+                  key="finish"
+                  icon={Rocket}
+                  title={t("welcome.setup.finish.title")}
+                  subtitle={t("welcome.setup.finish.subtitle")}
+                  footer={
+                    <>
+                      <Button
+                        size="lg"
+                        onClick={() => handleExit(true)}
+                        className={primaryButtonClass}
+                      >
+                        {t("welcome.takeTour")}
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => handleExit(false)}
+                        className="text-sm text-muted-foreground transition-colors hover:text-primary"
+                      >
+                        {t("welcome.skipTour")}
+                      </button>
+                    </>
+                  }
+                >
+                  <div className={`${cardClass} divide-y divide-border/60 p-0 text-left`}>
+                    {[
+                      {
+                        icon: FolderDownIcon,
+                        label: t("welcome.setup.finish.folder"),
+                        value: downloadDirectory,
+                        mono: true,
+                        ok: !!downloadDirectory,
+                      },
+                      isOnWindows && {
+                        icon: ShieldCheck,
+                        label: t("welcome.setup.finish.protection"),
+                        value: protectResult?.success
+                          ? t("welcome.setup.finish.on")
+                          : t("welcome.setup.finish.off"),
+                        ok: !!protectResult?.success,
+                      },
+                      isOnWindows && {
+                        icon: PackageOpen,
+                        label: t("welcome.setup.finish.components"),
+                        value:
+                          depsOutcome === "installed"
+                            ? t("welcome.setup.finish.componentsInstalled")
+                            : depsOutcome === "partial"
+                              ? t("welcome.setup.finish.componentsPartial")
+                              : t("welcome.setup.finish.componentsSkipped"),
+                        ok: depsOutcome === "installed",
+                      },
+                      {
+                        icon: RefreshCw,
+                        label: t("welcome.setup.finish.updates"),
+                        value: autoUpdate
+                          ? t("welcome.setup.finish.automatic")
+                          : t("welcome.setup.finish.manual"),
+                        ok: autoUpdate,
+                      },
+                    ]
+                      .filter(Boolean)
+                      .map(({ icon: Icon, label, value, mono, ok }) => (
+                        <div key={label} className="flex items-center gap-3 px-4 py-2.5">
+                          <Icon className="h-4 w-4 shrink-0 text-primary" />
+                          <span className="shrink-0 text-sm font-medium">{label}</span>
+                          <span
+                            className={`ml-auto min-w-0 truncate text-right text-sm text-muted-foreground ${mono ? "font-mono" : ""}`}
+                            title={value}
+                          >
+                            {value}
+                          </span>
+                          {ok ? (
+                            <CircleCheck className="h-4 w-4 shrink-0 text-green-500" />
+                          ) : (
+                            <span className="h-4 w-4 shrink-0 rounded-full border-2 border-muted-foreground/40" />
+                          )}
+                        </div>
+                      ))}
+                  </div>
 
-              <motion.div
-                className="flex flex-col items-center space-y-4"
-                variants={itemVariants}
-              >
-                <Button
-                  onClick={() => handleExit(true)}
-                  size="lg"
-                  className="px-8 py-6 text-secondary"
-                >
-                  <Rocket className="mr-2 h-5 w-5" />
-                  {t("welcome.takeTour")}
-                </Button>
-                <button
-                  onClick={() => handleExit(false)}
-                  className="text-sm text-foreground/60 transition-colors hover:text-primary"
-                >
-                  {t("welcome.skipTour")}
-                </button>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                  <div className="mt-3 flex items-start gap-3 rounded-xl border border-primary/25 bg-primary/5 p-3 text-left">
+                    <Users className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                    <p className="text-sm leading-relaxed">
+                      {t("welcome.setup.finish.onlineTip")}
+                    </p>
+                  </div>
+                </SetupStep>
+              )}
+            </AnimatePresence>
+          </StepDirectionContext.Provider>
+        </MotionConfig>
       </div>
       {/* Proton CachyOS Download Confirmation Dialog */}
       {showProtonCachyConfirm && protonCachyInfo && (
