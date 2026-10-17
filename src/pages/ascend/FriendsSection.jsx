@@ -1,13 +1,14 @@
 import SectionHeader from "./SectionHeader";
+import { EmptyState, Panel, StatStrip } from "./primitives";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   Users,
   User,
   Eye,
-  EyeOff,
   Circle,
   Moon,
+  EyeOff,
   Loader2,
   Search,
   MessageCircle,
@@ -18,6 +19,104 @@ import {
   Hammer,
 } from "lucide-react";
 
+const STATUS_DOT = {
+  online: "bg-green-500",
+  away: "bg-yellow-500",
+  busy: "bg-red-500",
+  offline: "bg-gray-400",
+};
+
+function FriendRow({ friend, status, t, onView, onMessage, onRemove }) {
+  const isOffline = status === "offline";
+  const subtitle = isOffline
+    ? t("ascend.status.offline")
+    : friend.customMessage || t(`ascend.status.${status}`);
+
+  return (
+    <li className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30">
+      <button
+        onClick={onView}
+        className="relative shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        aria-label={friend.displayName}
+      >
+        <span
+          className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-full ${
+            isOffline ? "bg-muted" : "bg-primary"
+          }`}
+        >
+          {friend.photoURL ? (
+            <>
+              <img
+                src={friend.photoURL}
+                alt=""
+                onError={event => {
+                  event.currentTarget.style.display = "none";
+                  event.currentTarget.nextElementSibling?.classList.remove("hidden");
+                }}
+                className={`h-full w-full object-cover ${isOffline ? "opacity-70" : ""}`}
+                referrerPolicy="no-referrer"
+              />
+              <User className="hidden h-5 w-5 text-secondary" aria-hidden="true" />
+            </>
+          ) : (
+            <User
+              className={`h-5 w-5 ${isOffline ? "text-muted-foreground" : "text-secondary"}`}
+              aria-hidden="true"
+            />
+          )}
+        </span>
+        <span
+          className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${STATUS_DOT[status]}`}
+        />
+      </button>
+
+      <button onClick={onView} className="min-w-0 flex-1 text-left outline-none">
+        <p
+          className={`flex items-center gap-1 truncate text-sm font-medium transition-colors group-hover:text-foreground ${
+            isOffline ? "text-muted-foreground" : ""
+          }`}
+        >
+          {friend.displayName}
+          {friend.owner && <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />}
+          {friend.contributor && <Hammer className="h-3.5 w-3.5 shrink-0 text-orange-500" />}
+          {friend.verified && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-blue-500" />}
+        </p>
+        <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+      </button>
+
+      <div className="flex shrink-0 gap-0.5 opacity-60 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 text-muted-foreground hover:text-primary"
+          onClick={onView}
+          aria-label={t("ascend.friends.viewProfile", { defaultValue: "View profile" })}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 text-muted-foreground hover:text-primary"
+          onClick={onMessage}
+          aria-label={t("ascend.profile.message")}
+        >
+          <MessageCircle className="h-4 w-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 text-muted-foreground hover:text-red-500"
+          onClick={onRemove}
+          aria-label={t("ascend.friends.remove", { defaultValue: "Remove friend" })}
+        >
+          <UserMinus className="h-4 w-4" />
+        </Button>
+      </div>
+    </li>
+  );
+}
+
 export default function FriendsSection({
   friends,
   t,
@@ -27,16 +126,21 @@ export default function FriendsSection({
   handleStartConversation,
   handleRemoveFriend,
 }) {
-  const onlineFriends = friends.filter(f => f.status === "online");
-  const awayFriends = friends.filter(f => f.status === "away");
-  const busyFriends = friends.filter(f => f.status === "busy");
-  const offlineFriends = friends.filter(
-    f => !["online", "away", "busy"].includes(f.status)
-  );
+  const statusOf = friend =>
+    ["online", "away", "busy"].includes(friend.status) ? friend.status : "offline";
+  const onlineFriends = friends.filter(f => statusOf(f) === "online");
+  const awayFriends = friends.filter(f => ["away", "busy"].includes(statusOf(f)));
+  const offlineFriends = friends.filter(f => statusOf(f) === "offline");
+
+  const groups = [
+    { id: "online", label: t("ascend.friends.onlineNow"), list: onlineFriends },
+    { id: "away", label: t("ascend.friends.awayOrBusy"), list: awayFriends },
+    { id: "offline", label: t("ascend.friends.offlineSection"), list: offlineFriends },
+  ].filter(group => group.list.length > 0);
+
   return (
-    <div className="space-y-6">
+    <div className="mb-24 space-y-6">
       <SectionHeader
-        icon={Users}
         title={t("ascend.friends.title")}
         description={t("ascend.friends.subtitle", {
           defaultValue: "Connect and play with your friends",
@@ -52,410 +156,69 @@ export default function FriendsSection({
         }
       />
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Users className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{friends.length}</p>
-              <p className="text-xs text-muted-foreground">
-                {t("ascend.friends.totalFriends") || "Total Friends"}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
-              <Circle className="h-5 w-5 fill-green-500 text-green-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{onlineFriends.length}</p>
-              <p className="text-xs text-muted-foreground">
-                {t("ascend.friends.online") || "Online"}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-500/10">
-              <Moon className="h-5 w-5 text-yellow-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{awayFriends.length}</p>
-              <p className="text-xs text-muted-foreground">
-                {t("ascend.friends.away") || "Away"}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-500/10">
-              <EyeOff className="h-5 w-5 text-gray-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{offlineFriends.length}</p>
-              <p className="text-xs text-muted-foreground">
-                {t("ascend.friends.offline") || "Offline"}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {loadingFriends ? (
-        <div className="flex justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       ) : friends.length > 0 ? (
-        <div className="space-y-4">
-          {/* Online Friends Section */}
-          {onlineFriends.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1">
-                <div className="h-2 w-2 rounded-full bg-green-500" />
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  {t("ascend.friends.onlineNow") || "Online Now"} ({onlineFriends.length})
-                </h3>
-              </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                {onlineFriends.map(friend => (
-                  <motion.div
-                    key={friend.uid}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="group relative overflow-hidden rounded-xl border border-green-500/20 bg-gradient-to-r from-green-500/5 to-transparent p-4 transition-all hover:border-green-500/40 hover:shadow-lg hover:shadow-green-500/5"
-                  >
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleViewProfile(friend.uid, "friends")}
-                        className="relative shrink-0"
-                      >
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/70 ring-2 ring-green-500/30 transition-all group-hover:ring-green-500/50">
-                          {friend.photoURL ? (
-                            <>
-                              <img
-                                src={friend.photoURL}
-                                alt={friend.displayName}
-                                onError={event => {
-                                  event.currentTarget.style.display = "none";
-                                  event.currentTarget.nextElementSibling?.classList.remove(
-                                    "hidden"
-                                  );
-                                }}
-                                className="h-full w-full rounded-full object-cover"
-                                referrerPolicy="no-referrer"
-                              />
-                              <User
-                                className="hidden h-6 w-6 text-primary-foreground"
-                                aria-hidden="true"
-                              />
-                            </>
-                          ) : (
-                            <User
-                              className="h-6 w-6 text-primary-foreground"
-                              aria-hidden="true"
-                            />
-                          )}
-                        </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card bg-green-500" />
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <button
-                          onClick={() => handleViewProfile(friend.uid, "friends")}
-                          className="block text-left"
-                        >
-                          <p className="flex items-center gap-1 truncate font-semibold transition-colors hover:text-primary">
-                            {friend.displayName}
-                            {friend.owner && (
-                              <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
-                            )}
-                            {friend.contributor && (
-                              <Hammer className="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                            )}
-                            {friend.verified && (
-                              <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-                            )}
-                          </p>
-                        </button>
-                        <p className="truncate text-xs text-green-600 dark:text-green-400">
-                          {friend.customMessage || t("ascend.status.online")}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => handleViewProfile(friend.uid, "friends")}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => handleStartConversation(friend.uid)}
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="hover:text-destructive h-8 w-8 text-muted-foreground"
-                          onClick={() => handleRemoveFriend(friend.uid)}
-                        >
-                          <UserMinus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          )}
+        <>
+          <StatStrip
+            stats={[
+              { icon: Users, label: t("ascend.friends.totalFriends"), value: friends.length },
+              { icon: Circle, label: t("ascend.friends.online"), value: onlineFriends.length },
+              { icon: Moon, label: t("ascend.friends.away"), value: awayFriends.length },
+              { icon: EyeOff, label: t("ascend.friends.offline"), value: offlineFriends.length },
+            ]}
+          />
 
-          {/* Away/Busy Friends Section */}
-          {(awayFriends.length > 0 || busyFriends.length > 0) && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1">
-                <div className="h-2 w-2 rounded-full bg-yellow-500" />
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  {t("ascend.friends.awayOrBusy") || "Away / Busy"} (
-                  {awayFriends.length + busyFriends.length})
-                </h3>
-              </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                {[...awayFriends, ...busyFriends].map(friend => (
-                  <motion.div
-                    key={friend.uid}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="group relative overflow-hidden rounded-xl border border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 to-transparent p-4 transition-all hover:border-yellow-500/40 hover:shadow-lg hover:shadow-yellow-500/5"
-                  >
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleViewProfile(friend.uid, "friends")}
-                        className="relative shrink-0"
-                      >
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/70 ring-2 ring-yellow-500/30 transition-all group-hover:ring-yellow-500/50">
-                          {friend.photoURL ? (
-                            <>
-                              <img
-                                src={friend.photoURL}
-                                alt={friend.displayName}
-                                onError={event => {
-                                  event.currentTarget.style.display = "none";
-                                  event.currentTarget.nextElementSibling?.classList.remove(
-                                    "hidden"
-                                  );
-                                }}
-                                className="h-full w-full rounded-full object-cover"
-                                referrerPolicy="no-referrer"
-                              />
-                              <User
-                                className="hidden h-6 w-6 text-primary-foreground"
-                                aria-hidden="true"
-                              />
-                            </>
-                          ) : (
-                            <User
-                              className="h-6 w-6 text-primary-foreground"
-                              aria-hidden="true"
-                            />
-                          )}
-                        </div>
-                        <div
-                          className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card ${friend.status === "busy" ? "bg-red-500" : "bg-yellow-500"}`}
-                        />
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <button
-                          onClick={() => handleViewProfile(friend.uid, "friends")}
-                          className="block text-left"
-                        >
-                          <p className="flex items-center gap-1 truncate font-semibold transition-colors hover:text-primary">
-                            {friend.displayName}
-                            {friend.owner && (
-                              <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
-                            )}
-                            {friend.contributor && (
-                              <Hammer className="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                            )}
-                            {friend.verified && (
-                              <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-                            )}
-                          </p>
-                        </button>
-                        <p className="truncate text-xs text-yellow-600 dark:text-yellow-400">
-                          {friend.customMessage ||
-                            (friend.status === "busy"
-                              ? t("ascend.status.busy")
-                              : t("ascend.status.away"))}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => handleViewProfile(friend.uid, "friends")}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => handleStartConversation(friend.uid)}
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="hover:text-destructive h-8 w-8 text-muted-foreground"
-                          onClick={() => handleRemoveFriend(friend.uid)}
-                        >
-                          <UserMinus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Offline Friends Section */}
-          {offlineFriends.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1">
-                <div className="h-2 w-2 rounded-full bg-gray-500" />
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  {t("ascend.friends.offlineSection") || "Offline"} (
-                  {offlineFriends.length})
-                </h3>
-              </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                {offlineFriends.map(friend => (
-                  <motion.div
-                    key={friend.uid}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="group relative overflow-hidden rounded-xl border border-border/50 bg-card/30 p-4 transition-all hover:border-border hover:bg-card/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleViewProfile(friend.uid, "friends")}
-                        className="relative shrink-0"
-                      >
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-muted to-muted/70 opacity-75 transition-all group-hover:opacity-100">
-                          {friend.photoURL ? (
-                            <>
-                              <img
-                                src={friend.photoURL}
-                                alt={friend.displayName}
-                                onError={event => {
-                                  event.currentTarget.style.display = "none";
-                                  event.currentTarget.nextElementSibling?.classList.remove(
-                                    "hidden"
-                                  );
-                                }}
-                                className="h-full w-full rounded-full object-cover"
-                                referrerPolicy="no-referrer"
-                              />
-                              <User
-                                className="hidden h-6 w-6 text-primary-foreground"
-                                aria-hidden="true"
-                              />
-                            </>
-                          ) : (
-                            <User
-                              className="h-6 w-6 text-primary-foreground"
-                              aria-hidden="true"
-                            />
-                          )}
-                        </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card bg-gray-500" />
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <button
-                          onClick={() => handleViewProfile(friend.uid, "friends")}
-                          className="block text-left"
-                        >
-                          <p className="flex items-center gap-1 truncate font-semibold text-muted-foreground transition-colors hover:text-foreground">
-                            {friend.displayName}
-                            {friend.owner && (
-                              <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
-                            )}
-                            {friend.contributor && (
-                              <Hammer className="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                            )}
-                            {friend.verified && (
-                              <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-                            )}
-                          </p>
-                        </button>
-                        <p className="truncate text-xs text-muted-foreground/70">
-                          {t("ascend.status.offline")}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => handleViewProfile(friend.uid, "friends")}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => handleStartConversation(friend.uid)}
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="hover:text-destructive h-8 w-8 text-muted-foreground"
-                          onClick={() => handleRemoveFriend(friend.uid)}
-                        >
-                          <UserMinus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-dashed border-border bg-card/30 p-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <Users className="h-8 w-8 text-primary" />
+          <div className="space-y-5">
+            {groups.map((group, index) => (
+              <motion.section
+                key={group.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="space-y-2"
+              >
+                <h2 className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className={`h-2 w-2 rounded-full ${STATUS_DOT[group.id]}`} />
+                  {group.label}
+                  <span className="font-normal normal-case tracking-normal">
+                    {group.list.length}
+                  </span>
+                </h2>
+                <Panel as="ul" className="divide-y divide-border/40 overflow-hidden">
+                  {group.list.map(friend => (
+                    <FriendRow
+                      key={friend.uid}
+                      friend={friend}
+                      status={statusOf(friend)}
+                      t={t}
+                      onView={() => handleViewProfile(friend.uid, "friends")}
+                      onMessage={() => handleStartConversation(friend.uid)}
+                      onRemove={() => handleRemoveFriend(friend.uid)}
+                    />
+                  ))}
+                </Panel>
+              </motion.section>
+            ))}
           </div>
-          <h3 className="text-lg font-semibold">{t("ascend.friends.empty")}</h3>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
-            {t("ascend.friends.emptyHint")}
-          </p>
-          <Button
-            className="mt-6 gap-2 text-secondary"
-            onClick={() => setActiveSection("search")}
-          >
-            <Search className="h-4 w-4" />
-            {t("ascend.friends.findFriends")}
-          </Button>
-        </div>
+        </>
+      ) : (
+        <EmptyState
+          icon={Users}
+          title={t("ascend.friends.empty")}
+          description={t("ascend.friends.emptyHint")}
+          action={
+            <Button
+              className="gap-2 text-secondary"
+              onClick={() => setActiveSection("search")}
+            >
+              <Search className="h-4 w-4" />
+              {t("ascend.friends.findFriends")}
+            </Button>
+          }
+        />
       )}
     </div>
   );

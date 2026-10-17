@@ -313,23 +313,41 @@
       "deleteError": "Failed to delete backup",
       "deleteSuccess": "Backup deleted successfully",
       "deleteTitle": "Delete Backup?",
+      "download": "Download",
       "downloadError": "Failed to download backup",
-      "downloadStarted": "Download started",
       "downloadingBackup": "Downloading backup from cloud...",
+      "downloadStarted": "Download started",
       "fileTooLarge": "File too large (max 100MB)",
       "fillAllFields": "Please fill in all fields",
       "filterByGame": "Filter by game name...",
+      "hideOlder": "Hide older versions",
+      "latest": "Latest",
       "loadError": "Failed to load backups",
       "noBackups": "No backups found",
+      "onThisPC": "On this PC",
+      "restore": "Restore",
+      "restoreConfirm": "Restore saves",
+      "restoreDesc": "This replaces the current save files for this game with the {{date}} backup. Close the game first, and back up your current saves if you might want them later.",
       "restoreError": "Failed to restore backup",
       "restoreSuccess": "Backup restored successfully",
+      "restoreTitle": "Restore {{game}}?",
       "restoringBackup": "Restoring backup...",
+      "showOlder_one": "Show {{count}} older version",
+      "showOlder_other": "Show {{count}} older versions",
+      "stats": {
+        "backups": "Backups",
+        "games": "Games",
+        "lastBackup": "Last backup",
+        "storage": "Storage used"
+      },
       "subscriptionRequired": "Active Ascend subscription required",
       "subscriptionRequiredDesc": "Cloud backups require an active Ascend subscription. Upgrade to access this feature.",
       "subtitle": "Game save files stored with Ascend so you can restore them on another PC.",
       "title": "Save Backups",
       "uploadError": "Failed to upload backup",
       "uploadSuccess": "Backup uploaded successfully",
+      "versions_one": "{{count}} version",
+      "versions_other": "{{count}} versions",
       "viewPlans": "View Plans",
       "yourBackups": "Saved Game Files"
     },
@@ -528,11 +546,13 @@
       "cloudLibrary": "Game Library",
       "community": "Community",
       "companion": "Companion",
+      "findPeople": "Find People",
       "friends": "Friends",
       "home": "Home",
       "leaderboard": "Leaderboard",
       "messages": "Messages",
       "notifications": "Notifications",
+      "overview": "Overview",
       "premium": "Premium Features",
       "requests": "Requests",
       "search": "Search",
@@ -545,6 +565,53 @@
       "loading": "Loading notifications...",
       "subtitle": "Stay updated with important announcements and updates",
       "title": "Notifications"
+    },
+    "overview": {
+      "communityTitle": "Community",
+      "companion": {
+        "description": "Check downloads and your library from your phone.",
+        "title": "Companion"
+      },
+      "descNever": "Run your first sync to store your games, playtime and achievements with Ascend, then restore them on any PC.",
+      "descSynced": "Games, playtime, achievements and saves follow you to any PC. Sync after you play to keep everything current.",
+      "friendsOnline": "{{count}} online",
+      "headlineNever": "Back up your library to the cloud",
+      "headlineSynced": "Your library is safe in the cloud",
+      "library": {
+        "count": "{{count}} games",
+        "description": "Every synced game with its playtime, launches and achievements.",
+        "title": "Game Library"
+      },
+      "libraryBackups": {
+        "description": "Back up or restore whole game installs.",
+        "title": "Library Backups"
+      },
+      "open": "Open",
+      "recentTitle": "Recently played",
+      "restore": "Restore to this PC",
+      "retro": {
+        "description": "Memory cards and save folders from your emulators.",
+        "title": "Retro Saves"
+      },
+      "saves": {
+        "count": "{{count}} backups",
+        "description": "Game save files stored with Ascend, ready to restore on another PC.",
+        "empty": "No backups yet",
+        "latest": "Latest: {{game}}",
+        "title": "Save Backups"
+      },
+      "stats": {
+        "achievements": "Achievements",
+        "games": "Games synced",
+        "playtime": "Playtime",
+        "saves": "Save backups"
+      },
+      "statusNever": "Not synced yet",
+      "statusSynced": "Synced {{time}}",
+      "syncNow": "Sync now",
+      "toolsTitle": "Cloud tools",
+      "unread": "Unread",
+      "viewAll": "View all"
     },
     "premium": {
       "autoUpdate": {
@@ -587,6 +654,24 @@
         "description": "Send and accept friend requests, build your gaming network, and see when your friends are online. Connect with other Ascendara users and grow your community.",
         "title": "Friends System"
       },
+      "groups": {
+        "cloud": {
+          "description": "Your games, saves and progress, kept safe and available on every PC.",
+          "title": "Cloud"
+        },
+        "early": {
+          "description": "See what's next before everyone else.",
+          "title": "Early Access"
+        },
+        "games": {
+          "description": "Faster, smarter ways to get games and keep them running.",
+          "title": "Downloads & Games"
+        },
+        "social": {
+          "description": "Play alongside friends and the rest of the Ascendara community.",
+          "title": "Community"
+        }
+      },
       "leaderboard": {
         "description": "Compete with the community on the public leaderboard. See how your stats stack up against other players and climb the ranks.",
         "title": "Public Leaderboard"
@@ -603,6 +688,7 @@
         "description": "Seamlessly manage your Nexus mods for supported games. Browse, install, and organize mods directly within Ascendara.",
         "title": "Nexus Mod Managing"
       },
+      "open": "Open",
       "profile": {
         "description": "Set up your personalized profile with a custom bio, showcase your gaming preferences, and let others know what you're all about. Make your profile uniquely yours.",
         "title": "Profile & Bio"
@@ -973,6 +1059,7 @@
       "upgrade": "Join Ascend",
       "upgradeShort": "Join",
       "verified": "Verified User",
+      "verifiedLabel": "Verified",
       "verifiedShort": "✓"
     },
     "upcoming": {

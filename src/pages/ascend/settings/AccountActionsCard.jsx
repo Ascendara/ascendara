@@ -60,7 +60,7 @@ export default function AccountActionsCard({
         whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.99 }}
         onClick={handleLogout}
-        className="group flex w-full items-center justify-between rounded-xl border border-border/50 bg-card/50 p-4 text-left backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-card"
+        className="group flex w-full items-center justify-between rounded-xl border border-border/50 bg-card/60 p-4 text-left transition-all hover:border-primary/30 hover:bg-card"
       >
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50 transition-colors group-hover:bg-primary/10">
@@ -82,7 +82,7 @@ export default function AccountActionsCard({
           <motion.button
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.99 }}
-            className="group flex w-full items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4 text-left backdrop-blur-sm transition-all hover:border-primary/40 hover:bg-primary/10"
+            className="group flex w-full items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4 text-left transition-all hover:border-primary/40 hover:bg-primary/10"
           >
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">

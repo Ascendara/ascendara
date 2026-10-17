@@ -1,4 +1,5 @@
 import SectionHeader from "./SectionHeader";
+import { EmptyState } from "./primitives";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,8 +62,8 @@ export default function LeaderboardSection({
       {loadingLeaderboard ? (
         <div className="flex flex-col items-center justify-center py-20">
           <div className="relative">
-            <div className="h-20 w-20 rounded-full border-4 border-yellow-500/20" />
-            <div className="absolute inset-0 h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-yellow-500" />
+            <div className="h-20 w-20 rounded-full border-4 border-primary/20" />
+            <div className="absolute inset-0 h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-primary" />
           </div>
           <p className="mt-6 text-muted-foreground">
             {t("ascend.leaderboard.loading") || "Loading leaderboard..."}
@@ -75,7 +76,7 @@ export default function LeaderboardSection({
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-2xl border border-red-500/30 bg-gradient-to-r from-red-500/10 to-orange-500/10 p-5"
+              className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5"
             >
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500/20">
@@ -103,7 +104,7 @@ export default function LeaderboardSection({
                 onClick={() => handleViewProfile(player.uid)}
                 className={`group relative min-w-0 overflow-hidden rounded-2xl border p-5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   index === 0
-                    ? "border-primary/30 bg-gradient-to-b from-primary/10 to-card/70 sm:order-2 sm:py-7"
+                    ? "border-primary/40 bg-card/60 sm:order-2 sm:py-7"
                     : index === 1
                       ? "border-border/60 bg-card/60 hover:border-primary/30 sm:order-1"
                       : "border-border/60 bg-card/60 hover:border-primary/30 sm:order-3"
@@ -121,7 +122,7 @@ export default function LeaderboardSection({
                 </div>
                 <div className="flex flex-col items-center text-center">
                   <div
-                    className={`mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-primary/10 text-primary ring-1 ring-border/50 ${index === 0 ? "sm:h-20 sm:w-20" : ""}`}
+                    className={`mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary ring-1 ring-border/50 ${index === 0 ? "sm:h-20 sm:w-20" : ""}`}
                   >
                     {player.photoURL ? (
                       <img
@@ -181,11 +182,11 @@ export default function LeaderboardSection({
               transition={{ delay: 0.4 }}
               className="space-y-3"
             >
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-muted-foreground">
-                <Award className="h-5 w-5" />
+              <h2 className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Award className="h-3.5 w-3.5" />
                 Runner-ups
               </h2>
-              <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/50">
+              <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
                 {leaderboardData.runnerUps.map((user, index) => (
                   <motion.button
                     type="button"
@@ -194,16 +195,16 @@ export default function LeaderboardSection({
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: Math.min(index * 0.03, 0.2) }}
                     onClick={() => handleViewProfile(user.uid)}
-                    className="group flex w-full items-center gap-3 border-b border-border/40 p-4 text-left outline-none transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:gap-4"
+                    className="group flex w-full items-center gap-3 border-b border-border/40 px-4 py-3 text-left outline-none transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:gap-4"
                   >
                     {/* Rank */}
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted/50 font-bold text-muted-foreground">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center text-sm font-semibold tabular-nums text-muted-foreground">
                       {index + 4}
                     </div>
 
                     {/* Avatar */}
                     <div className="relative shrink-0">
-                      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-md">
+                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary">
                         {user.photoURL ? (
                           <img
                             src={user.photoURL}
@@ -212,7 +213,7 @@ export default function LeaderboardSection({
                             referrerPolicy="no-referrer"
                           />
                         ) : (
-                          <span className="text-lg font-bold text-white">
+                          <span className="text-sm font-semibold text-secondary">
                             {user.displayName?.[0]?.toUpperCase() || "U"}
                           </span>
                         )}
@@ -222,7 +223,7 @@ export default function LeaderboardSection({
                     {/* Info */}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1">
-                        <h3 className="truncate font-semibold">{user.displayName}</h3>
+                        <h3 className="truncate text-sm font-semibold">{user.displayName}</h3>
                         {user.owner && <Crown className="h-4 w-4 text-yellow-500" />}
                         {user.contributor && (
                           <Hammer className="h-4 w-4 text-orange-500" />
@@ -231,13 +232,13 @@ export default function LeaderboardSection({
                           <BadgeCheck className="h-4 w-4 text-blue-500" />
                         )}
                       </div>
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <Star className="h-3.5 w-3.5 text-primary" />
+                          <Star className="h-3.5 w-3.5" />
                           Level {user.level}
                         </span>
                         <span className="flex items-center gap-1">
-                          <Zap className="h-3.5 w-3.5 text-yellow-500" />
+                          <Zap className="h-3.5 w-3.5" />
                           {user.xp?.toLocaleString()} XP
                         </span>
                       </div>
@@ -246,16 +247,16 @@ export default function LeaderboardSection({
                     {/* Stats */}
                     <div className="hidden shrink-0 items-center gap-4 text-sm text-muted-foreground sm:flex">
                       <span className="flex items-center gap-1">
-                        <Clock className="h-4 w-4 text-violet-500" />
+                        <Clock className="h-4 w-4" />
                         {formatPlaytimeHours(user.totalPlaytime)}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Gamepad2 className="h-4 w-4 text-emerald-500" />
+                        <Gamepad2 className="h-4 w-4" />
                         {user.totalGames}
                       </span>
                     </div>
 
-                    <ChevronRight className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
                   </motion.button>
                 ))}
               </div>
@@ -263,33 +264,17 @@ export default function LeaderboardSection({
           )}
         </>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="relative overflow-hidden rounded-2xl border-2 border-dashed border-yellow-500/30 bg-gradient-to-br from-yellow-500/5 via-transparent to-amber-500/5 p-12 text-center"
-        >
-          <div className="absolute -right-20 -top-20 h-48 w-48 rounded-full bg-yellow-500/10 blur-3xl" />
-          <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl" />
-          <div className="relative">
-            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 shadow-lg">
-              <Trophy className="h-10 w-10 text-yellow-500/50" />
-            </div>
-            <h2 className="text-2xl font-bold">
-              {t("ascend.leaderboard.empty") || "No leaderboard data yet"}
-            </h2>
-            <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-              {t("ascend.leaderboard.emptyDescription") ||
-                "Sync your profile to appear on the leaderboard and compete with other players!"}
-            </p>
-            <Button
-              onClick={() => setActiveSection("home")}
-              className="mt-6 gap-2 text-secondary"
-            >
+        <EmptyState
+          icon={Trophy}
+          title={t("ascend.leaderboard.empty")}
+          description={t("ascend.leaderboard.emptyDescription")}
+          action={
+            <Button onClick={() => setActiveSection("home")} className="gap-2 text-secondary">
               <CloudUpload className="h-4 w-4" />
-              {t("ascend.leaderboard.syncProfile") || "Sync Your Profile"}
+              {t("ascend.leaderboard.syncProfile")}
             </Button>
-          </div>
-        </motion.div>
+          }
+        />
       )}
     </div>
   );

@@ -4,7 +4,7 @@ import { Eye, LockIcon } from "lucide-react";
 
 export default function PrivacySettingsCard({ t, userData, updateData }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+    <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
       <div className="flex items-center justify-between border-b border-border/50 p-5">
         <div className="flex items-center gap-2">
           <LockIcon className="mb-3 h-5 w-5 text-primary" />

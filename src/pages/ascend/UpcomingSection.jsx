@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import SectionHeader from "./SectionHeader";
+import { EmptyState } from "./primitives";
 import { Button } from "@/components/ui/button";
 import {
   Loader2,
@@ -35,8 +36,8 @@ export default function UpcomingSection({
       {loadingUpcoming ? (
         <div className="flex flex-col items-center justify-center py-32">
           <div className="relative">
-            <div className="h-20 w-20 rounded-full border-4 border-violet-500/20" />
-            <div className="absolute inset-0 h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-violet-500" />
+            <div className="h-20 w-20 rounded-full border-4 border-primary/20" />
+            <div className="absolute inset-0 h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-primary" />
           </div>
           <p className="mt-6 text-muted-foreground">
             {t("ascend.upcoming.loading") || "Loading upcoming changes..."}
@@ -48,28 +49,24 @@ export default function UpcomingSection({
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-500/20 via-purple-500/10 to-fuchsia-500/10 p-8"
+            className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/60 p-6 sm:p-8"
           >
-            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
-            <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-purple-500/20 blur-3xl" />
-            <div className="absolute left-1/2 top-0 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-violet-500/50 to-transparent" />
-
             <div className="relative">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex min-w-0 flex-1 items-start gap-5">
                   <div className="mt-1 flex-shrink-0">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-xl shadow-violet-500/30">
-                      <Sparkles className="h-8 w-8 text-white" />
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                      <Sparkles className="h-8 w-8 text-primary" />
                     </div>
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="mb-3 flex flex-wrap items-center gap-3">
                       {upcomingEntry.major && (
-                        <span className="rounded-full bg-gradient-to-r from-violet-500 to-purple-500 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-violet-500/30">
+                        <span className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-secondary">
                           MAJOR UPDATE
                         </span>
                       )}
-                      <span className="rounded-lg border border-violet-500/20 bg-violet-500/10 px-3 py-1.5 font-mono text-sm font-semibold text-violet-600 dark:text-violet-400">
+                      <span className="rounded-lg border border-primary/20 bg-primary/10 px-3 py-1.5 font-mono text-sm font-semibold text-primary">
                         v{upcomingEntry.version}
                       </span>
                       <span className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -133,7 +130,7 @@ export default function UpcomingSection({
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: tagIndex * 0.1 }}
-                      className="rounded-2xl border border-border/50 bg-card/50 p-6"
+                      className="rounded-2xl border border-border/50 bg-card/60 p-6"
                     >
                       <h3 className="mb-4 text-xl font-semibold">{parentTag}</h3>
                       <div className="space-y-4">
@@ -284,32 +281,23 @@ export default function UpcomingSection({
           </div>
         </>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="rounded-3xl border border-dashed border-border/50 bg-card/30 p-16 text-center"
-        >
-          <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-500/20 to-purple-500/20">
-            <Check className="h-12 w-12 text-violet-500" />
-          </div>
-          <h2 className="mb-3 text-2xl font-bold">
-            {t("ascend.upcoming.upToDate") || "You're up to date!"}
-          </h2>
-          <p className="mx-auto max-w-md text-muted-foreground">
-            {t("ascend.upcoming.noUpcoming") ||
-              "There are no upcoming updates at this time. Check back later!"}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadUpcomingChangelog}
-            disabled={loadingUpcoming}
-            className="mt-6 gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            {t("ascend.upcoming.refresh") || "Refresh"}
-          </Button>
-        </motion.div>
+        <EmptyState
+          icon={Check}
+          title={t("ascend.upcoming.upToDate")}
+          description={t("ascend.upcoming.noUpcoming")}
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadUpcomingChangelog}
+              disabled={loadingUpcoming}
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {t("ascend.upcoming.refresh")}
+            </Button>
+          }
+        />
       )}
     </div>
   );

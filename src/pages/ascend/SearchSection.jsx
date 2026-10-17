@@ -1,5 +1,6 @@
 import { useState } from "react";
 import SectionHeader from "./SectionHeader";
+import { EmptyState, Panel } from "./primitives";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +57,7 @@ export default function SearchSection({
             <Input
               aria-label={t("ascend.search.placeholder")}
               placeholder={t("ascend.search.placeholder")}
-              className="h-12 rounded-xl border-border/50 bg-background/50 pl-12 text-base"
+              className="h-11 rounded-xl border-border/50 bg-card/60 pl-12"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
@@ -64,7 +65,7 @@ export default function SearchSection({
           <Button
             type="submit"
             disabled={isSearching || !searchQuery.trim()}
-            className="h-12 rounded-xl px-6 text-secondary"
+            className="h-11 rounded-xl px-6 text-secondary"
           >
             {isSearching ? (
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -84,7 +85,7 @@ export default function SearchSection({
           {[0, 1, 2].map(index => (
             <div
               key={index}
-              className="flex animate-pulse items-center gap-4 rounded-2xl border border-border/50 bg-card/50 p-5 motion-reduce:animate-none"
+              className="flex animate-pulse items-center gap-4 rounded-2xl border border-border/50 bg-card/60 p-5 motion-reduce:animate-none"
             >
               <div className="h-12 w-12 rounded-xl bg-muted" />
               <div className="flex-1 space-y-3">
@@ -95,27 +96,24 @@ export default function SearchSection({
           ))}
         </div>
       ) : searchResults.length > 0 ? (
-        <div className="space-y-3">
-          <p className="px-1 text-sm text-muted-foreground">
-            {t("ascend.search.resultsCount", { count: searchResults.length }) ||
-              `${searchResults.length} users found`}
+        <div className="space-y-2">
+          <p className="px-1 text-xs text-muted-foreground">
+            {t("ascend.search.resultsCount", { count: searchResults.length })}
           </p>
+          <Panel as="ul" className="divide-y divide-border/40 overflow-hidden">
           {searchResults.map((result, index) => (
-            <motion.div
+            <motion.li
               key={result.uid}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(index * 0.03, 0.2) }}
-              className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 transition-colors hover:border-primary/30 hover:bg-card focus-within:border-primary/40"
+              className="group relative transition-colors hover:bg-muted/30 focus-within:bg-muted/30"
             >
-              {/* Background glow on hover */}
-              <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-primary/5 opacity-0 blur-3xl transition-opacity group-hover:opacity-100" />
-
-              <div className="relative w-full p-5 text-left">
+              <div className="relative w-full px-4 py-3 text-left">
                 <div className="relative flex flex-wrap items-center gap-4">
                   {/* Avatar with status */}
                   <div className="relative shrink-0">
-                    <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 ring-1 ring-border/50">
+                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary">
                       {result.photoURL ? (
                         <>
                           <img
@@ -143,7 +141,7 @@ export default function SearchSection({
                       )}
                     </div>
                     <div
-                      className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-card shadow-sm ${
+                      className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${
                         result.status === "online"
                           ? "bg-green-500"
                           : result.status === "away"
@@ -158,7 +156,7 @@ export default function SearchSection({
                   {/* User Info */}
                   <div className="min-w-0 flex-1 basis-40">
                     <div className="mb-1 flex items-center gap-2">
-                      <h3 className="min-w-0 truncate text-base font-semibold">
+                      <h3 className="min-w-0 truncate text-sm font-semibold">
                         <button
                           type="button"
                           onClick={() => handleViewProfile(result.uid)}
@@ -168,13 +166,13 @@ export default function SearchSection({
                         </button>
                       </h3>
                       {result.owner && (
-                        <Crown className="h-5 w-5 shrink-0 text-yellow-500" />
+                        <Crown className="h-4 w-4 shrink-0 text-yellow-500" />
                       )}
                       {result.contributor && (
-                        <Hammer className="h-5 w-5 shrink-0 text-orange-500" />
+                        <Hammer className="h-4 w-4 shrink-0 text-orange-500" />
                       )}
                       {result.verified && (
-                        <BadgeCheck className="h-5 w-5 shrink-0 text-blue-500" />
+                        <BadgeCheck className="h-4 w-4 shrink-0 text-blue-500" />
                       )}
                       {!result.private && result.level > 1 && (
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
@@ -182,7 +180,7 @@ export default function SearchSection({
                         </span>
                       )}
                       {result.private && (
-                        <span className="flex items-center gap-1 rounded-full bg-yellow-500/10 px-2 py-0.5 text-xs font-medium text-yellow-600 dark:text-yellow-400">
+                        <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                           <LockIcon className="h-3 w-3" />
                           {t("ascend.profile.private") || "Private"}
                         </span>
@@ -191,7 +189,7 @@ export default function SearchSection({
 
                     {/* Bio */}
                     {!result.private && result.bio && (
-                      <p className="mb-2 line-clamp-1 text-sm text-muted-foreground">
+                      <p className="mb-1 line-clamp-1 text-xs text-muted-foreground">
                         {result.bio}
                       </p>
                     )}
@@ -250,10 +248,10 @@ export default function SearchSection({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="rounded-xl bg-background/50"
+                            className="rounded-xl"
                             disabled
                           >
-                            <UserCheck className="mr-2 h-4 w-4 text-green-500" />
+                            <UserCheck className="mr-2 h-4 w-4" />
                             {t("ascend.friends.friends") || "Friends"}
                           </Button>
                         );
@@ -262,10 +260,10 @@ export default function SearchSection({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="rounded-xl bg-background/50"
+                            className="rounded-xl"
                             disabled
                           >
-                            <Clock className="mr-2 h-4 w-4 text-amber-500" />
+                            <Clock className="mr-2 h-4 w-4" />
                             {t("ascend.friends.requestPending") || "Pending"}
                           </Button>
                         );
@@ -274,10 +272,10 @@ export default function SearchSection({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="rounded-xl bg-background/50"
+                            className="rounded-xl"
                             disabled
                           >
-                            <Inbox className="mr-2 h-4 w-4 text-blue-500" />
+                            <Inbox className="mr-2 h-4 w-4" />
                             {t("ascend.friends.requestReceived") || "Request Received"}
                           </Button>
                         );
@@ -286,7 +284,7 @@ export default function SearchSection({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="rounded-xl bg-background/50"
+                            className="rounded-xl"
                             onClick={e => {
                               e.stopPropagation();
                               handleSendRequest(result.uid);
@@ -302,39 +300,22 @@ export default function SearchSection({
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </motion.li>
           ))}
+          </Panel>
         </div>
       ) : submittedQuery !== null ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="rounded-2xl border border-border/50 bg-card/50 p-12 text-center"
-        >
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/50">
-            <Search className="h-8 w-8 text-muted-foreground/50" />
-          </div>
-          <h3 className="mb-1 text-lg font-semibold">
-            {t("ascend.search.noResultsTitle") || "No users found"}
-          </h3>
-          <p className="text-sm text-muted-foreground">{t("ascend.search.noResults")}</p>
-        </motion.div>
+        <EmptyState
+          icon={Search}
+          title={t("ascend.search.noResultsTitle")}
+          description={t("ascend.search.noResults")}
+        />
       ) : (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="rounded-2xl border border-dashed border-border/50 bg-card/30 p-12 text-center"
-        >
-          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10">
-            <Users className="h-10 w-10 text-primary/50" />
-          </div>
-          <h3 className="mb-1 text-lg font-semibold">
-            {t("ascend.search.startSearching") || "Start searching"}
-          </h3>
-          <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-            {t("ascend.search.hint")}
-          </p>
-        </motion.div>
+        <EmptyState
+          icon={Users}
+          title={t("ascend.search.startSearching")}
+          description={t("ascend.search.hint")}
+        />
       )}
     </div>
   );

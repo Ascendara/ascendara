@@ -48,26 +48,11 @@ export default function SubscriptionSettingsCard({
   handleSubscribe,
 }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/50">
-      {/* Animated background effects for subscribed/verified users */}
-      {(ascendAccess.isSubscribed || ascendAccess.isVerified) && (
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div
-            className={`absolute -right-20 -top-20 h-64 w-64 rounded-full blur-3xl ${ascendAccess.isVerified ? "bg-gradient-to-br from-blue-500/20 to-cyan-500/10" : "bg-gradient-to-br from-yellow-500/20 to-amber-500/10"}`}
-          />
-          <div
-            className={`absolute -bottom-20 -left-20 h-64 w-64 rounded-full blur-3xl ${ascendAccess.isVerified ? "bg-gradient-to-br from-violet-500/20 to-blue-500/10" : "bg-gradient-to-br from-primary/20 to-violet-500/10"}`}
-          />
-          <div
-            className={`absolute left-1/2 top-0 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent to-transparent ${ascendAccess.isVerified ? "via-blue-500/50" : "via-yellow-500/50"}`}
-          />
-        </div>
-      )}
-
+    <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/60">
       <div className="relative flex items-center justify-between border-b border-border/50 p-5">
         <div className="flex items-center gap-2">
           <div
-            className={`flex h-8 w-8 items-center justify-center rounded-lg ${ascendAccess.isVerified ? "bg-gradient-to-br from-blue-500/20 to-cyan-500/20" : ascendAccess.isSubscribed ? "bg-gradient-to-br from-yellow-500/20 to-amber-500/20" : "bg-primary/10"}`}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg ${ascendAccess.isVerified ? "bg-muted/60" : ascendAccess.isSubscribed ? "bg-muted/60" : "bg-primary/10"}`}
           >
             {ascendAccess.isVerified ? (
               <BadgeCheck className="h-4 w-4 text-blue-500" />
@@ -80,14 +65,14 @@ export default function SubscriptionSettingsCard({
           <h2 className="mt-2 font-semibold">{t("ascend.settings.subscription")}</h2>
         </div>
         {ascendAccess.isVerified ? (
-          <div className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-500/20 to-cyan-500/20 px-3 py-1">
+          <div className="flex items-center gap-1.5 rounded-full bg-blue-500/10 px-3 py-1">
             <BadgeCheck className="h-3.5 w-3.5 text-blue-500" />
             <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
               VERIFIED
             </span>
           </div>
         ) : ascendAccess.isSubscribed ? (
-          <div className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-yellow-500/20 to-amber-500/20 px-3 py-1">
+          <div className="flex items-center gap-1.5 rounded-full bg-yellow-500/10 px-3 py-1">
             <Sparkle className="h-3.5 w-3.5 text-yellow-500" />
             <span className="text-xs font-medium text-yellow-600 dark:text-yellow-400">
               PRO
@@ -125,7 +110,7 @@ export default function SubscriptionSettingsCard({
           <div className="space-y-6">
             <div className="flex items-center gap-4">
               <div className="relative">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/25">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-500">
                   <BadgeCheck className="h-8 w-8 text-white" />
                 </div>
                 <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-background">
@@ -134,7 +119,7 @@ export default function SubscriptionSettingsCard({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="bg-gradient-to-r from-blue-500 to-cyan-600 bg-clip-text text-xl font-bold text-transparent">
+                  <h3 className="text-xl font-bold">
                     {t("ascend.settings.verifiedUser") || "Verified User"}
                   </h3>
                 </div>
@@ -149,9 +134,8 @@ export default function SubscriptionSettingsCard({
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 p-4 ring-1 ring-emerald-500/20"
+                className="group relative overflow-hidden rounded-xl bg-muted/40 p-4 ring-1 ring-border/50"
               >
-                <div className="absolute -right-4 -top-4 h-12 w-12 rounded-full bg-emerald-500/10 blur-xl transition-all group-hover:bg-emerald-500/20" />
                 <p className="mb-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                   {t("ascend.settings.status")}
                 </p>
@@ -167,9 +151,8 @@ export default function SubscriptionSettingsCard({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 p-4 ring-1 ring-blue-500/20"
+                className="group relative overflow-hidden rounded-xl bg-muted/40 p-4 ring-1 ring-border/50"
               >
-                <div className="absolute -right-4 -top-4 h-12 w-12 rounded-full bg-blue-500/10 blur-xl transition-all group-hover:bg-blue-500/20" />
                 <p className="mb-1 text-xs font-medium text-blue-600 dark:text-blue-400">
                   {t("ascend.settings.accessType") || "Access Type"}
                 </p>
@@ -179,7 +162,7 @@ export default function SubscriptionSettingsCard({
               </motion.div>
             </div>
 
-            <div className="rounded-xl bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-violet-500/10 p-4 ring-1 ring-blue-500/20">
+            <div className="rounded-xl bg-muted/40 p-4 ring-1 ring-border/50">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20">
                   <Heart className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -216,7 +199,7 @@ export default function SubscriptionSettingsCard({
             )}
             <div className="flex items-center gap-4">
               <div className="relative">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-yellow-500 to-amber-600 shadow-lg shadow-yellow-500/25">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-yellow-500">
                   <BadgeDollarSign className="h-8 w-8 text-white" />
                 </div>
                 <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-background">
@@ -225,7 +208,7 @@ export default function SubscriptionSettingsCard({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="bg-gradient-to-r from-yellow-500 to-amber-600 bg-clip-text text-xl font-bold text-transparent">
+                  <h3 className="text-xl font-bold">
                     {t("ascend.settings.ascendSubscription") || "Ascend"}
                   </h3>
                 </div>
@@ -239,9 +222,8 @@ export default function SubscriptionSettingsCard({
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 p-4 ring-1 ring-emerald-500/20"
+                className="group relative overflow-hidden rounded-xl bg-muted/40 p-4 ring-1 ring-border/50"
               >
-                <div className="absolute -right-4 -top-4 h-12 w-12 rounded-full bg-emerald-500/10 blur-xl transition-all group-hover:bg-emerald-500/20" />
                 <p className="mb-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                   {t("ascend.settings.status")}
                 </p>
@@ -257,9 +239,8 @@ export default function SubscriptionSettingsCard({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 p-4 ring-1 ring-primary/20"
+                className="group relative overflow-hidden rounded-xl bg-muted/40 p-4 ring-1 ring-border/50"
               >
-                <div className="absolute -right-4 -top-4 h-12 w-12 rounded-full bg-primary/10 blur-xl transition-all group-hover:bg-primary/20" />
                 <p className="mb-1 text-xs font-medium text-primary">
                   {t("ascend.settings.billingCycle")}
                 </p>
@@ -273,7 +254,7 @@ export default function SubscriptionSettingsCard({
               </motion.div>
             </div>
 
-            <div className="rounded-xl bg-gradient-to-r from-yellow-500/10 via-amber-500/10 to-orange-500/10 p-4 ring-1 ring-yellow-500/20">
+            <div className="rounded-xl bg-muted/40 p-4 ring-1 ring-border/50">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-500/20">
                   <Heart className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
@@ -314,7 +295,7 @@ export default function SubscriptionSettingsCard({
           <div className="space-y-5">
             <div className="flex items-center gap-4">
               <div className="relative">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-600/20 ring-2 ring-emerald-500/20">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/60">
                   <BadgeCheck className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
                 </div>
               </div>
@@ -333,7 +314,7 @@ export default function SubscriptionSettingsCard({
               </div>
             </div>
 
-            <div className="rounded-xl bg-gradient-to-br from-primary/10 to-violet-500/10 p-4 ring-1 ring-primary/20">
+            <div className="rounded-xl bg-muted/40 p-4 ring-1 ring-border/50">
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-sm font-medium">
                   {t("ascend.settings.trialProgress")}
@@ -352,12 +333,12 @@ export default function SubscriptionSettingsCard({
                     width: `${((7 - (isDev && devSubscriptionState === "trial" ? 5 : ascendAccess.daysRemaining)) / 7) * 100}%`,
                   }}
                   transition={{ duration: 1, ease: "easeOut" }}
-                  className="h-full rounded-full bg-gradient-to-r from-primary to-violet-500"
+                  className="h-full rounded-full bg-primary"
                 />
               </div>
             </div>
 
-            <div className="rounded-xl bg-gradient-to-r from-emerald-500/10 via-green-500/10 to-teal-500/10 p-4 ring-1 ring-emerald-500/20">
+            <div className="rounded-xl bg-muted/40 p-4 ring-1 ring-border/50">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/20">
                   <Sparkle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -443,7 +424,7 @@ export default function SubscriptionSettingsCard({
 
             {!deletedAccountWarning ? (
               <Button
-                className="h-12 w-full gap-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/25 transition-all hover:scale-[1.02] hover:shadow-yellow-500/40"
+                className="h-12 w-full gap-2 text-secondary"
                 onClick={handleSubscribe}
               >
                 <Crown className="h-4 w-4" />
@@ -460,7 +441,7 @@ export default function SubscriptionSettingsCard({
           // No Access / Trial Expired - Premium Features Showcase
           <div className="space-y-5">
             <div className="text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-600/20 ring-2 ring-yellow-500/20">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/60">
                 <Crown className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
               </div>
               <h3 className="text-xl font-bold">
@@ -570,7 +551,7 @@ export default function SubscriptionSettingsCard({
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  className="group relative flex items-start gap-3 rounded-lg bg-gradient-to-r from-muted/50 to-muted/30 p-3 transition-colors hover:from-primary/10 hover:to-primary/5"
+                  className="group relative flex items-start gap-3 rounded-lg bg-muted/40 p-3 transition-colors hover:bg-primary/5"
                 >
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
                     <feature.icon className="h-4 w-4 text-primary" />
@@ -592,7 +573,7 @@ export default function SubscriptionSettingsCard({
 
             {!deletedAccountWarning ? (
               <Button
-                className="h-12 w-full gap-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg shadow-yellow-500/25 transition-all hover:scale-[1.02] hover:shadow-yellow-500/40"
+                className="h-12 w-full gap-2 text-secondary"
                 onClick={handleSubscribe}
               >
                 <Crown className="h-4 w-4" />

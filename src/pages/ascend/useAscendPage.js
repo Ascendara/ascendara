@@ -6,7 +6,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useNavigate } from "react-router-dom";
 import { getUserAuthHeaders, userAuthenticatedFetch } from "@/utils/authHelper";
-import { retroBackupPlatform, restoreRetroCloudBackup } from "@/services/retroService";
+import { retroBackupPlatform } from "@/services/retroService";
+import { restoreCloudSave } from "@/services/restoreCloudSave";
 import { checkForUpdates } from "@/services/updateCheckingService";
 import gameService from "@/services/gameService";
 import imageCacheService from "@/services/imageCacheService";
@@ -304,7 +305,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     if (user?.uid && !showDisplayNamePrompt) {
       if (!cloudOnly) loadFriendsData();
       if (!cloudOnly) loadRequestsData();
-      // Note: User status is loaded by AscendSidebar and synced via onStatusChange prop
+      // Note: User status is loaded by AscendNavBar and synced via onStatusChange prop
       loadProfileStats();
       loadLocalStats();
       loadCloudLibrary();
@@ -445,13 +446,16 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     };
   }, []);
 
-  // Load backups when cloudbackups section is accessed
+  // Load backups when cloudbackups section is accessed; the overview only
+  // needs a summary, so it fetches once per session
+  const overviewBackupsLoadedRef = useRef(false);
   useEffect(() => {
-    if (
-      activeSection === "cloudbackups" &&
-      user?.uid &&
-      (ascendAccess.isSubscribed || ascendAccess.isVerified)
-    ) {
+    if (!user?.uid || !(ascendAccess.isSubscribed || ascendAccess.isVerified)) return;
+    if (activeSection === "cloudbackups") {
+      overviewBackupsLoadedRef.current = true;
+      loadBackups();
+    } else if (activeSection === "home" && !overviewBackupsLoadedRef.current) {
+      overviewBackupsLoadedRef.current = true;
       loadBackups();
     }
   }, [activeSection, user?.uid, ascendAccess.isSubscribed, ascendAccess.isVerified]);
@@ -1521,7 +1525,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         setSelectedBackupFile(null);
         setBackupGameName("");
         setBackupName("");
-        loadBackups(backupFilterGame || null);
+        loadBackups();
       } else if (result.code === "SUBSCRIPTION_REQUIRED") {
         toast.error(
           t("ascend.cloudBackups.subscriptionRequired") ||
@@ -1557,80 +1561,16 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     }
   };
 
-  const handleRestoreBackup = async (backupId, gameName, backupName) => {
-    setRestoringBackup(backupId);
+  // Same restore path as Big Picture: validates the cloud zip and restores
+  // through Ludusavi (or the Retro service for emulator saves)
+  const handleRestoreBackup = async backup => {
+    setRestoringBackup(backup.backupId);
     try {
-      const retroPlatform = retroBackupPlatform(gameName);
-      if (retroPlatform) {
-        const result = await restoreRetroCloudBackup(retroPlatform, backupId);
-        if (result) toast.success(`Restored ${result.restored} Retro save files`);
-        setRestoringBackup(null);
-        return;
-      }
-      // Get download URL from backend
-      const result = await getBackupDownloadUrl(backupId);
-      if (!result.downloadUrl) {
-        if (result.code === "SUBSCRIPTION_REQUIRED") {
-          toast.error(
-            t("ascend.cloudBackups.subscriptionRequired") ||
-              "Active Ascend subscription required"
-          );
-        } else {
-          toast.error(result.error || "Failed to get download URL");
-        }
-        setRestoringBackup(null);
-        return;
-      }
-
-      // Download the backup file
-      toast.info(
-        t("ascend.cloudBackups.downloadingBackup") || "Downloading backup from cloud..."
-      );
-
-      const response = await fetch(result.downloadUrl);
-      if (!response.ok) {
-        throw new Error("Failed to download backup file");
-      }
-
-      const blob = await response.blob();
-      const arrayBuffer = await blob.arrayBuffer();
-      const buffer = new Uint8Array(arrayBuffer);
-
-      // Save to temp location
-      const tempPath = await window.electron.getTempPath();
-      const backupFilePath = `${tempPath}/ascendara-restore-${crypto.randomUUID()}.zip`;
-      await window.electron.writeFile(backupFilePath, buffer);
-
-      // Extract and restore using Ludusavi
-      toast.info(t("ascend.cloudBackups.restoringBackup") || "Restoring backup...");
-
-      const restoreResult = await window.electron.ludusavi({
-        action: "restore",
-        gameName: gameName,
-        path: backupFilePath,
-      });
-
-      if (restoreResult.success) {
-        toast.success(
-          t("ascend.cloudBackups.restoreSuccess") || "Backup restored successfully"
-        );
-      } else {
-        toast.error(
-          restoreResult.error ||
-            t("ascend.cloudBackups.restoreError") ||
-            "Failed to restore backup"
-        );
-      }
-
-      // Clean up temp file
-      try {
-        await window.electron.deleteFile(backupFilePath);
-      } catch (cleanupErr) {
-        console.warn("Failed to clean up temp file:", cleanupErr);
-      }
+      await restoreCloudSave(backup, settings);
+      toast.success(t("ascend.cloudBackups.restoreSuccess"));
     } catch (e) {
       console.error("Failed to restore backup:", e);
-      toast.error(t("ascend.cloudBackups.restoreError") || "Failed to restore backup");
+      toast.error(e.message || t("ascend.cloudBackups.restoreError"));
     }
     setRestoringBackup(null);
   };
@@ -1643,7 +1583,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         toast.success(
           t("ascend.cloudBackups.deleteSuccess") || "Backup deleted successfully"
         );
-        loadBackups(backupFilterGame || null);
+        loadBackups();
       } else if (result.code === "SUBSCRIPTION_REQUIRED") {
         toast.error(
           t("ascend.cloudBackups.subscriptionRequired") ||
@@ -3016,6 +2956,9 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     loadingBackups,
     setBackupFilterGame,
     backups,
+    restoringBackup,
+    handleRestoreBackup,
+    handleDownloadBackup,
     deletingBackup,
     handleDeleteBackup,
     setUserStatus,

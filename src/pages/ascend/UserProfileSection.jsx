@@ -1,3 +1,4 @@
+import { StatStrip } from "./primitives";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -84,16 +85,16 @@ export default function UserProfileSection({
         <>
           {/* Private Account Warning */}
           {viewingProfile.private && (
-            <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-6">
+            <div className="rounded-2xl border border-border/50 bg-card/60 p-5">
               <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-yellow-500/20">
-                  <LockIcon className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
+                  <LockIcon className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-yellow-600 dark:text-yellow-400">
+                  <h3 className="font-semibold">
                     {t("ascend.profile.privateAccount") || "Private Account"}
                   </h3>
-                  <p className="text-sm text-yellow-600/80 dark:text-yellow-400/80">
+                  <p className="text-sm text-muted-foreground">
                     {t("ascend.profile.privateAccountMessage") ||
                       "This user has set their account to private. Their profile details, games, and achievements are hidden."}
                   </p>
@@ -103,17 +104,12 @@ export default function UserProfileSection({
           )}
 
           {/* Profile Header */}
-          <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90">
-            {/* Background decoration */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-violet-500/5" />
-            <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-primary/10 blur-3xl" />
-            <div className="absolute -bottom-20 -left-20 h-60 w-60 rounded-full bg-violet-500/10 blur-3xl" />
-
-            <div className="relative p-8">
+          <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/60">
+            <div className="relative p-6 sm:p-8">
               <div className="flex flex-col items-start gap-6 md:flex-row">
                 {/* Avatar */}
                 <div className="relative shrink-0">
-                  <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 shadow-2xl shadow-primary/30 ring-4 ring-background">
+                  <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl bg-primary ring-4 ring-background">
                     {viewingProfile.photoURL ? (
                       <img
                         src={viewingProfile.photoURL}
@@ -203,7 +199,7 @@ export default function UserProfileSection({
                     <div className="flex flex-wrap items-center gap-3">
                       {viewingProfile.country && (
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <Globe className="h-4 w-4 text-blue-500" />
+                          <Globe className="h-4 w-4" />
                           <span>{viewingProfile.country}</span>
                         </div>
                       )}
@@ -394,41 +390,25 @@ export default function UserProfileSection({
             </div>
           </div>
 
-          {/* Stats Grid - only show if not private */}
+          {/* Stats - only show if not private */}
           {!viewingProfile.private && (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              <div className="rounded-2xl border border-border/50 bg-card/50 p-5">
-                <div className="mb-2 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                    <Clock className="h-5 w-5 text-primary" />
-                  </div>
-                </div>
-                <p className="text-2xl font-bold">
-                  {Math.floor(viewingProfile.totalPlaytime / 3600)}h
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {t("ascend.profile.totalPlaytime") || "Total Playtime"}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/50 bg-card/50 p-5">
-                <div className="mb-2 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10">
-                    <Gamepad2 className="h-5 w-5 text-violet-500" />
-                  </div>
-                </div>
-                <p className="text-2xl font-bold">{viewingProfile.gamesPlayed}</p>
-                <p className="text-sm text-muted-foreground">
-                  {t("ascend.profile.gamesPlayed") || "Games Played"}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/50 bg-card/50 p-5">
-                <div className="mb-2 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
-                    <Trophy className="h-5 w-5 text-amber-500" />
-                  </div>
-                </div>
-                <p className="text-2xl font-bold">
-                  {viewingProfile.unlockedAchievements ||
+            <StatStrip
+              stats={[
+                {
+                  icon: Clock,
+                  label: t("ascend.profile.totalPlaytime"),
+                  value: `${Math.floor((viewingProfile.totalPlaytime || 0) / 3600)}h`,
+                },
+                {
+                  icon: Gamepad2,
+                  label: t("ascend.profile.gamesPlayed"),
+                  value: viewingProfile.gamesPlayed || 0,
+                },
+                {
+                  icon: Trophy,
+                  label: t("ascend.profile.achievements"),
+                  value:
+                    viewingProfile.unlockedAchievements ||
                     viewingProfile.achievements?.reduce(
                       (acc, game) =>
                         acc +
@@ -437,31 +417,20 @@ export default function UserProfileSection({
                           0),
                       0
                     ) ||
-                    0}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {t("ascend.profile.achievements") || "Achievements"}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/50 bg-card/50 p-5">
-                <div className="mb-2 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
-                    <Star className="h-5 w-5 text-emerald-500" />
-                  </div>
-                </div>
-                <p className="text-2xl font-bold">
-                  {viewingProfile.xp?.toLocaleString() || 0}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {t("ascend.profile.totalXP") || "Total XP"}
-                </p>
-              </div>
-            </div>
+                    0,
+                },
+                {
+                  icon: Star,
+                  label: t("ascend.profile.totalXP"),
+                  value: viewingProfile.xp?.toLocaleString() || 0,
+                },
+              ]}
+            />
           )}
 
           {/* Top Games - only show if not private */}
           {!viewingProfile.private && viewingProfile.games?.length > 0 && (
-            <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+            <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
               <div className="flex items-center justify-between border-b border-border/50 p-5">
                 <div className="flex items-center gap-2">
                   <Gamepad2 className="h-5 w-5 text-primary" />
@@ -482,7 +451,7 @@ export default function UserProfileSection({
                       key={game.name}
                       className="flex items-center gap-4 p-4 transition-colors hover:bg-muted/30"
                     >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-violet-500/20 text-lg font-bold text-primary">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/60 text-lg font-bold text-primary">
                         {index + 1}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -521,7 +490,7 @@ export default function UserProfileSection({
             viewingProfile.achievements?.some(g =>
               g.achievements?.some(a => a.achieved)
             ) && (
-              <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+              <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
                 <div className="flex items-center gap-2 border-b border-border/50 p-5">
                   <Trophy className="h-5 w-5 text-amber-500" />
                   <h2 className="font-semibold">

@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import AscendSidebar from "@/components/AscendSidebar";
+import AscendNavBar from "@/components/AscendNavBar";
 import SubscriptionPlanDialog from "@/components/SubscriptionPlanDialog";
 import { toast } from "sonner";
 import {
@@ -21,6 +21,7 @@ import {
 import { lazy, Suspense } from "react";
 import useAscendPage from "./ascend/useAscendPage";
 import SectionLoading from "./ascend/SectionLoading";
+import CommunityTabs, { COMMUNITY_SECTIONS } from "./ascend/CommunityTabs";
 const HomeSection = lazy(() => import("./ascend/HomeSection"));
 const SearchSection = lazy(() => import("./ascend/SearchSection"));
 const FriendsSection = lazy(() => import("./ascend/FriendsSection"));
@@ -62,19 +63,11 @@ const Ascend = () => {
     handlePlanSelection,
     userData,
     activeSection,
-    userStatus,
     setActiveSection,
     friends,
     incomingRequests,
     localStats,
-    formatPlaytime,
     loadingLocalStats,
-    recentGames,
-    gameImages,
-    loadingProfileStats,
-    profileStats,
-    handleSyncProfile,
-    isSyncingProfile,
     handleSearch,
     searchQuery,
     setSearchQuery,
@@ -204,6 +197,9 @@ const Ascend = () => {
     backups,
     deletingBackup,
     handleDeleteBackup,
+    restoringBackup,
+    handleRestoreBackup,
+    handleDownloadBackup,
     setUserStatus,
     isLogin,
     accountExistsError,
@@ -612,6 +608,8 @@ const Ascend = () => {
       return `${hours}h ${minutes}m`;
     };
 
+    const isCommunitySection = COMMUNITY_SECTIONS.includes(activeSection);
+
     // Render content based on active section
     const renderContent = () => {
       switch (activeSection) {
@@ -619,21 +617,24 @@ const Ascend = () => {
           return (
             <HomeSection
               user={user}
-              userStatus={userStatus}
               t={t}
               setActiveSection={setActiveSection}
+              ascendAccess={ascendAccess}
               friends={friends}
               incomingRequests={incomingRequests}
+              conversations={conversations}
               localStats={localStats}
-              formatPlaytime={formatPlaytime}
               loadingLocalStats={loadingLocalStats}
-              recentGames={recentGames}
-              gameImages={gameImages}
               formatPlaytimeDetailed={formatPlaytimeDetailed}
-              loadingProfileStats={loadingProfileStats}
-              profileStats={profileStats}
-              handleSyncProfile={handleSyncProfile}
-              isSyncingProfile={isSyncingProfile}
+              cloudLibrary={cloudLibrary}
+              loadingCloudLibrary={loadingCloudLibrary}
+              cloudLibraryImages={cloudLibraryImages}
+              handleSyncLibrary={handleSyncLibrary}
+              isSyncingLibrary={isSyncingLibrary}
+              handleRestoreFromCloud={handleRestoreFromCloud}
+              isRestoringFromCloud={isRestoringFromCloud}
+              backups={backups}
+              loadingBackups={loadingBackups}
             />
           );
 
@@ -871,11 +872,15 @@ const Ascend = () => {
               backups={backups}
               deletingBackup={deletingBackup}
               handleDeleteBackup={handleDeleteBackup}
+              restoringBackup={restoringBackup}
+              handleRestoreBackup={handleRestoreBackup}
+              handleDownloadBackup={handleDownloadBackup}
+              cloudLibraryImages={cloudLibraryImages}
             />
           );
 
         case "premium":
-          return <PremiumSection t={t} />;
+          return <PremiumSection t={t} setActiveSection={setActiveSection} />;
 
         default:
           return null;
@@ -884,9 +889,8 @@ const Ascend = () => {
 
     return (
       <>
-        <div className="fixed inset-0 flex bg-background">
-          {/* Sidebar */}
-          <AscendSidebar
+        <div className="fixed inset-0 flex flex-col bg-background">
+          <AscendNavBar
             activeSection={activeSection}
             onSectionChange={setActiveSection}
             user={user}
@@ -894,18 +898,32 @@ const Ascend = () => {
             onStatusChange={setUserStatus}
             ascendAccess={ascendAccess}
             onSubscribe={handleSubscribe}
+            badges={{
+              requests: incomingRequests.length,
+              messages: conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0),
+            }}
           />
 
           {/* Main content */}
           <div
-            className={`min-h-0 min-w-0 flex-1 bg-muted/10 px-4 pt-[calc(60px+1.5rem)] sm:px-6 lg:px-10 lg:pt-[calc(60px+2rem)] ${activeSection === "messages" ? "flex flex-col overflow-hidden pb-32" : "overflow-y-auto pb-6 lg:pb-8"}`}
+            className={`min-h-0 min-w-0 flex-1 px-4 pt-6 sm:px-6 lg:px-10 lg:pt-8 ${activeSection === "messages" ? "flex flex-col overflow-hidden pb-32" : "overflow-y-auto pb-6 lg:pb-8"}`}
           >
+            {isCommunitySection && (
+              <div className="mx-auto w-full max-w-6xl">
+                <CommunityTabs
+                  t={t}
+                  activeSection={activeSection}
+                  setActiveSection={setActiveSection}
+                  requestCount={incomingRequests.length}
+                />
+              </div>
+            )}
             <motion.div
               key={activeSection}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
-              className={`mx-auto w-full ${activeSection === "messages" ? "min-h-0 flex-1 max-w-6xl" : activeSection === "leaderboard" ? "max-w-6xl" : "max-w-4xl"}`}
+              className={`mx-auto w-full max-w-6xl ${activeSection === "messages" ? "min-h-0 flex-1" : ""}`}
             >
               {<Suspense fallback={<SectionLoading />}>{renderContent()}</Suspense>}
             </motion.div>

@@ -1,17 +1,51 @@
 import SectionHeader from "./SectionHeader";
+import { Panel } from "./primitives";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import {
-  Loader2,
-  Sparkles,
-  UserPlus,
-  Check,
-  X,
-  Clock,
-  Send,
-  UserCheck,
-  Inbox,
-} from "lucide-react";
+import { Loader2, UserPlus, Check, X, Send, UserCheck, Inbox } from "lucide-react";
+
+function RequestList({ icon: Icon, title, emptyIcon: EmptyIcon, emptyTitle, emptyHint, children, count }) {
+  return (
+    <Panel className="flex flex-col overflow-hidden">
+      <div className="flex items-center gap-2 border-b border-border/50 px-4 py-3">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-sm font-semibold">{title}</h2>
+        <span className="ml-auto rounded-md bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
+          {count}
+        </span>
+      </div>
+      {count > 0 ? (
+        <ul className="divide-y divide-border/40">{children}</ul>
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
+          <EmptyIcon className="h-6 w-6 text-muted-foreground/60" />
+          <p className="mt-3 text-sm font-medium text-muted-foreground">{emptyTitle}</p>
+          <p className="mt-1 text-xs text-muted-foreground/80">{emptyHint}</p>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function RequestRow({ name, subtitle, index, children }) {
+  return (
+    <motion.li
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index, 8) * 0.04 }}
+      className="flex items-center gap-3 px-4 py-3"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-secondary">
+        {name?.[0]?.toUpperCase() || "U"}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{name}</p>
+        <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">{children}</div>
+    </motion.li>
+  );
+}
 
 export default function RequestsSection({
   t,
@@ -25,7 +59,6 @@ export default function RequestsSection({
   return (
     <div className="mb-24 space-y-6">
       <SectionHeader
-        icon={UserPlus}
         title={t("ascend.requests.title")}
         description={t("ascend.requests.subtitle", {
           defaultValue: "Manage your friend requests",
@@ -41,208 +74,75 @@ export default function RequestsSection({
         }
       />
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 gap-3">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border border-border/50 bg-card/50 p-4"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
-              <UserCheck className="h-5 w-5 text-green-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{incomingRequests.length}</p>
-              <p className="text-xs text-muted-foreground">
-                {t("ascend.requests.incoming")}
-              </p>
-            </div>
-          </div>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="rounded-xl border border-border/50 bg-card/50 p-4"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-              <Send className="h-5 w-5 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{outgoingRequests.length}</p>
-              <p className="text-xs text-muted-foreground">
-                {t("ascend.requests.outgoing")}
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
       {loadingRequests ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       ) : (
-        <>
-          {/* Incoming Requests */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-border/50" />
-              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                <UserCheck className="h-4 w-4 text-green-500" />
-                {t("ascend.requests.incoming")}
-              </h2>
-              <div className="h-px flex-1 bg-border/50" />
-            </div>
-            {incomingRequests.length > 0 ? (
-              <div className="space-y-3">
-                {incomingRequests.map((request, index) => (
-                  <motion.div
-                    key={request.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 transition-all duration-300 hover:border-green-500/30 hover:bg-card hover:shadow-lg hover:shadow-green-500/5"
-                  >
-                    <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-green-500/5 opacity-0 blur-3xl transition-opacity group-hover:opacity-100" />
-                    <div className="relative flex items-center justify-between p-5">
-                      <div className="flex items-center gap-4">
-                        <div className="relative">
-                          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-green-500 via-green-500/90 to-emerald-500 shadow-lg shadow-green-500/20">
-                            <span className="text-xl font-bold text-white">
-                              {request.fromDisplayName?.[0]?.toUpperCase() || "U"}
-                            </span>
-                          </div>
-                          <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-card bg-green-500">
-                            <UserPlus className="h-3 w-3 text-white" />
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-lg font-semibold">
-                            {request.fromDisplayName}
-                          </p>
-                          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                            {t("ascend.requests.wantsToAdd")}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          className="gap-2 rounded-xl bg-green-500 text-white hover:bg-green-600"
-                          size="sm"
-                          onClick={() => handleAcceptRequest(request.id, request.fromUid)}
-                        >
-                          <Check className="h-4 w-4" />
-                          {t("ascend.requests.accept")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-xl"
-                          onClick={() => handleDenyRequest(request.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="rounded-2xl border border-dashed border-border/50 bg-card/30 p-8 text-center"
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <RequestList
+            icon={UserCheck}
+            title={t("ascend.requests.incoming")}
+            count={incomingRequests.length}
+            emptyIcon={Inbox}
+            emptyTitle={t("ascend.requests.noIncoming")}
+            emptyHint={t("ascend.requests.empty")}
+          >
+            {incomingRequests.map((request, index) => (
+              <RequestRow
+                key={request.id}
+                index={index}
+                name={request.fromDisplayName}
+                subtitle={t("ascend.requests.wantsToAdd")}
               >
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/10">
-                  <Inbox className="h-7 w-7 text-green-500/50" />
-                </div>
-                <p className="font-medium text-muted-foreground">
-                  {t("ascend.requests.noIncoming")}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground/70">
-                  {t("ascend.requests.empty") || "New requests will appear here"}
-                </p>
-              </motion.div>
-            )}
-          </div>
+                <Button
+                  size="sm"
+                  className="h-8 gap-1.5 text-secondary"
+                  onClick={() => handleAcceptRequest(request.id, request.fromUid)}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  {t("ascend.requests.accept")}
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                  onClick={() => handleDenyRequest(request.id)}
+                  aria-label={t("ascend.requests.deny", { defaultValue: "Decline" })}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </RequestRow>
+            ))}
+          </RequestList>
 
-          {/* Outgoing Requests */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-border/50" />
-              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                <Send className="h-4 w-4 text-blue-500" />
-                {t("ascend.requests.outgoing")}
-              </h2>
-              <div className="h-px flex-1 bg-border/50" />
-            </div>
-            {outgoingRequests.length > 0 ? (
-              <div className="space-y-3">
-                {outgoingRequests.map((request, index) => (
-                  <motion.div
-                    key={request.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 transition-all duration-300 hover:border-blue-500/30 hover:bg-card hover:shadow-lg hover:shadow-blue-500/5"
-                  >
-                    <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-blue-500/5 opacity-0 blur-3xl transition-opacity group-hover:opacity-100" />
-                    <div className="relative flex items-center justify-between p-5">
-                      <div className="flex items-center gap-4">
-                        <div className="relative">
-                          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 via-blue-500/90 to-indigo-500 shadow-lg shadow-blue-500/20">
-                            <span className="text-xl font-bold text-white">
-                              {request.toDisplayName?.[0]?.toUpperCase() || "U"}
-                            </span>
-                          </div>
-                          <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-card bg-blue-500">
-                            <Send className="h-3 w-3 text-white" />
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-lg font-semibold">{request.toDisplayName}</p>
-                          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5 text-blue-500" />
-                            {t("ascend.requests.pending")}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive rounded-xl"
-                        onClick={() => handleDenyRequest(request.id)}
-                      >
-                        <X className="mr-1.5 h-4 w-4" />
-                        {t("ascend.requests.cancel")}
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="rounded-2xl border border-dashed border-border/50 bg-card/30 p-8 text-center"
+          <RequestList
+            icon={Send}
+            title={t("ascend.requests.outgoing")}
+            count={outgoingRequests.length}
+            emptyIcon={Send}
+            emptyTitle={t("ascend.requests.noOutgoing")}
+            emptyHint={t("ascend.search.hint")}
+          >
+            {outgoingRequests.map((request, index) => (
+              <RequestRow
+                key={request.id}
+                index={index}
+                name={request.toDisplayName}
+                subtitle={t("ascend.requests.pending")}
               >
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10">
-                  <Send className="h-7 w-7 text-blue-500/50" />
-                </div>
-                <p className="font-medium text-muted-foreground">
-                  {t("ascend.requests.noOutgoing")}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground/70">
-                  {t("ascend.search.hint") || "Search for users to send friend requests"}
-                </p>
-              </motion.div>
-            )}
-          </div>
-        </>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={() => handleDenyRequest(request.id)}
+                >
+                  {t("ascend.requests.cancel")}
+                </Button>
+              </RequestRow>
+            ))}
+          </RequestList>
+        </div>
       )}
     </div>
   );

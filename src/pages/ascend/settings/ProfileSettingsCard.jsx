@@ -44,7 +44,7 @@ export default function ProfileSettingsCard({
   userData,
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+    <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
       <div className="flex items-center justify-between border-b border-border/50 p-5">
         <div className="flex items-center gap-2">
           <User className="mb-3 h-5 w-5 text-primary" />
@@ -68,7 +68,7 @@ export default function ProfileSettingsCard({
           {/* Avatar & Photo URL */}
           <div className="flex items-start gap-5">
             <div className="relative shrink-0">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-primary/80 shadow-lg">
+              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-primary">
                 {editPhotoURL ? (
                   <img
                     src={editPhotoURL}
@@ -276,7 +276,7 @@ export default function ProfileSettingsCard({
           {/* Profile Display */}
           <div className="flex items-start gap-5">
             <div className="relative shrink-0">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-primary/80 shadow-lg">
+              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-primary">
                 {user.photoURL ? (
                   <img
                     src={user.photoURL}

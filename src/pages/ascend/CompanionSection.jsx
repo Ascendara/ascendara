@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import SectionHeader from "./SectionHeader";
+import { EmptyState } from "./primitives";
 import { getDeviceIcon, getDeviceDescription } from "@/lib/deviceParser";
 import { Button } from "@/components/ui/button";
 import {
@@ -98,22 +99,14 @@ export default function CompanionSection({
                 {t("ascend.companion.loadingDevices")}
               </div>
             ) : connectedDevices.length === 0 ? (
-              <div className="flex min-h-44 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 p-6 text-center">
-                <Smartphone
-                  className="h-8 w-8 shrink-0 text-muted-foreground/50"
-                  aria-hidden="true"
-                />
-                <div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {t("ascend.companion.noConnectedDevices")}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {t("ascend.companion.emptyDescription")}
-                  </p>
-                </div>
-              </div>
+              <EmptyState
+                icon={Smartphone}
+                title={t("ascend.companion.noConnectedDevices")}
+                description={t("ascend.companion.emptyDescription")}
+                className="py-12"
+              />
             ) : (
-              <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-card/50">
+              <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-card/60">
                 {connectedDevices.map(device => {
                   const iconName = getDeviceIcon(device.deviceInfo);
                   const DeviceIcon =
@@ -175,7 +168,7 @@ export default function CompanionSection({
         </section>
         <section
           aria-labelledby="companion-pairing"
-          className="min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card/50"
+          className="min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card/60"
         >
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-4 py-4">
             <h2 id="companion-pairing" className="text-sm font-semibold">

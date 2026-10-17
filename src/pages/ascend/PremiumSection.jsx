@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import SectionHeader from "./SectionHeader";
+import { useLibraryBackupStore } from "@/services/libraryBackupStore";
 import {
   User,
   Users,
@@ -19,418 +21,201 @@ import {
   FlaskConical,
   Joystick,
   HardDriveDownload,
+  ChevronRight,
 } from "lucide-react";
 
-export default function PremiumSection({ t }) {
+function FeatureCard({ feature, t, delay, featured }) {
+  const Icon = feature.icon;
+  const Wrapper = feature.onOpen ? motion.button : motion.div;
   return (
-    <div className="mb-24 space-y-6">
+    <Wrapper
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay }}
+      onClick={feature.onOpen}
+      className={`group relative flex h-full w-full flex-col rounded-2xl border text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
+        featured
+          ? "border-primary/20 bg-card/70 p-5 hover:border-primary/40 hover:bg-card"
+          : "border-border/50 bg-card/40 p-4"
+      } ${feature.onOpen && !featured ? "hover:border-primary/30 hover:bg-card" : ""}`}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={`flex shrink-0 items-center justify-center rounded-xl ${
+            featured
+              ? "h-10 w-10 bg-primary/15 text-primary"
+              : "h-9 w-9 bg-muted/60 text-foreground/80"
+          }`}
+        >
+          <Icon className={featured ? "h-5 w-5" : "h-4 w-4"} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold leading-tight">{t(`${feature.key}.title`)}</h3>
+          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+            {t(`${feature.key}.description`)}
+          </p>
+        </div>
+      </div>
+      {feature.onOpen && (
+        <span className="mt-auto flex items-center gap-1 self-end pt-3 text-xs font-medium text-primary">
+          {t("ascend.premium.open")}
+          <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        </span>
+      )}
+    </Wrapper>
+  );
+}
+
+export default function PremiumSection({ t, setActiveSection }) {
+  const navigate = useNavigate();
+  const openLibraryBackups = useLibraryBackupStore(state => state.setOpen);
+
+  const groups = [
+    {
+      id: "cloud",
+      icon: Cloud,
+      featured: true,
+      features: [
+        {
+          key: "ascend.premium.cloudSync",
+          icon: Cloud,
+          onOpen: () => setActiveSection("cloudlibrary"),
+        },
+        {
+          key: "ascend.premium.cloudBackups",
+          icon: CloudUpload,
+          onOpen: () => setActiveSection("cloudbackups"),
+        },
+        {
+          key: "ascend.premium.retroCloudSaves",
+          icon: Joystick,
+          onOpen: () => navigate("/retro"),
+        },
+        {
+          key: "ascend.premium.libraryBackups",
+          icon: HardDriveDownload,
+          onOpen: () => {
+            openLibraryBackups(true);
+            navigate("/library");
+          },
+        },
+        {
+          key: "ascend.premium.webView",
+          icon: Smartphone,
+          onOpen: () => setActiveSection("companion"),
+        },
+      ],
+    },
+    {
+      id: "games",
+      icon: Gamepad2,
+      features: [
+        { key: "ascend.premium.unlimitedDownloads", icon: InfinityIcon },
+        { key: "ascend.premium.downloadQueue", icon: ListOrdered },
+        { key: "ascend.premium.autoUpdate", icon: RefreshCw },
+        { key: "ascend.premium.flingTrainer", icon: Zap },
+        { key: "ascend.premium.nexusMods", icon: Puzzle },
+        { key: "ascend.premium.emulatorPresets", icon: Joystick },
+      ],
+    },
+    {
+      id: "social",
+      icon: Users,
+      features: [
+        {
+          key: "ascend.premium.friends",
+          icon: Users,
+          onOpen: () => setActiveSection("friends"),
+        },
+        {
+          key: "ascend.premium.chat",
+          icon: MessageCircle,
+          onOpen: () => setActiveSection("messages"),
+        },
+        {
+          key: "ascend.premium.profile",
+          icon: User,
+          onOpen: () => setActiveSection("settings"),
+        },
+        {
+          key: "ascend.premium.leaderboard",
+          icon: Trophy,
+          onOpen: () => setActiveSection("leaderboard"),
+        },
+      ],
+    },
+    {
+      id: "early",
+      icon: Sparkles,
+      features: [
+        {
+          key: "ascend.premium.upcoming",
+          icon: Sparkles,
+          onOpen: () => setActiveSection("upcoming"),
+        },
+        { key: "ascend.premium.experimentalBranch", icon: FlaskConical },
+        { key: "ascend.premium.moreComing", icon: Sparkles },
+      ],
+    },
+  ];
+
+  let delay = 0;
+  return (
+    <div className="mb-24 space-y-8">
       <SectionHeader
         icon={Crown}
         title={t("ascend.premium.title")}
         description={t("ascend.premium.subtitle")}
       />
 
-      {/* Features Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Friends System */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+      {groups.map(group => (
+        <section
+          key={group.id}
+          className={
+            group.featured
+              ? "relative overflow-hidden rounded-2xl border border-border/50 bg-card/60 p-5 sm:p-6"
+              : ""
+          }
         >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-blue-500/10 blur-2xl transition-all group-hover:bg-blue-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500">
-              <Users className="h-6 w-6" />
+          <div className="relative mb-4 flex items-center gap-3">
+            <group.icon
+              className={`h-5 w-5 ${group.featured ? "text-primary" : "text-muted-foreground"}`}
+            />
+            <div>
+              <h2 className={group.featured ? "text-xl font-bold" : "text-lg font-semibold"}>
+                {t(`ascend.premium.groups.${group.id}.title`)}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {t(`ascend.premium.groups.${group.id}.description`)}
+              </p>
             </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.friends.title") || "Friends System"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.friends.description") ||
-                "Send and accept friend requests, build your gaming network, and see when your friends are online. Connect with other Ascendara users and grow your community."}
-            </p>
           </div>
-        </motion.div>
-        {/* WebView */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-slate-500/10 blur-2xl transition-all group-hover:bg-slate-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500">
-              <Smartphone className="h-6 w-6" />
-            </div>
-            <div className="flex items-center gap-2">
-              <h3 className="mt-4 text-lg font-semibold">
-                {t("ascend.premium.webView.title")}
-              </h3>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.webView.description") ||
-                "Find others to play with in game-specific communities. Connect with players who share your interests and coordinate multiplayer sessions."}
-            </p>
+          <div
+            className={`relative grid gap-3 ${
+              group.featured ? "md:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3"
+            }`}
+          >
+            {group.features.map((feature, index) => (
+              <div
+                key={feature.key}
+                className={
+                  group.featured && index === group.features.length - 1 &&
+                  group.features.length % 2 === 1
+                    ? "md:col-span-2"
+                    : ""
+                }
+              >
+                <FeatureCard
+                  feature={feature}
+                  t={t}
+                  featured={group.featured}
+                  delay={(delay += 0.03)}
+                />
+              </div>
+            ))}
           </div>
-        </motion.div>
-
-        {/* Real-Time Chat */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-green-500/10 blur-2xl transition-all group-hover:bg-green-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/10 text-green-500">
-              <MessageCircle className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.chat.title") || "Real-Time Chat"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.chat.description") ||
-                "Chat directly with your friends within Ascendara. Share game recommendations, coordinate play sessions, and stay connected with your gaming circle."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Profile & Bio */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-purple-500/10 blur-2xl transition-all group-hover:bg-purple-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500">
-              <User className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.profile.title") || "Profile & Bio"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.profile.description") ||
-                "Set up your personalized profile with a custom bio, showcase your gaming preferences, and let others know what you're all about. Make your profile uniquely yours."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Cloud Sync */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-cyan-500/10 blur-2xl transition-all group-hover:bg-cyan-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-500">
-              <Cloud className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.cloudSync.title") || "Cloud Sync"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.cloudSync.description") ||
-                "Your profile, achievements, and game data are automatically synced to the cloud. Access your complete gaming history from anywhere, on any device."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Public Leaderboard */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-yellow-500/10 blur-2xl transition-all group-hover:bg-yellow-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-yellow-500/10 text-yellow-500">
-              <Trophy className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.leaderboard.title") || "Public Leaderboard"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.leaderboard.description") ||
-                "Compete with the community on the public leaderboard. See how your stats stack up against other players and climb the ranks."}
-            </p>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.65 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-sky-500/10 blur-2xl transition-all group-hover:bg-sky-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500">
-              <CloudUpload className="h-6 w-6" />
-            </div>
-            <div className="flex items-center gap-2">
-              <h3 className="mt-4 text-lg font-semibold">
-                {t("ascend.premium.cloudBackups.title") || "Cloud Backups"}
-              </h3>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.cloudBackups.description") ||
-                "Automatically back up your game saves to the cloud. Never lose your progress and restore your saves on any device."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Library Backups */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.68 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-violet-500/10 blur-2xl transition-all group-hover:bg-violet-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500">
-              <HardDriveDownload className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.libraryBackups.title")}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.libraryBackups.description")}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Retro Cloud Saves */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-rose-500/10 blur-2xl transition-all group-hover:bg-rose-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500">
-              <Gamepad2 className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.retroCloudSaves.title") || "Retro Cloud Saves"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.retroCloudSaves.description") ||
-                "Back up your Retro library's memory cards and save folders to the cloud, then restore them on any device. Ascendara keeps a recovery copy of your local saves before every restore."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Auto Game Update Checking */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-indigo-500/10 blur-2xl transition-all group-hover:bg-indigo-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-500">
-              <RefreshCw className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.autoUpdate.title") || "Auto Game Update Checking"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.autoUpdate.description") ||
-                "Automatically check for game updates in the background. Get notified when updates are available and install them with a single click."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Upcoming Updates Peek */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-violet-500/10 blur-2xl transition-all group-hover:bg-violet-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500">
-              <Sparkles className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.upcoming.title") || "Upcoming Updates Peek"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.upcoming.description") ||
-                "Get an exclusive preview of what's coming in the next Ascendara update. Stay ahead of the curve and know what new features are on the horizon."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Nexus Mod Managing */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-pink-500/10 blur-2xl transition-all group-hover:bg-pink-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-pink-500/10 text-pink-500">
-              <Puzzle className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.nexusMods.title") || "Nexus Mod Managing"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.nexusMods.description") ||
-                "Seamlessly manage your Nexus mods for supported games. Browse, install, and organize mods directly within Ascendara."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Unlimited Downloads */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-500/10 blur-2xl transition-all group-hover:bg-emerald-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
-              <InfinityIcon className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.unlimitedDownloads.title") || "Unlimited Downloads"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.unlimitedDownloads.description") ||
-                "Download as many games as you want with no restrictions. Ascend removes all download limits so you can build your library freely."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* FLiNG Trainer */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-orange-500/10 blur-2xl transition-all group-hover:bg-orange-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500">
-              <Zap className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.flingTrainer.title") || "FLiNG Trainer"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.flingTrainer.description") ||
-                "Automatically downloads the correct FLiNG trainer for your game and handles installation, no manual searching or setup required."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Download Queue */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.55 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-teal-500/10 blur-2xl transition-all group-hover:bg-teal-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500">
-              <ListOrdered className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.downloadQueue.title") || "Download Queue"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.downloadQueue.description") ||
-                "Queue multiple downloads and let Ascendara handle them automatically. Start downloads and come back when they're all ready."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Expanded Emulator Presets */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-lime-500/10 blur-2xl transition-all group-hover:bg-lime-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-lime-500/10 text-lime-500">
-              <Joystick className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.emulatorPresets.title") || "Expanded Emulator Presets"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.emulatorPresets.description") ||
-                "Unlock an expanded library of emulator presets covering dozens of additional systems beyond the 12 that ship with Ascendara, complete with download links and ready-to-use configurations."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Experimental Branch */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.65 }}
-          className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-6 transition-all hover:border-amber-500/30 hover:bg-card hover:shadow-lg hover:shadow-amber-500/5"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-amber-500/10 blur-2xl transition-all group-hover:bg-amber-500/20" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
-              <FlaskConical className="h-6 w-6" />
-            </div>
-            <div className="flex items-center gap-2">
-              <h3 className="mt-4 text-lg font-semibold">
-                {t("ascend.premium.experimentalBranch.title") || "Experimental Branch"}
-              </h3>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.experimentalBranch.description") ||
-                "Easily switch to the experimental branch in Preferences to test cutting-edge features before they're released. Be the first to try new functionality and help shape Ascendara's future."}
-            </p>
-          </div>
-        </motion.div>
-
-        {/* And More Coming */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          className="group relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-violet-500/5 p-6 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
-        >
-          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/20 blur-2xl transition-all group-hover:bg-primary/30" />
-          <div className="relative">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20 text-primary">
-              <Sparkles className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">
-              {t("ascend.premium.moreComing.title") || "And More Coming"}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("ascend.premium.moreComing.description") ||
-                "There are constantly new features for Ascend subscribers. Your subscription helps fund development of exciting new capabilities."}
-            </p>
-          </div>
-        </motion.div>
-      </div>
+        </section>
+      ))}
     </div>
   );
 }
