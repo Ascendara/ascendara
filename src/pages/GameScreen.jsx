@@ -77,6 +77,7 @@ import gameService from "@/services/gameService";
 import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
 import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
 import GameHero from "@/components/gamescreen/GameHero";
+import StoreGameScreen from "@/components/gamescreen/StoreGameScreen";
 import GameActions from "@/components/gamescreen/GameActions";
 import GameOverviewTab from "@/components/gamescreen/GameOverviewTab";
 import AchievementsTab from "@/components/gamescreen/AchievementsTab";
@@ -1206,6 +1207,13 @@ const EditGameInfoDialog = ({
 const steamAppDataCache = new Map();
 
 export default function GameScreen() {
+  const location = useLocation();
+  const game = location.state?.gameData;
+  if (game?._isStoreOwned) return <StoreGameScreen key={`${game.store}:${game.id}`} game={game} />;
+  return <InstalledGameScreen />;
+}
+
+function InstalledGameScreen() {
   const showError = (game, error) => {
     setErrorGame(game);
     setErrorMessage(error);
@@ -1912,6 +1920,8 @@ export default function GameScreen() {
 
   // Load game image with localStorage cache (similar to Library.jsx)
   useEffect(() => {
+    // The screen re-renders without a game while it animates out
+    if (!game) return;
     let isMounted = true;
     const gameId = game.game || game.name;
 
@@ -1920,8 +1930,6 @@ export default function GameScreen() {
 
     const loadGameImage = async () => {
       // 1. Try fetching Grid image from backend first (Priority)
-    // The screen re-renders without a game while it animates out
-    if (!game) return;
       try {
         const gridBase64 = await window.electron.getGameImage(gameId, "grid");
 

@@ -289,6 +289,16 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("rename-existing-game-directory", game, additionalDirIndex),
   verifyGame: game => ipcRenderer.invoke("verify-game", game),
   getLauncherImportState: () => ipcRenderer.invoke("get-launcher-import-state"),
+  storeAccounts: {
+    state: () => ipcRenderer.invoke("store-accounts-state"),
+    connect: store => ipcRenderer.invoke("store-accounts-connect", store),
+    refresh: store => ipcRenderer.invoke("store-accounts-refresh", store),
+    disconnect: store => ipcRenderer.invoke("store-accounts-disconnect", store),
+    cancel: store => ipcRenderer.invoke("store-accounts-cancel", store),
+    openGame: (store, id, intent) => ipcRenderer.invoke("store-accounts-open-game", store, id, intent),
+    gameDetails: (store, id) => ipcRenderer.invoke("store-game-details", store, id),
+    artwork: (store, id) => ipcRenderer.invoke("store-game-artwork", store, id),
+  },
   startLauncherImport: launchers =>
     ipcRenderer.invoke("start-launcher-import", launchers),
   cancelLauncherImport: () => ipcRenderer.invoke("cancel-launcher-import"),

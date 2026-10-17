@@ -160,15 +160,17 @@ export default function GameOverviewTab({
                 </p>
               </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-2"
-              onClick={onEditGameInfo}
-            >
-              {hasMatch ? <Edit3 className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {hasMatch ? t("gameScreen.editGameInfo") : t("gameScreen.setGameInfo")}
-            </Button>
+            {onEditGameInfo && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2"
+                onClick={onEditGameInfo}
+              >
+                {hasMatch ? <Edit3 className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                {hasMatch ? t("gameScreen.editGameInfo") : t("gameScreen.setGameInfo")}
+              </Button>
+            )}
           </div>
 
           {steamData?.developers?.length > 0 && (

@@ -2493,6 +2493,19 @@
       "vrGame": "Virtual Reality Game"
     },
     "import": "Import",
+    "importChooser": {
+      "description": "Already have games on Steam, Epic Games or another launcher? Bring them into Ascendara so all your games are in one place.",
+      "hint": "Not sure where to start? Choose games installed on this PC. You can always come back and do the other later.",
+      "menuItem": "Import from other launchers",
+      "recommended": "Recommended",
+      "scanDescription": "Finds games you have already downloaded with Steam, Epic Games, GOG, Ubisoft or Battle.net and adds them here. Nothing is moved or downloaded again.",
+      "scanRunning": "A scan is running",
+      "scanTitle": "Games installed on this PC",
+      "storesConnected": "Connected: {{stores}}",
+      "storesDescription": "Sign in to Steam, Epic Games or GOG to see every game you own. You can install them from their store whenever you like.",
+      "storesTitle": "Games you own but have not installed",
+      "title": "Bring in games from other launchers"
+    },
     "importFailedDesc": "There was a problem importing your Steam games. Please try again or check your directory.",
     "importFailedTitle": "Import Failed",
     "importSteamGames": "Import Steam Games",
@@ -2525,7 +2538,7 @@
         "found": "Found",
         "skipped": "Skipped"
       },
-      "description": "Bring games from your launchers into one library. Choose where to look, and Ascendara will add installed games and find their artwork.",
+      "description": "Pick the launchers you use. Ascendara finds the games you have installed with them and adds them to your library, along with their artwork.",
       "emptyDescription": "Open a selected launcher and finish installing a game, then scan again. Games you own but have not installed are not imported.",
       "emptyTitle": "No installed games found",
       "errors": {
@@ -2606,7 +2619,7 @@
       "stopRequested": "Stopping…",
       "swapComplete": "{{game}} is now managed by Ascendara. The imported copy was removed.",
       "switchAction": "Switch & Download",
-      "title": "Import Games",
+      "title": "Games installed on this PC",
       "unknownGame": "Unknown game",
       "unsupported": "Unavailable on this platform"
     },
@@ -2715,6 +2728,7 @@
     "manage": "Manage",
     "minute": "minute",
     "minutes": "minutes",
+    "moreAddOptions": "More ways to add games",
     "moveToFolder": {
       "description": "Choose a folder for {{game}}.",
       "menuDescription": "Organize this game into a library folder",
@@ -2851,6 +2865,7 @@
       "bulkRemove": "Remove Selected Games",
       "selected": "Multiselection is enabled"
     },
+    "toolsMenu": "Library tools",
     "totalSpace": "Total",
     "updateImage": "Update Image",
     "uploadImage": "Upload Image",
@@ -4200,6 +4215,43 @@
       "wineSection": "Wine"
     },
     "yourLocalIndex": "Your Game Index"
+  },
+  "storeAccounts": {
+    "cancel": "Cancel",
+    "checking": "Checking installation…",
+    "connect": "Connect",
+    "description": "Sign in to see the games you own on Steam, Epic Games or GOG, including ones you have not installed. They show up in your library next to your other games.",
+    "disconnect": "Disconnect",
+    "display": {
+      "note": "Installed games take priority, so matching store titles are hidden. Store games open in their own launcher or downloads page.",
+      "ownedOn": "Owned on {{store}}",
+      "saveError": "Could not save this preference. Please try again.",
+      "show": "Show connected-store games",
+      "showDescription": "Include games you own on other stores, even when they are not installed."
+    },
+    "failed": "The account operation failed. Please try again.",
+    "gameCount": "{{count}} games",
+    "installNamed": "Install with {{store}}",
+    "installed": "Installed",
+    "keyring": "Secure storage is unavailable. Unlock your system keyring and restart Ascendara to connect accounts.",
+    "launching": "Starting game in its launcher…",
+    "loadFailed": "Could not load store accounts. Try reopening this window.",
+    "loading": "Loading accounts",
+    "localOnly": "Ubisoft and Battle.net remain available through the local launcher scan. Installation is handled by each store; GOG opens your downloads page.",
+    "notConnected": "Not connected",
+    "notInstalled": "Not installed",
+    "openNamed": "Open in {{store}}",
+    "opening": "Opening store…",
+    "privacy": "Sign in directly with each store. Saved sessions and library data are encrypted on this device. Disconnect removes Ascendara’s saved connection and library.",
+    "reconnect": "Reconnect",
+    "refresh": "Refresh",
+    "showInLibrary": "Show {{store}} games in library",
+    "start": "Connect a store above to see your owned games.",
+    "summary": "{{count}} owned games in your library",
+    "summaryHidden": "Owned games are hidden from your library",
+    "title": "Store accounts",
+    "unsupportedDetection": "Automatic installation detection for this store is currently available on Windows. You can still open the store to install or play.",
+    "viewInLibrary": "View in library"
   },
   "torbox": {
     "account": "TorBox Account",

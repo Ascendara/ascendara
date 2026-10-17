@@ -292,6 +292,7 @@ function registerCriticalHandlers() {
   updates.registerUpdateHandlers();
   downloads.registerDownloadHandlers();
   games.registerGameHandlers();
+  require("./modules/store-accounts").registerStoreAccountHandlers();
   require("./modules/retro").registerRetroHandlers();
   system.registerSystemHandlers();
   require("./modules/proton").registerRunnerHandlers();

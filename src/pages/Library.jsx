@@ -71,6 +71,7 @@ import {
   LayoutGrid,
   List as ListIcon,
   ChevronRight,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -82,7 +83,6 @@ import {
   AlertDialogHeader,
   AlertDialogCancel,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import "@/components/ui/separator";
 import {
@@ -113,6 +113,11 @@ import { calculateLibraryValue } from "@/services/cheapsharkService";
 import { getDownloadQueue } from "@/services/downloadQueueService";
 
 import ImportGamesDialog from "@/components/ImportGamesDialog";
+import StoreAccountsDialog from "@/components/StoreAccountsDialog";
+import ImportFromLaunchersDialog from "@/components/ImportFromLaunchersDialog";
+import StoreOwnedGameCard from "@/components/StoreOwnedGameCard";
+import { useStoreLibrary } from "@/hooks/useStoreLibrary";
+import { storeLibraryEntries, storeNames } from "@/lib/storeLibrary";
 import LibraryBackupsDialog from "@/components/LibraryBackupsDialog";
 import NewFolderDialog from "@/components/NewFolderDialog";
 import MoveToFolderDialog from "@/components/MoveToFolderDialog";
@@ -145,6 +150,7 @@ const preloadLibraryPages = () =>
 
 // Keep deliberately retained installs independently reachable in React.
 const getLibraryCardKey = game =>
+  game._storeKey ||
   (game.isFolder
     ? getLibraryIdentityKey(game)
     : `${getLibraryIdentityKey(game)}:${libraryInstallKey(game)}`) ||
@@ -206,6 +212,9 @@ const Library = () => {
   const [loading, setLoading] = useState(() => libraryGamesCache === null);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
   const [isImportGamesOpen, setIsImportGamesOpen] = useState(false);
+  const [isStoreAccountsOpen, setIsStoreAccountsOpen] = useState(false);
+  const [isImportChooserOpen, setIsImportChooserOpen] = useState(false);
+  const storeLibrary = useStoreLibrary();
   const [isImportingGames, setIsImportingGames] = useState(false);
   const isLibraryBackupsOpen = useLibraryBackupStore(state => state.open);
   const setIsLibraryBackupsOpen = useLibraryBackupStore(state => state.setOpen);
@@ -549,7 +558,9 @@ const Library = () => {
       _isQueued: true,
       _queueId: q.id,
     }));
-  const gamesWithQueued = [...games, ...queuedStubs];
+  const ownedStoreGames = storeLibraryEntries(storeLibrary.accounts, storeLibrary.preferences,
+    [...libraryRecords, ...games.filter(game => !game.isFolder), ...getGamesInFolders(), ...queuedStubs]);
+  const gamesWithQueued = [...games, ...queuedStubs, ...ownedStoreGames];
 
   // Filter games based on search query
   const filteredGames = gamesWithQueued
@@ -1525,7 +1536,7 @@ const Library = () => {
       id: "all",
       label: t("library.pageTitle") || "All Games",
       icon: <SquareLibrary className="h-4 w-4" />,
-      count: games.filter(g => !g.isFolder).length + getGamesInFolders().length,
+      count: games.filter(g => !g.isFolder).length + getGamesInFolders().length + ownedStoreGames.length,
     },
     {
       id: "hiddenFolders",
@@ -1619,7 +1630,7 @@ const Library = () => {
                   {username || "Guest"}
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {games.filter(g => !g.isFolder).length + getGamesInFolders().length}{" "}
+                  {games.filter(g => !g.isFolder).length + getGamesInFolders().length + ownedStoreGames.length}{" "}
                   {t("library.gamesInLibrary") || "games"}
                 </p>
               </div>
@@ -1734,6 +1745,50 @@ const Library = () => {
                 </div>
               );
             })()}
+        </div>
+
+        {/* ── Add to library ── */}
+        <div className="flex gap-1.5 px-3 pt-3">
+          <Button
+            className="h-9 flex-1 gap-2 text-secondary"
+            onClick={() => setIsAddGameOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            {t("library.addGame.title") || "Add Game"}
+          </Button>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                aria-label={t("library.moreAddOptions")}
+                title={t("library.moreAddOptions")}
+              >
+                {isImportingGames ? (
+                  <Loader className="h-4 w-4 animate-spin text-primary" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem
+                className="gap-2"
+                onSelect={() => {
+                  storeLibrary.refresh();
+                  setIsImportChooserOpen(true);
+                }}
+              >
+                <Import className="h-4 w-4 text-muted-foreground" />
+                {t("library.importChooser.menuItem")}
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onSelect={() => setIsNewFolderOpen(true)}>
+                <FolderPlus className="h-4 w-4 text-muted-foreground" />
+                {t("library.newFolder.create") || "New Folder"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* ── Library views ── */}
@@ -1851,163 +1906,154 @@ const Library = () => {
           })()}
         </nav>
 
-        {/* ── Actions ── */}
-        <div className="space-y-0.5 px-2 pt-3">
-          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-            {t("library.manage")}
-          </p>
-
-          <TooltipProvider>
-            <AlertDialog
-              key="add-game-dialog"
-              open={isAddGameOpen}
-              onOpenChange={open => {
-                setIsAddGameOpen(open);
-                if (!open) setDroppedExecutablePath(null);
-              }}
-            >
-              <AlertDialogTrigger asChild>
-                <button className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
-                    <Plus className="h-4 w-4" />
-                  </span>
-                  <span>{t("library.addGame.title") || "Add Game"}</span>
-                </button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="flex max-h-[90vh] flex-col border-border bg-background sm:max-w-3xl">
-                <AlertDialogHeader className="space-y-2">
-                  <AlertDialogTitle className="text-2xl font-bold text-foreground">
-                    {t("library.addGame.title")}
-                  </AlertDialogTitle>
-                  <AlertDialogDescription className="text-xs text-muted-foreground">
-                    {t("library.addGameDescription2")}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="flex-1 overflow-y-auto py-4">
-                  <AddGameForm
-                    initialExecutablePath={droppedExecutablePath}
-                    onRestorePrompt={entry => setAddGameRestoreEntry(entry)}
-                    onLibraryChanged={loadGames}
-                    onSuccess={() => {
-                      setIsAddGameOpen(false);
-                      setDroppedExecutablePath(null);
-                      setSelectedGameImage(null);
-                      loadGames();
-                    }}
-                  />
-                </div>
-              </AlertDialogContent>
-            </AlertDialog>
-
-            <button
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground"
-              onClick={() => setIsImportGamesOpen(true)}
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
-                {isImportingGames ? (
-                  <Loader className="h-4 w-4 animate-spin text-primary" />
-                ) : (
-                  <Import className="h-4 w-4" />
-                )}
-              </span>
-              <span>{t("library.launcherImport.title")}</span>
-            </button>
-            <ImportGamesDialog
-              open={isImportGamesOpen}
-              onOpenChange={setIsImportGamesOpen}
-              onLibraryChanged={loadGames}
-              onBusyChange={setIsImportingGames}
-            />
-
-            <button
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground"
-              onClick={() => setIsNewFolderOpen(true)}
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
-                <FolderPlus className="h-4 w-4" />
-              </span>
-              <span>{t("library.newFolder.create") || "New Folder"}</span>
-            </button>
-            <NewFolderDialog
-              open={isNewFolderOpen}
-              onOpenChange={setIsNewFolderOpen}
-              onCreate={handleCreateFolder}
-            />
-
-            <button
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground"
-              onClick={() => setIsLibraryBackupsOpen(true)}
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
-                <HardDriveDownload className="h-4 w-4" />
-              </span>
-              <span>{t("library.libraryBackups.button")}</span>
-            </button>
-            <LibraryBackupsDialog
-              canManage={
-                !!user &&
-                ascendAccess.hasAccess &&
-                (ascendAccess.isSubscribed || ascendAccess.isVerified)
-              }
-              open={isLibraryBackupsOpen}
-              onOpenChange={setIsLibraryBackupsOpen}
-              gameNames={[
-                ...new Set(
-                  [
-                    ...games
-                      .filter(game => !game.isFolder)
-                      .map(game => game.game || game.name),
-                    ...getGamesInFolders().map(game => game.game || game.name),
-                  ].filter(Boolean)
-                ),
-              ]}
-            />
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className={cn(
-                    "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground",
-                    isSyncingLibrary && "cursor-not-allowed opacity-50"
-                  )}
-                  onClick={handleCloudSync}
-                  disabled={isSyncingLibrary}
-                >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
-                    {isSyncingLibrary ? (
-                      <Loader className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <CloudUpload className="h-4 w-4" />
-                    )}
-                  </span>
-                  <span>{t("library.cloudSync") || "Sync to Cloud"}</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="text-secondary">
-                {user
-                  ? t("library.cloudSync") || "Sync to Cloud"
-                  : t("library.signInToSync") || "Sign in to sync"}
-              </TooltipContent>
-            </Tooltip>
-
-            <button
-              onClick={() => handleCalculateLibraryValue()}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground"
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground">
-                <DollarSign className="h-4 w-4" />
-              </span>
-              <span className="truncate">
-                {libraryValueData && !libraryHasChanged()
-                  ? `$${libraryValueData.totalValue.toFixed(2)}`
-                  : t("library.libraryValue.calculate") || "Library Value"}
-              </span>
-            </button>
-          </TooltipProvider>
-        </div>
 
         {/* ── Spacer pushes storage to bottom ── */}
         <div className="flex-1" />
+
+        {/* ── Library tools: less frequent actions live in one menu ── */}
+        <div className="px-2 pb-1">
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary data-[state=open]:bg-accent/60 data-[state=open]:text-foreground">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md">
+                  <Wrench className="h-4 w-4" />
+                </span>
+                <span className="flex-1 text-left">{t("library.toolsMenu")}</span>
+                {isSyncingLibrary ? (
+                  <Loader className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="end" className="w-64">
+              <DropdownMenuItem className="gap-2" onSelect={() => setIsLibraryBackupsOpen(true)}>
+                <HardDriveDownload className="h-4 w-4 text-muted-foreground" />
+                {t("library.libraryBackups.button")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="items-start gap-2"
+                disabled={isSyncingLibrary}
+                onSelect={handleCloudSync}
+              >
+                {isSyncingLibrary ? (
+                  <Loader className="mt-0.5 h-4 w-4 animate-spin text-muted-foreground" />
+                ) : (
+                  <CloudUpload className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                )}
+                <span className="flex flex-col">
+                  {t("library.cloudSync") || "Sync to Cloud"}
+                  {!user && (
+                    <span className="text-xs text-muted-foreground">
+                      {t("library.signInToSync") || "Sign in to sync"}
+                    </span>
+                  )}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onSelect={() => handleCalculateLibraryValue()}>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1">
+                  {t("library.libraryValue.calculate") || "Library Value"}
+                </span>
+                {libraryValueData && !libraryHasChanged() && (
+                  <span className="text-xs font-semibold tabular-nums text-foreground">
+                    ${libraryValueData.totalValue.toFixed(2)}
+                  </span>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Dialogs opened from the sidebar */}
+          <AlertDialog
+            key="add-game-dialog"
+            open={isAddGameOpen}
+            onOpenChange={open => {
+              setIsAddGameOpen(open);
+              if (!open) setDroppedExecutablePath(null);
+            }}
+          >
+            <AlertDialogContent className="flex max-h-[90vh] flex-col border-border bg-background sm:max-w-3xl">
+              <AlertDialogHeader className="space-y-2">
+                <AlertDialogTitle className="text-2xl font-bold text-foreground">
+                  {t("library.addGame.title")}
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-xs text-muted-foreground">
+                  {t("library.addGameDescription2")}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="flex-1 overflow-y-auto py-4">
+                <AddGameForm
+                  initialExecutablePath={droppedExecutablePath}
+                  onRestorePrompt={entry => setAddGameRestoreEntry(entry)}
+                  onLibraryChanged={loadGames}
+                  onSuccess={() => {
+                    setIsAddGameOpen(false);
+                    setDroppedExecutablePath(null);
+                    setSelectedGameImage(null);
+                    loadGames();
+                  }}
+                />
+              </div>
+            </AlertDialogContent>
+          </AlertDialog>
+          <ImportGamesDialog
+            open={isImportGamesOpen}
+            onOpenChange={setIsImportGamesOpen}
+            onLibraryChanged={loadGames}
+            onBusyChange={setIsImportingGames}
+          />
+          <ImportFromLaunchersDialog
+            open={isImportChooserOpen}
+            onOpenChange={setIsImportChooserOpen}
+            isScanning={isImportingGames}
+            connectedStores={storeLibrary.accounts
+              .filter(account => account.connected)
+              .map(account => account.store)}
+            onScanThisPC={() => {
+              setIsImportChooserOpen(false);
+              setIsImportGamesOpen(true);
+            }}
+            onConnectStores={() => {
+              setIsImportChooserOpen(false);
+              setIsStoreAccountsOpen(true);
+            }}
+          />
+          <StoreAccountsDialog
+            open={isStoreAccountsOpen}
+            onOpenChange={setIsStoreAccountsOpen}
+            preferences={storeLibrary.preferences}
+            onPreferencesChange={storeLibrary.updatePreferences}
+            onShowInLibrary={() => {
+              setIsStoreAccountsOpen(false);
+              setActiveTab("all");
+            }}
+          />
+          <NewFolderDialog
+            open={isNewFolderOpen}
+            onOpenChange={setIsNewFolderOpen}
+            onCreate={handleCreateFolder}
+          />
+          <LibraryBackupsDialog
+            canManage={
+              !!user &&
+              ascendAccess.hasAccess &&
+              (ascendAccess.isSubscribed || ascendAccess.isVerified)
+            }
+            open={isLibraryBackupsOpen}
+            onOpenChange={setIsLibraryBackupsOpen}
+            gameNames={[
+              ...new Set(
+                [
+                  ...games
+                    .filter(game => !game.isFolder)
+                    .map(game => game.game || game.name),
+                  ...getGamesInFolders().map(game => game.game || game.name),
+                ].filter(Boolean)
+              ),
+            ]}
+          />
 
         {/* ── Storage info ── */}
         <div className="px-4 pb-4 pt-2">
@@ -2610,7 +2656,11 @@ const Library = () => {
             (() => {
               const renderGameCard = game => (
                 <div key={getLibraryCardKey(game)}>
-                  {game.isFolder ? (
+                  {game._isStoreOwned ? (
+                    <StoreOwnedGameCard game={game} viewMode={viewMode}
+                      favorite={favorites.includes(game.game)}
+                      onToggleFavorite={() => toggleFavorite(game.game)} />
+                  ) : game.isFolder ? (
                     <DroppableFolderCard
                       folder={game}
                       onDropGame={droppedGame =>
@@ -2656,7 +2706,7 @@ const Library = () => {
                 // Build directory groups from all filtered games so each section is complete
                 const dirGroups = new Map();
                 tabGames.forEach(game => {
-                  const dir = game._sourceDir || t("library.sort.addedGames");
+                  const dir = game._isStoreOwned ? storeNames[game.store] : game._sourceDir || t("library.sort.addedGames");
                   if (!dirGroups.has(dir)) dirGroups.set(dir, []);
                   dirGroups.get(dir).push(game);
                 });
