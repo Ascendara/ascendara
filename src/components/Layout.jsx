@@ -4,9 +4,66 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useSettings } from "@/context/SettingsContext";
 import Navigation from "./Navigation";
 import Tour from "./Tour";
-import PageTransition from "./PageTransition";
 import { useNaturalDownloadScroll } from "@/hooks/useNaturalDownloadScroll";
 import Search from "@/pages/Search";
+
+const EASE_OUT = [0.22, 1, 0.36, 1];
+
+// Pages that show a single game (opened from a card on Library, Search, Home...)
+const isDetailPath = path => path === "/gamescreen" || path === "/download";
+
+const getTransitionKind = (from, to) => {
+  if (from === "/library" && to.startsWith("/folderview/")) return "folder-in";
+  if (from.startsWith("/folderview/") && to === "/library") return "folder-out";
+  if (isDetailPath(to) && !isDetailPath(from)) return "detail-in";
+  if (isDetailPath(from) && !isDetailPath(to)) return "detail-out";
+  return "page";
+};
+
+// Small, quick motions: enough to show where you're going without slowing
+// navigation down. Exits stay short because AnimatePresence waits on them.
+const routeVariants = {
+  enter: kind => {
+    switch (kind) {
+      case "folder-in":
+        return { opacity: 0, x: 36, scale: 0.985 };
+      case "folder-out":
+        return { opacity: 0, x: -36, scale: 0.985 };
+      case "detail-in":
+        return { opacity: 0, y: 10, scale: 0.985 };
+      case "detail-out":
+        return { opacity: 0, scale: 1.01 };
+      case "none":
+        return { opacity: 1 };
+      default:
+        return { opacity: 0, y: 6 };
+    }
+  },
+  visible: kind => ({
+    opacity: 1,
+    x: 0,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: kind === "none" ? 0 : kind === "page" ? 0.2 : 0.26,
+      ease: EASE_OUT,
+    },
+  }),
+  leave: kind => {
+    switch (kind) {
+      case "folder-in":
+        return { opacity: 0, x: -24, scale: 0.99, transition: { duration: 0.14 } };
+      case "folder-out":
+        return { opacity: 0, x: 24, scale: 0.99, transition: { duration: 0.14 } };
+      case "detail-in":
+        return { opacity: 0, scale: 0.99, transition: { duration: 0.12 } };
+      case "detail-out":
+        return { opacity: 0, y: 8, scale: 0.99, transition: { duration: 0.12 } };
+      default:
+        return { opacity: 0, transition: { duration: 0 } };
+    }
+  },
+};
 
 const Layout = memo(() => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -17,20 +74,20 @@ const Layout = memo(() => {
   const reducedMotion = useReducedMotion();
   const [routeTransition, setRouteTransition] = useState({
     path: location.pathname,
-    direction: 0,
+    kind: "page",
   });
   if (routeTransition.path !== location.pathname) {
-    const enteringFolder =
-      location.pathname.startsWith("/folderview/") && routeTransition.path === "/library";
-    const leavingFolder =
-      location.pathname === "/library" && routeTransition.path.startsWith("/folderview/");
     setRouteTransition({
       path: location.pathname,
-      direction: enteringFolder ? 1 : leavingFolder ? -1 : 0,
+      kind: getTransitionKind(routeTransition.path, location.pathname),
     });
   }
-  const animateFolders = settings?.smoothTransitions !== false && !reducedMotion;
-  const folderDirection = animateFolders ? routeTransition.direction : 0;
+  const animate = settings?.smoothTransitions !== false && !reducedMotion;
+  const transitionKind = animate ? routeTransition.kind : "none";
+
+  useEffect(() => {
+    document.documentElement.dataset.motion = animate ? "full" : "reduced";
+  }, [animate]);
   const isCollectionPage =
     location.pathname === "/library" || location.pathname.startsWith("/folderview/");
   const isSearchPage = location.pathname === "/search";
@@ -77,13 +134,19 @@ const Layout = memo(() => {
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <div className="h-8" />
       {/* Search is rendered persistently so scroll position and loaded games survive navigation */}
-      <main
+      <motion.main
         ref={searchScrollRef}
         className="flex-1 overflow-y-auto px-4 pb-24"
         style={{ display: isSearchPage ? "block" : "none" }}
+        initial={false}
+        animate={
+          isSearchPage
+            ? { opacity: 1, y: 0, transition: { duration: animate ? 0.22 : 0, ease: EASE_OUT } }
+            : { opacity: 0, y: animate ? 6 : 0, transition: { duration: 0 } }
+        }
       >
         <Search scrollContainerRef={searchScrollRef} isVisible={isSearchPage} />
-      </main>
+      </motion.main>
       {/* Other pages render normally via Outlet */}
       <main
         className="flex-1 overflow-y-auto px-4 pb-24"
@@ -91,36 +154,18 @@ const Layout = memo(() => {
       >
         {/* Skipped on /search so the outgoing page unmounts immediately instead of lingering in the hidden container with its listeners */}
         {!isSearchPage && (
-          <AnimatePresence initial={false} mode="wait" custom={folderDirection}>
+          <AnimatePresence mode="wait" custom={transitionKind}>
             <motion.div
               key={location.pathname}
-              custom={folderDirection}
+              custom={transitionKind}
               className={isCollectionPage ? "fixed inset-0" : undefined}
-              variants={{
-                enter: direction => ({
-                  opacity: direction ? 0 : 1,
-                  x: direction * 36,
-                  scale: direction ? 0.985 : 1,
-                }),
-                visible: { opacity: 1, x: 0, scale: 1 },
-                leave: direction => ({
-                  opacity: direction ? 0 : 1,
-                  x: direction * -24,
-                  scale: direction ? 0.99 : 1,
-                  transition: { duration: direction ? 0.14 : 0 },
-                }),
-              }}
+              style={{ transformOrigin: "50% 30%" }}
+              variants={routeVariants}
               initial="enter"
               animate="visible"
               exit="leave"
-              transition={{
-                duration: folderDirection ? 0.24 : 0,
-                ease: [0.22, 1, 0.36, 1],
-              }}
             >
-              <PageTransition key={location.pathname} disabled={Boolean(folderDirection)}>
-                {outlet}
-              </PageTransition>
+              {outlet}
             </motion.div>
           </AnimatePresence>
         )}

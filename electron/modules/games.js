@@ -338,48 +338,55 @@ function registerGameHandlers() {
   });
 
   // Get custom games
-  ipcMain.handle("get-custom-games", () => {
+  ipcMain.handle("get-custom-games", async () => {
     const settings = settingsManager.getSettings();
     try {
       if (!settings.downloadDirectory) return [];
 
       const allDirectories = getGameDirectories(settings);
 
-      const allGames = [];
-      for (const dir of allDirectories) {
-        const gamesFilePath = path.join(dir, "games.json");
-        const gamesDirectory = path.join(dir, "games");
+      const perDirectory = await Promise.all(
+        allDirectories.map(async dir => {
+          const gamesFilePath = path.join(dir, "games.json");
+          const gamesDirectory = path.join(dir, "games");
 
-        try {
-          const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+          try {
+            const gamesData = JSON.parse(
+              await fs.promises.readFile(gamesFilePath, "utf8")
+            );
 
-          const gamesWithImagePaths = gamesData.games.map(game => {
-            const possibleExtensions = [".jpg", ".jpeg", ".png"];
-            let imagePath = null;
-
-            for (const ext of possibleExtensions) {
-              const potentialPath = path.join(
-                gamesDirectory,
-                `${game.game}.ascendara${ext}`
-              );
-              if (fs.existsSync(potentialPath)) {
-                imagePath = potentialPath;
-                break;
+            // One directory listing instead of up to three stat calls per game,
+            // which blocked the main process on large libraries.
+            const coverFiles = new Map();
+            try {
+              for (const name of await fs.promises.readdir(gamesDirectory)) {
+                coverFiles.set(name.toLowerCase(), name);
               }
+            } catch {
+              /* no covers directory yet */
             }
 
-            return { ...game, isCustom: true, custom: true, imagePath, _sourceDir: dir };
-          });
-
-          allGames.push(...gamesWithImagePaths);
-        } catch (error) {
-          if (error.code !== "ENOENT") {
-            console.error(`Error reading custom games from ${dir}:`, error);
+            return (gamesData.games || []).map(game => {
+              let imagePath = null;
+              for (const ext of [".jpg", ".jpeg", ".png"]) {
+                const match = coverFiles.get(`${game.game}.ascendara${ext}`.toLowerCase());
+                if (match) {
+                  imagePath = path.join(gamesDirectory, match);
+                  break;
+                }
+              }
+              return { ...game, isCustom: true, custom: true, imagePath, _sourceDir: dir };
+            });
+          } catch (error) {
+            if (error.code !== "ENOENT") {
+              console.error(`Error reading custom games from ${dir}:`, error);
+            }
+            return [];
           }
-        }
-      }
+        })
+      );
 
-      return allGames;
+      return perDirectory.flat();
     } catch (error) {
       console.error("Error reading the settings file:", error);
       return [];

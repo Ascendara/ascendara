@@ -313,7 +313,7 @@ function GameCardContent({ game, compact }) {
   if (compact) {
     return (
       <div
-        className="flex cursor-pointer gap-4 rounded-lg p-2 transition-colors hover:bg-secondary/50"
+        className="press flex cursor-pointer gap-4 rounded-lg p-2 transition-all hover:bg-secondary/50"
         onClick={handleCardClick}
       >
         <img
@@ -346,7 +346,7 @@ function GameCardContent({ game, compact }) {
             handleCardClick();
           }
         }}
-        className="group relative flex h-[420px] cursor-pointer flex-col justify-between overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10"
+        className="press group relative flex h-[420px] cursor-pointer flex-col justify-between overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10"
       >
         <CardContent className="p-0">
           {/* Image Section */}

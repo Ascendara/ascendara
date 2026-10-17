@@ -62,6 +62,11 @@ import GamesBackupDialog from "@/components/GamesBackupDialog";
 import imageCacheService from "@/services/imageCacheService";
 import "@/components/GameMetadata";
 import steamService from "@/services/gameInfoService";
+import {
+  gameImageCache,
+  heroImageCache,
+  logoImageCache,
+} from "@/lib/gameImageCache";
 import GameRate from "@/components/GameRate";
 import { GameAssetSearchDialog } from "@/components/GameAssetSearchDialog";
 import nexusModsService from "@/services/nexusModsService";
@@ -1226,6 +1231,10 @@ const EditGameInfoDialog = ({
   );
 };
 
+// Steam store details by App ID, kept for the session so reopening a game
+// doesn't refetch them over the network
+const steamAppDataCache = new Map();
+
 export default function GameScreen() {
   const showError = (game, error) => {
     setErrorGame(game);
@@ -1250,8 +1259,11 @@ export default function GameScreen() {
     isVerified: false,
     verified: false,
   });
-  const [loading, setLoading] = useState(!gameData);
-  const [imageData, setImageData] = useState("");
+  const loading = !gameData;
+  const initialGameId = gameData?.game || gameData?.name;
+  const [imageData, setImageData] = useState(
+    () => (initialGameId && gameImageCache.get(initialGameId)) || ""
+  );
   const [executableExists, setExecutableExists] = useState(true);
   const canLaunchGame = executableExists;
   const [favorites, setFavorites] = useState(() => {
@@ -1328,7 +1340,7 @@ export default function GameScreen() {
         })
         .catch(() => {});
     }
-  }, [game]);
+  }, [game?.game, game?.name]);
 
   useEffect(() => {
     if (!isOnLinux || !game) return;
@@ -1349,7 +1361,7 @@ export default function GameScreen() {
         setUmuIdInput(found);
       }
     });
-  }, [isOnLinux, game]);
+  }, [isOnLinux, game?.game, game?.name, game?.executable]);
 
   // Nexus Mods state
   const [supportsModManaging, setSupportsModManaging] = useState(false);
@@ -1423,7 +1435,9 @@ export default function GameScreen() {
   }, [showUpdateDialog, game?.game, game?.name, t]);
 
   // Logo state
-  const [logoData, setLogoData] = useState(null);
+  const [logoData, setLogoData] = useState(
+    () => (initialGameId && logoImageCache.get(initialGameId)) || null
+  );
   const [showLogo, setShowLogo] = useState(() => {
     const saved = localStorage.getItem(`game-show-logo-${game?.game || game?.name}`);
     return saved !== "false";
@@ -1513,7 +1527,7 @@ export default function GameScreen() {
       setAchievementsLoading(false);
     };
     fetchAchievements();
-  }, [game]);
+  }, [game?.game, game?.name, game?.isCustom]);
 
   const handleRefreshAchievements = async () => {
     if (!game || refreshingAchievements) return;
@@ -1576,64 +1590,62 @@ export default function GameScreen() {
           navigate("/library");
           return;
         }
-        // Trigger the download of missing assets
+        // The page already has the game from the library, so render it right
+        // away and run these checks in the background instead of swapping the
+        // whole screen for a spinner while they finish.
         const gameName = game.game || game.name;
-        if (gameName) {
-          window.electron.ensureGameAssets(gameName);
-        }
-
-        // Check games.json for a _isDeleted stub matching this game and prompt to restore
-        try {
-          const customGames = await window.electron.getCustomGames();
-          const deletedStubs = (customGames || []).filter(g => g._isDeleted);
-          console.log(
-            "[GameScreen] Checking for deleted stub for:",
-            gameName,
-            "| All stubs:",
-            deletedStubs.map(g => g.game)
-          );
-          const stub = deletedStubs.find(g => g.game === gameName);
-          if (stub) {
-            console.log("[GameScreen] Found deleted stub, showing restore prompt:", stub);
-            setPendingRestoreStub(stub);
-            setIsRestorePromptOpen(true);
-          } else {
-            console.log("[GameScreen] No deleted stub found for:", gameName);
-          }
-        } catch (e) {
-          console.warn("[GameScreen] Could not check for deleted stub:", e);
-        }
-
-        setLoading(true);
-
-        // Check if executable exists
-        if (game.executable) {
-          const exists = await window.electron.checkFileExists(game.executable);
-          setExecutableExists(exists);
-        } else {
-          setExecutableExists(false);
-        }
-
-        // Check if game is running
-        const running = await window.electron.isGameRunning(game.game || game.name);
+        const [exists, running] = await Promise.all([
+          game.executable
+            ? window.electron.checkFileExists(game.executable).catch(() => true)
+            : Promise.resolve(false),
+          window.electron.isGameRunning(gameName).catch(() => false),
+        ]);
+        if (cancelled) return;
+        setExecutableExists(exists);
         setIsRunning(running);
-
-        setLoading(false);
-
-        // Fetch Steam API data - prefer the saved steamAppId if the user has matched/edited it
-        if (game.steamAppId) {
-          fetchSteamDataByAppId(game.steamAppId);
-        } else {
-          fetchSteamData(game.game || game.name);
-        }
       } catch (error) {
         console.error("Error loading game:", error);
-        setLoading(false);
       }
     };
 
+    let cancelled = false;
     initializeGameScreen();
-  }, [game, navigate]);
+    return () => {
+      cancelled = true;
+    };
+  }, [game?.game, game?.name, game?.executable, navigate]);
+
+  // Non-critical work deferred until after the first paint: downloading missing
+  // artwork and checking games.json for a deleted-game stub to restore.
+  useEffect(() => {
+    const gameName = game?.game || game?.name;
+    if (!gameName) return;
+    let cancelled = false;
+    const idle = window.requestIdleCallback || (cb => setTimeout(cb, 200));
+    const cancelIdle = window.cancelIdleCallback || clearTimeout;
+
+    const handle = idle(async () => {
+      window.electron.ensureGameAssets(gameName);
+
+      try {
+        const customGames = await window.electron.getCustomGames();
+        if (cancelled) return;
+        const stub = (customGames || []).find(g => g._isDeleted && g.game === gameName);
+        if (stub) {
+          console.log("[GameScreen] Found deleted stub, showing restore prompt:", stub);
+          setPendingRestoreStub(stub);
+          setIsRestorePromptOpen(true);
+        }
+      } catch (e) {
+        console.warn("[GameScreen] Could not check for deleted stub:", e);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      cancelIdle(handle);
+    };
+  }, [game?.game, game?.name]);
 
   // Follow launch/close events instead of polling the main process
   useEffect(() => {
@@ -1686,7 +1698,7 @@ export default function GameScreen() {
     };
 
     checkForUpdates();
-  }, [game]);
+  }, [game?.game, game?.gameID, game?.version, game?.isCustom]);
 
   // Imported (launcher-tied) games don't have version tracking or update checks.
   // Look up a matching Ascendara catalog entry so we can offer switching to a
@@ -1717,14 +1729,13 @@ export default function GameScreen() {
   // Prefer the saved steamAppId (user-matched/edited) over a name search,
   // otherwise an edited match gets immediately overwritten by a name search.
   useEffect(() => {
-    if (game) {
-      if (game.steamAppId) {
-        fetchSteamDataByAppId(game.steamAppId);
-      } else {
-        fetchSteamData(game.game || game.name);
-      }
+    if (!game) return;
+    if (game.steamAppId) {
+      fetchSteamDataByAppId(game.steamAppId);
+    } else {
+      fetchSteamData(game.game || game.name);
     }
-  }, [game]);
+  }, [game?.steamAppId, game?.game, game?.name]);
 
   // Set up event listeners
   useEffect(() => {
@@ -1885,21 +1896,24 @@ export default function GameScreen() {
     if (!game) return;
     const gameId = game.game || game.name;
 
+    let isMounted = true;
     const loadLogo = async () => {
       try {
         const logoBase64 = await window.electron.getGameImage(gameId, "logo");
-        if (logoBase64) {
-          setLogoData(`data:image/png;base64,${logoBase64}`);
-        } else {
-          setLogoData(null);
-        }
+        if (!isMounted) return;
+        const dataUrl = logoBase64 ? `data:image/png;base64,${logoBase64}` : null;
+        logoImageCache.set(gameId, dataUrl);
+        setLogoData(dataUrl);
       } catch (e) {
-        setLogoData(null);
+        if (isMounted) setLogoData(null);
       }
     };
 
     loadLogo();
-  }, [game]);
+    return () => {
+      isMounted = false;
+    };
+  }, [game?.game, game?.name]);
 
   // Save logo preference
   useEffect(() => {
@@ -1960,11 +1974,13 @@ export default function GameScreen() {
 
         if (gridBase64 && isMounted) {
           const dataUrl = `data:image/jpeg;base64,${gridBase64}`;
+          gameImageCache.set(gameId, dataUrl);
           setImageData(dataUrl);
           setHasGridImage(true);
           return;
         }
       } catch (e) {}
+      if (!isMounted) return;
 
       // Grid image failed, mark as not available
       setHasGridImage(false);
@@ -2016,21 +2032,30 @@ export default function GameScreen() {
 
   // Load hero image when grid image fails
   useEffect(() => {
-    if (!hasGridImage && game) {
-      const gameId = game.game || game.name;
-      const loadHeroImage = async () => {
-        try {
-          const heroBase64 = await window.electron.getGameImage(gameId, "hero");
-          if (heroBase64) {
-            setHeroImageData(`data:image/jpeg;base64,${heroBase64}`);
-          }
-        } catch (e) {
-          console.error("Error loading hero image:", e);
-        }
-      };
-      loadHeroImage();
+    if (hasGridImage || !game) return;
+    const gameId = game.game || game.name;
+    if (heroImageCache.get(gameId)) {
+      setHeroImageData(heroImageCache.get(gameId));
+      return;
     }
-  }, [hasGridImage, game]);
+    let isMounted = true;
+    const loadHeroImage = async () => {
+      try {
+        const heroBase64 = await window.electron.getGameImage(gameId, "hero");
+        if (heroBase64 && isMounted) {
+          const dataUrl = `data:image/jpeg;base64,${heroBase64}`;
+          heroImageCache.set(gameId, dataUrl);
+          setHeroImageData(dataUrl);
+        }
+      } catch (e) {
+        console.error("Error loading hero image:", e);
+      }
+    };
+    loadHeroImage();
+    return () => {
+      isMounted = false;
+    };
+  }, [hasGridImage, game?.game, game?.name]);
 
   // Keep the prompt in sync with the game's persisted review status.
   useEffect(() => {
@@ -2525,6 +2550,11 @@ export default function GameScreen() {
 
   // Fetch Steam data by specific App ID
   const fetchSteamDataByAppId = async appId => {
+    const cached = steamAppDataCache.get(String(appId));
+    if (cached) {
+      setSteamData(cached);
+      return;
+    }
     try {
       setSteamLoading(true);
       console.log("Fetching Steam data by App ID:", appId);
@@ -2544,6 +2574,7 @@ export default function GameScreen() {
           );
         }
         console.log("Steam data fetched by App ID:", formattedData.appid);
+        steamAppDataCache.set(String(appId), formattedData);
         setSteamData(formattedData);
       } else {
         console.log("No game data found for App ID:", appId);
@@ -2852,148 +2883,150 @@ export default function GameScreen() {
           ))}
         </div>
 
-        {currentSection === "overview" && (
-          <GameOverviewTab
-            game={game}
-            steamData={steamData}
-            steamLoading={steamLoading}
-            screenshots={screenshots}
-            onEditGameInfo={() => setShowEditGameInfo(true)}
-            isAuthenticated={isAuthenticated}
-            onGetAscend={() => navigate("/ascend")}
-            isOnLinux={isOnLinux}
-            umuId={umuId}
-            umuIdInput={umuIdInput}
-            onUmuIdInputChange={setUmuIdInput}
-            umuIdSaving={umuIdSaving}
-            onSaveUmuId={async () => {
-              if (!game.executable) return;
-              setUmuIdSaving(true);
-              const result = await window.electron.umuSetGameId(
-                game.game || game.name,
-                umuIdInput
-              );
-              if (result.success) {
-                setUmuId(umuIdInput);
-                toast.success(t("gameScreen.umuIdSaved"));
-              } else {
-                toast.error(t("gameScreen.umuIdSaveFailed"));
-              }
-              setUmuIdSaving(false);
-            }}
-          />
-        )}
+        <div key={currentSection} className="animate-section-in">
+          {currentSection === "overview" && (
+            <GameOverviewTab
+              game={game}
+              steamData={steamData}
+              steamLoading={steamLoading}
+              screenshots={screenshots}
+              onEditGameInfo={() => setShowEditGameInfo(true)}
+              isAuthenticated={isAuthenticated}
+              onGetAscend={() => navigate("/ascend")}
+              isOnLinux={isOnLinux}
+              umuId={umuId}
+              umuIdInput={umuIdInput}
+              onUmuIdInputChange={setUmuIdInput}
+              umuIdSaving={umuIdSaving}
+              onSaveUmuId={async () => {
+                if (!game.executable) return;
+                setUmuIdSaving(true);
+                const result = await window.electron.umuSetGameId(
+                  game.game || game.name,
+                  umuIdInput
+                );
+                if (result.success) {
+                  setUmuId(umuIdInput);
+                  toast.success(t("gameScreen.umuIdSaved"));
+                } else {
+                  toast.error(t("gameScreen.umuIdSaveFailed"));
+                }
+                setUmuIdSaving(false);
+              }}
+            />
+          )}
 
-        {currentSection === "achievements" && (
-          <AchievementsTab
-            achievements={achievements}
-            loading={achievementsLoading}
-            refreshing={refreshingAchievements}
-            onRefresh={handleRefreshAchievements}
-            page={achievementsPage}
-            perPage={perPage}
-            onPageChange={setAchievementsPage}
-          />
-        )}
+          {currentSection === "achievements" && (
+            <AchievementsTab
+              achievements={achievements}
+              loading={achievementsLoading}
+              refreshing={refreshingAchievements}
+              onRefresh={handleRefreshAchievements}
+              page={achievementsPage}
+              perPage={perPage}
+              onPageChange={setAchievementsPage}
+            />
+          )}
 
-        {currentSection === "soundtrack" && (
-          <SoundtrackTab
-            gameName={game.game}
-            soundtrack={soundtrack}
-            loading={loadingSoundtrack}
-            page={currentPage}
-            onPageChange={setCurrentPage}
-            onPlayTrack={track => {
-              // Use the direct URL for audio playback
-              setTrack({
-                ...track,
-                url: track.url.replace(
-                  "/api/khinsider",
-                  "https://downloads.khinsider.com"
-                ),
-              });
-              play();
-            }}
-          />
-        )}
+          {currentSection === "soundtrack" && (
+            <SoundtrackTab
+              gameName={game.game}
+              soundtrack={soundtrack}
+              loading={loadingSoundtrack}
+              page={currentPage}
+              onPageChange={setCurrentPage}
+              onPlayTrack={track => {
+                // Use the direct URL for audio playback
+                setTrack({
+                  ...track,
+                  url: track.url.replace(
+                    "/api/khinsider",
+                    "https://downloads.khinsider.com"
+                  ),
+                });
+                play();
+              }}
+            />
+          )}
 
-        {currentSection === "extras" && (
-          <ModsTrainersTab
-            hasAscendAccess={isAuthenticated && ascendAccess.hasAccess}
-            isAuthenticated={isAuthenticated}
-            onGetAscend={() => navigate("/ascend")}
-            showTrainer={supportsFlingTrainer}
-            trainerProps={{
-              trainer: flingTrainerData,
-              trainerExists,
-              isInstalling: isDownloadingTrainer,
-              onInstall: async () => {
-                setIsDownloadingTrainer(true);
-                try {
-                  const result = await flingTrainerService.downloadTrainerToGame(
-                    flingTrainerData,
-                    game?.game || game?.name,
-                    game?.isCustom || false
-                  );
-                  if (result.success) {
-                    toast.success(t("gameScreen.trainerInstalledSuccess"), {
-                      description: t("gameScreen.trainerInstalledDescription"),
-                    });
-                    // Check if trainer now exists
-                    const exists = await window.electron.checkTrainerExists(
+          {currentSection === "extras" && (
+            <ModsTrainersTab
+              hasAscendAccess={isAuthenticated && ascendAccess.hasAccess}
+              isAuthenticated={isAuthenticated}
+              onGetAscend={() => navigate("/ascend")}
+              showTrainer={supportsFlingTrainer}
+              trainerProps={{
+                trainer: flingTrainerData,
+                trainerExists,
+                isInstalling: isDownloadingTrainer,
+                onInstall: async () => {
+                  setIsDownloadingTrainer(true);
+                  try {
+                    const result = await flingTrainerService.downloadTrainerToGame(
+                      flingTrainerData,
                       game?.game || game?.name,
                       game?.isCustom || false
                     );
-                    setTrainerExists(exists);
-                  } else {
+                    if (result.success) {
+                      toast.success(t("gameScreen.trainerInstalledSuccess"), {
+                        description: t("gameScreen.trainerInstalledDescription"),
+                      });
+                      // Check if trainer now exists
+                      const exists = await window.electron.checkTrainerExists(
+                        game?.game || game?.name,
+                        game?.isCustom || false
+                      );
+                      setTrainerExists(exists);
+                    } else {
+                      toast.error(t("gameScreen.trainerInstallFailed"), {
+                        description:
+                          result.error || t("gameScreen.trainerInstallFailedDescription"),
+                      });
+                    }
+                  } catch (error) {
                     toast.error(t("gameScreen.trainerInstallFailed"), {
-                      description:
-                        result.error || t("gameScreen.trainerInstallFailedDescription"),
+                      description: t("gameScreen.trainerInstallFailedDescription"),
                     });
+                  } finally {
+                    setIsDownloadingTrainer(false);
                   }
-                } catch (error) {
-                  toast.error(t("gameScreen.trainerInstallFailed"), {
-                    description: t("gameScreen.trainerInstallFailedDescription"),
-                  });
-                } finally {
-                  setIsDownloadingTrainer(false);
-                }
-              },
-              onDownloadStandalone: async () => {
-                const success = await flingTrainerService.downloadTrainer(
-                  flingTrainerData,
-                  game?.game || game?.name
-                );
-                if (success) {
-                  toast.success(t("gameScreen.trainerDownloadStarted"), {
-                    description: t("gameScreen.trainerDownloadStartedDescription"),
-                  });
-                } else {
-                  toast.error(t("gameScreen.trainerDownloadFailed"));
-                }
-              },
-              onOpenPage: () => flingTrainerService.openTrainerPage(flingTrainerData),
-            }}
-            showMods={supportsModManaging}
-            modsProps={{
-              nexusGameData,
-              loading: modsLoading,
-              mods: allMods,
-              popularMods,
-              totalCount: modsTotalCount,
-              page: modsPage,
-              perPage: modsPerPage,
-              searchQuery: modsSearchQuery,
-              onSearchQueryChange: setModsSearchQuery,
-              onSearch: handleModSearch,
-              sortBy: modsSortBy,
-              onSortChange: handleSortChange,
-              onPageChange: handleModsPageChange,
-              onSelectMod: fetchModFiles,
-              onBrowse: () => fetchMods(0, "", "endorsements"),
-            }}
-          />
-        )}
+                },
+                onDownloadStandalone: async () => {
+                  const success = await flingTrainerService.downloadTrainer(
+                    flingTrainerData,
+                    game?.game || game?.name
+                  );
+                  if (success) {
+                    toast.success(t("gameScreen.trainerDownloadStarted"), {
+                      description: t("gameScreen.trainerDownloadStartedDescription"),
+                    });
+                  } else {
+                    toast.error(t("gameScreen.trainerDownloadFailed"));
+                  }
+                },
+                onOpenPage: () => flingTrainerService.openTrainerPage(flingTrainerData),
+              }}
+              showMods={supportsModManaging}
+              modsProps={{
+                nexusGameData,
+                loading: modsLoading,
+                mods: allMods,
+                popularMods,
+                totalCount: modsTotalCount,
+                page: modsPage,
+                perPage: modsPerPage,
+                searchQuery: modsSearchQuery,
+                onSearchQueryChange: setModsSearchQuery,
+                onSearch: handleModSearch,
+                sortBy: modsSortBy,
+                onSortChange: handleSortChange,
+                onPageChange: handleModsPageChange,
+                onSelectMod: fetchModFiles,
+                onBrowse: () => fetchMods(0, "", "endorsements"),
+              }}
+            />
+          )}
+        </div>
       </div>
 
       {/* Mod Details Dialog */}

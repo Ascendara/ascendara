@@ -7,7 +7,7 @@ const buttonVariants = ({
   className = "",
 } = {}) => {
   return cn(
-    "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background",
+    "press-sm inline-flex items-center justify-center rounded-md text-sm font-medium transition-[color,background-color,border-color,scale] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background",
     {
       "bg-primary text-primary-foreground hover:bg-primary/90": variant === "default",
       "bg-destructive text-destructive-foreground hover:bg-destructive/90":

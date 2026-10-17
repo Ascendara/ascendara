@@ -122,6 +122,11 @@ import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { useGameRunning } from "@/hooks/useGameRunning";
 import {
+  gameImageCache,
+  heroImageCache,
+  logoImageCache,
+} from "@/lib/gameImageCache";
+import {
   loadFolders,
   saveFolders,
   createFolder,
@@ -132,10 +137,10 @@ import {
 
 const Retro = React.lazy(() => import("./Retro"));
 
-// Module-level cache so images survive page switches without re-fetching via IPC
-const gameImageCache = new Map();
-const heroImageCache = new Map();
 let libraryGamesCache = null;
+
+// Warm the GameScreen chunk so the first open doesn't flash the Suspense fallback
+const preloadGameScreen = () => import("./GameScreen");
 
 // Keep deliberately retained installs independently reachable in React.
 const getLibraryCardKey = game =>
@@ -205,10 +210,19 @@ const Library = () => {
   const setIsLibraryBackupsOpen = useLibraryBackupStore(state => state.setOpen);
 
   useEffect(() => {
+    const idle = window.requestIdleCallback || (cb => setTimeout(cb, 300));
+    const cancelIdle = window.cancelIdleCallback || clearTimeout;
+    const handle = idle(() => preloadGameScreen().catch(() => {}));
+    return () => cancelIdle(handle);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     const unsubscribe = window.electron.onGameAssetsUpdated(async ({ game, success }) => {
       if (!success) return;
       gameImageCache.delete(game);
+      heroImageCache.delete(game);
+      logoImageCache.delete(game);
       try {
         const image = await window.electron.getGameImage(game, "grid");
         if (!active || !image) return;
@@ -3911,7 +3925,7 @@ const FavoritesGalleryCard = memo(
           className={cn(
             "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
             !isRemoving &&
-              "cursor-pointer hover:-translate-y-1 hover:border-primary/40 hover:shadow-2xl",
+              "press cursor-pointer hover:-translate-y-1 hover:border-primary/40 hover:shadow-2xl",
             isRemoving &&
               "pointer-events-none duration-300 animate-out fade-out zoom-out-95 slide-out-to-bottom-2"
           )}
@@ -4100,7 +4114,9 @@ const InstalledGameCard = memo(
     const [executableExists, setExecutableExists] = useState(null);
     const [contextMenuOpen, setContextMenuOpen] = useState(false);
     const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
-    const [logoData, setLogoData] = useState(null);
+    const [logoData, setLogoData] = useState(
+      () => logoImageCache.get(game.game || game.name) ?? null
+    );
     const [heroData, setHeroData] = useState(
       () => heroImageCache.get(game.game || game.name) ?? null
     );
@@ -4238,22 +4254,22 @@ const InstalledGameCard = memo(
       let isMounted = true;
       const gameId = game.game || game.name;
 
-      const loadLogo = async () => {
+      const loadLogo = async (force = false) => {
+        if (!force && logoImageCache.has(gameId)) return;
         try {
           const logoBase64 = await window.electron.getGameImage(gameId, "logo");
-          if (logoBase64 && isMounted) {
-            setLogoData(`data:image/png;base64,${logoBase64}`);
-          } else {
-            setLogoData(null);
-          }
+          if (!isMounted) return;
+          const dataUrl = logoBase64 ? `data:image/png;base64,${logoBase64}` : null;
+          logoImageCache.set(gameId, dataUrl);
+          setLogoData(dataUrl);
         } catch (e) {
-          setLogoData(null);
+          if (isMounted) setLogoData(null);
         }
       };
 
       loadLogo();
       const unsubscribe = window.electron.onGameAssetsUpdated(({ game: updatedGame }) => {
-        if (updatedGame === gameId) loadLogo();
+        if (updatedGame === gameId) loadLogo(true);
       });
 
       return () => {
@@ -5117,7 +5133,7 @@ const InstalledGameCard = memo(
               "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
               !game._isDownloading &&
                 !game._isQueued &&
-                "hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
+                "press hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
               (game._isDownloading || game._isQueued) && "cursor-default opacity-60",
               isSelected && "ring-2 ring-primary",
               selectionMode && game.isCustom && "selectable-card",
@@ -5346,8 +5362,8 @@ const CloudOnlyGameCard = memo(
             }
           }}
           className={cn(
-            "group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
-            "hover:-translate-y-1 hover:shadow-xl",
+            "press group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
+            "press hover:-translate-y-1 hover:shadow-xl",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           )}
         >
@@ -5572,7 +5588,7 @@ const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
     <Card
       className={cn(
         "group relative overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
-        "hover:-translate-y-1 hover:shadow-xl"
+        "press hover:-translate-y-1 hover:shadow-xl"
       )}
     >
       <CardContent className="p-0">
@@ -5721,7 +5737,7 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
       <Card
         className={cn(
           "group relative overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
-          "hover:-translate-y-1 hover:shadow-xl"
+          "press hover:-translate-y-1 hover:shadow-xl"
         )}
       >
         <CardContent className="p-0">

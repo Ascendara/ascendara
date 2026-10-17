@@ -22,6 +22,7 @@ import {
   loadFolders,
 } from "@/lib/folderManager";
 import { Input } from "@/components/ui/input";
+import { gameImageCache } from "@/lib/gameImageCache";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,8 +34,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// Module-level image cache — persists across renders
-const imageCache = {};
+// Shared with Library/GameScreen so covers already loaded there appear instantly
+const imageCache = {
+  get: id => gameImageCache.get(id),
+  set: (id, url) => gameImageCache.set(id, url),
+};
 
 // Defined outside FolderView so it never gets recreated on parent re-render,
 // which was causing the cleanup `cancelled = true` to fire before IPC resolved.
@@ -42,15 +46,15 @@ const GameCard = React.memo(
   ({ game, favorites, onPlay, onRemove, onToggleFavorite, t }) => {
     const [isHovered, setIsHovered] = useState(false);
     const [imageData, setImageData] = useState(
-      () => imageCache[game.game || game.name] ?? null
+      () => imageCache.get(game.game || game.name) ?? null
     );
     const gameId = game.game || game.name;
     const isFavorite = favorites.includes(gameId);
 
     useEffect(() => {
       let cancelled = false;
-      if (imageCache[gameId]) {
-        setImageData(imageCache[gameId]);
+      if (imageCache.get(gameId)) {
+        setImageData(imageCache.get(gameId));
         return;
       }
       (async () => {
@@ -58,7 +62,7 @@ const GameCard = React.memo(
           const base64 = await window.electron.getGameImage(gameId, "grid");
           if (!cancelled && base64) {
             const dataUrl = `data:image/jpeg;base64,${base64}`;
-            imageCache[gameId] = dataUrl;
+            imageCache.set(gameId, dataUrl);
             setImageData(dataUrl);
           }
         } catch {
@@ -74,7 +78,7 @@ const GameCard = React.memo(
       <Card
         className={cn(
           "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
-          "hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
+          "press hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
           "cursor-pointer"
         )}
         onClick={e => {
@@ -172,6 +176,8 @@ const FolderView = () => {
   const lastFolderNameRef = useRef(folderName);
   const lastFolderGamesRef = useRef([]);
   const isMounted = useRef(true);
+  // Latest installed + custom records, so opening a game doesn't rescan disk
+  const libraryRecordsRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -207,17 +213,6 @@ const FolderView = () => {
     // Immediately load and cache folder data
     const folder = getFolderByName(decodeURIComponent(folderName));
     if (folder && folder.items) {
-      folder.items.forEach(game => {
-        const gameId = game.game || game.name;
-        if (!imageCache[gameId]) {
-          const localStorageKey = `game-cover-${gameId}`;
-          const cachedImage = localStorage.getItem(localStorageKey);
-          if (cachedImage) {
-            imageCache[gameId] = cachedImage;
-          }
-        }
-      });
-
       // Keep previous games visible until new ones are ready
       // Only update if the games actually changed
       const newGames = folder.items;
@@ -266,6 +261,7 @@ const FolderView = () => {
           ...(Array.isArray(customGames) ? customGames : []).map(game => ({ ...game, isCustom: true })),
         ];
         const visible = resolveLibraryConflicts(records, readLibraryChoices()).games;
+        libraryRecordsRef.current = records;
         const folder = getFolderByName(decodeURIComponent(folderName));
         setFolderGames(reconcileFolderItems(folder?.items || [], visible));
       } catch (error) {
@@ -399,7 +395,30 @@ const FolderView = () => {
 
   const handlePlayGame = async game => {
     const gameId = game.game || game.name;
-    console.log("Play game:", gameId);
+    const matchesInstall = g =>
+      (g.game || g.name) === gameId &&
+      (!game._sourceDir ||
+        (g._sourceDir === game._sourceDir && g.executable === game.executable));
+
+    // Already have fresh records from the playtime refresh: navigate instantly
+    const known = libraryRecordsRef.current?.find(
+      g => Boolean(g.isCustom) === Boolean(game.isCustom) && matchesInstall(g)
+    );
+    if (known) {
+      navigate("/gamescreen", {
+        state: {
+          returnToFolder: location.pathname,
+          gameData: {
+            ...known,
+            ...(game.folderSpecificProps
+              ? { folderSpecificProps: game.folderSpecificProps }
+              : {}),
+          },
+        },
+      });
+      return;
+    }
+
     // Get the complete game data from the main library to ensure we have all properties
     try {
       // First try to get from installed games

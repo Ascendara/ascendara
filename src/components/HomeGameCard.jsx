@@ -66,7 +66,7 @@ const HomeGameCard = memo(({ game, small }) => {
   return (
     <Card
       ref={cardRef}
-      className="group relative cursor-pointer overflow-hidden rounded-xl border-none transition-all duration-300 animate-in fade-in-50 hover:shadow-xl"
+      className="press group relative cursor-pointer overflow-hidden rounded-xl border-none transition-all duration-300 animate-in fade-in-50 hover:shadow-xl"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={handleClick}

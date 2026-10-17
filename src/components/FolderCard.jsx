@@ -173,7 +173,7 @@ const FolderCard = ({
           data-library-folder={name}
           className={cn(
             "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
-            "hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
+            "press hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
             "cursor-pointer",
             className
           )}

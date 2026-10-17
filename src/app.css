@@ -781,3 +781,48 @@ h2 {
 .recharts-line path {
   transition: none !important;
 }
+
+/* ── Micro-interactions ─────────────────────────────────────────────
+   Uses the standalone `scale` property so it composes with Tailwind's
+   hover translate/scale transforms instead of overriding them. Elements
+   rely on their own `transition-all` for the easing. */
+.press:active {
+  scale: 0.98;
+}
+.press-sm:active:not(:disabled) {
+  scale: 0.97;
+}
+
+@keyframes section-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-section-in {
+  animation: section-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Honour the "Smooth transitions" setting and the OS reduced-motion preference */
+html[data-motion="reduced"] .press:active,
+html[data-motion="reduced"] .press-sm:active {
+  scale: none;
+}
+html[data-motion="reduced"] .animate-section-in,
+html[data-motion="reduced"] .animate-page-fade,
+html[data-motion="reduced"] .animate-fade-in {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .press:active,
+  .press-sm:active {
+    scale: none;
+  }
+  .animate-section-in {
+    animation: none;
+  }
+}
