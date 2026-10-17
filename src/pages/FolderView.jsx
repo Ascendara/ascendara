@@ -164,6 +164,21 @@ const GameCard = React.memo(
   }
 );
 
+// Cheap equality check over what the grid renders, to skip no-op re-renders
+const sameFolderGames = (a, b) =>
+  a.length === b.length &&
+  a.every((g, i) => {
+    const h = b[i];
+    return (
+      (g.game || g.name) === (h.game || h.name) &&
+      g._sourceDir === h._sourceDir &&
+      g.executable === h.executable &&
+      g.playTime === h.playTime &&
+      g.online === h.online &&
+      g.dlc === h.dlc
+    );
+  });
+
 const FolderView = () => {
   const { folderName } = useParams();
   const navigate = useNavigate();
@@ -263,18 +278,23 @@ const FolderView = () => {
         const visible = resolveLibraryConflicts(records, readLibraryChoices()).games;
         libraryRecordsRef.current = records;
         const folder = getFolderByName(decodeURIComponent(folderName));
-        setFolderGames(reconcileFolderItems(folder?.items || [], visible));
+        const next = reconcileFolderItems(folder?.items || [], visible);
+        // Only re-render the grid when something visible actually changed
+        setFolderGames(prev => (sameFolderGames(prev, next) ? prev : next));
       } catch (error) {
         console.error("Error refreshing folder playtime:", error);
       }
     };
 
-    refreshPlaytime();
+    // Wait for the folder slide-in to finish before scanning the library from
+    // disk, so the IPC work and re-render don't land mid-animation.
+    const initialRefresh = setTimeout(refreshPlaytime, 300);
     window.addEventListener("focus", refreshPlaytime);
     window.addEventListener("library-install-choices-updated", refreshPlaytime);
     const unsubscribe = window.electron.onGameClosed(refreshPlaytime);
     return () => {
       cancelled = true;
+      clearTimeout(initialRefresh);
       window.removeEventListener("focus", refreshPlaytime);
       window.removeEventListener("library-install-choices-updated", refreshPlaytime);
       unsubscribe();
@@ -311,7 +331,7 @@ const FolderView = () => {
         return aIsFav ? -1 : 1;
       });
 
-      setFolderGames(sortedGames);
+      setFolderGames(prev => (sameFolderGames(prev, sortedGames) ? prev : sortedGames));
     }
   }, [favorites, folderName]);
 

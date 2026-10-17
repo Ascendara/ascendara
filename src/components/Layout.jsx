@@ -25,10 +25,12 @@ const getTransitionKind = (from, to) => {
 const routeVariants = {
   enter: kind => {
     switch (kind) {
+      // Folders slide without scaling: scaling a full library grid forces a
+      // costly re-raster of every card and made the switch stutter.
       case "folder-in":
-        return { opacity: 0, x: 36, scale: 0.985 };
+        return { opacity: 0, x: 28 };
       case "folder-out":
-        return { opacity: 0, x: -36, scale: 0.985 };
+        return { opacity: 0, x: -28 };
       case "detail-in":
         return { opacity: 0, y: 10, scale: 0.985 };
       case "detail-out":
@@ -45,16 +47,17 @@ const routeVariants = {
     y: 0,
     scale: 1,
     transition: {
-      duration: kind === "none" ? 0 : kind === "page" ? 0.2 : 0.26,
+      duration: kind === "none" ? 0 : kind === "page" ? 0.2 : 0.24,
       ease: EASE_OUT,
     },
   }),
   leave: kind => {
     switch (kind) {
+      // Short opacity-only exit: the next page waits on it, and fading is
+      // the cheapest thing to animate on a large grid.
       case "folder-in":
-        return { opacity: 0, x: -24, scale: 0.99, transition: { duration: 0.14 } };
       case "folder-out":
-        return { opacity: 0, x: 24, scale: 0.99, transition: { duration: 0.14 } };
+        return { opacity: 0, transition: { duration: 0.08 } };
       case "detail-in":
         return { opacity: 0, scale: 0.99, transition: { duration: 0.12 } };
       case "detail-out":

@@ -139,8 +139,9 @@ const Retro = React.lazy(() => import("./Retro"));
 
 let libraryGamesCache = null;
 
-// Warm the GameScreen chunk so the first open doesn't flash the Suspense fallback
-const preloadGameScreen = () => import("./GameScreen");
+// Warm the pages opened from here so the first open doesn't flash the Suspense fallback
+const preloadLibraryPages = () =>
+  Promise.all([import("./GameScreen"), import("./FolderView")]);
 
 // Keep deliberately retained installs independently reachable in React.
 const getLibraryCardKey = game =>
@@ -212,7 +213,7 @@ const Library = () => {
   useEffect(() => {
     const idle = window.requestIdleCallback || (cb => setTimeout(cb, 300));
     const cancelIdle = window.cancelIdleCallback || clearTimeout;
-    const handle = idle(() => preloadGameScreen().catch(() => {}));
+    const handle = idle(() => preloadLibraryPages().catch(() => {}));
     return () => cancelIdle(handle);
   }, []);
 
