@@ -4111,35 +4111,39 @@
   },
   "tour": {
     "ascend": {
-      "content": "This is Ascend — you can join right now, today, after the tutorial! Connect with friends, sync your data across devices, and unlock exclusive features.",
+      "content": "Ascend is Ascendara's optional subscription. It adds cloud saves, a friends list, chat and more, and you can try it with a free trial. You never need it to download or play games.",
       "title": "Ascend"
     },
+    "back": "Back",
     "downloads": {
       "content": "This is your Downloads area. You can track your current downloads, check progress, and manage the downloads here.",
       "title": "Downloads"
     },
     "final": {
-      "content": "If you encounter any issues or want to submit feedback, right click anywhere on the app and select \"Report Issue\".",
+      "content": "You're ready to go. If you ever run into a problem or have feedback, right-click anywhere in the app and choose \"Report Issue\".",
       "title": "Welcome to Ascendara"
     },
     "gameLibrary": {
       "content": "Here is your Game Library. All your downloaded or imported games will show up here, ready to launch, organize, and enjoy.",
       "title": "Game Library"
     },
+    "keyboardHint": "Tip: use the ← and → keys to move through the tour. Press Esc to skip.",
+    "letsGo": "Let's go",
     "navigationBar": {
-      "content": "This is where you will switch between pages on Ascendara. You can also use the control key plus a number 1-5 to switch between pages.",
+      "content": "Switch between pages here. You can also press Ctrl plus a number from 1 to 6 to jump straight to a page.",
       "title": "Navigation Bar"
     },
+    "next": "Next",
     "profile": {
       "content": "This is your Ascendara profile. You can level up having high playtime and playing games, it's all for fun! Nothing will ever be uploaded to any servers.",
       "title": "Profile"
     },
     "resizing": {
-      "content": "Need more space? You can resize the navigation bar by dragging the corners to make things fit just right.",
+      "content": "Need more space? Drag the top corners of the navigation bar to make it bigger or smaller.",
       "title": "Resizing Navigation"
     },
     "searchDownload": {
-      "content": "This is where you can search and download games. Browse through the massive collection and find your next favorite game.",
+      "content": "Search and download games here. Want to play with friends? Look for games with the Online tag.",
       "title": "Search & Download"
     },
     "serverStatus": {
@@ -4147,18 +4151,23 @@
       "title": "Server Status"
     },
     "settings": {
-      "content": "Make Ascendara yours — adjust themes, choose your download folder, add download folders, and fine-tune other preferences here. There are also some useful features you can toggle on and off, check back after the tour to see what you may want.",
+      "content": "Make Ascendara yours. Change your theme, download folders and other preferences here. It's worth a look after the tour to see what you can turn on.",
       "title": "Your Preferences"
     },
+    "skip": "Skip tour",
     "sound": {
       "almostThere": "You're almost there...",
       "gettingCloser": "Getting closer...",
       "musicBy": "Effects by kinflo",
+      "mute": "Mute",
       "readyForLiftoff": "Ready to Ascend?",
-      "soClose": "So close now..."
+      "soClose": "So close now...",
+      "unmute": "Unmute"
     },
+    "start": "Start the tour",
+    "stepOf": "Step {{current}} of {{total}}",
     "title": "Welcome to Ascendara",
-    "welcome": "Let's take a quick tour to get you comfortable with Ascendara and show you some tricks."
+    "welcome": "Let's take a quick look around so you know where everything is. It only takes a minute."
   },
   "welcome": {
     "allRequiredDependenciesHaveBeenInstalledDesc": "All required dependencies have been successfully installed. Welcome to Ascendara.",

@@ -286,6 +286,7 @@ const MenuBar = () => {
           className="ml-1.5 flex cursor-pointer items-center gap-1"
           onClick={handleStatusClick}
           title={t("server-status.title")}
+          data-tour="server-status"
           style={{ WebkitAppRegion: "no-drag" }}
         >
           {serverStatus.noInternet ? (

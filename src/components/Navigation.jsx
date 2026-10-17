@@ -345,7 +345,11 @@ const Navigation = memo(({ items }) => {
           : "visible translate-y-0 opacity-100"
       }`}
     >
-      <div className="nav-container relative mx-auto max-w-xl" style={navStyle}>
+      <div
+        className="nav-container relative mx-auto max-w-xl"
+        style={navStyle}
+        data-tour="navigation"
+      >
         <div
           className="pointer-events-auto relative flex items-center justify-center gap-2 rounded-2xl border border-border p-3 shadow-lg backdrop-blur-lg"
           style={{
