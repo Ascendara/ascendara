@@ -259,6 +259,41 @@ def create_robust_session():
     return session
 
 
+class ProgressWriter:
+    """Coalesce UI updates and tolerate temporary metadata access contention.
+
+    Lifecycle writes still use safe_write_json directly: completion must never
+    be reported unless it was persisted. Cancellation and other disk failures
+    must also propagate, even for these optional progress snapshots.
+    """
+    def __init__(self):
+        self.next_write = 0
+        self.blocked_since = None
+
+    def write(self, filepath, data):
+        now = time.monotonic()
+        if now < self.next_write:
+            return
+        try:
+            safe_write_json(filepath, data)
+        except OSError as exc:
+            if not (isinstance(exc, PermissionError) or getattr(exc, 'winerror', None) in (5, 32, 33)):
+                raise
+            if self.blocked_since is None:
+                self.blocked_since = now
+                logging.warning('Progress metadata is temporarily locked: %s', filepath, exc_info=True)
+            elif now - self.blocked_since >= 60:
+                raise PermissionError(
+                    f'Cannot update download progress for over a minute: {filepath}. '
+                    'Check file permissions and other programs accessing this file.') from exc
+            self.next_write = time.monotonic() + 2
+        else:
+            if self.blocked_since is not None:
+                logging.info('Progress metadata writes recovered: %s', filepath)
+            self.blocked_since = None
+            self.next_write = time.monotonic() + .5
+
+
 class VerificationFailure(RuntimeError):
     pass
 
@@ -305,6 +340,7 @@ class ChunkedDownloader:
         self.game_info, self.game_info_path = game_info, game_info_path
         self.stopped, self.last_error = False, None
         self._eta = SmoothETA()
+        self._progress_writer = ProgressWriter()
         self.session, self.expected_size = session, expected_size
 
     def _check_for_stop(self):
@@ -329,16 +365,17 @@ class ChunkedDownloader:
                     progressCompleted=f'{min(100, done / total * 100) if total else 0:.2f}',
                     progressDownloadSpeeds=read_size(speed) + '/s',
                     timeUntilComplete=eta_text if total else f'Downloaded: {read_size(done)}')
-        safe_write_json(self.game_info_path, self.game_info)
+        self._progress_writer.write(self.game_info_path, self.game_info)
 
     def download(self):
         try:
             settings = load_settings()
             limit = max(0, int(settings.get('downloadLimit', 0))) * 1024
             self._progress(0, None, 0)
+            safe_write_json(self.game_info_path, self.game_info)
             def retry(attempt):
                 self.game_info['downloadingData']['retryAttempt'] = attempt
-                safe_write_json(self.game_info_path, self.game_info)
+                self._progress_writer.write(self.game_info_path, self.game_info)
             with (nullcontext(self.session) if self.session is not None else create_robust_session()) as session:
                 Transfer(self.url, self.dest_path, session, self._progress, self._check_for_stop,
                          limit, retry, self.expected_size, connection_count(settings)).run()
@@ -396,7 +433,13 @@ def flatten_payload(root, manifest, game):
         if len(names) != len(folded) or any(
                 '/'.join(name.split('/')[:index]) in names
                 for name in names for index in range(1, len(name.split('/')))):
-            raise ValueError(f'Archive wrapper has conflicting files: {wrapper}')
+            if archive_wrapper:
+                raise ValueError(f'Archive wrapper has conflicting files: {wrapper}; '
+                                 'continuation archives cannot be flattened safely')
+            # Flattening is optional for a game payload. Keep both copies in
+            # their original locations; executable discovery searches recursively.
+            logging.info('Keeping archive wrapper %s to preserve conflicting files', wrapper)
+            break
         # Move the wrapper aside first to handle repeated, same-name wrappers.
         temporary = tempfile.mkdtemp(prefix='.flatten-', dir=os.path.dirname(root))
         os.rmdir(temporary)
@@ -1579,7 +1622,7 @@ class AscendaraDownloader:
                         last_update = now
                 def retry(attempt):
                     data['retryAttempt'] = attempt
-                    safe_write_json(self.game_info_path, self.game_info)
+                    reporter._progress_writer.write(self.game_info_path, self.game_info)
                 if not cached:
                     Transfer(item['link'], item['source'], session, progress, self._check_for_stop,
                              limit, retry, item['size'], connection_count(settings)).run()
@@ -1647,7 +1690,9 @@ class AscendaraDownloader:
             self.game_info['downloadingData']['extractionProgress'].update(
                 readSpeed=round((io[0] - io_samples[0][1]) / span) if len(io_samples) > 1 else 0,
                 writeSpeed=round((io[1] - io_samples[0][2]) / span) if len(io_samples) > 1 else 0)
-        safe_write_json(self.game_info_path, self.game_info)
+        if not hasattr(self, '_extraction_progress_writer'):
+            self._extraction_progress_writer = ProgressWriter()
+        self._extraction_progress_writer.write(self.game_info_path, self.game_info)
         if now - getattr(self, '_last_extraction_log', 0) >= 15:
             logging.info('Extraction [%s]: %s, %s/%s files, %.2f%%, %s',
                          state.get('engine', 'Preparing'), speed, done, total, percent, name)
