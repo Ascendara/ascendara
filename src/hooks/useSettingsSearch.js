@@ -17,20 +17,11 @@ export const useSettingsSearch = () => {
         if (setting.navigate) {
           setting.navigate(navigate);
         } else if (setting.scrollTo) {
-          if (location.pathname !== "/settings") {
-            navigate("/settings", {
-              state: { scrollTo: setting.scrollTo },
-            });
-          } else {
-            const element = document.getElementById(setting.scrollTo);
-            if (element) {
-              element.scrollIntoView({ behavior: "smooth", block: "center" });
-              element.classList.add("highlight-setting");
-              setTimeout(() => {
-                element.classList.remove("highlight-setting");
-              }, 4000);
-            }
-          }
+          // Settings opens the right category and scrolls, even if it is
+          // already the current page
+          navigate("/settings", {
+            state: { scrollTo: setting.scrollTo },
+          });
         }
       },
     }));

@@ -55,9 +55,7 @@ import {
   FolderSync,
   FileCheck2,
   CpuIcon,
-  CornerDownRight,
   Database,
-  LoaderIcon,
   Palette,
   Download as DownloadIcon,
   UploadIcon,
@@ -71,7 +69,6 @@ import {
   Library,
   Settings2,
   Gamepad2,
-  ClipboardList,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { useNavigate } from "react-router-dom";
@@ -95,6 +92,7 @@ import {
 import { useSettings } from "@/context/SettingsContext";
 import { verifyAscendAccess } from "@/services/firebaseService";
 import ProtonOptionsDialog from "@/components/ProtonOptionsDialog";
+import GameIndexManager from "@/components/GameIndexManager";
 
 const themes = [
   // Light themes
@@ -298,10 +296,6 @@ function Settings() {
   const [testingVersion, setTestingVersion] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [exclusionLoading, setExclusionLoading] = useState(false);
-  const [lastRefreshTime, setLastRefreshTime] = useState(null);
-  const [isIndexRefreshing, setIsIndexRefreshing] = useState(false);
-  const [indexRefreshProgress, setIndexRefreshProgress] = useState(null); // { progress, phase, processedPosts, totalPosts }
-  const [indexInfo, setIndexInfo] = useState(null); // { gameCount, date, size }
   const [showCustomColorsDialog, setShowCustomColorsDialog] = useState(false);
   const [controllerConnected, setControllerConnected] = useState(false);
   const [runners, setRunners] = useState([]);
@@ -400,39 +394,6 @@ function Settings() {
     setExclusionLoading(false);
   };
 
-  // Load when the index was last refreshed
-  useEffect(() => {
-    const loadRefreshStatus = async () => {
-      try {
-        const currentSettings = await window.electron.getSettings();
-        if (currentSettings?.lastLocalIndexRefresh) {
-          setLastRefreshTime(new Date(currentSettings.lastLocalIndexRefresh));
-        }
-        const indexPath =
-          currentSettings?.localIndex ||
-          (await window.electron.getDefaultLocalIndexPath?.());
-        if (indexPath) {
-          const progress = await window.electron.getLocalRefreshProgress(indexPath);
-          if (progress?.lastSuccessfulTimestamp) {
-            setLastRefreshTime(new Date(progress.lastSuccessfulTimestamp * 1000));
-          }
-        }
-      } catch (e) {
-        console.log("No progress file found for last refresh time");
-      }
-    };
-    loadRefreshStatus();
-
-    const handlePublicDownloadComplete = () => {
-      setLastRefreshTime(new Date());
-    };
-    window.electron.onPublicIndexDownloadComplete?.(handlePublicDownloadComplete);
-
-    return () => {
-      window.electron.offPublicIndexDownloadComplete?.();
-    };
-  }, []);
-
   useEffect(() => {
     const checkBranch = async () => {
       const branch = (await window.electron.getBranch?.()) ?? "live";
@@ -478,26 +439,6 @@ function Settings() {
       }
     };
     checkSubscription();
-  }, []);
-
-  // Fetch index info from API
-  useEffect(() => {
-    const fetchIndexInfo = async () => {
-      try {
-        const infoResponse = await fetch("https://api.ascendara.app/localindex/info");
-        const infoData = await infoResponse.json();
-        if (infoData.success) {
-          setIndexInfo({
-            gameCount: infoData.gameCount,
-            date: infoData.date,
-            size: infoData.size,
-          });
-        }
-      } catch (error) {
-        console.error("Failed to fetch index info:", error);
-      }
-    };
-    fetchIndexInfo();
   }, []);
 
   useEffect(() => {
@@ -1135,11 +1076,70 @@ function Settings() {
     loadLanguages();
   }, []);
 
+  // Settings are grouped into categories; the side list follows the scroll
+  const settingsCategories = [
+    { id: "general", icon: Settings2 },
+    { id: "game-index", icon: Database },
+    { id: "downloads", icon: Download },
+    { id: "gaming", icon: Gamepad2 },
+    { id: "backups", icon: FolderSync },
+    { id: "compatibility", icon: SquareTerminal, hidden: !isOnLinux },
+    { id: "tools", icon: Package },
+    { id: "advanced", icon: FlaskConical },
+  ].map(category => ({
+    ...category,
+    title: t(`settings.categories.${category.id}.title`),
+    description: t(`settings.categories.${category.id}.description`),
+  }));
+  const visibleCategories = settingsCategories.filter(category => !category.hidden);
+  // One category is shown at a time; the rest stay mounted but hidden so
+  // search can still find any setting by its id
+  const [activeCategory, setActiveCategory] = useState(() => {
+    try {
+      return sessionStorage.getItem("settings-category") || "general";
+    } catch {
+      return "general";
+    }
+  });
+
+  const selectCategory = id => {
+    setActiveCategory(id);
+    try {
+      sessionStorage.setItem("settings-category", id);
+    } catch {
+      // Remembering the category is only a convenience
+    }
+    window.scrollTo({ top: 0 });
+  };
+
+  // Fall back to General if the remembered category isn't available here
+  useEffect(() => {
+    if (!visibleCategories.some(category => category.id === activeCategory)) {
+      setActiveCategory("general");
+    }
+  }, [isOnLinux]);
+
+  const categoryProps = id => {
+    const category = settingsCategories.find(c => c.id === id);
+    return {
+      id,
+      icon: category.icon,
+      title: category.title,
+      description: category.description,
+      active: activeCategory === id,
+    };
+  };
+
   // Handle scrollTo from navigation state (from global search)
   useEffect(() => {
     if ((location.state?.scrollTo || location.state?.scrollToBottom) && !isLoading) {
       const scrollToId = location.state.scrollTo;
       const scrollToBottom = !!location.state.scrollToBottom;
+
+      // Open the category that holds the setting before scrolling to it
+      const target = scrollToId && document.getElementById(scrollToId);
+      const targetCategory = target?.closest("[data-category]")?.dataset.category;
+      if (targetCategory) setActiveCategory(targetCategory);
 
       // Small delay to ensure DOM is ready
       setTimeout(() => {
@@ -1240,7 +1240,7 @@ function Settings() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto max-w-7xl p-4 md:p-8">
         <div className="mb-6 flex items-center gap-4">
-          <h1 className="text-3xl font-bold text-primary">{t("settings.title")}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("settings.title")}</h1>
 
           {isExperiment ? (
             <div className="group relative ml-auto flex items-center text-sm text-muted-foreground">
@@ -1301,670 +1301,356 @@ function Settings() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* Left Column - Core Settings */}
-          <div className="space-y-6 lg:col-span-8">
-            {/* Local Game Index Card */}
-            {(() => {
-              const customMode = !!settings?.customSourcesMode;
-              const activeList = settings?.activeCustomList || null;
-              const cs = settings?.customSource || null;
-              const isCustomList = customMode && (activeList || cs?.isCustomList);
-              const sourceName = isCustomList
-                ? activeList?.name ||
-                  cs?.name ||
-                  t("localRefresh.noSourceSelected") ||
-                  "No source selected"
-                : customMode
-                  ? cs?.name || t("localRefresh.noSourceSelected") || "No source selected"
-                  : t("localRefresh.ascendaraIndex") || "Ascendara Index";
-              const gameCount = isCustomList
-                ? (activeList?.itemCount ?? cs?.gameCount ?? null)
-                : customMode
-                  ? (cs?.gameCount ?? cs?.gamesCount ?? null)
-                  : (indexInfo?.gameCount ?? null);
-              const lastSyncedMs = isCustomList
-                ? (activeList?.createdAt ?? cs?.lastSynced ?? null)
-                : customMode
-                  ? (cs?.lastSynced ?? null)
-                  : lastRefreshTime
-                    ? lastRefreshTime.getTime()
-                    : indexInfo?.date
-                      ? new Date(indexInfo.date).getTime()
-                      : null;
-              const formatLastSync = ms => {
-                if (!ms) return t("localRefresh.never") || "Never";
-                const d = new Date(ms);
-                const diff = Date.now() - d.getTime();
-                if (diff < 60 * 1000) return t("localRefresh.justNow") || "Just now";
-                if (diff < 60 * 60 * 1000) {
-                  const m = Math.floor(diff / (60 * 1000));
-                  return `${m} ${t("localRefresh.minutesAgo") || "min ago"}`;
-                }
-                if (diff < 24 * 60 * 60 * 1000) {
-                  const h = Math.floor(diff / (60 * 60 * 1000));
-                  return `${h} ${t("localRefresh.hoursAgo") || "h ago"}`;
-                }
-                return d.toLocaleDateString();
-              };
-              return (
-                <Card className="border-border p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="rounded-lg bg-primary/10 p-3">
-                        {isIndexRefreshing ? (
-                          <LoaderIcon className="h-6 w-6 animate-spin text-primary" />
-                        ) : isCustomList ? (
-                          <ClipboardList className="h-6 w-6 text-primary" />
-                        ) : customMode ? (
-                          <Globe className="h-6 w-6 text-primary" />
-                        ) : (
-                          <Database className="h-6 w-6 text-primary" />
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h2 className="text-xl font-semibold text-primary">
-                            {t("settings.yourLocalIndex") || "Local Game Index"}
-                          </h2>
-                          {isIndexRefreshing && (
-                            <Badge variant="secondary" className="mb-2.5 text-xs">
-                              {t("localRefresh.statusRunning") || "Refreshing..."}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="max-w-[500px] text-sm text-muted-foreground">
-                          {t("settings.localIndexDescription")}
-                        </p>
-                        <div className="flex items-center gap-2 pt-1 text-sm text-muted-foreground">
-                          <span className="font-medium text-foreground">
-                            {sourceName}
-                          </span>
-                          <span className="text-muted-foreground/60">/</span>
-                          <span>
-                            {customMode
-                              ? t("localRefresh.lastSynced") || "Last synced"
-                              : t("localRefresh.lastRefresh") || "Last refresh"}
-                            : {formatLastSync(lastSyncedMs)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="shrink-0 gap-2 text-secondary"
-                      onClick={() => navigate("/localrefresh")}
+        <div className="grid items-start gap-8 lg:grid-cols-[210px_minmax(0,1fr)]">
+          <aside className="space-y-4 lg:sticky lg:top-[84px]">
+            <SettingsNav
+              categories={visibleCategories}
+              activeId={activeCategory}
+              onSelect={selectCategory}
+            />
+            <SupportDevelopersNote t={t} />
+          </aside>
+
+          <div className="min-w-0">
+            <SettingsCategory {...categoryProps("general")} columns>
+              <Card id="appearance-settings" className="border border-border/60 shadow-none p-6">
+                {/* Appearance Section */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                    {t("settings.appearance")}
+                  </h3>
+                  <div id="theme">
+                    <Label>{t("settings.themes")}</Label>
+
+                    {/* Custom Colors Button */}
+                    <div
+                      id="custom-colors"
+                      className={`mt-3 flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-all hover:bg-accent/50 ${theme === "custom" ? "border-primary bg-primary/5" : "border-border"}`}
+                      onClick={() => {
+                        setOriginalColorsOnOpen({ ...customColors });
+                        setSelectedThemeVersion(null);
+                        setShowCustomColorsDialog(true);
+                      }}
                     >
-                      {isIndexRefreshing
-                        ? t("localRefresh.viewProgress") || "View Progress"
-                        : t("settings.manageIndex2")}
-                    </Button>
-                  </div>
-
-                  {/* 3-stat strip: Games / Last synced / Source-specific */}
-                  <div className="mt-6 grid grid-cols-3 gap-3">
-                    <div className="rounded-lg border border-border/50 p-3">
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {t("localRefresh.games") || "Games"}
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-primary/20 to-accent/20">
+                          <Palette className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {t("settings.customColors") || "Custom Colors"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {t("settings.customColorsSubtitle") || "Create your own theme"}
+                          </p>
+                        </div>
                       </div>
-                      <div className="mt-1 text-2xl font-bold leading-none">
-                        {isIndexRefreshing && indexRefreshProgress?.processedPosts != null
-                          ? `${Number(indexRefreshProgress.processedPosts).toLocaleString()}${
-                              indexRefreshProgress.totalPosts
-                                ? ` / ${Number(indexRefreshProgress.totalPosts).toLocaleString()}`
-                                : ""
-                            }`
-                          : gameCount != null
-                            ? gameCount.toLocaleString()
-                            : "—"}
-                      </div>
-                    </div>
-                    <div className="rounded-lg border border-border/50 p-3">
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {customMode
-                          ? t("localRefresh.lastSynced") || "Last synced"
-                          : t("localRefresh.lastRefresh") || "Last refresh"}
-                      </div>
-                      <div className="mt-1 truncate text-sm font-semibold">
-                        {formatLastSync(lastSyncedMs)}
-                      </div>
-                    </div>
-                    <div className="rounded-lg border border-border/50 p-3">
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {isCustomList
-                          ? t("localRefresh.fileLocation") || "File"
-                          : t("localRefresh.status") || "Status"}
-                      </div>
-                      <div className="mt-1 flex items-center gap-1 text-sm font-semibold">
-                        {isCustomList ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              window.electron?.showCustomListInFolder?.(
-                                activeList?.id || cs?.id
-                              )
-                            }
-                            className="inline-flex cursor-pointer items-center gap-1 text-primary hover:underline"
-                          >
-                            <FolderOpen className="h-3.5 w-3.5" />
-                            {t("localRefresh.showInFolder") || "Show in folder"}
-                          </button>
-                        ) : isIndexRefreshing ? (
-                          <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                            <LoaderIcon className="h-3.5 w-3.5 animate-spin" />
-                            {indexRefreshProgress?.progress != null
-                              ? `${Math.min(Math.round(indexRefreshProgress.progress * 100), 100)}%`
-                              : t("localRefresh.statusRunning") || "Refreshing..."}
-                          </span>
-                        ) : customMode ? (
-                          cs?.lastSynced ? (
-                            <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400">
-                              <CheckCircle className="h-3.5 w-3.5" />
-                              {t("localRefresh.statusCompleted") || "Synced"}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">
-                              {t("localRefresh.statusIdle") || "Not synced"}
-                            </span>
-                          )
-                        ) : settings?.usingLocalIndex ? (
-                          <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400">
-                            <Zap className="h-3.5 w-3.5" />
-                            {t("localRefresh.usingLocalIndex") || "Active"}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">
-                            {t("localRefresh.statusIdle") || "Idle"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })()}
-
-            {/* General Settings Card */}
-            <Card className="border-border p-6">
-              <h2 className="mb-4 text-xl font-semibold text-primary">
-                {t("settings.general")}
-              </h2>
-
-              {/* Appearance Section */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                  {t("settings.appearance")}
-                </h3>
-                <div id="theme">
-                  <Label>{t("settings.themes")}</Label>
-
-                  {/* Custom Colors Button */}
-                  <div
-                    id="custom-colors"
-                    className={`mt-3 flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-all hover:bg-accent/50 ${theme === "custom" ? "border-primary bg-primary/5" : "border-border"}`}
-                    onClick={() => {
-                      setOriginalColorsOnOpen({ ...customColors });
-                      setSelectedThemeVersion(null);
-                      setShowCustomColorsDialog(true);
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-primary/20 to-accent/20">
-                        <Palette className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          {t("settings.customColors") || "Custom Colors"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {t("settings.customColorsSubtitle") || "Create your own theme"}
-                        </p>
-                      </div>
-                    </div>
-                    {theme === "custom" ? (
-                      <div className="flex items-center gap-2 rounded-full bg-primary/10 px-2 py-1">
-                        <div className="h-2 w-2 rounded-full bg-primary" />
-                        <span className="text-xs font-medium text-primary">
-                          {t("settings.active") || "Active"}
-                        </span>
-                      </div>
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </div>
-                  <Accordion
-                    type="single"
-                    collapsible
-                    className="mt-2 w-full rounded-lg border-border bg-background text-card-foreground shadow-sm"
-                  >
-                    <AccordionItem value="light-themes" className="border-0 px-1">
-                      <AccordionTrigger className="px-3 py-4 hover:no-underline">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
-                            {t("settings.lightThemes")}
+                      {theme === "custom" ? (
+                        <div className="flex items-center gap-2 rounded-full bg-primary/10 px-2 py-1">
+                          <div className="h-2 w-2 rounded-full bg-primary" />
+                          <span className="text-xs font-medium text-primary">
+                            {t("settings.active") || "Active"}
                           </span>
                         </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="px-3 pb-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          {groupedThemes.light.map(t => (
-                            <ThemeButton
-                              key={t.id}
-                              theme={t}
-                              currentTheme={theme}
-                              onSelect={handleThemeChange}
-                            />
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-
-                    <AccordionItem
-                      value="dark-themes"
-                      className="border-0 border-t border-t-border/20 px-1"
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <Accordion
+                      type="single"
+                      collapsible
+                      className="mt-2 w-full rounded-lg border-border bg-background text-card-foreground shadow-sm"
                     >
-                      <AccordionTrigger className="px-3 py-4 hover:no-underline">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
-                            {t("settings.darkThemes")}
-                          </span>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="px-3 pb-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          {groupedThemes.dark.map(t => (
-                            <ThemeButton
-                              key={t.id}
-                              theme={t}
-                              currentTheme={theme}
-                              onSelect={handleThemeChange}
-                            />
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
-                </div>
+                      <AccordionItem value="light-themes" className="border-0 px-1">
+                        <AccordionTrigger className="px-3 py-4 hover:no-underline">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">
+                              {t("settings.lightThemes")}
+                            </span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-3 pb-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            {groupedThemes.light.map(t => (
+                              <ThemeButton
+                                key={t.id}
+                                theme={t}
+                                currentTheme={theme}
+                                onSelect={handleThemeChange}
+                              />
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
 
-                <div
-                  id="smooth-transitions"
-                  className="flex items-center justify-between"
-                >
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.smoothTransitions")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.smoothTransitionsDescription")}
-                    </p>
+                      <AccordionItem
+                        value="dark-themes"
+                        className="border-0 border-t border-t-border/20 px-1"
+                      >
+                        <AccordionTrigger className="px-3 py-4 hover:no-underline">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">
+                              {t("settings.darkThemes")}
+                            </span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-3 pb-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            {groupedThemes.dark.map(t => (
+                              <ThemeButton
+                                key={t.id}
+                                theme={t}
+                                currentTheme={theme}
+                                onSelect={handleThemeChange}
+                              />
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </div>
-                  <Switch
-                    checked={settings.smoothTransitions}
-                    onCheckedChange={() =>
-                      handleSettingChange(
-                        "smoothTransitions",
-                        !settings.smoothTransitions
-                      )
-                    }
-                  />
-                </div>
 
-                <div id="side-scrollbar" className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.sideScrollBar")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.sideScrollBarDescription")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.sideScrollBar}
-                    onCheckedChange={() =>
-                      handleSettingChange("sideScrollBar", !settings.sideScrollBar)
-                    }
-                  />
-                </div>
-
-                <div id="home-search" className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.homeSearch")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.homeSearchDescription")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.homeSearch}
-                    onCheckedChange={() =>
-                      handleSettingChange("homeSearch", !settings.homeSearch)
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* Application Section */}
-              <div className="mt-8 space-y-4">
-                <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                  {t("settings.application")}
-                </h3>
-
-                <div
-                  id="default-landing-page"
-                  className="flex items-center justify-between"
-                >
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.defaultLandingPage")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.defaultLandingPageDescription")}
-                    </p>
-                  </div>
-                  <Select
-                    value={settings.defaultOpenPage || "home"}
-                    onValueChange={value => handleSettingChange("defaultOpenPage", value)}
-                  >
-                    <SelectTrigger className="w-[180px] bg-background">
-                      <SelectValue placeholder="Home" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="home">{t("common.home")}</SelectItem>
-                      <SelectItem value="search">{t("common.search")}</SelectItem>
-                      <SelectItem value="library">{t("common.library")}</SelectItem>
-                      <SelectItem value="downloads">{t("common.downloads")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Only Windows exposes the automatic update preference. */}
-                {window.electron.getPlatform() === "win32" && (
-                  <div id="auto-update" className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.ascendaraUpdates")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.ascendaraUpdatesDescription2")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.autoUpdate}
-                      onCheckedChange={() =>
-                        handleSettingChange("autoUpdate", !settings.autoUpdate)
-                      }
-                    />
-                  </div>
-                )}
-
-                <div id="notifications" className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.notifications")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.notificationsDescription")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.notifications}
-                    onCheckedChange={() =>
-                      handleSettingChange("notifications", !settings.notifications)
-                    }
-                  />
-                </div>
-
-                <div id="open-on-startup" className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.openOnStartup")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.openOnStartupDescription")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.openOnStartup}
-                    onCheckedChange={() => {
-                      const newValue = !settings.openOnStartup;
-                      handleSettingChange("openOnStartup", newValue);
-                      if (!newValue && settings.startMinimized) {
-                        handleSettingChange("startMinimized", false);
-                      }
-                    }}
-                  />
-                </div>
-
-                <div
-                  id="start-minimized"
-                  className={`flex items-center justify-between ${
-                    !settings.openOnStartup ? "opacity-50" : ""
-                  }`}
-                >
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.startMinimized")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.startMinimizedDescription")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.startMinimized}
-                    disabled={!settings.openOnStartup}
-                    onCheckedChange={() =>
-                      handleSettingChange("startMinimized", !settings.startMinimized)
-                    }
-                  />
-                </div>
-
-                <div id="quick-launch" className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.quickLaunch")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.quickLaunchDescription")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={!settings.endOnClose}
-                    onCheckedChange={() =>
-                      handleSettingChange("endOnClose", !settings.endOnClose)
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* Gaming Section */}
-              <div className="mt-8 space-y-4">
-                <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                  {t("settings.gaming")}
-                </h3>
-
-                <div id="discord-rpc" className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.discordRPC")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.discordRPCDescription")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.rpcEnabled}
-                    onCheckedChange={() =>
-                      handleSettingChange("rpcEnabled", !settings.rpcEnabled)
-                    }
-                  />
-                </div>
-
-                <div
-                  id="hide-on-game-launch"
-                  className="flex items-center justify-between"
-                >
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.hideOnGameLaunch")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.hideOnGameLaunchDescription")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.hideOnGameLaunch}
-                    onCheckedChange={() =>
-                      handleSettingChange("hideOnGameLaunch", !settings.hideOnGameLaunch)
-                    }
-                  />
-                </div>
-
-                <div id="mature-content" className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.matureContent")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.matureContentDescription")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.seeInappropriateContent}
-                    onCheckedChange={() =>
-                      handleSettingChange(
-                        "seeInappropriateContent",
-                        !settings.seeInappropriateContent
-                      )
-                    }
-                  />
-                </div>
-
-                {isOnWindows && (
                   <div
-                    id="auto-create-shortcuts"
+                    id="smooth-transitions"
                     className="flex items-center justify-between"
                   >
                     <div className="space-y-0.5">
-                      <Label>{t("settings.autoCreateShortcuts")}</Label>
+                      <Label>{t("settings.smoothTransitions")}</Label>
                       <p className="text-sm text-muted-foreground">
-                        {t("settings.autoCreateShortcutsDescription")}
+                        {t("settings.smoothTransitionsDescription")}
                       </p>
                     </div>
                     <Switch
-                      checked={settings.autoCreateShortcuts}
+                      checked={settings.smoothTransitions}
                       onCheckedChange={() =>
                         handleSettingChange(
-                          "autoCreateShortcuts",
-                          !settings.autoCreateShortcuts
+                          "smoothTransitions",
+                          !settings.smoothTransitions
                         )
                       }
                     />
                   </div>
-                )}
 
-                <div
-                  id="prompt-game-support"
-                  className="flex items-center justify-between"
-                >
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.promptGameSupport")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.promptGameSupportDescription")}
-                    </p>
+                  <div id="side-scrollbar" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.sideScrollBar")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.sideScrollBarDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.sideScrollBar}
+                      onCheckedChange={() =>
+                        handleSettingChange("sideScrollBar", !settings.sideScrollBar)
+                      }
+                    />
                   </div>
-                  <Switch
-                    checked={settings.promptPurchaseAfter3Hours}
-                    onCheckedChange={() =>
-                      handleSettingChange(
-                        "promptPurchaseAfter3Hours",
-                        !settings.promptPurchaseAfter3Hours
-                      )
-                    }
-                  />
-                </div>
 
-                <div
-                  id="extra-game-options"
-                  className="flex items-center justify-between"
-                >
-                  <div className="space-y-0.5">
-                    <Label>{t("settings.extraGameOptions")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.extraGameOptionsDescription")}
-                    </p>
+                  <div id="home-search" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.homeSearch")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.homeSearchDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.homeSearch}
+                      onCheckedChange={() =>
+                        handleSettingChange("homeSearch", !settings.homeSearch)
+                      }
+                    />
                   </div>
-                  <Switch
-                    checked={settings.extraGameOptions}
-                    onCheckedChange={() =>
-                      handleSettingChange("extraGameOptions", !settings.extraGameOptions)
-                    }
-                  />
                 </div>
-              </div>
-            </Card>
+              </Card>
 
-            <Card id="big-picture-settings" className="mb-6 border-border">
-              <div className="space-y-4 p-6">
-                <h3 className="mb-2 text-xl font-semibold text-primary">
-                  {t("settings.bigPictureSettings")}
-                </h3>
+              <Card id="application-settings" className="border border-border/60 shadow-none p-6">
+                {/* Application Section */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                    {t("settings.application")}
+                  </h3>
 
-                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`rounded-full p-2 ${controllerConnected ? "bg-green-500/20" : "bg-muted"}`}
+                  <div
+                    id="default-landing-page"
+                    className="flex items-center justify-between"
+                  >
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.defaultLandingPage")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.defaultLandingPageDescription")}
+                      </p>
+                    </div>
+                    <Select
+                      value={settings.defaultOpenPage || "home"}
+                      onValueChange={value => handleSettingChange("defaultOpenPage", value)}
                     >
-                      <Gamepad2
-                        className={`h-5 w-5 ${controllerConnected ? "text-green-500" : "text-muted-foreground"}`}
+                      <SelectTrigger className="w-[180px] bg-background">
+                        <SelectValue placeholder="Home" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="home">{t("common.home")}</SelectItem>
+                        <SelectItem value="search">{t("common.search")}</SelectItem>
+                        <SelectItem value="library">{t("common.library")}</SelectItem>
+                        <SelectItem value="downloads">{t("common.downloads")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Only Windows exposes the automatic update preference. */}
+                  {window.electron.getPlatform() === "win32" && (
+                    <div id="auto-update" className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>{t("settings.ascendaraUpdates")}</Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.ascendaraUpdatesDescription2")}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={settings.autoUpdate}
+                        onCheckedChange={() =>
+                          handleSettingChange("autoUpdate", !settings.autoUpdate)
+                        }
                       />
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">
-                        {controllerConnected
-                          ? t("settings.controllerConnected")
-                          : t("settings.noControllerDetected")}
-                      </p>
+                  )}
+
+                  <div id="notifications" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.notifications")}</Label>
                       <p className="text-sm text-muted-foreground">
-                        {controllerConnected
-                          ? t("settings.controllerConnectedDescription")
-                          : t("settings.noControllerDetectedDescription")}
+                        {t("settings.notificationsDescription")}
                       </p>
                     </div>
+                    <Switch
+                      checked={settings.notifications}
+                      onCheckedChange={() =>
+                        handleSettingChange("notifications", !settings.notifications)
+                      }
+                    />
                   </div>
-                  <Button
-                    onClick={() => navigate("/bigpicture")}
-                    className="gap-2 text-secondary"
-                  >
-                    {t("settings.enterBigPicture")}
-                  </Button>
-                </div>
 
-                <div className="space-y-2">
-                  <Label>{t("settings.controllerType")}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings.controllerTypeDescription")}
-                  </p>
-                  <Select
-                    value={settings.controllerType || "xbox"}
-                    onValueChange={value => handleSettingChange("controllerType", value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="xbox">Xbox</SelectItem>
-                      <SelectItem value="playstation">PlayStation</SelectItem>
-                      <SelectItem value="generic">Generic</SelectItem>
-                      <SelectItem value="keyboard">Keyboard</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div id="open-on-startup" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.openOnStartup")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.openOnStartupDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.openOnStartup}
+                      onCheckedChange={() => {
+                        const newValue = !settings.openOnStartup;
+                        handleSettingChange("openOnStartup", newValue);
+                        if (!newValue && settings.startMinimized) {
+                          handleSettingChange("startMinimized", false);
+                        }
+                      }}
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label>{t("settings.keyboardLayout")}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings.keyboardLayoutDescription")}
-                  </p>
-                  <Select
-                    value={settings.bigPictureKeyboardLayout || "qwerty"}
-                    onValueChange={value =>
-                      handleSettingChange("bigPictureKeyboardLayout", value)
-                    }
+                  <div
+                    id="start-minimized"
+                    className={`flex items-center justify-between ${
+                      !settings.openOnStartup ? "opacity-50" : ""
+                    }`}
                   >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="qwerty">QWERTY</SelectItem>
-                      <SelectItem value="azerty">AZERTY</SelectItem>
-                      <SelectItem value="qwertz">QWERTZ</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </Card>
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.startMinimized")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.startMinimizedDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.startMinimized}
+                      disabled={!settings.openOnStartup}
+                      onCheckedChange={() =>
+                        handleSettingChange("startMinimized", !settings.startMinimized)
+                      }
+                    />
+                  </div>
 
-            <Card className="mb-6 border-border">
-              <div className="space-y-3 p-6">
-                <h3 className="mb-2 text-xl font-semibold text-primary">
+                  <div id="quick-launch" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.quickLaunch")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.quickLaunchDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={!settings.endOnClose}
+                      onCheckedChange={() =>
+                        handleSettingChange("endOnClose", !settings.endOnClose)
+                      }
+                    />
+                  </div>
+                </div>
+              </Card>
+
+              {/* Language Settings Card */}
+              <Card id="language" className="border border-border/60 shadow-none p-6">
+                <div className="mb-2 flex items-center gap-2">
+                  <Languages className="mb-2 h-5 w-5 text-primary" />
+                  <h2 className="text-base font-semibold text-foreground">
+                    {t("settings.languageSettings")}
+                  </h2>
+                </div>
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.languageSettingsDescription")}
+                    </p>
+                    <Select
+                      value={language}
+                      onValueChange={value => {
+                        handleLanguageChange(value);
+                        changeLanguage(value);
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue>
+                          <div className="flex items-center gap-2">
+                            <span>
+                              {availableLanguages.find(l => l.id === language)?.icon}
+                            </span>
+                            <span>
+                              {availableLanguages.find(l => l.id === language)?.name}
+                            </span>
+                          </div>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableLanguages.map(lang => (
+                          <SelectItem key={lang.id} value={lang.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{lang.icon}</span>
+                              <span>{lang.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p
+                      className="text-md inline-flex cursor-pointer items-center font-medium text-muted-foreground duration-200 hover:translate-x-1"
+                      onClick={() => navigate("/extralanguages")}
+                    >
+                      {t("settings.selectMoreLanguages")}
+                      <ArrowRight className="ml-1 h-4 w-4" />
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.languageSetNote")}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </SettingsCategory>
+
+            <SettingsCategory {...categoryProps("game-index")}>
+              <GameIndexManager embedded view="index" />
+            </SettingsCategory>
+
+            <SettingsCategory {...categoryProps("downloads")} columns>
+              <Card id="download-manager" className="space-y-5 border border-border/60 p-6 shadow-none">
+                <h3 className="text-base font-semibold text-foreground">
                   {t("settings.downloaderSettings")}
                 </h3>
                 {isDownloaderRunning && (
@@ -2017,137 +1703,6 @@ function Settings() {
                     )}
                   </div>
                 ) : null}
-
-                {/* Torbox API Key Config */}
-                <div id="torbox-api-key" className="space-y-2">
-                  <Label>{t("settings.torboxApiKey")}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings.torboxApiKeyDescription")}&nbsp;
-                    <a
-                      onClick={() =>
-                        window.electron.openURL(
-                          "https://ascendara.app/docs/features/torbox-integration"
-                        )
-                      }
-                      className="cursor inline-flex cursor-pointer items-center text-primary hover:underline"
-                    >
-                      {t("settings.torboxApiKeyLearnHowtoGet")}
-                      <ExternalLink className="ml-1 inline-block h-3 w-3" />
-                    </a>
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Input
-                    id="torboxApiKey"
-                    type="password"
-                    placeholder={t("settings.torboxApiKeyPlaceholder")}
-                    value={
-                      torboxApiKey !== null ? torboxApiKey : settings.torboxApiKey || ""
-                    }
-                    onChange={e => setTorboxApiKey(e.target.value)}
-                    autoComplete="off"
-                  />
-                  <Button
-                    onClick={() => {
-                      setSettings(s => ({ ...s, torboxApiKey: torboxApiKey }));
-                      toast.success(t("settings.apiKeySaved"));
-                      setTorboxApiKey(null);
-                    }}
-                    disabled={torboxApiKey === null}
-                    variant="none"
-                    className="text-primary"
-                  >
-                    {t("settings.setKey")}
-                  </Button>
-                </div>
-
-                <div id="prioritize-torbox" className="flex items-center justify-between">
-                  <div
-                    className={`space-y-2${
-                      !(
-                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
-                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
-                      )
-                        ? "pointer-events-none select-none opacity-50"
-                        : ""
-                    }`}
-                  >
-                    <Label>{t("settings.prioritizeTorboxOverSeamless")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.prioritizeTorboxOverSeamlessDesc")}&nbsp;
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.prioritizeTorboxOverSeamless}
-                    onCheckedChange={value => {
-                      setSettings(prev => ({
-                        ...prev,
-                        prioritizeTorboxOverSeamless: value,
-                      }));
-                    }}
-                    disabled={
-                      !(
-                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
-                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
-                      )
-                    }
-                  />
-                </div>
-
-                <div id="torbox-torrents" className="flex items-center justify-between">
-                  <div
-                    className={`space-y-2${
-                      !(
-                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
-                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
-                      )
-                        ? "pointer-events-none select-none opacity-50"
-                        : ""
-                    }`}
-                  >
-                    <Label>{t("settings.useTorboxForTorrents")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.useTorboxForTorrentsDesc")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.useTorboxForTorrents ?? true}
-                    onCheckedChange={value =>
-                      handleSettingChange("useTorboxForTorrents", value)
-                    }
-                    disabled={
-                      !(
-                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
-                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
-                      )
-                    }
-                  />
-                </div>
-
-                <div
-                  id="torbox-torrent-fallback"
-                  className="flex items-center justify-between"
-                >
-                  <div
-                    className={`space-y-2${
-                      !settings.useTorboxForTorrents || !settings.torrentEnabled
-                        ? "pointer-events-none select-none opacity-50"
-                        : ""
-                    }`}
-                  >
-                    <Label>{t("settings.fallbackToQbittorrentOnTorboxFailure")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.fallbackToQbittorrentOnTorboxFailureDesc")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.fallbackToQbittorrentOnTorboxFailure ?? false}
-                    onCheckedChange={value =>
-                      handleSettingChange("fallbackToQbittorrentOnTorboxFailure", value)
-                    }
-                    disabled={!settings.useTorboxForTorrents || !settings.torrentEnabled}
-                  />
-                </div>
 
                 {/* Single Stream Download Toggle */}
                 <div id="single-stream" className="flex items-center justify-between">
@@ -2383,7 +1938,7 @@ function Settings() {
                   )}
                 </div>
 
-                <div id="post-download-behavior" className="space-y-2 pt-8">
+                <div id="post-download-behavior" className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="space-y-2">
                       <Label>{t("settings.behaviorAfterDownload")}</Label>
@@ -2419,7 +1974,7 @@ function Settings() {
                 </div>
 
                 {/* Download Speed Limit Section */}
-                <div id="download-limit" className="space-y-2 pt-8">
+                <div id="download-limit" className="space-y-2">
                   <Label
                     htmlFor="downloadLimit"
                     className={isDownloaderRunning ? "opacity-50" : ""}
@@ -2436,7 +1991,13 @@ function Settings() {
                     t={t}
                   />
                 </div>
-                <div id="download-directory" className="pt-8">
+              </Card>
+
+              <Card id="download-locations" className="space-y-5 border border-border/60 p-6 shadow-none">
+                <h3 className="text-base font-semibold text-foreground">
+                  {t("settings.downloadLocationsTitle")}
+                </h3>
+                <div id="download-directory">
                   <div className="mb-4">
                     <Label
                       htmlFor="defaultDownloadPath"
@@ -2538,542 +2099,1182 @@ function Settings() {
                     </div>
                   </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
 
-            <Card id="ludusavi" className="border-border">
-              <div className="p-6">
-                <div className="flex items-center justify-between">
+              <Card id="torbox-settings" className="space-y-5 border border-border/60 p-6 shadow-none">
+                <h3 className="text-base font-semibold text-foreground">
+                  {t("settings.torboxTitle")}
+                </h3>
+                {/* Torbox API Key Config */}
+                <div id="torbox-api-key" className="space-y-2">
+                  <Label>{t("settings.torboxApiKey")}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t("settings.torboxApiKeyDescription")}&nbsp;
+                    <a
+                      onClick={() =>
+                        window.electron.openURL(
+                          "https://ascendara.app/docs/features/torbox-integration"
+                        )
+                      }
+                      className="cursor inline-flex cursor-pointer items-center text-primary hover:underline"
+                    >
+                      {t("settings.torboxApiKeyLearnHowtoGet")}
+                      <ExternalLink className="ml-1 inline-block h-3 w-3" />
+                    </a>
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    id="torboxApiKey"
+                    type="password"
+                    placeholder={t("settings.torboxApiKeyPlaceholder")}
+                    value={
+                      torboxApiKey !== null ? torboxApiKey : settings.torboxApiKey || ""
+                    }
+                    onChange={e => setTorboxApiKey(e.target.value)}
+                    autoComplete="off"
+                  />
+                  <Button
+                    onClick={() => {
+                      setSettings(s => ({ ...s, torboxApiKey: torboxApiKey }));
+                      toast.success(t("settings.apiKeySaved"));
+                      setTorboxApiKey(null);
+                    }}
+                    disabled={torboxApiKey === null}
+                    variant="none"
+                    className="text-primary"
+                  >
+                    {t("settings.setKey")}
+                  </Button>
+                </div>
+
+                <div id="prioritize-torbox" className="flex items-center justify-between">
+                  <div
+                    className={`space-y-2${
+                      !(
+                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
+                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
+                      )
+                        ? "pointer-events-none select-none opacity-50"
+                        : ""
+                    }`}
+                  >
+                    <Label>{t("settings.prioritizeTorboxOverSeamless")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.prioritizeTorboxOverSeamlessDesc")}&nbsp;
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.prioritizeTorboxOverSeamless}
+                    onCheckedChange={value => {
+                      setSettings(prev => ({
+                        ...prev,
+                        prioritizeTorboxOverSeamless: value,
+                      }));
+                    }}
+                    disabled={
+                      !(
+                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
+                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
+                      )
+                    }
+                  />
+                </div>
+
+                <div id="torbox-torrents" className="flex items-center justify-between">
+                  <div
+                    className={`space-y-2${
+                      !(
+                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
+                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
+                      )
+                        ? "pointer-events-none select-none opacity-50"
+                        : ""
+                    }`}
+                  >
+                    <Label>{t("settings.useTorboxForTorrents")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.useTorboxForTorrentsDesc")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.useTorboxForTorrents ?? true}
+                    onCheckedChange={value =>
+                      handleSettingChange("useTorboxForTorrents", value)
+                    }
+                    disabled={
+                      !(
+                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
+                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
+                      )
+                    }
+                  />
+                </div>
+
+                <div
+                  id="torbox-torrent-fallback"
+                  className="flex items-center justify-between"
+                >
+                  <div
+                    className={`space-y-2${
+                      !settings.useTorboxForTorrents || !settings.torrentEnabled
+                        ? "pointer-events-none select-none opacity-50"
+                        : ""
+                    }`}
+                  >
+                    <Label>{t("settings.fallbackToQbittorrentOnTorboxFailure")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.fallbackToQbittorrentOnTorboxFailureDesc")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.fallbackToQbittorrentOnTorboxFailure ?? false}
+                    onCheckedChange={value =>
+                      handleSettingChange("fallbackToQbittorrentOnTorboxFailure", value)
+                    }
+                    disabled={!settings.useTorboxForTorrents || !settings.torrentEnabled}
+                  />
+                </div>
+              </Card>
+
+              {/* Torrenting Card */}
+              <Card id="torrent-downloads" className="border border-border/60 shadow-none p-6">
+                <div className="mb-6 flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold text-primary">
-                      {t("settings.gameBackup.title")}
-                    </h3>
+                    <h2 className="text-base font-semibold text-foreground">
+                      {t("settings.torrenting")}
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t("settings.torrentingDescription")}
+                    </p>
+                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <Switch
+                            checked={settings.torrentEnabled}
+                            onCheckedChange={handleTorrentToggle}
+                            disabled={
+                              !isOnWindows ||
+                              (settings.customSourcesMode &&
+                                settings.customSource?.torrentOnly &&
+                                settings.torrentEnabled)
+                            }
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      {!isOnWindows ? (
+                        <TooltipContent>
+                          <p className="text-secondary">
+                            {t("settings.onlyWindowsSupported")}
+                          </p>
+                        </TooltipContent>
+                      ) : settings.customSourcesMode &&
+                        settings.customSource?.torrentOnly &&
+                        settings.torrentEnabled ? (
+                        <TooltipContent>
+                          <p className="text-secondary">
+                            {t("settings.torrentRequiredBySource") ||
+                              "Your selected external source requires torrenting."}
+                          </p>
+                        </TooltipContent>
+                      ) : null}
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                {settings.customSourcesMode &&
+                  settings.customSource?.torrentOnly &&
+                  settings.torrentEnabled && (
+                    <div className="mb-4 rounded-md border border-orange-500/30 bg-orange-500/5 p-3 text-xs text-orange-700 dark:text-orange-300">
+                      {(
+                        t("settings.torrentLockedBySourceNote") ||
+                        "Torrenting can't be disabled while {{name}} is selected — it only publishes magnet links. Change the external source in Local Refresh first."
+                      ).replace(
+                        "{{name}}",
+                        settings.customSource?.name || "this external source"
+                      )}
+                    </div>
+                  )}
 
-                    {/* Backup Location */}
-                    <div id="backup-directory" className="mt-2 space-y-2">
-                      <Label>{t("settings.gameBackup.backupLocation")}</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder={t("settings.gameBackup.selectDirectory")}
-                          className="flex-1"
-                          value={settings.ludusavi.backupLocation}
-                          readOnly
-                        />
+                <div className="space-y-6">
+                  {/* qBittorrent Status */}
+                  <div
+                    className={`rounded-lg p-4 ${settings.torrentEnabled ? "bg-muted/30" : "bg-muted/20"}`}
+                  >
+                    <div className="flex items-center gap-2 text-sm">
+                      {settings.torrentEnabled ? (
+                        <QbittorrentStatus refreshKey={qbitStatusRefreshKey} />
+                      ) : (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Badge className="h-2 w-2 rounded-full bg-gray-400" />
+                          <span>{t("app.qbittorrent.inactive")}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* qBittorrent Installation */}
+                  {settings.torrentEnabled && !hideQbitInstallNote && (
+                    <div className="rounded-lg border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/50">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex flex-1 items-start gap-3">
+                          <Download className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                          <div className="space-y-2">
+                            <h4 className="font-semibold text-amber-900 dark:text-amber-100">
+                              {t("settings.qbitInstall.title")}
+                            </h4>
+                            <p className="text-sm text-amber-800 dark:text-amber-200">
+                              {t("settings.qbitInstall.description")}
+                            </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mt-2 border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-100 dark:hover:bg-amber-800"
+                              onClick={() =>
+                                window.electron.openURL(
+                                  "https://www.qbittorrent.org/download"
+                                )
+                              }
+                            >
+                              <ExternalLink className="mr-2 h-4 w-4" />
+                              {t("settings.qbitInstall.downloadButton")}
+                            </Button>
+                          </div>
+                        </div>
                         <Button
-                          className="text-secondary"
-                          onClick={e => {
-                            handleDirectoryChangeBackups(e);
-                          }}
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 rounded-full hover:bg-amber-200/50 dark:hover:bg-amber-800/50"
+                          onClick={handleDismissQbitInstallNote}
                         >
-                          {t("settings.selectDirectory")}
+                          <X className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                         </Button>
                       </div>
                     </div>
-                    {!settings.ludusavi.backupLocation && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-primary" />
-                        <p className="text-sm text-primary">
-                          {t("settings.gameBackup.selectLocationToEnable")}
-                        </p>
+                  )}
+
+                  {/* qBittorrent Configuration */}
+                  <div
+                    className={`space-y-4 ${!settings.torrentEnabled ? "pointer-events-none opacity-50" : ""}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold">
+                        {t("settings.qbitConfig.title")}
+                      </h3>
+                      {!settings.torrentEnabled && (
+                        <Badge variant="secondary" className="text-xs">
+                          {t("common.disabled")}
+                        </Badge>
+                      )}
+                    </div>
+                    <p
+                      className={`text-sm ${!settings.torrentEnabled ? "text-muted-foreground/60" : "text-muted-foreground"}`}
+                    >
+                      {t("settings.qbitConfig.description")}
+                    </p>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="qbit-host"
+                          className={
+                            !settings.torrentEnabled ? "text-muted-foreground/60" : ""
+                          }
+                        >
+                          {t("settings.qbitConfig.host")}
+                        </Label>
+                        <Input
+                          id="qbit-host"
+                          type="text"
+                          placeholder="localhost"
+                          disabled={!settings.torrentEnabled}
+                          value={
+                            qbitConfigDraft?.host ?? settings.torrentHost ?? "localhost"
+                          }
+                          onChange={e =>
+                            setQbitConfigDraft(prev => ({
+                              ...(prev || {
+                                host: settings.torrentHost ?? "localhost",
+                                port: settings.torrentPort ?? 8080,
+                                username: settings.torrentUsername ?? "admin",
+                                password: settings.torrentPassword ?? "adminadmin",
+                              }),
+                              host: e.target.value,
+                            }))
+                          }
+                        />
                       </div>
-                    )}
-                    <div className="mt-4 flex items-center justify-between">
-                      <div
-                        className={`space-y-2 ${!settings.ludusavi.backupLocation ? "pointer-events-none opacity-50" : ""}`}
+
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="qbit-port"
+                          className={
+                            !settings.torrentEnabled ? "text-muted-foreground/60" : ""
+                          }
+                        >
+                          {t("settings.qbitConfig.port")}
+                        </Label>
+                        <Input
+                          id="qbit-port"
+                          type="number"
+                          min={1}
+                          max={65535}
+                          placeholder="8080"
+                          disabled={!settings.torrentEnabled}
+                          value={qbitConfigDraft?.port ?? settings.torrentPort ?? 8080}
+                          onChange={e =>
+                            setQbitConfigDraft(prev => ({
+                              ...(prev || {
+                                host: settings.torrentHost ?? "localhost",
+                                port: settings.torrentPort ?? 8080,
+                                username: settings.torrentUsername ?? "admin",
+                                password: settings.torrentPassword ?? "adminadmin",
+                              }),
+                              port: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="qbit-username"
+                          className={
+                            !settings.torrentEnabled ? "text-muted-foreground/60" : ""
+                          }
+                        >
+                          {t("settings.qbitConfig.username")}
+                        </Label>
+                        <Input
+                          id="qbit-username"
+                          type="text"
+                          autoComplete="off"
+                          placeholder="admin"
+                          disabled={!settings.torrentEnabled}
+                          value={
+                            qbitConfigDraft?.username ?? settings.torrentUsername ?? "admin"
+                          }
+                          onChange={e =>
+                            setQbitConfigDraft(prev => ({
+                              ...(prev || {
+                                host: settings.torrentHost ?? "localhost",
+                                port: settings.torrentPort ?? 8080,
+                                username: settings.torrentUsername ?? "admin",
+                                password: settings.torrentPassword ?? "adminadmin",
+                              }),
+                              username: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="qbit-password"
+                          className={
+                            !settings.torrentEnabled ? "text-muted-foreground/60" : ""
+                          }
+                        >
+                          {t("settings.qbitConfig.password")}
+                        </Label>
+                        <Input
+                          id="qbit-password"
+                          type="password"
+                          autoComplete="new-password"
+                          placeholder="adminadmin"
+                          disabled={!settings.torrentEnabled}
+                          value={
+                            qbitConfigDraft?.password ??
+                            settings.torrentPassword ??
+                            "adminadmin"
+                          }
+                          onChange={e =>
+                            setQbitConfigDraft(prev => ({
+                              ...(prev || {
+                                host: settings.torrentHost ?? "localhost",
+                                port: settings.torrentPort ?? 8080,
+                                username: settings.torrentUsername ?? "admin",
+                                password: settings.torrentPassword ?? "adminadmin",
+                              }),
+                              password: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-primary"
+                        disabled={!qbitConfigDraft || !settings.torrentEnabled}
+                        onClick={() => setQbitConfigDraft(null)}
                       >
-                        <Label>{t("settings.gameBackup.title")}</Label>
-                        <p className="max-w-[70%] text-sm text-muted-foreground">
-                          {t("settings.gameBackup.description")}&nbsp;
-                          <a
-                            onClick={() =>
-                              window.electron.openURL(
-                                "https://ascendara.app/docs/features/game-backups"
-                              )
-                            }
-                            className="cursor-pointer text-primary hover:underline"
-                          >
-                            {t("common.learnMore")}
-                            <ExternalLink className="mb-1 ml-1 inline-block h-3 w-3" />
-                          </a>
-                        </p>
-                      </div>
-                      <Switch
-                        checked={settings.ludusavi.enabled}
-                        onCheckedChange={value => {
-                          handleToggleLudusavi(value);
+                        {t("common.cancel")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="text-muted"
+                        disabled={!qbitConfigDraft || !settings.torrentEnabled}
+                        onClick={() => {
+                          const draft = qbitConfigDraft;
+                          if (!draft) return;
+                          const portNum = parseInt(draft.port, 10);
+                          if (!draft.host || draft.host.trim() === "") {
+                            toast.error(t("settings.qbitConfig.errors.host"));
+                            return;
+                          }
+                          if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+                            toast.error(t("settings.qbitConfig.errors.port"));
+                            return;
+                          }
+                          setSettings(s => ({
+                            ...s,
+                            torrentHost: draft.host.trim(),
+                            torrentPort: portNum,
+                            torrentUsername: (draft.username ?? "").trim() || "admin",
+                            torrentPassword: draft.password ?? "adminadmin",
+                          }));
+                          setQbitConfigDraft(null);
+                          setQbitStatusRefreshKey(k => k + 1);
+                          toast.success(t("settings.qbitConfig.saved"));
                         }}
-                        disabled={!settings.ludusavi.backupLocation}
-                      />
+                      >
+                        {t("settings.qbitConfig.save")}
+                      </Button>
                     </div>
                   </div>
                 </div>
-                <div
-                  className={`mt-6 space-y-6 ${!settings.ludusavi.enabled ? "pointer-events-none opacity-50" : ""}`}
-                >
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="space-y-2">
-                      <Label>{t("settings.gameBackup.skipManifestCheck")}</Label>
-                      <p className="max-w-[70%] text-sm text-muted-foreground">
-                        {t("settings.gameBackup.skipManifestCheckDesc")}&nbsp;
+              </Card>
+            </SettingsCategory>
+
+            <SettingsCategory {...categoryProps("gaming")} columns>
+              <Card id="gaming-settings" className="border border-border/60 shadow-none p-6">
+                <div className="space-y-4">
+
+                  <div id="discord-rpc" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.discordRPC")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.discordRPCDescription")}
                       </p>
                     </div>
                     <Switch
-                      checked={settings.ludusavi.backupOptions.skipManifestCheck}
-                      onCheckedChange={value => {
-                        setSettings(prev => ({
-                          ...prev,
-                          ludusavi: {
-                            ...prev.ludusavi,
-                            backupOptions: {
-                              ...prev.ludusavi.backupOptions,
-                              skipManifestCheck: value,
-                            },
-                          },
-                        }));
-                      }}
+                      checked={settings.rpcEnabled}
+                      onCheckedChange={() =>
+                        handleSettingChange("rpcEnabled", !settings.rpcEnabled)
+                      }
                     />
                   </div>
-                  <div className="space-y-4">
-                    {/* Backup Format */}
-                    <div className="space-y-2">
-                      <Label>{t("settings.gameBackup.backupFormat")}</Label>
-                      <Select
-                        value={settings.ludusavi.backupFormat}
-                        onValueChange={value => {
-                          setSettings(prev => ({
-                            ...prev,
-                            ludusavi: {
-                              ...prev.ludusavi,
-                              backupFormat: value,
-                            },
-                          }));
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="zip">
-                            {t("settings.gameBackup.formatZip")}
-                          </SelectItem>
-                          <SelectItem value="simple">
-                            {t("settings.gameBackup.formatSimple")}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+
+                  <div
+                    id="hide-on-game-launch"
+                    className="flex items-center justify-between"
+                  >
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.hideOnGameLaunch")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.hideOnGameLaunchDescription")}
+                      </p>
                     </div>
+                    <Switch
+                      checked={settings.hideOnGameLaunch}
+                      onCheckedChange={() =>
+                        handleSettingChange("hideOnGameLaunch", !settings.hideOnGameLaunch)
+                      }
+                    />
                   </div>
 
-                  {/* Backup Options */}
-                  <div className="space-y-4">
-                    {/* Number of Backups */}
-                    <div className="space-y-2">
-                      <Label>{t("settings.gameBackup.backupsToKeep")}</Label>
-                      <Select
-                        value={settings.ludusavi.backupOptions.backupsToKeep.toString()}
-                        onValueChange={value => {
+                  <div id="mature-content" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.matureContent")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.matureContentDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.seeInappropriateContent}
+                      onCheckedChange={() =>
+                        handleSettingChange(
+                          "seeInappropriateContent",
+                          !settings.seeInappropriateContent
+                        )
+                      }
+                    />
+                  </div>
+
+                  {isOnWindows && (
+                    <div
+                      id="auto-create-shortcuts"
+                      className="flex items-center justify-between"
+                    >
+                      <div className="space-y-0.5">
+                        <Label>{t("settings.autoCreateShortcuts")}</Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.autoCreateShortcutsDescription")}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={settings.autoCreateShortcuts}
+                        onCheckedChange={() =>
+                          handleSettingChange(
+                            "autoCreateShortcuts",
+                            !settings.autoCreateShortcuts
+                          )
+                        }
+                      />
+                    </div>
+                  )}
+
+                  <div
+                    id="prompt-game-support"
+                    className="flex items-center justify-between"
+                  >
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.promptGameSupport")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.promptGameSupportDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.promptPurchaseAfter3Hours}
+                      onCheckedChange={() =>
+                        handleSettingChange(
+                          "promptPurchaseAfter3Hours",
+                          !settings.promptPurchaseAfter3Hours
+                        )
+                      }
+                    />
+                  </div>
+
+                  <div
+                    id="extra-game-options"
+                    className="flex items-center justify-between"
+                  >
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.extraGameOptions")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.extraGameOptionsDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.extraGameOptions}
+                      onCheckedChange={() =>
+                        handleSettingChange("extraGameOptions", !settings.extraGameOptions)
+                      }
+                    />
+                  </div>
+                </div>
+              </Card>
+
+              <Card
+                id="big-picture-settings"
+                className="space-y-5 border border-border/60 p-6 shadow-none"
+              >
+                <h3 className="text-base font-semibold text-foreground">
+                  {t("settings.bigPictureSettings")}
+                </h3>
+
+                <div className="space-y-3 rounded-lg border border-border/50 bg-muted/20 p-4">
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`shrink-0 rounded-full p-2 ${controllerConnected ? "bg-green-500/15" : "bg-muted"}`}
+                    >
+                      <Gamepad2
+                        className={`h-5 w-5 ${controllerConnected ? "text-green-500" : "text-muted-foreground"}`}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground">
+                        {controllerConnected
+                          ? t("settings.controllerConnected")
+                          : t("settings.noControllerDetected")}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {controllerConnected
+                          ? t("settings.controllerConnectedDescription")
+                          : t("settings.noControllerDetectedDescription")}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => navigate("/bigpicture")}
+                    className="w-full gap-2 text-secondary"
+                  >
+                    <Gamepad2 className="h-4 w-4" />
+                    {t("settings.enterBigPicture")}
+                  </Button>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0 space-y-0.5">
+                    <Label>{t("settings.controllerType")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.controllerTypeDescription")}
+                    </p>
+                  </div>
+                  <Select
+                    value={settings.controllerType || "xbox"}
+                    onValueChange={value => handleSettingChange("controllerType", value)}
+                  >
+                    <SelectTrigger className="w-[150px] shrink-0 bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="xbox">Xbox</SelectItem>
+                      <SelectItem value="playstation">PlayStation</SelectItem>
+                      <SelectItem value="generic">Generic</SelectItem>
+                      <SelectItem value="keyboard">Keyboard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0 space-y-0.5">
+                    <Label>{t("settings.keyboardLayout")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.keyboardLayoutDescription")}
+                    </p>
+                  </div>
+                  <Select
+                    value={settings.bigPictureKeyboardLayout || "qwerty"}
+                    onValueChange={value =>
+                      handleSettingChange("bigPictureKeyboardLayout", value)
+                    }
+                  >
+                    <SelectTrigger className="w-[150px] shrink-0 bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="qwerty">QWERTY</SelectItem>
+                      <SelectItem value="azerty">AZERTY</SelectItem>
+                      <SelectItem value="qwertz">QWERTZ</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </Card>
+
+              {/* Achievement Watcher Directories Card */}
+              <Card className="border border-border/60 shadow-none p-6">
+                <h3 className="mb-2 text-base font-semibold text-foreground">
+                  {t("settings.achievementWatcher.title") ||
+                    "Achievement Watcher Directories"}
+                </h3>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  {t("settings.achievementWatcher.description") ||
+                    "Configure which directories are monitored for achievement tracking. Add folders where your games are installed to enable achievement tracking for those games."}
+                </p>
+                {/* Default Directories Section */}
+                {isOnWindows && (
+                  <div className="mb-6">
+                    <p className="mb-2 text-sm font-medium text-foreground">
+                      {t("settings.achievementWatcher.defaultDirs") ||
+                        "Default directories always tracked:"}
+                    </p>
+                    <ul className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/50 bg-muted/20">
+                      {[
+                        "Public/Documents/Steam/CODEX",
+                        "Public/Documents/Steam/RUNE",
+                        "Public/Documents/EMPRESS",
+                        "Public/Documents/OnlineFix",
+                        "AppData/Roaming/GSE Saves",
+                        "AppData/Roaming/Steam/CODEX",
+                        "AppData/Roaming/EMPRESS",
+                        "AppData/Roaming/Goldberg SteamEmu Saves",
+                        "AppData/Roaming/SmartSteamEmu",
+                        "ProgramData/Steam",
+                        "LocalAppData/SKIDROW",
+                      ].map(dir => (
+                        <li
+                          key={dir}
+                          className="flex min-w-0 items-center gap-2 px-3 py-1.5 font-mono text-xs text-muted-foreground"
+                        >
+                          <FolderOpen className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate" title={dir}>
+                            {dir}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {t("settings.achievementWatcher.defaultDirsNote") ||
+                        "These directories and files are always tracked by default and cannot be removed."}
+                    </p>
+                  </div>
+                )}
+                <div className="space-y-3">
+                  {/* List user-added directories */}
+                  {settings.watchingFolders && settings.watchingFolders.length > 0 ? (
+                    <ul className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/50">
+                      {settings.watchingFolders.map((dir, idx) => (
+                        <li key={dir} className="flex min-w-0 items-center gap-2 py-1 pl-3 pr-1">
+                          <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="flex-1 truncate text-sm" title={dir}>
+                            {dir}
+                          </span>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-muted-foreground"
+                            aria-label={
+                              t("settings.achievementWatcher.removeDir") ||
+                              "Remove directory"
+                            }
+                            onClick={() => {
+                              setSettings(prev => ({
+                                ...prev,
+                                watchingFolders: prev.watchingFolders.filter(
+                                  (d, i) => i !== idx
+                                ),
+                              }));
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      {t("settings.achievementWatcher.noDirs") ||
+                        "No directories added yet."}
+                    </div>
+                  )}
+                  {/* Add new directory */}
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2"
+                    onClick={async () => {
+                      const directory = await window.electron.openDirectoryDialog();
+                      if (directory) {
+                        const currentFolders = settings.watchingFolders || [];
+                        if (currentFolders.includes(directory)) {
+                          toast.error(
+                            t("settings.achievementWatcher.duplicateDir") ||
+                              "This directory is already being watched."
+                          );
+                          return;
+                        }
+                        setSettings(prev => ({
+                          ...prev,
+                          watchingFolders: [...currentFolders, directory],
+                        }));
+                      }
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    {t("settings.achievementWatcher.addDir") || "Add Directory"}
+                  </Button>
+                </div>
+              </Card>
+            </SettingsCategory>
+
+            <SettingsCategory {...categoryProps("backups")}>
+              <Card id="ludusavi" className="border border-border/60 shadow-none">
+                <div className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-semibold text-foreground">
+                        {t("settings.gameBackup.title")}
+                      </h3>
+
+                      {/* Backup Location */}
+                      <div id="backup-directory" className="mt-2 space-y-2">
+                        <Label>{t("settings.gameBackup.backupLocation")}</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder={t("settings.gameBackup.selectDirectory")}
+                            className="flex-1"
+                            value={settings.ludusavi.backupLocation}
+                            readOnly
+                          />
+                          <Button
+                            className="text-secondary"
+                            onClick={e => {
+                              handleDirectoryChangeBackups(e);
+                            }}
+                          >
+                            {t("settings.selectDirectory")}
+                          </Button>
+                        </div>
+                      </div>
+                      {!settings.ludusavi.backupLocation && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-primary" />
+                          <p className="text-sm text-primary">
+                            {t("settings.gameBackup.selectLocationToEnable")}
+                          </p>
+                        </div>
+                      )}
+                      <div className="mt-4 flex items-center justify-between">
+                        <div
+                          className={`space-y-2 ${!settings.ludusavi.backupLocation ? "pointer-events-none opacity-50" : ""}`}
+                        >
+                          <Label>{t("settings.gameBackup.title")}</Label>
+                          <p className="max-w-[70%] text-sm text-muted-foreground">
+                            {t("settings.gameBackup.description")}&nbsp;
+                            <a
+                              onClick={() =>
+                                window.electron.openURL(
+                                  "https://ascendara.app/docs/features/game-backups"
+                                )
+                              }
+                              className="cursor-pointer text-primary hover:underline"
+                            >
+                              {t("common.learnMore")}
+                              <ExternalLink className="mb-1 ml-1 inline-block h-3 w-3" />
+                            </a>
+                          </p>
+                        </div>
+                        <Switch
+                          checked={settings.ludusavi.enabled}
+                          onCheckedChange={value => {
+                            handleToggleLudusavi(value);
+                          }}
+                          disabled={!settings.ludusavi.backupLocation}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className={`mt-6 space-y-6 ${!settings.ludusavi.enabled ? "pointer-events-none opacity-50" : ""}`}
+                  >
+                    <div className="mt-4 flex items-center justify-between">
+                      <div className="space-y-2">
+                        <Label>{t("settings.gameBackup.skipManifestCheck")}</Label>
+                        <p className="max-w-[70%] text-sm text-muted-foreground">
+                          {t("settings.gameBackup.skipManifestCheckDesc")}&nbsp;
+                        </p>
+                      </div>
+                      <Switch
+                        checked={settings.ludusavi.backupOptions.skipManifestCheck}
+                        onCheckedChange={value => {
                           setSettings(prev => ({
                             ...prev,
                             ludusavi: {
                               ...prev.ludusavi,
                               backupOptions: {
                                 ...prev.ludusavi.backupOptions,
-                                backupsToKeep: parseInt(value),
+                                skipManifestCheck: value,
                               },
                             },
                           }));
                         }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="3">
-                            {t("settings.gameBackup.backupsCount.three")}
-                          </SelectItem>
-                          <SelectItem value="5">
-                            {t("settings.gameBackup.backupsCount.five")}
-                          </SelectItem>
-                          <SelectItem value="10">
-                            {t("settings.gameBackup.backupsCount.ten")}
-                          </SelectItem>
-                          <SelectItem value="custom">
-                            {t("settings.gameBackup.backupsCount.custom")}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                      />
+                    </div>
+                    <div className="space-y-4">
+                      {/* Backup Format */}
+                      <div className="space-y-2">
+                        <Label>{t("settings.gameBackup.backupFormat")}</Label>
+                        <Select
+                          value={settings.ludusavi.backupFormat}
+                          onValueChange={value => {
+                            setSettings(prev => ({
+                              ...prev,
+                              ludusavi: {
+                                ...prev.ludusavi,
+                                backupFormat: value,
+                              },
+                            }));
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="zip">
+                              {t("settings.gameBackup.formatZip")}
+                            </SelectItem>
+                            <SelectItem value="simple">
+                              {t("settings.gameBackup.formatSimple")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
 
-                    {/* Compression Settings */}
-                    <div className="space-y-2">
-                      <Label>{t("settings.gameBackup.compressionLevel")}</Label>
-                      <Select
-                        value={settings.ludusavi.backupOptions.compressionLevel}
-                        onValueChange={value => {
-                          setSettings(prev => ({
-                            ...prev,
-                            ludusavi: {
-                              ...prev.ludusavi,
-                              backupOptions: {
-                                ...prev.ludusavi.backupOptions,
-                                compressionLevel: value,
+                    {/* Backup Options */}
+                    <div className="space-y-4">
+                      {/* Number of Backups */}
+                      <div className="space-y-2">
+                        <Label>{t("settings.gameBackup.backupsToKeep")}</Label>
+                        <Select
+                          value={settings.ludusavi.backupOptions.backupsToKeep.toString()}
+                          onValueChange={value => {
+                            setSettings(prev => ({
+                              ...prev,
+                              ludusavi: {
+                                ...prev.ludusavi,
+                                backupOptions: {
+                                  ...prev.ludusavi.backupOptions,
+                                  backupsToKeep: parseInt(value),
+                                },
                               },
-                            },
-                          }));
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">
-                            {t("settings.gameBackup.compressionNone")}
-                          </SelectItem>
-                          <SelectItem value="deflate">
-                            {t("settings.gameBackup.compressionDeflate")}
-                          </SelectItem>
-                          <SelectItem value="bzip2">
-                            {t("settings.gameBackup.compressionBzip2")}
-                          </SelectItem>
-                          <SelectItem value="zstd">
-                            {t("settings.gameBackup.compressionZstd")}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                            }));
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="3">
+                              {t("settings.gameBackup.backupsCount.three")}
+                            </SelectItem>
+                            <SelectItem value="5">
+                              {t("settings.gameBackup.backupsCount.five")}
+                            </SelectItem>
+                            <SelectItem value="10">
+                              {t("settings.gameBackup.backupsCount.ten")}
+                            </SelectItem>
+                            <SelectItem value="custom">
+                              {t("settings.gameBackup.backupsCount.custom")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Compression Settings */}
+                      <div className="space-y-2">
+                        <Label>{t("settings.gameBackup.compressionLevel")}</Label>
+                        <Select
+                          value={settings.ludusavi.backupOptions.compressionLevel}
+                          onValueChange={value => {
+                            setSettings(prev => ({
+                              ...prev,
+                              ludusavi: {
+                                ...prev.ludusavi,
+                                backupOptions: {
+                                  ...prev.ludusavi.backupOptions,
+                                  compressionLevel: value,
+                                },
+                              },
+                            }));
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="default">
+                              {t("settings.gameBackup.compressionNone")}
+                            </SelectItem>
+                            <SelectItem value="deflate">
+                              {t("settings.gameBackup.compressionDeflate")}
+                            </SelectItem>
+                            <SelectItem value="bzip2">
+                              {t("settings.gameBackup.compressionBzip2")}
+                            </SelectItem>
+                            <SelectItem value="zstd">
+                              {t("settings.gameBackup.compressionZstd")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            </SettingsCategory>
 
-            {/* ── Linux Compatibility Layer ── */}
             {isOnLinux && (
-              <>
-                <Card className="border-border p-6">
-                  <div className="space-y-6">
-                    <h3 className="mb-2 text-xl font-semibold text-primary">
-                      {t("welcome.compatibilityLayer")}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.linuxCompat.description")}
-                    </p>
-
-                    {/* Runner Selection */}
-                    <div className="space-y-3">
-                      <label className="text-sm font-medium">
-                        {t("settings.linuxCompat.defaultRunner")}
-                      </label>
-                      <select
-                        value={selectedRunner}
-                        onChange={async e => {
-                          setSelectedRunner(e.target.value);
-                          await window.electron.updateSetting(
-                            "linuxRunner",
-                            e.target.value
-                          );
-                        }}
-                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                      >
-                        <option value="auto">
-                          {t("settings.linuxCompat.autoDetect")}
-                        </option>
-                        {runners.map(r => (
-                          <option key={r.path} value={r.path}>
-                            {r.name} (
-                            {r.source === "steam"
-                              ? t("settings.linuxCompat.sourceSteam")
-                              : r.source === "custom"
-                                ? t("settings.linuxCompat.sourceCustom")
-                                : t("settings.linuxCompat.sourceSystem")}
-                            ){r.version ? ` — v${r.version}` : ""}
-                          </option>
-                        ))}
-                      </select>
-
-                      {(() => {
-                        let activeRunnerName = "";
-                        if (selectedRunner === "auto") {
-                          activeRunnerName = runners[0]?.name?.toLowerCase() || "";
-                        } else {
-                          activeRunnerName = (
-                            selectedRunner.split("/").pop() || ""
-                          ).toLowerCase();
-                        }
-                        const runnerType = activeRunnerName.includes("cachyos")
-                          ? "cachyos"
-                          : activeRunnerName.includes("ge-proton") ||
-                              activeRunnerName.includes("proton-ge")
-                            ? "ge"
-                            : null;
-
-                        if (!runnerType) return null;
-
-                        return (
-                          <Button
-                            size="sm"
-                            className="gap-2 text-secondary"
-                            onClick={() => setProtonOptionsOpen(true)}
-                          >
-                            <SquareTerminal className="h-4 w-4" />
-                            {t("settings.linuxCompat.viewProtonOptions")}
-                          </Button>
-                        );
-                      })()}
-                    </div>
-
-                    {/* Detected Runners List */}
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium">
-                        {t("settings.linuxCompat.detectedRunners")}
-                      </h4>
-                      {runners.length === 0 ? (
-                        <p className="text-sm text-yellow-500">
-                          {t("settings.linuxCompat.noRunnersWarning")}
+              <SettingsCategory {...categoryProps("compatibility")}>
+                {/* ── Linux Compatibility Layer ── */}
+                {isOnLinux && (
+                  <>
+                    <Card className="border border-border/60 shadow-none p-6">
+                      <div className="space-y-6">
+                        <h3 className="mb-2 text-base font-semibold text-foreground">
+                          {t("welcome.compatibilityLayer")}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.linuxCompat.description")}
                         </p>
-                      ) : (
-                        <ul className="space-y-1">
-                          {runners.map(r => (
-                            <li
-                              key={r.path}
-                              className="flex items-center gap-2 text-sm text-muted-foreground"
-                            >
-                              <span
-                                className={`h-2 w-2 rounded-full ${
-                                  r.source === "steam"
-                                    ? "bg-blue-500"
-                                    : r.source === "custom"
-                                      ? "bg-purple-500"
-                                      : "bg-green-500"
-                                }`}
-                              />
-                              <span className="text-foreground">{r.name}</span>
-                              <span>({r.source})</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-3">
-                      {/* Download / Update Proton-CachyOS */}
-                      <Button
-                        onClick={async () => {
-                          try {
-                            const info = await window.electron.getProtonCachyOSInfo();
-                            if (!info.success) {
-                              console.error(
-                                "Failed to get Proton-CachyOS info:",
-                                info.error
+                        {/* Runner Selection */}
+                        <div className="space-y-3">
+                          <label className="text-sm font-medium">
+                            {t("settings.linuxCompat.defaultRunner")}
+                          </label>
+                          <select
+                            value={selectedRunner}
+                            onChange={async e => {
+                              setSelectedRunner(e.target.value);
+                              await window.electron.updateSetting(
+                                "linuxRunner",
+                                e.target.value
                               );
-                              return;
-                            }
-                            if (info.alreadyInstalled) {
-                              const updated = await window.electron.getRunners();
-                              setRunners(updated);
-                              return;
-                            }
-                            setProtonCachyInfo(info);
-                            setShowProtonCachyConfirm(true);
-                          } catch (e) {
-                            console.error("Failed to get Proton-CachyOS info:", e);
-                          }
-                        }}
-                        disabled={isDownloadingProtonCachy}
-                        className="gap-2 text-secondary"
-                      >
-                        {isDownloadingProtonCachy ? (
-                          <>
-                            <Loader className="h-4 w-4 animate-spin" />
-                            {t("settings.linuxCompat.downloading")}
-                          </>
-                        ) : (
-                          <>
-                            <Download className="h-4 w-4" />
-                            {runners.some(r => r.name.toLowerCase().includes("cachyos"))
-                              ? t("settings.linuxCompat.updateProtonCachy")
-                              : t("settings.linuxCompat.downloadProtonCachy")}
-                          </>
-                        )}
-                      </Button>
-
-                      {/* Check for Updates (CachyOS) */}
-                      <Button
-                        variant="outline"
-                        onClick={async () => {
-                          setProtonCachyUpdateStatus("checking");
-                          try {
-                            const info = await window.electron.checkProtonCachyOSUpdate();
-                            if (!info.success) {
-                              setProtonCachyUpdateStatus(null);
-                              return;
-                            }
-                            if (info.alreadyInstalled) {
-                              setProtonCachyUpdateStatus("up-to-date");
-                            } else if (info.updateAvailable) {
-                              setProtonCachyUpdateStatus("update-available");
-                              setProtonCachyInfo(info);
-                            } else {
-                              setProtonCachyUpdateStatus(null);
-                            }
-                          } catch (e) {
-                            console.error("Failed to check for updates:", e);
-                            setProtonCachyUpdateStatus(null);
-                          }
-                        }}
-                        disabled={protonCachyUpdateStatus === "checking"}
-                        className="gap-2"
-                      >
-                        {protonCachyUpdateStatus === "checking" ? (
-                          <>
-                            <Loader className="h-4 w-4 animate-spin" />
-                            {t("settings.linuxCompat.checking")}
-                          </>
-                        ) : (
-                          <>
-                            <FolderSync className="h-4 w-4" />
-                            {t("settings.linuxCompat.checkForUpdates")}
-                          </>
-                        )}
-                      </Button>
-                    </div>
-
-                    {/* Update Status Message */}
-                    {protonCachyUpdateStatus === "up-to-date" && (
-                      <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3">
-                        <FileCheck2 className="h-4 w-4 text-green-500" />
-                        <p className="text-sm text-green-500">
-                          {t("settings.linuxCompat.upToDate")}
-                        </p>
-                      </div>
-                    )}
-
-                    {protonCachyUpdateStatus === "update-available" &&
-                      protonCachyInfo && (
-                        <div className="flex items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
-                          <div className="flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                            <p className="text-sm text-yellow-500">
-                              {t("settings.linuxCompat.updateAvailable", {
-                                version: protonCachyInfo.latestVersion,
-                              })}
-                              {protonCachyInfo.installedVersions.length > 0 && (
-                                <span className="text-yellow-500/70">
-                                  {" "}
-                                  {t("settings.linuxCompat.updateAvailableCurrent", {
-                                    version: protonCachyInfo.installedVersions[0],
-                                  })}
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => setShowProtonCachyConfirm(true)}
-                            className="gap-1"
+                            }}
+                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           >
-                            <Download className="h-3 w-3" />
-                            {t("settings.linuxCompat.update")}
+                            <option value="auto">
+                              {t("settings.linuxCompat.autoDetect")}
+                            </option>
+                            {runners.map(r => (
+                              <option key={r.path} value={r.path}>
+                                {r.name} (
+                                {r.source === "steam"
+                                  ? t("settings.linuxCompat.sourceSteam")
+                                  : r.source === "custom"
+                                    ? t("settings.linuxCompat.sourceCustom")
+                                    : t("settings.linuxCompat.sourceSystem")}
+                                ){r.version ? ` — v${r.version}` : ""}
+                              </option>
+                            ))}
+                          </select>
+
+                          {(() => {
+                            let activeRunnerName = "";
+                            if (selectedRunner === "auto") {
+                              activeRunnerName = runners[0]?.name?.toLowerCase() || "";
+                            } else {
+                              activeRunnerName = (
+                                selectedRunner.split("/").pop() || ""
+                              ).toLowerCase();
+                            }
+                            const runnerType = activeRunnerName.includes("cachyos")
+                              ? "cachyos"
+                              : activeRunnerName.includes("ge-proton") ||
+                                  activeRunnerName.includes("proton-ge")
+                                ? "ge"
+                                : null;
+
+                            if (!runnerType) return null;
+
+                            return (
+                              <Button
+                                size="sm"
+                                className="gap-2 text-secondary"
+                                onClick={() => setProtonOptionsOpen(true)}
+                              >
+                                <SquareTerminal className="h-4 w-4" />
+                                {t("settings.linuxCompat.viewProtonOptions")}
+                              </Button>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Detected Runners List */}
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium">
+                            {t("settings.linuxCompat.detectedRunners")}
+                          </h4>
+                          {runners.length === 0 ? (
+                            <p className="text-sm text-yellow-500">
+                              {t("settings.linuxCompat.noRunnersWarning")}
+                            </p>
+                          ) : (
+                            <ul className="space-y-1">
+                              {runners.map(r => (
+                                <li
+                                  key={r.path}
+                                  className="flex items-center gap-2 text-sm text-muted-foreground"
+                                >
+                                  <span
+                                    className={`h-2 w-2 rounded-full ${
+                                      r.source === "steam"
+                                        ? "bg-blue-500"
+                                        : r.source === "custom"
+                                          ? "bg-purple-500"
+                                          : "bg-green-500"
+                                    }`}
+                                  />
+                                  <span className="text-foreground">{r.name}</span>
+                                  <span>({r.source})</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap gap-3">
+                          {/* Download / Update Proton-CachyOS */}
+                          <Button
+                            onClick={async () => {
+                              try {
+                                const info = await window.electron.getProtonCachyOSInfo();
+                                if (!info.success) {
+                                  console.error(
+                                    "Failed to get Proton-CachyOS info:",
+                                    info.error
+                                  );
+                                  return;
+                                }
+                                if (info.alreadyInstalled) {
+                                  const updated = await window.electron.getRunners();
+                                  setRunners(updated);
+                                  return;
+                                }
+                                setProtonCachyInfo(info);
+                                setShowProtonCachyConfirm(true);
+                              } catch (e) {
+                                console.error("Failed to get Proton-CachyOS info:", e);
+                              }
+                            }}
+                            disabled={isDownloadingProtonCachy}
+                            className="gap-2 text-secondary"
+                          >
+                            {isDownloadingProtonCachy ? (
+                              <>
+                                <Loader className="h-4 w-4 animate-spin" />
+                                {t("settings.linuxCompat.downloading")}
+                              </>
+                            ) : (
+                              <>
+                                <Download className="h-4 w-4" />
+                                {runners.some(r => r.name.toLowerCase().includes("cachyos"))
+                                  ? t("settings.linuxCompat.updateProtonCachy")
+                                  : t("settings.linuxCompat.downloadProtonCachy")}
+                              </>
+                            )}
+                          </Button>
+
+                          {/* Check for Updates (CachyOS) */}
+                          <Button
+                            variant="outline"
+                            onClick={async () => {
+                              setProtonCachyUpdateStatus("checking");
+                              try {
+                                const info = await window.electron.checkProtonCachyOSUpdate();
+                                if (!info.success) {
+                                  setProtonCachyUpdateStatus(null);
+                                  return;
+                                }
+                                if (info.alreadyInstalled) {
+                                  setProtonCachyUpdateStatus("up-to-date");
+                                } else if (info.updateAvailable) {
+                                  setProtonCachyUpdateStatus("update-available");
+                                  setProtonCachyInfo(info);
+                                } else {
+                                  setProtonCachyUpdateStatus(null);
+                                }
+                              } catch (e) {
+                                console.error("Failed to check for updates:", e);
+                                setProtonCachyUpdateStatus(null);
+                              }
+                            }}
+                            disabled={protonCachyUpdateStatus === "checking"}
+                            className="gap-2"
+                          >
+                            {protonCachyUpdateStatus === "checking" ? (
+                              <>
+                                <Loader className="h-4 w-4 animate-spin" />
+                                {t("settings.linuxCompat.checking")}
+                              </>
+                            ) : (
+                              <>
+                                <FolderSync className="h-4 w-4" />
+                                {t("settings.linuxCompat.checkForUpdates")}
+                              </>
+                            )}
                           </Button>
                         </div>
-                      )}
 
-                    {/* Advanced options: Proton-GE alternative */}
-                    <details className="group rounded-lg border border-border bg-muted/30">
-                      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium text-foreground">
-                        {t("settings.linuxCompat.advancedOptions")}
-                        <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
-                      </summary>
-                      <div className="flex flex-wrap items-center gap-3 border-t border-border p-4">
-                        <p className="w-full text-xs text-muted-foreground">
-                          {t("settings.linuxCompat.protonGEAltDescription")}
-                        </p>
-
-                        {/* Download / Update Proton-GE */}
-                        <Button
-                          onClick={async () => {
-                            try {
-                              const info = await window.electron.getProtonGEInfo();
-                              if (!info.success) {
-                                console.error(
-                                  "Failed to get Proton-GE info:",
-                                  info.error
-                                );
-                                return;
-                              }
-                              if (info.alreadyInstalled) {
-                                const updated = await window.electron.getRunners();
-                                setRunners(updated);
-                                return;
-                              }
-                              setProtonGEInfo(info);
-                              setShowProtonGEConfirm(true);
-                            } catch (e) {
-                              console.error("Failed to get Proton-GE info:", e);
-                            }
-                          }}
-                          disabled={isDownloadingProtonGE}
-                          className="gap-2 text-secondary"
-                        >
-                          {isDownloadingProtonGE ? (
-                            <>
-                              <Loader className="h-4 w-4 animate-spin" />
-                              {t("settings.linuxCompat.downloading")}
-                            </>
-                          ) : (
-                            <>
-                              <Download className="h-4 w-4" />
-                              {runners.some(r =>
-                                r.name.toLowerCase().includes("ge-proton")
-                              )
-                                ? t("settings.linuxCompat.updateProtonGE")
-                                : t("settings.linuxCompat.downloadProtonGE")}
-                            </>
-                          )}
-                        </Button>
-
-                        {/* Check for Updates (GE) */}
-                        <Button
-                          variant="outline"
-                          onClick={async () => {
-                            setProtonGEUpdateStatus("checking");
-                            try {
-                              const info = await window.electron.checkProtonGEUpdate();
-                              if (!info.success) {
-                                setProtonGEUpdateStatus(null);
-                                return;
-                              }
-                              if (info.alreadyInstalled) {
-                                setProtonGEUpdateStatus("up-to-date");
-                              } else if (info.updateAvailable) {
-                                setProtonGEUpdateStatus("update-available");
-                                setProtonGEInfo(info);
-                              } else {
-                                setProtonGEUpdateStatus(null);
-                              }
-                            } catch (e) {
-                              console.error("Failed to check for GE updates:", e);
-                              setProtonGEUpdateStatus(null);
-                            }
-                          }}
-                          disabled={protonGEUpdateStatus === "checking"}
-                          className="gap-2"
-                        >
-                          {protonGEUpdateStatus === "checking" ? (
-                            <>
-                              <Loader className="h-4 w-4 animate-spin" />
-                              {t("settings.linuxCompat.checking")}
-                            </>
-                          ) : (
-                            <>
-                              <FolderSync className="h-4 w-4" />
-                              {t("settings.linuxCompat.checkForUpdates")}
-                            </>
-                          )}
-                        </Button>
-
-                        {protonGEUpdateStatus === "up-to-date" && (
-                          <div className="flex w-full items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3">
+                        {/* Update Status Message */}
+                        {protonCachyUpdateStatus === "up-to-date" && (
+                          <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3">
                             <FileCheck2 className="h-4 w-4 text-green-500" />
                             <p className="text-sm text-green-500">
                               {t("settings.linuxCompat.upToDate")}
@@ -3081,1431 +3282,1037 @@ function Settings() {
                           </div>
                         )}
 
-                        {protonGEUpdateStatus === "update-available" && protonGEInfo && (
-                          <div className="flex w-full items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
-                            <div className="flex items-center gap-2">
-                              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                              <p className="text-sm text-yellow-500">
-                                {t("settings.linuxCompat.updateAvailable", {
-                                  version: protonGEInfo.latestVersion,
-                                })}
-                                {protonGEInfo.installedVersions.length > 0 && (
-                                  <span className="text-yellow-500/70">
-                                    {" "}
-                                    {t("settings.linuxCompat.updateAvailableCurrent", {
-                                      version: protonGEInfo.installedVersions[0],
-                                    })}
-                                  </span>
-                                )}
-                              </p>
+                        {protonCachyUpdateStatus === "update-available" &&
+                          protonCachyInfo && (
+                            <div className="flex items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+                              <div className="flex items-center gap-2">
+                                <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                                <p className="text-sm text-yellow-500">
+                                  {t("settings.linuxCompat.updateAvailable", {
+                                    version: protonCachyInfo.latestVersion,
+                                  })}
+                                  {protonCachyInfo.installedVersions.length > 0 && (
+                                    <span className="text-yellow-500/70">
+                                      {" "}
+                                      {t("settings.linuxCompat.updateAvailableCurrent", {
+                                        version: protonCachyInfo.installedVersions[0],
+                                      })}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => setShowProtonCachyConfirm(true)}
+                                className="gap-1"
+                              >
+                                <Download className="h-3 w-3" />
+                                {t("settings.linuxCompat.update")}
+                              </Button>
                             </div>
+                          )}
+
+                        {/* Advanced options: Proton-GE alternative */}
+                        <details className="group rounded-lg border border-border bg-muted/30">
+                          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium text-foreground">
+                            {t("settings.linuxCompat.advancedOptions")}
+                            <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
+                          </summary>
+                          <div className="flex flex-wrap items-center gap-3 border-t border-border p-4">
+                            <p className="w-full text-xs text-muted-foreground">
+                              {t("settings.linuxCompat.protonGEAltDescription")}
+                            </p>
+
+                            {/* Download / Update Proton-GE */}
                             <Button
-                              size="sm"
-                              onClick={() => setShowProtonGEConfirm(true)}
-                              className="gap-1"
+                              onClick={async () => {
+                                try {
+                                  const info = await window.electron.getProtonGEInfo();
+                                  if (!info.success) {
+                                    console.error(
+                                      "Failed to get Proton-GE info:",
+                                      info.error
+                                    );
+                                    return;
+                                  }
+                                  if (info.alreadyInstalled) {
+                                    const updated = await window.electron.getRunners();
+                                    setRunners(updated);
+                                    return;
+                                  }
+                                  setProtonGEInfo(info);
+                                  setShowProtonGEConfirm(true);
+                                } catch (e) {
+                                  console.error("Failed to get Proton-GE info:", e);
+                                }
+                              }}
+                              disabled={isDownloadingProtonGE}
+                              className="gap-2 text-secondary"
                             >
-                              <Download className="h-3 w-3" />
-                              {t("settings.linuxCompat.update")}
+                              {isDownloadingProtonGE ? (
+                                <>
+                                  <Loader className="h-4 w-4 animate-spin" />
+                                  {t("settings.linuxCompat.downloading")}
+                                </>
+                              ) : (
+                                <>
+                                  <Download className="h-4 w-4" />
+                                  {runners.some(r =>
+                                    r.name.toLowerCase().includes("ge-proton")
+                                  )
+                                    ? t("settings.linuxCompat.updateProtonGE")
+                                    : t("settings.linuxCompat.downloadProtonGE")}
+                                </>
+                              )}
                             </Button>
+
+                            {/* Check for Updates (GE) */}
+                            <Button
+                              variant="outline"
+                              onClick={async () => {
+                                setProtonGEUpdateStatus("checking");
+                                try {
+                                  const info = await window.electron.checkProtonGEUpdate();
+                                  if (!info.success) {
+                                    setProtonGEUpdateStatus(null);
+                                    return;
+                                  }
+                                  if (info.alreadyInstalled) {
+                                    setProtonGEUpdateStatus("up-to-date");
+                                  } else if (info.updateAvailable) {
+                                    setProtonGEUpdateStatus("update-available");
+                                    setProtonGEInfo(info);
+                                  } else {
+                                    setProtonGEUpdateStatus(null);
+                                  }
+                                } catch (e) {
+                                  console.error("Failed to check for GE updates:", e);
+                                  setProtonGEUpdateStatus(null);
+                                }
+                              }}
+                              disabled={protonGEUpdateStatus === "checking"}
+                              className="gap-2"
+                            >
+                              {protonGEUpdateStatus === "checking" ? (
+                                <>
+                                  <Loader className="h-4 w-4 animate-spin" />
+                                  {t("settings.linuxCompat.checking")}
+                                </>
+                              ) : (
+                                <>
+                                  <FolderSync className="h-4 w-4" />
+                                  {t("settings.linuxCompat.checkForUpdates")}
+                                </>
+                              )}
+                            </Button>
+
+                            {protonGEUpdateStatus === "up-to-date" && (
+                              <div className="flex w-full items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3">
+                                <FileCheck2 className="h-4 w-4 text-green-500" />
+                                <p className="text-sm text-green-500">
+                                  {t("settings.linuxCompat.upToDate")}
+                                </p>
+                              </div>
+                            )}
+
+                            {protonGEUpdateStatus === "update-available" && protonGEInfo && (
+                              <div className="flex w-full items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+                                <div className="flex items-center gap-2">
+                                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                                  <p className="text-sm text-yellow-500">
+                                    {t("settings.linuxCompat.updateAvailable", {
+                                      version: protonGEInfo.latestVersion,
+                                    })}
+                                    {protonGEInfo.installedVersions.length > 0 && (
+                                      <span className="text-yellow-500/70">
+                                        {" "}
+                                        {t("settings.linuxCompat.updateAvailableCurrent", {
+                                          version: protonGEInfo.installedVersions[0],
+                                        })}
+                                      </span>
+                                    )}
+                                  </p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  onClick={() => setShowProtonGEConfirm(true)}
+                                  className="gap-1"
+                                >
+                                  <Download className="h-3 w-3" />
+                                  {t("settings.linuxCompat.update")}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </details>
+
+                        {/* Info Box */}
+                        <div className="rounded-lg border border-border bg-muted/50 p-3">
+                          <p className="text-xs text-muted-foreground">
+                            <strong>Proton</strong> {t("settings.linuxCompat.infoBoxProton")}{" "}
+                            <strong>Wine</strong> {t("settings.linuxCompat.infoBoxWine")}
+                          </p>
+                        </div>
+                      </div>
+                      {/* ── UMU Section ── */}
+                      <div className="space-y-4 border-t border-border pt-6">
+                        <h4 className="text-sm font-medium text-foreground">
+                          UMU Launcher & UMU-Proton
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          {t("settings.linuxCompat.infoBoxUmuLauncher")}
+                        </p>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          {/* UMU Launcher */}
+                          <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">UMU Launcher</span>
+                              {umuInstalled ? (
+                                <span className="flex items-center gap-1 rounded bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
+                                  <FileCheck2 className="h-3 w-3" /> {t("common.installed")}
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 rounded bg-red-500/20 px-2 py-0.5 text-xs font-semibold text-red-500">
+                                  <AlertTriangle className="h-3 w-3" /> {t("common.missing")}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {t("settings.linuxCompat.umuRequired")}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                disabled={isDownloadingUmuLauncher}
+                                className="gap-1 text-secondary"
+                                onClick={async () => {
+                                  setIsDownloadingUmuLauncher(true);
+                                  try {
+                                    const result =
+                                      await window.electron.downloadUmuLauncher();
+                                    if (result.success) {
+                                      setUmuInstalled(true);
+                                      toast.success(
+                                        t("settings.linuxCompat.umu.launcher.installSuccess")
+                                      );
+                                    } else {
+                                      toast.error(
+                                        t("settings.linuxCompat.umu.launcher.installFailed") +
+                                          ": " +
+                                          (result.error || result.message)
+                                      );
+                                    }
+                                  } catch (e) {
+                                    toast.error(
+                                      t("settings.linuxCompat.umu.launcher.installError")
+                                    );
+                                  }
+                                  setIsDownloadingUmuLauncher(false);
+                                }}
+                              >
+                                {isDownloadingUmuLauncher ? (
+                                  <>
+                                    <Loader className="h-3 w-3 animate-spin" />{" "}
+                                    {t("common.installing")}
+                                  </>
+                                ) : umuInstalled ? (
+                                  <>
+                                    <RefreshCw className="h-3 w-3" />{" "}
+                                    {t("settings.linuxCompat.reinstallUpdate")}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="h-3 w-3" /> {t("common.install")}
+                                  </>
+                                )}
+                              </Button>
+                              <button
+                                onClick={() =>
+                                  window.electron.openURL(
+                                    "https://github.com/Open-Wine-Components/umu-launcher"
+                                  )
+                                }
+                                className="text-xs text-muted-foreground underline hover:text-primary"
+                              >
+                                GitHub
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* UMU Proton */}
+                          <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">UMU-Proton</span>
+                              {umuProtonInfo?.alreadyInstalled ? (
+                                <span className="flex items-center gap-1 rounded bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
+                                  <FileCheck2 className="h-3 w-3" /> {umuProtonInfo.name}
+                                </span>
+                              ) : umuProtonInfo?.updateAvailable ? (
+                                <span className="flex items-center gap-1 rounded bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-500">
+                                  <FolderSync className="h-3 w-3" />{" "}
+                                  {t("settings.linuxCompat.updateAvailableUmu")}
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                                  {t("settings.linuxCompat.notInstalled")}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {t("settings.linuxCompat.infoBoxUmuProton")}
+                              {umuProtonInfo?.sizeFormatted &&
+                                ` Latest: ${umuProtonInfo.name} (${umuProtonInfo.sizeFormatted})`}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                disabled={isDownloadingUmuProton}
+                                className="gap-1 text-secondary"
+                                onClick={async () => {
+                                  setIsDownloadingUmuProton(true);
+                                  setUmuProtonUpdateStatus(null);
+                                  try {
+                                    const result = await window.electron.downloadUmuProton();
+                                    if (result.success) {
+                                      toast.success(
+                                        t("settings.linuxCompat.umu.proton.installSuccess", {
+                                          name: result.name,
+                                        })
+                                      );
+                                      const updated = await window.electron.getRunners();
+                                      setRunners(updated);
+                                      const info = await window.electron.getUmuProtonInfo();
+                                      if (info?.success) setUmuProtonInfo(info);
+                                    } else {
+                                      toast.error(
+                                        t("settings.linuxCompat.umu.proton.installFailed", {
+                                          message: result.message || "Unknown error",
+                                        })
+                                      );
+                                    }
+                                  } catch (e) {
+                                    toast.error(
+                                      t("settings.linuxCompat.umu.proton.installError")
+                                    );
+                                  }
+                                  setIsDownloadingUmuProton(false);
+                                }}
+                              >
+                                {isDownloadingUmuProton ? (
+                                  <>
+                                    <Loader className="h-3 w-3 animate-spin" />{" "}
+                                    {t("common.installing")}
+                                  </>
+                                ) : umuProtonInfo?.alreadyInstalled ? (
+                                  <>
+                                    <FolderSync className="h-3 w-3" />{" "}
+                                    {t("settings.linuxCompat.reinstall")}
+                                  </>
+                                ) : umuProtonInfo?.updateAvailable ? (
+                                  <>
+                                    <Download className="h-3 w-3" />{" "}
+                                    {t("settings.linuxCompat.update")}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="h-3 w-3" /> {t("common.install")}
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
+                                disabled={umuProtonUpdateStatus === "checking"}
+                                onClick={async () => {
+                                  setUmuProtonUpdateStatus("checking");
+                                  const info = await window.electron.checkUmuProtonUpdate();
+                                  if (info?.success) {
+                                    setUmuProtonInfo(info);
+                                    setUmuProtonUpdateStatus(
+                                      info.alreadyInstalled
+                                        ? "up-to-date"
+                                        : info.updateAvailable
+                                          ? "update-available"
+                                          : null
+                                    );
+                                  } else {
+                                    setUmuProtonUpdateStatus(null);
+                                  }
+                                }}
+                              >
+                                {umuProtonUpdateStatus === "checking" ? (
+                                  <Loader className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <FolderSync className="h-3 w-3" />
+                                )}
+                                {t("settings.linuxCompat.checkForUpdates")}
+                              </Button>
+                            </div>
+
+                            {umuProtonUpdateStatus === "up-to-date" && (
+                              <p className="flex items-center gap-1 text-xs text-green-500">
+                                <FileCheck2 className="h-3 w-3" />{" "}
+                                {t("settings.linuxCompat.upToDate")}
+                              </p>
+                            )}
+                            {umuProtonUpdateStatus === "update-available" && (
+                              <p className="flex items-center gap-1 text-xs text-blue-500">
+                                <AlertTriangle className="h-3 w-3" />{" "}
+                                {t("settings.linuxCompat.updateAvailableUmu")}:{" "}
+                                {umuProtonInfo?.latestVersion}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Warning if UMU not installed */}
+                        {!umuInstalled && (
+                          <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
+                            <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                              {t("gameScreen.umuLauncherNotInstalled")}
+                            </p>
                           </div>
                         )}
                       </div>
-                    </details>
+                    </Card>
 
-                    {/* Info Box */}
-                    <div className="rounded-lg border border-border bg-muted/50 p-3">
-                      <p className="text-xs text-muted-foreground">
-                        <strong>Proton</strong> {t("settings.linuxCompat.infoBoxProton")}{" "}
-                        <strong>Wine</strong> {t("settings.linuxCompat.infoBoxWine")}
-                      </p>
-                    </div>
-                  </div>
-                  {/* ── UMU Section ── */}
-                  <div className="space-y-4 border-t border-border pt-6">
-                    <h4 className="text-sm font-medium text-foreground">
-                      UMU Launcher & UMU-Proton
-                    </h4>
-                    <p className="text-xs text-muted-foreground">
-                      {t("settings.linuxCompat.infoBoxUmuLauncher")}
-                    </p>
+                    <ProtonOptionsDialog
+                      open={protonOptionsOpen}
+                      onOpenChange={setProtonOptionsOpen}
+                      runnerType={(() => {
+                        let name =
+                          selectedRunner === "auto"
+                            ? runners[0]?.name?.toLowerCase() || ""
+                            : (selectedRunner.split("/").pop() || "").toLowerCase();
+                        if (name.includes("cachyos")) return "cachyos";
+                        if (name.includes("ge-proton") || name.includes("proton-ge"))
+                          return "ge";
+                        return null;
+                      })()}
+                    />
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {/* UMU Launcher */}
-                      <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">UMU Launcher</span>
-                          {umuInstalled ? (
-                            <span className="flex items-center gap-1 rounded bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
-                              <FileCheck2 className="h-3 w-3" /> {t("common.installed")}
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 rounded bg-red-500/20 px-2 py-0.5 text-xs font-semibold text-red-500">
-                              <AlertTriangle className="h-3 w-3" /> {t("common.missing")}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {t("settings.linuxCompat.umuRequired")}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            disabled={isDownloadingUmuLauncher}
-                            className="gap-1 text-secondary"
-                            onClick={async () => {
-                              setIsDownloadingUmuLauncher(true);
-                              try {
-                                const result =
-                                  await window.electron.downloadUmuLauncher();
-                                if (result.success) {
-                                  setUmuInstalled(true);
-                                  toast.success(
-                                    t("settings.linuxCompat.umu.launcher.installSuccess")
-                                  );
-                                } else {
-                                  toast.error(
-                                    t("settings.linuxCompat.umu.launcher.installFailed") +
-                                      ": " +
-                                      (result.error || result.message)
-                                  );
-                                }
-                              } catch (e) {
-                                toast.error(
-                                  t("settings.linuxCompat.umu.launcher.installError")
-                                );
-                              }
-                              setIsDownloadingUmuLauncher(false);
+                    {/* Proton-GE Download Confirmation Dialog */}
+                    <AlertDialog
+                      open={showProtonGEConfirm && !!protonGEInfo}
+                      onOpenChange={open => {
+                        if (!open) {
+                          setShowProtonGEConfirm(false);
+                          setProtonGEInfo(null);
+                        }
+                      }}
+                    >
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            {protonGEInfo?.updateAvailable
+                              ? t("settings.linuxCompat.protonConfirm.titleUpdate")
+                              : t("settings.linuxCompat.protonConfirm.titleDownload")}
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="space-y-3">
+                            <p>
+                              {protonGEInfo?.updateAvailable ? (
+                                <>
+                                  {t(
+                                    "settings.linuxCompat.protonConfirm.updateAvailablePrefix"
+                                  )}{" "}
+                                  <strong className="text-foreground">
+                                    {protonGEInfo.name}
+                                  </strong>
+                                  {protonGEInfo.installedVersions?.length > 0 && (
+                                    <span>
+                                      {" "}
+                                      {t("settings.linuxCompat.protonConfirm.replacing", {
+                                        versions: protonGEInfo.installedVersions.join(", "),
+                                      })}
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  {t(
+                                    "settings.linuxCompat.protonConfirm.aboutToDownloadPrefix"
+                                  )}{" "}
+                                  <strong className="text-foreground">
+                                    {protonGEInfo?.name}
+                                  </strong>
+                                  .
+                                </>
+                              )}
+                            </p>
+                            <p>
+                              {t("settings.linuxCompat.protonConfirm.file")}{" "}
+                              <code className="rounded bg-muted px-1 text-xs">
+                                {protonGEInfo?.fileName}
+                              </code>
+                            </p>
+                            <p>
+                              {t("settings.linuxCompat.protonConfirm.size")}{" "}
+                              <strong className="text-foreground">
+                                {protonGEInfo?.sizeFormatted}
+                              </strong>{" "}
+                              {protonGEInfo &&
+                                t("settings.linuxCompat.protonConfirm.sizeApprox", {
+                                  gb: (protonGEInfo.size / (1024 * 1024 * 1024)).toFixed(1),
+                                })}
+                            </p>
+                            <p>
+                              {t("settings.linuxCompat.protonConfirm.description")}{" "}
+                              <code className="rounded bg-muted px-1 text-xs">
+                                ~/.ascendara/runners/
+                              </code>
+                            </p>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel
+                            onClick={() => {
+                              setShowProtonGEConfirm(false);
+                              setProtonGEInfo(null);
                             }}
                           >
-                            {isDownloadingUmuLauncher ? (
-                              <>
-                                <Loader className="h-3 w-3 animate-spin" />{" "}
-                                {t("common.installing")}
-                              </>
-                            ) : umuInstalled ? (
-                              <>
-                                <RefreshCw className="h-3 w-3" />{" "}
-                                {t("settings.linuxCompat.reinstallUpdate")}
-                              </>
-                            ) : (
-                              <>
-                                <Download className="h-3 w-3" /> {t("common.install")}
-                              </>
-                            )}
-                          </Button>
-                          <button
-                            onClick={() =>
-                              window.electron.openURL(
-                                "https://github.com/Open-Wine-Components/umu-launcher"
-                              )
-                            }
-                            className="text-xs text-muted-foreground underline hover:text-primary"
-                          >
-                            GitHub
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* UMU Proton */}
-                      <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">UMU-Proton</span>
-                          {umuProtonInfo?.alreadyInstalled ? (
-                            <span className="flex items-center gap-1 rounded bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
-                              <FileCheck2 className="h-3 w-3" /> {umuProtonInfo.name}
-                            </span>
-                          ) : umuProtonInfo?.updateAvailable ? (
-                            <span className="flex items-center gap-1 rounded bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-500">
-                              <FolderSync className="h-3 w-3" />{" "}
-                              {t("settings.linuxCompat.updateAvailableUmu")}
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-                              {t("settings.linuxCompat.notInstalled")}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {t("settings.linuxCompat.infoBoxUmuProton")}
-                          {umuProtonInfo?.sizeFormatted &&
-                            ` Latest: ${umuProtonInfo.name} (${umuProtonInfo.sizeFormatted})`}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            disabled={isDownloadingUmuProton}
-                            className="gap-1 text-secondary"
+                            {t("settings.linuxCompat.protonConfirm.cancel")}
+                          </AlertDialogCancel>
+                          <AlertDialogAction
                             onClick={async () => {
-                              setIsDownloadingUmuProton(true);
-                              setUmuProtonUpdateStatus(null);
+                              setShowProtonGEConfirm(false);
+                              setProtonGEUpdateStatus(null);
+                              setIsDownloadingProtonGE(true);
                               try {
-                                const result = await window.electron.downloadUmuProton();
+                                const result = await window.electron.downloadProtonGE();
                                 if (result.success) {
-                                  toast.success(
-                                    t("settings.linuxCompat.umu.proton.installSuccess", {
-                                      name: result.name,
-                                    })
-                                  );
                                   const updated = await window.electron.getRunners();
                                   setRunners(updated);
-                                  const info = await window.electron.getUmuProtonInfo();
-                                  if (info?.success) setUmuProtonInfo(info);
-                                } else {
-                                  toast.error(
-                                    t("settings.linuxCompat.umu.proton.installFailed", {
-                                      message: result.message || "Unknown error",
-                                    })
-                                  );
+                                  if (result.path) {
+                                    setSelectedRunner(result.path);
+                                  }
                                 }
                               } catch (e) {
-                                toast.error(
-                                  t("settings.linuxCompat.umu.proton.installError")
-                                );
+                                console.error("Failed to download Proton-GE:", e);
                               }
-                              setIsDownloadingUmuProton(false);
+                              setIsDownloadingProtonGE(false);
+                              setProtonGEInfo(null);
+                            }}
+                            className="gap-2"
+                          >
+                            <Download className="h-4 w-4" />
+                            {protonGEInfo?.updateAvailable
+                              ? t("settings.linuxCompat.protonConfirm.updateBtn", {
+                                  size: protonGEInfo?.sizeFormatted,
+                                })
+                              : t("settings.linuxCompat.protonConfirm.downloadBtn", {
+                                  size: protonGEInfo?.sizeFormatted,
+                                })}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+
+                    {/* Proton-CachyOS Download Confirmation Dialog */}
+                    <AlertDialog
+                      open={showProtonCachyConfirm && !!protonCachyInfo}
+                      onOpenChange={open => {
+                        if (!open) {
+                          setShowProtonCachyConfirm(false);
+                          setProtonCachyInfo(null);
+                        }
+                      }}
+                    >
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            {protonCachyInfo?.updateAvailable
+                              ? t("settings.linuxCompat.protonConfirm.titleUpdateCachy")
+                              : t("settings.linuxCompat.protonConfirm.titleDownloadCachy")}
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="space-y-3">
+                            <p>
+                              {protonCachyInfo?.updateAvailable ? (
+                                <>
+                                  {t(
+                                    "settings.linuxCompat.protonConfirm.updateAvailablePrefixCachy"
+                                  )}{" "}
+                                  <strong className="text-foreground">
+                                    {protonCachyInfo.name}
+                                  </strong>
+                                  {protonCachyInfo.installedVersions?.length > 0 && (
+                                    <span>
+                                      {" "}
+                                      {t("settings.linuxCompat.protonConfirm.replacing", {
+                                        versions:
+                                          protonCachyInfo.installedVersions.join(", "),
+                                      })}
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  {t(
+                                    "settings.linuxCompat.protonConfirm.aboutToDownloadPrefix"
+                                  )}{" "}
+                                  <strong className="text-foreground">
+                                    {protonCachyInfo?.name}
+                                  </strong>
+                                  .
+                                </>
+                              )}
+                            </p>
+                            <p>
+                              {t("settings.linuxCompat.protonConfirm.file")}{" "}
+                              <code className="rounded bg-muted px-1 text-xs">
+                                {protonCachyInfo?.fileName}
+                              </code>
+                            </p>
+                            <p>
+                              {t("settings.linuxCompat.protonConfirm.size")}{" "}
+                              <strong className="text-foreground">
+                                {protonCachyInfo?.sizeFormatted}
+                              </strong>{" "}
+                              {protonCachyInfo &&
+                                t("settings.linuxCompat.protonConfirm.sizeApprox", {
+                                  gb: (protonCachyInfo.size / (1024 * 1024 * 1024)).toFixed(
+                                    1
+                                  ),
+                                })}
+                            </p>
+                            <p>
+                              {t("settings.linuxCompat.protonConfirm.descriptionCachy")}{" "}
+                              <code className="rounded bg-muted px-1 text-xs">
+                                ~/.ascendara/runners/
+                              </code>
+                            </p>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel
+                            onClick={() => {
+                              setShowProtonCachyConfirm(false);
+                              setProtonCachyInfo(null);
                             }}
                           >
-                            {isDownloadingUmuProton ? (
-                              <>
-                                <Loader className="h-3 w-3 animate-spin" />{" "}
-                                {t("common.installing")}
-                              </>
-                            ) : umuProtonInfo?.alreadyInstalled ? (
-                              <>
-                                <FolderSync className="h-3 w-3" />{" "}
-                                {t("settings.linuxCompat.reinstall")}
-                              </>
-                            ) : umuProtonInfo?.updateAvailable ? (
-                              <>
-                                <Download className="h-3 w-3" />{" "}
-                                {t("settings.linuxCompat.update")}
-                              </>
-                            ) : (
-                              <>
-                                <Download className="h-3 w-3" /> {t("common.install")}
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-1"
-                            disabled={umuProtonUpdateStatus === "checking"}
+                            {t("settings.linuxCompat.protonConfirm.cancel")}
+                          </AlertDialogCancel>
+                          <AlertDialogAction
                             onClick={async () => {
-                              setUmuProtonUpdateStatus("checking");
-                              const info = await window.electron.checkUmuProtonUpdate();
-                              if (info?.success) {
-                                setUmuProtonInfo(info);
-                                setUmuProtonUpdateStatus(
-                                  info.alreadyInstalled
-                                    ? "up-to-date"
-                                    : info.updateAvailable
-                                      ? "update-available"
-                                      : null
-                                );
-                              } else {
-                                setUmuProtonUpdateStatus(null);
+                              setShowProtonCachyConfirm(false);
+                              setProtonCachyUpdateStatus(null);
+                              setIsDownloadingProtonCachy(true);
+                              try {
+                                const result = await window.electron.downloadProtonCachyOS();
+                                if (result.success) {
+                                  const updated = await window.electron.getRunners();
+                                  setRunners(updated);
+                                  if (result.path) {
+                                    setSelectedRunner(result.path);
+                                  }
+                                }
+                              } catch (e) {
+                                console.error("Failed to download Proton-CachyOS:", e);
                               }
+                              setIsDownloadingProtonCachy(false);
+                              setProtonCachyInfo(null);
                             }}
+                            className="gap-2"
                           >
-                            {umuProtonUpdateStatus === "checking" ? (
-                              <Loader className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <FolderSync className="h-3 w-3" />
-                            )}
-                            {t("settings.linuxCompat.checkForUpdates")}
-                          </Button>
-                        </div>
-
-                        {umuProtonUpdateStatus === "up-to-date" && (
-                          <p className="flex items-center gap-1 text-xs text-green-500">
-                            <FileCheck2 className="h-3 w-3" />{" "}
-                            {t("settings.linuxCompat.upToDate")}
-                          </p>
-                        )}
-                        {umuProtonUpdateStatus === "update-available" && (
-                          <p className="flex items-center gap-1 text-xs text-blue-500">
-                            <AlertTriangle className="h-3 w-3" />{" "}
-                            {t("settings.linuxCompat.updateAvailableUmu")}:{" "}
-                            {umuProtonInfo?.latestVersion}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Warning if UMU not installed */}
-                    {!umuInstalled && (
-                      <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
-                        <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                          {t("gameScreen.umuLauncherNotInstalled")}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-
-                <ProtonOptionsDialog
-                  open={protonOptionsOpen}
-                  onOpenChange={setProtonOptionsOpen}
-                  runnerType={(() => {
-                    let name =
-                      selectedRunner === "auto"
-                        ? runners[0]?.name?.toLowerCase() || ""
-                        : (selectedRunner.split("/").pop() || "").toLowerCase();
-                    if (name.includes("cachyos")) return "cachyos";
-                    if (name.includes("ge-proton") || name.includes("proton-ge"))
-                      return "ge";
-                    return null;
-                  })()}
-                />
-
-                {/* Proton-GE Download Confirmation Dialog */}
-                <AlertDialog
-                  open={showProtonGEConfirm && !!protonGEInfo}
-                  onOpenChange={open => {
-                    if (!open) {
-                      setShowProtonGEConfirm(false);
-                      setProtonGEInfo(null);
-                    }
-                  }}
-                >
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        {protonGEInfo?.updateAvailable
-                          ? t("settings.linuxCompat.protonConfirm.titleUpdate")
-                          : t("settings.linuxCompat.protonConfirm.titleDownload")}
-                      </AlertDialogTitle>
-                      <AlertDialogDescription className="space-y-3">
-                        <p>
-                          {protonGEInfo?.updateAvailable ? (
-                            <>
-                              {t(
-                                "settings.linuxCompat.protonConfirm.updateAvailablePrefix"
-                              )}{" "}
-                              <strong className="text-foreground">
-                                {protonGEInfo.name}
-                              </strong>
-                              {protonGEInfo.installedVersions?.length > 0 && (
-                                <span>
-                                  {" "}
-                                  {t("settings.linuxCompat.protonConfirm.replacing", {
-                                    versions: protonGEInfo.installedVersions.join(", "),
-                                  })}
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              {t(
-                                "settings.linuxCompat.protonConfirm.aboutToDownloadPrefix"
-                              )}{" "}
-                              <strong className="text-foreground">
-                                {protonGEInfo?.name}
-                              </strong>
-                              .
-                            </>
-                          )}
-                        </p>
-                        <p>
-                          {t("settings.linuxCompat.protonConfirm.file")}{" "}
-                          <code className="rounded bg-muted px-1 text-xs">
-                            {protonGEInfo?.fileName}
-                          </code>
-                        </p>
-                        <p>
-                          {t("settings.linuxCompat.protonConfirm.size")}{" "}
-                          <strong className="text-foreground">
-                            {protonGEInfo?.sizeFormatted}
-                          </strong>{" "}
-                          {protonGEInfo &&
-                            t("settings.linuxCompat.protonConfirm.sizeApprox", {
-                              gb: (protonGEInfo.size / (1024 * 1024 * 1024)).toFixed(1),
-                            })}
-                        </p>
-                        <p>
-                          {t("settings.linuxCompat.protonConfirm.description")}{" "}
-                          <code className="rounded bg-muted px-1 text-xs">
-                            ~/.ascendara/runners/
-                          </code>
-                        </p>
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel
-                        onClick={() => {
-                          setShowProtonGEConfirm(false);
-                          setProtonGEInfo(null);
-                        }}
-                      >
-                        {t("settings.linuxCompat.protonConfirm.cancel")}
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={async () => {
-                          setShowProtonGEConfirm(false);
-                          setProtonGEUpdateStatus(null);
-                          setIsDownloadingProtonGE(true);
-                          try {
-                            const result = await window.electron.downloadProtonGE();
-                            if (result.success) {
-                              const updated = await window.electron.getRunners();
-                              setRunners(updated);
-                              if (result.path) {
-                                setSelectedRunner(result.path);
-                              }
-                            }
-                          } catch (e) {
-                            console.error("Failed to download Proton-GE:", e);
-                          }
-                          setIsDownloadingProtonGE(false);
-                          setProtonGEInfo(null);
-                        }}
-                        className="gap-2"
-                      >
-                        <Download className="h-4 w-4" />
-                        {protonGEInfo?.updateAvailable
-                          ? t("settings.linuxCompat.protonConfirm.updateBtn", {
-                              size: protonGEInfo?.sizeFormatted,
-                            })
-                          : t("settings.linuxCompat.protonConfirm.downloadBtn", {
-                              size: protonGEInfo?.sizeFormatted,
-                            })}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-
-                {/* Proton-CachyOS Download Confirmation Dialog */}
-                <AlertDialog
-                  open={showProtonCachyConfirm && !!protonCachyInfo}
-                  onOpenChange={open => {
-                    if (!open) {
-                      setShowProtonCachyConfirm(false);
-                      setProtonCachyInfo(null);
-                    }
-                  }}
-                >
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        {protonCachyInfo?.updateAvailable
-                          ? t("settings.linuxCompat.protonConfirm.titleUpdateCachy")
-                          : t("settings.linuxCompat.protonConfirm.titleDownloadCachy")}
-                      </AlertDialogTitle>
-                      <AlertDialogDescription className="space-y-3">
-                        <p>
-                          {protonCachyInfo?.updateAvailable ? (
-                            <>
-                              {t(
-                                "settings.linuxCompat.protonConfirm.updateAvailablePrefixCachy"
-                              )}{" "}
-                              <strong className="text-foreground">
-                                {protonCachyInfo.name}
-                              </strong>
-                              {protonCachyInfo.installedVersions?.length > 0 && (
-                                <span>
-                                  {" "}
-                                  {t("settings.linuxCompat.protonConfirm.replacing", {
-                                    versions:
-                                      protonCachyInfo.installedVersions.join(", "),
-                                  })}
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              {t(
-                                "settings.linuxCompat.protonConfirm.aboutToDownloadPrefix"
-                              )}{" "}
-                              <strong className="text-foreground">
-                                {protonCachyInfo?.name}
-                              </strong>
-                              .
-                            </>
-                          )}
-                        </p>
-                        <p>
-                          {t("settings.linuxCompat.protonConfirm.file")}{" "}
-                          <code className="rounded bg-muted px-1 text-xs">
-                            {protonCachyInfo?.fileName}
-                          </code>
-                        </p>
-                        <p>
-                          {t("settings.linuxCompat.protonConfirm.size")}{" "}
-                          <strong className="text-foreground">
-                            {protonCachyInfo?.sizeFormatted}
-                          </strong>{" "}
-                          {protonCachyInfo &&
-                            t("settings.linuxCompat.protonConfirm.sizeApprox", {
-                              gb: (protonCachyInfo.size / (1024 * 1024 * 1024)).toFixed(
-                                1
-                              ),
-                            })}
-                        </p>
-                        <p>
-                          {t("settings.linuxCompat.protonConfirm.descriptionCachy")}{" "}
-                          <code className="rounded bg-muted px-1 text-xs">
-                            ~/.ascendara/runners/
-                          </code>
-                        </p>
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel
-                        onClick={() => {
-                          setShowProtonCachyConfirm(false);
-                          setProtonCachyInfo(null);
-                        }}
-                      >
-                        {t("settings.linuxCompat.protonConfirm.cancel")}
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={async () => {
-                          setShowProtonCachyConfirm(false);
-                          setProtonCachyUpdateStatus(null);
-                          setIsDownloadingProtonCachy(true);
-                          try {
-                            const result = await window.electron.downloadProtonCachyOS();
-                            if (result.success) {
-                              const updated = await window.electron.getRunners();
-                              setRunners(updated);
-                              if (result.path) {
-                                setSelectedRunner(result.path);
-                              }
-                            }
-                          } catch (e) {
-                            console.error("Failed to download Proton-CachyOS:", e);
-                          }
-                          setIsDownloadingProtonCachy(false);
-                          setProtonCachyInfo(null);
-                        }}
-                        className="gap-2"
-                      >
-                        <Download className="h-4 w-4" />
-                        {protonCachyInfo?.updateAvailable
-                          ? t("settings.linuxCompat.protonConfirm.updateBtn", {
-                              size: protonCachyInfo?.sizeFormatted,
-                            })
-                          : t("settings.linuxCompat.protonConfirm.downloadBtn", {
-                              size: protonCachyInfo?.sizeFormatted,
-                            })}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
+                            <Download className="h-4 w-4" />
+                            {protonCachyInfo?.updateAvailable
+                              ? t("settings.linuxCompat.protonConfirm.updateBtn", {
+                                  size: protonCachyInfo?.sizeFormatted,
+                                })
+                              : t("settings.linuxCompat.protonConfirm.downloadBtn", {
+                                  size: protonCachyInfo?.sizeFormatted,
+                                })}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
+                )}
+              </SettingsCategory>
             )}
 
-            {/* Achievement Watcher Directories Card */}
-            <Card className="border-border p-6">
-              <h3 className="mb-2 text-xl font-semibold text-primary">
-                {t("settings.achievementWatcher.title") ||
-                  "Achievement Watcher Directories"}
-              </h3>
-              <p className="mb-4 text-sm text-muted-foreground">
-                {t("settings.achievementWatcher.description") ||
-                  "Configure which directories are monitored for achievement tracking. Add folders where your games are installed to enable achievement tracking for those games."}
-              </p>
-              {/* Default Directories Section */}
-              {isOnWindows && (
-                <div className="mb-6">
-                  <div className="mb-1 flex items-center gap-2">
-                    <FolderOpen className="text-primary-foreground h-4 w-4" />
-                    <span className="text-primary-foreground font-medium">
-                      {t("settings.achievementWatcher.defaultDirs") ||
-                        "Default directories always tracked:"}
-                    </span>
-                  </div>
-                  <div className="ml-6 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <CornerDownRight className="h-3.5 w-3.5" />
-                      <span>Public/Documents/Steam/CODEX</span>
+            <SettingsCategory {...categoryProps("tools")} columns>
+              {/* Timemachine Card */}
+              <Card id="timemachine" className="border border-border/60 shadow-none p-6">
+                <div className="mb-2 flex items-center gap-2">
+                  <History className="mb-2 h-5 w-5 text-primary" />
+                  <h2 className="text-base font-semibold text-foreground">
+                    {t("settings.ascendaraTimechine")}
+                  </h2>
+                </div>
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.showOldDownloadLinksDescription")}&nbsp;
+                      <a
+                        onClick={() =>
+                          window.electron.openURL(
+                            "https://ascendara.app/docs/features/overview#ascendara-timemachine"
+                          )
+                        }
+                        className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
+                      >
+                        {t("common.learnMore")}
+                        <ExternalLink className="ml-1 h-3 w-3" />
+                      </a>
+                    </p>
+                    <div className="flex items-center justify-between space-x-4">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium">
+                          {t("settings.enableAscendaraTimechine")}
+                        </Label>
+                      </div>
+                      <Switch
+                        checked={settings.showOldDownloadLinks}
+                        onCheckedChange={value => {
+                          handleSettingChange("showOldDownloadLinks", value);
+                        }}
+                      />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <CornerDownRight className="h-3.5 w-3.5" />
-                      <span>Public/Documents/Steam/RUNE</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CornerDownRight className="h-3.5 w-3.5" />
-                      <span>Public/Documents/EMPRESS</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CornerDownRight className="h-3.5 w-3.5" />
-                      <span>Public/Documents/OnlineFix</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CornerDownRight className="h-3.5 w-3.5" />
-                      <span>AppData/Roaming/GSE Saves</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CornerDownRight className="h-3.5 w-3.5" />
-                      <span>AppData/Roaming/Steam/CODEX</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CornerDownRight className="h-3.5 w-3.5" />
-                      <span>AppData/Roaming/EMPRESS</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CornerDownRight className="h-3.5 w-3.5" />
-                      <span>AppData/Roaming/Goldberg SteamEmu Saves</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CornerDownRight className="h-3.5 w-3.5" />
-                      <span>AppData/Roaming/SmartSteamEmu</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CornerDownRight className="h-3.5 w-3.5" />
-                      <span>ProgramData/Steam</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CornerDownRight className="h-3.5 w-3.5" />
-                      <span>LocalAppData/SKIDROW</span>
-                    </div>
-                  </div>
-                  <div className="mt-2 text-xs italic text-muted-foreground">
-                    {t("settings.achievementWatcher.defaultDirsNote") ||
-                      "These directories and files are always tracked by default and cannot be removed."}
                   </div>
                 </div>
-              )}
-              <div className="space-y-3">
-                {/* List user-added directories */}
-                {settings.watchingFolders && settings.watchingFolders.length > 0 ? (
-                  <ul className="mb-3 space-y-2">
-                    {settings.watchingFolders.map((dir, idx) => (
-                      <li key={dir} className="flex items-center gap-2">
-                        <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                        <span className="flex-1 truncate" title={dir}>
-                          {dir}
-                        </span>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="text-muted-foreground"
-                          aria-label={
-                            t("settings.achievementWatcher.removeDir") ||
-                            "Remove directory"
-                          }
-                          onClick={() => {
-                            setSettings(prev => ({
-                              ...prev,
-                              watchingFolders: prev.watchingFolders.filter(
-                                (d, i) => i !== idx
-                              ),
-                            }));
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="mb-3 text-sm text-muted-foreground">
-                    {t("settings.achievementWatcher.noDirs") ||
-                      "No directories added yet."}
-                  </div>
-                )}
-                {/* Add new directory */}
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-2"
-                  onClick={async () => {
-                    const directory = await window.electron.openDirectoryDialog();
-                    if (directory) {
-                      const currentFolders = settings.watchingFolders || [];
-                      if (currentFolders.includes(directory)) {
-                        toast.error(
-                          t("settings.achievementWatcher.duplicateDir") ||
-                            "This directory is already being watched."
-                        );
-                        return;
-                      }
-                      setSettings(prev => ({
-                        ...prev,
-                        watchingFolders: [...currentFolders, directory],
-                      }));
-                    }
-                  }}
-                >
-                  <Plus className="h-4 w-4" />
-                  {t("settings.achievementWatcher.addDir") || "Add Directory"}
-                </Button>
-              </div>
-            </Card>
+              </Card>
 
-            {/* Torrenting Card */}
-            <Card id="torrent-downloads" className="border-border p-6">
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-primary">
-                    {t("settings.torrenting")}
+              {/* Workshop Downloader Card */}
+              <Card id="workshop-downloader" className="border border-border/60 shadow-none p-6">
+                <div className="mb-2 flex items-center gap-2">
+                  <Package className="mb-2 h-5 w-5 text-primary" />
+                  <h2 className="text-base font-semibold text-foreground">
+                    {t("settings.ascendaraWorkshopDownloader")}
                   </h2>
+                </div>
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.ascendaraWorkshopDownloaderDescription")}&nbsp;
+                      <a
+                        className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
+                        onClick={() =>
+                          window.electron.openURL(
+                            "https://ascendara.app/docs/features/overview#ascendara-workshop-downloader"
+                          )
+                        }
+                      >
+                        {t("common.learnMore")}
+                        <ExternalLink className="ml-1 h-3 w-3" />
+                      </a>
+                    </p>
+                    <div className="flex items-center justify-between space-x-4">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium">
+                          {t("settings.ascendaraWorkshopDownloaderEnable")}
+                        </Label>
+                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div>
+                              <Switch
+                                checked={settings.viewWorkshopPage}
+                                disabled={!isOnWindows}
+                                onCheckedChange={value => {
+                                  handleSettingChange("viewWorkshopPage", value);
+                                }}
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          {!isOnWindows && (
+                            <TooltipContent>
+                              <p className="text-secondary">
+                                {t("settings.onlyWindowsSupported2")}
+                              </p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Components Card */}
+              {isOnWindows && (
+                <Card id="components" className="border border-border/60 shadow-none p-6">
+                  <div className="mb-2 flex items-center gap-2">
+                    <CpuIcon className="mb-2 h-5 w-5 text-primary" />
+                    <h2 className="text-base font-semibold text-foreground">
+                      {t("settings.components")}
+                    </h2>
+                  </div>
+                  <p className="mb-4 text-sm text-muted-foreground">
+                    {t("settings.componentsDescription")}
+                  </p>
+                  <Button
+                    onClick={() => navigate("/sidecaranddependencies")}
+                    className="flex w-full items-center gap-2 text-secondary"
+                  >
+                    {t("settings.viewComponentsPage")}
+                  </Button>
+                </Card>
+              )}
+            </SettingsCategory>
+
+            <SettingsCategory {...categoryProps("advanced")} columns>
+              {/* App Branch Card */}
+              <Card className="overflow-hidden border border-border/60 shadow-none p-0">
+                <div className="border-b border-border px-6 py-4">
+                  <div className="flex items-center gap-2">
+                    <FlaskConical className="mb-2 h-5 w-5 text-primary" />
+                    <h2 className="text-base font-semibold text-foreground">
+                      {t("settings.appBranch.title")}
+                    </h2>
+                  </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {t("settings.torrentingDescription")}
+                    {t("settings.appBranch.description")}
                   </p>
                 </div>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div>
-                        <Switch
-                          checked={settings.torrentEnabled}
-                          onCheckedChange={handleTorrentToggle}
-                          disabled={
-                            !isOnWindows ||
-                            (settings.customSourcesMode &&
-                              settings.customSource?.torrentOnly &&
-                              settings.torrentEnabled)
+                <div className="divide-y divide-border">
+                  {[
+                    {
+                      id: "live",
+                      label: t("settings.appBranch.live.label"),
+                      description: t("settings.appBranch.live.description"),
+                      color: "text-emerald-500",
+                      dotColor: "bg-emerald-500",
+                      ringColor: "ring-emerald-500/30",
+                      activeBg: "bg-emerald-500/8",
+                      activeBorder: "border-l-emerald-500",
+                    },
+                    {
+                      id: "public-testing",
+                      label: t("settings.appBranch.publicTesting.label"),
+                      description: t("settings.appBranch.publicTesting.description"),
+                      color: "text-yellow-500",
+                      dotColor: "bg-yellow-500",
+                      ringColor: "ring-yellow-500/30",
+                      activeBg: "bg-yellow-500/8",
+                      activeBorder: "border-l-yellow-500",
+                    },
+                    {
+                      id: "experimental",
+                      label: t("settings.appBranch.experimental.label"),
+                      description: t("settings.appBranch.experimental.description"),
+                      color: "text-red-400",
+                      dotColor: "bg-red-400",
+                      ringColor: "ring-red-400/30",
+                      activeBg: "bg-red-400/8",
+                      activeBorder: "border-l-red-400",
+                      requiresSubscription: true,
+                    },
+                  ].map(branch => {
+                    const isActive = currentBranch === branch.id;
+                    const isLocked = branch.requiresSubscription && !hasAscendSubscription;
+                    return (
+                      <button
+                        key={branch.id}
+                        disabled={isActive}
+                        onClick={() => {
+                          if (isActive) return;
+                          if (navigator.userAgent.toLowerCase().includes("macintosh")) {
+                            toast.warning(t("settings.appBranch.macUnsupported"));
+                            return;
                           }
-                        />
-                      </div>
-                    </TooltipTrigger>
-                    {!isOnWindows ? (
-                      <TooltipContent>
-                        <p className="text-secondary">
-                          {t("settings.onlyWindowsSupported")}
-                        </p>
-                      </TooltipContent>
-                    ) : settings.customSourcesMode &&
-                      settings.customSource?.torrentOnly &&
-                      settings.torrentEnabled ? (
-                      <TooltipContent>
-                        <p className="text-secondary">
-                          {t("settings.torrentRequiredBySource") ||
-                            "Your selected external source requires torrenting."}
-                        </p>
-                      </TooltipContent>
-                    ) : null}
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-              {settings.customSourcesMode &&
-                settings.customSource?.torrentOnly &&
-                settings.torrentEnabled && (
-                  <div className="mb-4 rounded-md border border-orange-500/30 bg-orange-500/5 p-3 text-xs text-orange-700 dark:text-orange-300">
-                    {(
-                      t("settings.torrentLockedBySourceNote") ||
-                      "Torrenting can't be disabled while {{name}} is selected — it only publishes magnet links. Change the external source in Local Refresh first."
-                    ).replace(
-                      "{{name}}",
-                      settings.customSource?.name || "this external source"
-                    )}
-                  </div>
-                )}
 
-              <div className="space-y-6">
-                {/* qBittorrent Status */}
-                <div
-                  className={`rounded-lg p-4 ${settings.torrentEnabled ? "bg-muted/30" : "bg-muted/20"}`}
-                >
-                  <div className="flex items-center gap-2 text-sm">
-                    {settings.torrentEnabled ? (
-                      <QbittorrentStatus refreshKey={qbitStatusRefreshKey} />
-                    ) : (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Badge className="h-2 w-2 rounded-full bg-gray-400" />
-                        <span>{t("app.qbittorrent.inactive")}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                          // Show Ascend promo dialog if locked
+                          if (isLocked) {
+                            setShowAscendPromoDialog(true);
+                            return;
+                          }
 
-                {/* qBittorrent Installation */}
-                {settings.torrentEnabled && !hideQbitInstallNote && (
-                  <div className="rounded-lg border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/50">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex flex-1 items-start gap-3">
-                        <Download className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
-                        <div className="space-y-2">
-                          <h4 className="font-semibold text-amber-900 dark:text-amber-100">
-                            {t("settings.qbitInstall.title")}
-                          </h4>
-                          <p className="text-sm text-amber-800 dark:text-amber-200">
-                            {t("settings.qbitInstall.description")}
-                          </p>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-2 border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-100 dark:hover:bg-amber-800"
-                            onClick={() =>
-                              window.electron.openURL(
-                                "https://www.qbittorrent.org/download"
-                              )
+                          // Check if branch versions are available
+                          if (branchVersions) {
+                            const liveVersion = branchVersions.live;
+                            const targetVersion = branchVersions[branch.id];
+
+                            // If switching to public-testing or experimental, check if version differs from live
+                            if (branch.id !== "live" && liveVersion === targetVersion) {
+                              setNoBranchMessage(
+                                `There is no ${branch.label} version available at the moment. The ${branch.label} branch is currently on the same version as Live (v${liveVersion}).`
+                              );
+                              setShowNoBranchDialog(true);
+                              return;
                             }
+                          }
+
+                          setPendingBranch(branch);
+                          setShowBranchDialog(true);
+                        }}
+                        className={[
+                          "group flex w-full items-center gap-4 border-l-4 px-6 py-4 text-left transition-all duration-150",
+                          isActive
+                            ? `${branch.activeBorder} ${branch.activeBg} cursor-default`
+                            : "cursor-pointer border-l-transparent hover:bg-muted/40",
+                        ].join(" ")}
+                      >
+                        <div className="relative flex-shrink-0">
+                          <span
+                            className={[
+                              "flex h-9 w-9 items-center justify-center rounded-full ring-2",
+                              isActive
+                                ? `${branch.dotColor} bg-opacity-20 ${branch.ringColor}`
+                                : "bg-muted ring-border",
+                            ].join(" ")}
                           >
-                            <ExternalLink className="mr-2 h-4 w-4" />
-                            {t("settings.qbitInstall.downloadButton")}
+                            <span
+                              className={[
+                                "h-3 w-3 rounded-full",
+                                isActive ? "bg-white" : branch.dotColor,
+                              ].join(" ")}
+                            />
+                          </span>
+                          {isActive && (
+                            <span
+                              className={`absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-background ${branch.dotColor} animate-pulse`}
+                            />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={[
+                                "text-sm font-semibold",
+                                isActive ? branch.color : "text-foreground",
+                              ].join(" ")}
+                            >
+                              {branch.label}
+                            </span>
+                            {isActive && (
+                              <Badge
+                                variant="secondary"
+                                className={`text-xs ${branch.color} border-current/20 bg-current/10`}
+                              >
+                                Active
+                              </Badge>
+                            )}
+                            {isLocked && (
+                              <Badge
+                                variant="outline"
+                                className="gap-1 border-yellow-500/30 text-xs text-yellow-500"
+                              >
+                                <Star className="h-3 w-3" />
+                                Ascend
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {branch.description}
+                          </p>
+                        </div>
+                        {!isActive && !isLocked && (
+                          <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Card>
+
+              {/* Developer Settings Card - Only shown in development mode */}
+              {isDev && (
+                <Card className="border border-border/60 shadow-none p-6">
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
+                        <CircleAlert size={20} />
+                        Developer Tools
+                      </h2>
+                      <div className="space-y-4">
+                        <Button
+                          className="w-full"
+                          variant="outline"
+                          onClick={() => window.electron.openDevTools()}
+                        >
+                          Open DevTools
+                        </Button>
+                        {isDev && (
+                          <>
+                            <Button
+                              className="w-full"
+                              variant="outline"
+                              onClick={() => window.electron.clearCache()}
+                            >
+                              Clear Cache
+                            </Button>
+                            <Button
+                              className="w-full"
+                              variant="outline"
+                              onClick={() => window.electron.openGameDirectory("local")}
+                            >
+                              Open Local Directory
+                            </Button>
+                            <Button
+                              className="w-full"
+                              variant="outline"
+                              onClick={() => window.electron.showTestNotification()}
+                            >
+                              Show Test Notification
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex flex-col space-y-2">
+                        <Label>Screen Trigger</Label>
+                        <div className="flex gap-2">
+                          <Select
+                            value={currentScreen}
+                            onValueChange={value => setCurrentScreen(value)}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Select Screen" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              <SelectItem value="updating">Updating</SelectItem>
+                              <SelectItem value="loading">Loading</SelectItem>
+                              <SelectItem value="crashscreen">Crash Screen</SelectItem>
+                              <SelectItem value="finishingup">Finishing Up</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            onClick={triggerScreen}
+                            disabled={currentScreen === "none" || isTriggering}
+                            variant="secondary"
+                          >
+                            {isTriggering ? (
+                              <div className="flex items-center gap-2">
+                                <Loader className="h-4 w-4 animate-spin" />
+                                Triggering...
+                              </div>
+                            ) : (
+                              "Trigger Screen"
+                            )}
                           </Button>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 rounded-full hover:bg-amber-200/50 dark:hover:bg-amber-800/50"
-                        onClick={handleDismissQbitInstallNote}
-                      >
-                        <X className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                      </Button>
                     </div>
                   </div>
-                )}
+                </Card>
+              )}
 
-                {/* qBittorrent Configuration */}
-                <div
-                  className={`space-y-4 ${!settings.torrentEnabled ? "pointer-events-none opacity-50" : ""}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold">
-                      {t("settings.qbitConfig.title")}
-                    </h3>
-                    {!settings.torrentEnabled && (
-                      <Badge variant="secondary" className="text-xs">
-                        {t("common.disabled")}
-                      </Badge>
-                    )}
-                  </div>
-                  <p
-                    className={`text-sm ${!settings.torrentEnabled ? "text-muted-foreground/60" : "text-muted-foreground"}`}
-                  >
-                    {t("settings.qbitConfig.description")}
-                  </p>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="qbit-host"
-                        className={
-                          !settings.torrentEnabled ? "text-muted-foreground/60" : ""
-                        }
-                      >
-                        {t("settings.qbitConfig.host")}
-                      </Label>
-                      <Input
-                        id="qbit-host"
-                        type="text"
-                        placeholder="localhost"
-                        disabled={!settings.torrentEnabled}
-                        value={
-                          qbitConfigDraft?.host ?? settings.torrentHost ?? "localhost"
-                        }
-                        onChange={e =>
-                          setQbitConfigDraft(prev => ({
-                            ...(prev || {
-                              host: settings.torrentHost ?? "localhost",
-                              port: settings.torrentPort ?? 8080,
-                              username: settings.torrentUsername ?? "admin",
-                              password: settings.torrentPassword ?? "adminadmin",
-                            }),
-                            host: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="qbit-port"
-                        className={
-                          !settings.torrentEnabled ? "text-muted-foreground/60" : ""
-                        }
-                      >
-                        {t("settings.qbitConfig.port")}
-                      </Label>
-                      <Input
-                        id="qbit-port"
-                        type="number"
-                        min={1}
-                        max={65535}
-                        placeholder="8080"
-                        disabled={!settings.torrentEnabled}
-                        value={qbitConfigDraft?.port ?? settings.torrentPort ?? 8080}
-                        onChange={e =>
-                          setQbitConfigDraft(prev => ({
-                            ...(prev || {
-                              host: settings.torrentHost ?? "localhost",
-                              port: settings.torrentPort ?? 8080,
-                              username: settings.torrentUsername ?? "admin",
-                              password: settings.torrentPassword ?? "adminadmin",
-                            }),
-                            port: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="qbit-username"
-                        className={
-                          !settings.torrentEnabled ? "text-muted-foreground/60" : ""
-                        }
-                      >
-                        {t("settings.qbitConfig.username")}
-                      </Label>
-                      <Input
-                        id="qbit-username"
-                        type="text"
-                        autoComplete="off"
-                        placeholder="admin"
-                        disabled={!settings.torrentEnabled}
-                        value={
-                          qbitConfigDraft?.username ?? settings.torrentUsername ?? "admin"
-                        }
-                        onChange={e =>
-                          setQbitConfigDraft(prev => ({
-                            ...(prev || {
-                              host: settings.torrentHost ?? "localhost",
-                              port: settings.torrentPort ?? 8080,
-                              username: settings.torrentUsername ?? "admin",
-                              password: settings.torrentPassword ?? "adminadmin",
-                            }),
-                            username: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="qbit-password"
-                        className={
-                          !settings.torrentEnabled ? "text-muted-foreground/60" : ""
-                        }
-                      >
-                        {t("settings.qbitConfig.password")}
-                      </Label>
-                      <Input
-                        id="qbit-password"
-                        type="password"
-                        autoComplete="new-password"
-                        placeholder="adminadmin"
-                        disabled={!settings.torrentEnabled}
-                        value={
-                          qbitConfigDraft?.password ??
-                          settings.torrentPassword ??
-                          "adminadmin"
-                        }
-                        onChange={e =>
-                          setQbitConfigDraft(prev => ({
-                            ...(prev || {
-                              host: settings.torrentHost ?? "localhost",
-                              port: settings.torrentPort ?? 8080,
-                              username: settings.torrentUsername ?? "admin",
-                              password: settings.torrentPassword ?? "adminadmin",
-                            }),
-                            password: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-primary"
-                      disabled={!qbitConfigDraft || !settings.torrentEnabled}
-                      onClick={() => setQbitConfigDraft(null)}
-                    >
-                      {t("common.cancel")}
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="text-muted"
-                      disabled={!qbitConfigDraft || !settings.torrentEnabled}
-                      onClick={() => {
-                        const draft = qbitConfigDraft;
-                        if (!draft) return;
-                        const portNum = parseInt(draft.port, 10);
-                        if (!draft.host || draft.host.trim() === "") {
-                          toast.error(t("settings.qbitConfig.errors.host"));
-                          return;
-                        }
-                        if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
-                          toast.error(t("settings.qbitConfig.errors.port"));
-                          return;
-                        }
-                        setSettings(s => ({
-                          ...s,
-                          torrentHost: draft.host.trim(),
-                          torrentPort: portNum,
-                          torrentUsername: (draft.username ?? "").trim() || "admin",
-                          torrentPassword: draft.password ?? "adminadmin",
-                        }));
-                        setQbitConfigDraft(null);
-                        setQbitStatusRefreshKey(k => k + 1);
-                        toast.success(t("settings.qbitConfig.saved"));
-                      }}
-                    >
-                      {t("settings.qbitConfig.save")}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Right Column - Additional Settings */}
-          <div className="space-y-6 lg:col-span-4">
-            <Card className="border-border p-6">
-              <div className="mb-2 flex items-center gap-2">
-                <MessageCircleQuestion className="mb-2 h-5 w-5 text-primary" />
-                <h2 className="text-xl font-semibold text-primary">
-                  {t("settings.quickSupport")}
-                </h2>
-              </div>
-              <p className="mb-4 text-sm text-muted-foreground">
-                {t("settings.supportDesc")}
-              </p>
-              <Button
-                className="flex w-full items-center gap-2 text-secondary"
-                onClick={() => {
-                  setSupportCode(["", "", "", "", "", ""]);
-                  setShowSupportDialog(true);
-                }}
-              >
-                {t("settings.getHelp")}
-              </Button>
-            </Card>
-
-            {/* Timemachine Card */}
-            <Card id="timemachine" className="border-border p-6">
-              <div className="mb-2 flex items-center gap-2">
-                <History className="mb-2 h-5 w-5 text-primary" />
-                <h2 className="text-xl font-semibold text-primary">
-                  {t("settings.ascendaraTimechine")}
-                </h2>
-              </div>
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings.showOldDownloadLinksDescription")}&nbsp;
-                    <a
-                      onClick={() =>
-                        window.electron.openURL(
-                          "https://ascendara.app/docs/features/overview#ascendara-timemachine"
-                        )
-                      }
-                      className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
-                    >
-                      {t("common.learnMore")}
-                      <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
-                  </p>
-                  <div className="flex items-center justify-between space-x-4">
-                    <div className="space-y-1">
-                      <Label className="text-sm font-medium">
-                        {t("settings.enableAscendaraTimechine")}
-                      </Label>
-                    </div>
-                    <Switch
-                      checked={settings.showOldDownloadLinks}
-                      onCheckedChange={value => {
-                        handleSettingChange("showOldDownloadLinks", value);
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Workshop Downloader Card */}
-            <Card id="workshop-downloader" className="border-border p-6">
-              <div className="mb-2 flex items-center gap-2">
-                <Package className="mb-2 h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold text-primary">
-                  {t("settings.ascendaraWorkshopDownloader")}
-                </h2>
-              </div>
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings.ascendaraWorkshopDownloaderDescription")}&nbsp;
-                    <a
-                      className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
-                      onClick={() =>
-                        window.electron.openURL(
-                          "https://ascendara.app/docs/features/overview#ascendara-workshop-downloader"
-                        )
-                      }
-                    >
-                      {t("common.learnMore")}
-                      <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
-                  </p>
-                  <div className="flex items-center justify-between space-x-4">
-                    <div className="space-y-1">
-                      <Label className="text-sm font-medium">
-                        {t("settings.ascendaraWorkshopDownloaderEnable")}
-                      </Label>
-                    </div>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div>
-                            <Switch
-                              checked={settings.viewWorkshopPage}
-                              disabled={!isOnWindows}
-                              onCheckedChange={value => {
-                                handleSettingChange("viewWorkshopPage", value);
-                              }}
-                            />
-                          </div>
-                        </TooltipTrigger>
-                        {!isOnWindows && (
-                          <TooltipContent>
-                            <p className="text-secondary">
-                              {t("settings.onlyWindowsSupported2")}
-                            </p>
-                          </TooltipContent>
-                        )}
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Components Card */}
-            {isOnWindows && (
-              <Card id="components" className="border-border p-6">
+              <Card className="border border-border/60 shadow-none p-6">
                 <div className="mb-2 flex items-center gap-2">
-                  <CpuIcon className="mb-2 h-5 w-5 text-primary" />
-                  <h2 className="text-xl font-semibold text-primary">
-                    {t("settings.components")}
+                  <MessageCircleQuestion className="mb-2 h-5 w-5 text-primary" />
+                  <h2 className="text-base font-semibold text-foreground">
+                    {t("settings.quickSupport")}
                   </h2>
                 </div>
                 <p className="mb-4 text-sm text-muted-foreground">
-                  {t("settings.componentsDescription")}
+                  {t("settings.supportDesc")}
                 </p>
                 <Button
-                  onClick={() => navigate("/sidecaranddependencies")}
                   className="flex w-full items-center gap-2 text-secondary"
+                  onClick={() => {
+                    setSupportCode(["", "", "", "", "", ""]);
+                    setShowSupportDialog(true);
+                  }}
                 >
-                  {t("settings.viewComponentsPage")}
+                  {t("settings.getHelp")}
                 </Button>
               </Card>
-            )}
 
-            {/* Language Settings Card */}
-            <Card id="language" className="border-border p-6">
-              <div className="mb-2 flex items-center gap-2">
-                <Languages className="mb-2 h-5 w-5 text-primary" />
-                <h2 className="text-xl font-semibold text-primary">
-                  {t("settings.languageSettings")}
-                </h2>
-              </div>
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings.languageSettingsDescription")}
-                  </p>
-                  <Select
-                    value={language}
-                    onValueChange={value => {
-                      handleLanguageChange(value);
-                      changeLanguage(value);
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue>
-                        <div className="flex items-center gap-2">
-                          <span>
-                            {availableLanguages.find(l => l.id === language)?.icon}
-                          </span>
-                          <span>
-                            {availableLanguages.find(l => l.id === language)?.name}
-                          </span>
-                        </div>
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableLanguages.map(lang => (
-                        <SelectItem key={lang.id} value={lang.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{lang.icon}</span>
-                            <span>{lang.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p
-                    className="text-md inline-flex cursor-pointer items-center font-medium text-muted-foreground duration-200 hover:translate-x-1"
-                    onClick={() => navigate("/extralanguages")}
-                  >
-                    {t("settings.selectMoreLanguages")}
-                    <ArrowRight className="ml-1 h-4 w-4" />
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings.languageSetNote")}
-                  </p>
-                </div>
-              </div>
-            </Card>
-
-            {/* Developer Settings Card - Only shown in development mode */}
-            {isDev && (
-              <Card className="border-border p-6">
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold text-primary">
-                      <CircleAlert size={20} />
-                      Developer Tools
-                    </h2>
-                    <div className="space-y-4">
-                      <Button
-                        className="w-full"
-                        variant="outline"
-                        onClick={() => window.electron.openDevTools()}
-                      >
-                        Open DevTools
-                      </Button>
-                      {isDev && (
-                        <>
-                          <Button
-                            className="w-full"
-                            variant="outline"
-                            onClick={() => window.electron.clearCache()}
-                          >
-                            Clear Cache
-                          </Button>
-                          <Button
-                            className="w-full"
-                            variant="outline"
-                            onClick={() => window.electron.openGameDirectory("local")}
-                          >
-                            Open Local Directory
-                          </Button>
-                          <Button
-                            className="w-full"
-                            variant="outline"
-                            onClick={() => window.electron.showTestNotification()}
-                          >
-                            Show Test Notification
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                    <div className="flex flex-col space-y-2">
-                      <Label>Screen Trigger</Label>
-                      <div className="flex gap-2">
-                        <Select
-                          value={currentScreen}
-                          onValueChange={value => setCurrentScreen(value)}
-                        >
-                          <SelectTrigger className="flex-1">
-                            <SelectValue placeholder="Select Screen" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            <SelectItem value="updating">Updating</SelectItem>
-                            <SelectItem value="loading">Loading</SelectItem>
-                            <SelectItem value="crashscreen">Crash Screen</SelectItem>
-                            <SelectItem value="finishingup">Finishing Up</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          onClick={triggerScreen}
-                          disabled={currentScreen === "none" || isTriggering}
-                          variant="secondary"
-                        >
-                          {isTriggering ? (
-                            <div className="flex items-center gap-2">
-                              <Loader className="h-4 w-4 animate-spin" />
-                              Triggering...
-                            </div>
-                          ) : (
-                            "Trigger Screen"
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            )}
-
-            {/* App Branch Card */}
-            <Card className="overflow-hidden border-border p-0">
-              <div className="border-b border-border px-6 py-4">
-                <div className="flex items-center gap-2">
-                  <FlaskConical className="mb-2 h-5 w-5 text-primary" />
-                  <h2 className="text-lg font-semibold text-primary">
-                    {t("settings.appBranch.title")}
-                  </h2>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t("settings.appBranch.description")}
-                </p>
-              </div>
-              <div className="divide-y divide-border">
-                {[
-                  {
-                    id: "live",
-                    label: t("settings.appBranch.live.label"),
-                    description: t("settings.appBranch.live.description"),
-                    color: "text-emerald-500",
-                    dotColor: "bg-emerald-500",
-                    ringColor: "ring-emerald-500/30",
-                    activeBg: "bg-emerald-500/8",
-                    activeBorder: "border-l-emerald-500",
-                  },
-                  {
-                    id: "public-testing",
-                    label: t("settings.appBranch.publicTesting.label"),
-                    description: t("settings.appBranch.publicTesting.description"),
-                    color: "text-yellow-500",
-                    dotColor: "bg-yellow-500",
-                    ringColor: "ring-yellow-500/30",
-                    activeBg: "bg-yellow-500/8",
-                    activeBorder: "border-l-yellow-500",
-                  },
-                  {
-                    id: "experimental",
-                    label: t("settings.appBranch.experimental.label"),
-                    description: t("settings.appBranch.experimental.description"),
-                    color: "text-red-400",
-                    dotColor: "bg-red-400",
-                    ringColor: "ring-red-400/30",
-                    activeBg: "bg-red-400/8",
-                    activeBorder: "border-l-red-400",
-                    requiresSubscription: true,
-                  },
-                ].map(branch => {
-                  const isActive = currentBranch === branch.id;
-                  const isLocked = branch.requiresSubscription && !hasAscendSubscription;
-                  return (
-                    <button
-                      key={branch.id}
-                      disabled={isActive}
-                      onClick={() => {
-                        if (isActive) return;
-                        if (navigator.userAgent.toLowerCase().includes("macintosh")) {
-                          toast.warning(t("settings.appBranch.macUnsupported"));
-                          return;
-                        }
-
-                        // Show Ascend promo dialog if locked
-                        if (isLocked) {
-                          setShowAscendPromoDialog(true);
-                          return;
-                        }
-
-                        // Check if branch versions are available
-                        if (branchVersions) {
-                          const liveVersion = branchVersions.live;
-                          const targetVersion = branchVersions[branch.id];
-
-                          // If switching to public-testing or experimental, check if version differs from live
-                          if (branch.id !== "live" && liveVersion === targetVersion) {
-                            setNoBranchMessage(
-                              `There is no ${branch.label} version available at the moment. The ${branch.label} branch is currently on the same version as Live (v${liveVersion}).`
-                            );
-                            setShowNoBranchDialog(true);
-                            return;
-                          }
-                        }
-
-                        setPendingBranch(branch);
-                        setShowBranchDialog(true);
-                      }}
-                      className={[
-                        "group flex w-full items-center gap-4 border-l-4 px-6 py-4 text-left transition-all duration-150",
-                        isActive
-                          ? `${branch.activeBorder} ${branch.activeBg} cursor-default`
-                          : "cursor-pointer border-l-transparent hover:bg-muted/40",
-                      ].join(" ")}
-                    >
-                      <div className="relative flex-shrink-0">
-                        <span
-                          className={[
-                            "flex h-9 w-9 items-center justify-center rounded-full ring-2",
-                            isActive
-                              ? `${branch.dotColor} bg-opacity-20 ${branch.ringColor}`
-                              : "bg-muted ring-border",
-                          ].join(" ")}
-                        >
-                          <span
-                            className={[
-                              "h-3 w-3 rounded-full",
-                              isActive ? "bg-white" : branch.dotColor,
-                            ].join(" ")}
-                          />
-                        </span>
-                        {isActive && (
-                          <span
-                            className={`absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-background ${branch.dotColor} animate-pulse`}
-                          />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={[
-                              "text-sm font-semibold",
-                              isActive ? branch.color : "text-foreground",
-                            ].join(" ")}
-                          >
-                            {branch.label}
-                          </span>
-                          {isActive && (
-                            <Badge
-                              variant="secondary"
-                              className={`text-xs ${branch.color} border-current/20 bg-current/10`}
-                            >
-                              Active
-                            </Badge>
-                          )}
-                          {isLocked && (
-                            <Badge
-                              variant="outline"
-                              className="gap-1 border-yellow-500/30 text-xs text-yellow-500"
-                            >
-                              <Star className="h-3 w-3" />
-                              Ascend
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {branch.description}
-                        </p>
-                      </div>
-                      {!isActive && !isLocked && (
-                        <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </Card>
-
-            {/* Notice Card */}
-            <Card className="border-border border-yellow-500/50 bg-yellow-500/5 p-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 text-yellow-500">
-                  <Hand className="h-5 w-5 scale-x-[-1]" />
-                  <h2 className="mb-0 text-lg font-semibold">
-                    {t("settings.warningTitle")}
-                  </h2>
-                </div>
-
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {t("settings.warningDescription")}
-                </p>
-
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {t("settings.warningSupportDevelopers")}
-                </p>
-
-                <div className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
-                  <span>{t("settings.warningSupportDevelopersCallToAction")}</span>
-                </div>
-              </div>
-            </Card>
+            </SettingsCategory>
           </div>
         </div>
       </div>
@@ -5958,6 +5765,114 @@ const QbittorrentStatus = ({ refreshKey = 0 } = {}) => {
     </div>
   );
 };
+
+function SettingsNav({ categories, activeId, onSelect }) {
+  return (
+    <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0">
+      {categories.map(category => {
+        const isActive = activeId === category.id;
+        return (
+          <button
+            key={category.id}
+            type="button"
+            onClick={() => onSelect(category.id)}
+            aria-current={isActive ? "true" : undefined}
+            className={`relative flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
+              isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {isActive && (
+              <motion.span
+                layoutId="settings-category-active"
+                className="absolute inset-0 rounded-lg bg-primary/10"
+                transition={{ type: "spring", stiffness: 400, damping: 34 }}
+              />
+            )}
+            <category.icon className="relative h-4 w-4 shrink-0" />
+            <span className="relative whitespace-nowrap">{category.title}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function SupportDevelopersNote({ t }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-3.5">
+      <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
+        <Hand className="h-4 w-4 shrink-0 scale-x-[-1]" />
+        <h2 className="mb-0 text-sm font-semibold leading-tight">
+          {t("settings.warningTitle")}
+        </h2>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+        {t("settings.warningSupportDevelopersCallToAction")}
+      </p>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-2 pt-2 text-xs leading-relaxed text-muted-foreground">
+              <p>{t("settings.warningDescription")}</p>
+              <p>{t("settings.warningSupportDevelopers")}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <button
+        type="button"
+        onClick={() => setExpanded(open => !open)}
+        aria-expanded={expanded}
+        className="mt-2 text-xs font-medium text-yellow-700 hover:underline dark:text-yellow-500"
+      >
+        {expanded ? t("settings.warningShowLess") : t("settings.warningReadMore")}
+      </button>
+    </div>
+  );
+}
+
+function SettingsCategory({
+  id,
+  icon: Icon,
+  title,
+  description,
+  active,
+  columns = false,
+  children,
+}) {
+  return (
+    <section id={id} data-category={id} hidden={!active} className="space-y-4">
+      <header className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+          {description && (
+            <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+          )}
+        </div>
+      </header>
+      {/* Multi-card categories flow into two balanced columns on wide windows */}
+      <div
+        className={
+          columns
+            ? "gap-4 xl:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid"
+            : "space-y-4"
+        }
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
 
 function ThemeButton({ theme, currentTheme, onSelect }) {
   const colors = getThemeColors(theme.id);

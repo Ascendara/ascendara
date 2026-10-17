@@ -3761,6 +3761,40 @@
     },
     "bigPictureSettings": "Big Picture Mode",
     "browsePublicThemes": "Browse Community Themes",
+    "categories": {
+      "advanced": {
+        "description": "Update branch, support and developer options.",
+        "title": "Advanced"
+      },
+      "backups": {
+        "description": "Back up your game saves with Ludusavi.",
+        "title": "Saves & Backups"
+      },
+      "compatibility": {
+        "description": "Run Windows games on Linux with Proton and UMU.",
+        "title": "Compatibility"
+      },
+      "downloads": {
+        "description": "How games download, where they go, and torrent and debrid services.",
+        "title": "Downloads"
+      },
+      "game-index": {
+        "description": "The game list Ascendara searches, kept up to date in the background.",
+        "title": "Game Index"
+      },
+      "gaming": {
+        "description": "Launching games, Discord status, Big Picture and achievement tracking.",
+        "title": "Gaming"
+      },
+      "general": {
+        "description": "Appearance, startup behavior and language.",
+        "title": "General"
+      },
+      "tools": {
+        "description": "Timemachine, the Workshop downloader and app components.",
+        "title": "Tools"
+      }
+    },
     "checkConfig": "Check Configuration",
     "colorSection": {
       "preview": "Live Preview"
@@ -3787,6 +3821,7 @@
     "discordRPCDescription": "Show what game your playing with Ascendara in Discord.",
     "downloadLimit": "Download Speed Limit",
     "downloadLimitDescription": "Set a maximum speed for downloads. 0 means unlimited.",
+    "downloadLocationsTitle": "Download Locations",
     "downloadLocationWarning": "Ascendara cannot write files to the chosen directory. Change was not saved.",
     "downloadThreads": "Download Threads",
     "downloadThreadsDescription": "Download threads determine how many simultaneous connections are used when downloading.",
@@ -4105,6 +4140,7 @@
     "torboxApiKeyDescription": "Debrid services allow you to convert file host links into premium direct download links, bypassing speed limits and wait times. Enter your Torbox API key here to enable this feature.",
     "torboxApiKeyLearnHowtoGet": "Learn how to get your API key",
     "torboxApiKeyPlaceholder": "Paste Torbox API key",
+    "torboxTitle": "TorBox",
     "torrentDescription": "Enable Ascendara's torrent functionality. This feature requires qBittorrent to be installed and is recommended for experienced users only.",
     "torrentLockedBySourceNote": "Torrenting can't be disabled while {{name}} is selected - it only publishes magnet links. Change the external source in Local Refresh first.",
     "torrentOnAscendara": "Torrent on Ascendara",
@@ -4139,6 +4175,8 @@
     },
     "viewComponentsPage": "View Components Page",
     "warningDescription": "Ascendara is designed as a testing platform for video games, allowing users to evaluate gameplay, performance, and compatibility before making a purchase decision. Ascendara strongly encourages users to support game developers by purchasing games they enjoy.",
+    "warningReadMore": "Read more",
+    "warningShowLess": "Show less",
     "warningSupportDevelopers": "Game developers invest significant time, resources, and creativity into creating the experiences we all enjoy. Your purchase directly supports their ability to continue making great games and sustains the gaming industry.",
     "warningSupportDevelopersCallToAction": "Please support the developers by purchasing games you enjoy.",
     "warningTitle": "Hey there, please read this!",
