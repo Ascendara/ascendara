@@ -1920,6 +1920,8 @@ export default function GameScreen() {
 
     const loadGameImage = async () => {
       // 1. Try fetching Grid image from backend first (Priority)
+    // The screen re-renders without a game while it animates out
+    if (!game) return;
       try {
         const gridBase64 = await window.electron.getGameImage(gameId, "grid");
 
@@ -1979,7 +1981,7 @@ export default function GameScreen() {
       // Clean up event listener
       window.removeEventListener("game-cover-updated", handleCoverUpdate);
     };
-  }, [game.game, game.name, steamData?.cover?.url]); // Add steamData.cover.url as dependency
+  }, [game?.game, game?.name, steamData?.cover?.url]); // Add steamData.cover.url as dependency
 
   // Load hero image when grid image fails
   useEffect(() => {
