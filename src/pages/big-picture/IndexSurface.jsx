@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import LocalRefresh from "../LocalRefresh";
+import GameIndexManager from "@/components/GameIndexManager";
 import { IndexManager } from "./IndexManager";
 import { VirtualKeyboard } from "./VirtualKeyboard";
 import "./index-surface.css";
@@ -162,7 +162,7 @@ export function IndexSurface({
       ref={root}
       className="bp-index-surface absolute inset-0 overflow-y-auto"
     >
-      <LocalRefresh
+      <GameIndexManager
         embedded
         onBack={onBack}
         renderManager={(model) => (

@@ -1808,6 +1808,21 @@
     "waitingInQueue": "Waiting in queue",
     "windowsDefenderError": "Windows detected a false positive and prevented the download from completing. Please enable Protect Directories in Ascendara preferences."
   },
+  "externalSources": {
+    "activeDesc": "Search is using {{name}} instead of the Ascendara index.",
+    "activeTitle": "An external source is active",
+    "description": "Pull games from a community source bucket or your own imported lists instead of the Ascendara index.",
+    "enable": "Turn on external sources",
+    "linkDesc": "Use a community source bucket or an imported list instead of the Ascendara index.",
+    "manage": "Manage sources",
+    "offDesc": "You're using the Ascendara index. Turn on external sources to pick a source bucket or import a list.",
+    "offTitle": "External sources are off",
+    "title": "External Sources",
+    "toggleOffDesc": "Ascendara uses its own game index. Turn this on to use an external source instead.",
+    "toggleOnDesc": "Search and downloads use the external source selected below.",
+    "toggleTitle": "Use external sources",
+    "useAscendaraIndex": "Use Ascendara index"
+  },
   "game": {
     "metadata": {
       "developer": "Developer",

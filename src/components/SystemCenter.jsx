@@ -141,9 +141,9 @@ const SystemCenter = () => {
   }, []);
 
   const closeAndNavigate = useCallback(
-    path => {
+    (path, state) => {
       setOpen(false);
-      navigate(path);
+      navigate(path, state ? { state } : undefined);
     },
     [navigate, setOpen]
   );
@@ -203,7 +203,7 @@ const SystemCenter = () => {
   const handleHealthAction = useCallback(
     async action => {
       if (action.type === "settings") return closeAndNavigate("/settings");
-      if (action.type === "local-refresh") return closeAndNavigate("/localrefresh");
+      if (action.type === "local-refresh") return closeAndNavigate("/settings", { scrollTo: "game-index" });
       if (action.type !== "install-dependencies") return;
 
       try {

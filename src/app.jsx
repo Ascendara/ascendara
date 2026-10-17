@@ -116,7 +116,7 @@ const pageLoaders = {
   ascend: () => import("./pages/Ascend"),
   library: () => import("./pages/Library"),
   folderView: () => import("./pages/FolderView"),
-  localRefresh: () => import("./pages/LocalRefresh"),
+  externalSources: () => import("./pages/ExternalSources"),
   settings: () => import("./pages/Settings"),
   welcome: () => import("./pages/Welcome"),
   bigPicture: () => import("./pages/BigPicture"),
@@ -133,7 +133,7 @@ const Profile = lazyPage(pageLoaders.profile);
 const Ascend = lazyPage(pageLoaders.ascend);
 const Library = lazyPage(pageLoaders.library);
 const FolderView = lazyPage(pageLoaders.folderView);
-const LocalRefresh = lazyPage(pageLoaders.localRefresh);
+const ExternalSources = lazyPage(pageLoaders.externalSources);
 const Settings = lazyPage(pageLoaders.settings);
 const Welcome = lazyPage(pageLoaders.welcome);
 const BigPicture = lazyPage(pageLoaders.bigPicture);
@@ -1660,7 +1660,6 @@ const AppRoutes = () => {
           >
             <Routes>
               <Route path="/extralanguages" element={<ExtraLanguages />} />
-              <Route path="/localrefresh" element={<LocalRefresh />} />
               <Route
                 path="*"
                 element={
@@ -1688,7 +1687,12 @@ const AppRoutes = () => {
             <Route path="torboxdownloads" element={<TorboxDownloads />} />
             <Route path="settings" element={<Settings />} />
             <Route path="sidecaranddependencies" element={<SidecarAndDependencies />} />
-            <Route path="localrefresh" element={<LocalRefresh />} />
+            <Route path="sources" element={<ExternalSources />} />
+            {/* The local index moved into Settings; keep old links working */}
+            <Route
+              path="localrefresh"
+              element={<Navigate to="/settings" replace state={{ scrollTo: "game-index" }} />}
+            />
             <Route path="profile" element={<Profile />} />
             <Route path="ascend" element={<Ascend />} />
             <Route path="workshopdownloader" element={<WorkshopDownloader />} />

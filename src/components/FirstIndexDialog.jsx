@@ -9,7 +9,7 @@ const FirstIndexDialog = ({ onClose }) => {
 
   const handleGoToIndex = async () => {
     onClose();
-    navigate("/localrefresh");
+    navigate("/settings", { state: { scrollTo: "game-index" } });
   };
 
   const handleSkip = async () => {

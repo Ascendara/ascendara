@@ -76,7 +76,7 @@ const Navigation = memo(({ items }) => {
           "/settings",
           "/extralanguages",
           "/sidecaranddependencies",
-          "/localrefresh",
+          "/sources",
         ].includes(location.pathname)
       ) {
         return true;

@@ -981,7 +981,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                             <div className="pt-2">
                               <Button
                                 className="flex w-full items-center justify-center gap-2 text-secondary"
-                                onClick={() => navigate("/localrefresh")}
+                                onClick={() => navigate("/settings", { state: { scrollTo: "game-index" } })}
                               >
                                 <RefreshCw className="h-4 w-4" />
                                 {t("search.refreshLocalIndex")}
@@ -1078,7 +1078,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                             <div className="pt-2">
                               <Button
                                 className="flex w-full items-center justify-center gap-2 text-secondary"
-                                onClick={() => navigate("/localrefresh")}
+                                onClick={() => navigate("/settings", { state: { scrollTo: "game-index" } })}
                               >
                                 <RefreshCw className="h-4 w-4" />
                                 {t("search.switchToLocalIndex")}

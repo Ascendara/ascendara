@@ -198,7 +198,7 @@ export function useCommandPaletteRegistration() {
         label: t("featureCenters.commandPalette.commands.localRefresh.label"),
         description: t("featureCenters.commandPalette.commands.localRefresh.description"),
         keywords: ["index", "refresh", "local", "índice", "atualizar"],
-        onSelect: navigate => navigate("/localrefresh"),
+        onSelect: navigate => navigate("/settings", { state: { scrollTo: "game-index" } }),
       },
       {
         id: "open-settings",

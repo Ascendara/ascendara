@@ -14,9 +14,7 @@ export const settingsSearchData = [
       "rescan",
     ],
     section: "General",
-    navigate: navigate => {
-      navigate("/localrefresh");
-    },
+    scrollTo: "game-index",
   },
   {
     id: "theme",
