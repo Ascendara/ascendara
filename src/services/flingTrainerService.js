@@ -329,16 +329,9 @@ const downloadTrainer = async (trainerData, gameName) => {
   }
 
   try {
-    // Use Electron to download the file to desktop
-    if (window.electron?.downloadToDesktop) {
-      const fileName = `${gameName.replace(/[^a-zA-Z0-9]/g, "_")}_Trainer.zip`;
-      await window.electron.downloadToDesktop(trainerData.downloadUrl, fileName);
-      return true;
-    } else {
-      // Fallback: open download URL in browser
-      window.open(trainerData.downloadUrl, "_blank");
-      return true;
-    }
+    // Hand the download to the system browser
+    await window.electron.openURL(trainerData.downloadUrl);
+    return true;
   } catch (error) {
     console.error("[FlingTrainer] Error downloading trainer:", error);
     return false;

@@ -1318,39 +1318,14 @@ const Profile = () => {
 
     try {
       SetRemovingDownloadHistoryIndex(HistoryIndex);
-      let Result = null;
-
-      if (window.electron?.removeDownloadHistoryItem) {
-        try {
-          Result = await window.electron.removeDownloadHistoryItem(HistoryIndex);
-        } catch (Error) {
-          const Message = String(Error?.message || Error || "");
-
-          if (!Message.includes("No handler registered")) {
-            throw Error;
-          }
-
-          console.warn(
-            `[Profile] remove-download-history-item IPC missing; falling back to timestamp update.`,
-            Error
-          );
-        }
-      } else {
-        console.warn(
-          `[Profile] removeDownloadHistoryItem bridge missing; falling back to timestamp update.`
-        );
+      if (window.electron?.setTimestampValue) {
+        await window.electron.setTimestampValue("downloadedHistory", NextHistory);
       }
 
-      if (!Result) {
-        if (window.electron?.setTimestampValue) {
-          await window.electron.setTimestampValue("downloadedHistory", NextHistory);
-        }
-
-        Result = {
-          success: true,
-          history: NextHistory,
-        };
-      }
+      const Result = {
+        success: true,
+        history: NextHistory,
+      };
 
       if (Result?.success === false) {
         throw new Error(Result.error || "Failed to remove download history item");

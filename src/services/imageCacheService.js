@@ -481,18 +481,9 @@ class ImageCacheService {
 
   async generateSignature(timestamp) {
     try {
-      // Try to get secret from electron - check if function exists first
-      let secret = "default_secret";
-      if (
-        window.electron?.imageSecret &&
-        typeof window.electron.imageSecret === "function"
-      ) {
-        try {
-          secret = (await window.electron.imageSecret()) || "default_secret";
-        } catch (err) {
-          console.warn("[ImageCache] Could not get image secret, using default");
-        }
-      }
+      // No image secret is exposed to the renderer, so requests have always
+      // been signed with this shared default
+      const secret = "default_secret";
 
       const encoder = new TextEncoder();
       const data = encoder.encode(timestamp.toString());

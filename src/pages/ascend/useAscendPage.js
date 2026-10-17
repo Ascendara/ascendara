@@ -1545,7 +1545,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     try {
       const result = await getBackupDownloadUrl(backupId);
       if (result.downloadUrl) {
-        window.electron.openExternal(result.downloadUrl);
+        window.electron.openURL(result.downloadUrl);
         toast.success(t("ascend.cloudBackups.downloadStarted") || "Download started");
       } else if (result.code === "SUBSCRIPTION_REQUIRED") {
         toast.error(

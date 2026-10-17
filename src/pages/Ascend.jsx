@@ -329,7 +329,7 @@ const Ascend = () => {
           <Button
             variant="outline"
             onClick={() =>
-              window.electron.openExternal(
+              window.electron.openURL(
                 "https://github.com/Ascendara/ascendara#-configure-firebase"
               )
             }
