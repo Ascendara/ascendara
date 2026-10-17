@@ -734,6 +734,26 @@ const UserActivityTracker = React.memo(() => {
     updateActivity();
   }, [pathname, state?.gameData?.game, state?.game?.game, user?.uid]);
 
+  // Keep launch diagnostics alive when navigating back to the library.
+  useEffect(() => {
+    return window.electron?.onGameClosed?.((_, data) => {
+      if (!data?.quickExit) return;
+      toast.warning(i18n.t("gameScreen.quickExitDialog.title"), {
+        description: i18n.t("gameScreen.quickExitDialog.description", { game: data.game }),
+        duration: Infinity,
+        closeButton: true,
+        action: {
+          label: i18n.t("gameScreen.quickExitDialog.openFolder"),
+          onClick: () => {
+            window.electron
+              .openGameDirectory(data.game, data.isCustom, data.installation)
+              .catch(error => console.error("Failed to open game folder:", error));
+          },
+        },
+      });
+    });
+  }, []);
+
   // Listen for game launch/close events
   useEffect(() => {
     if (!user?.uid) return;

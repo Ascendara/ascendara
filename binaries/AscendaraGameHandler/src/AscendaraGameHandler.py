@@ -1261,6 +1261,9 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                 logging.info(f"Interval reached: Added 180 seconds to {game_name}")
                 
             time.sleep(1)
+        # Flush before cleanup/backups so their duration is not counted as play.
+        session_duration_ms = max(0, int((session_end_time - start_time) * 1000))
+        print(f"ASCENDARA_SESSION_DURATION_MS:{session_duration_ms}", flush=True)
         logging.info("Game process ended")
 
         # Record whatever time was played since the last full 180s tick, so

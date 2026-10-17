@@ -28,6 +28,8 @@ const { getGameDirectories, getSelectedGameDirectories, getManagedGameDirectory 
 const { setPlayingActivity, updateDiscordRPCToLibrary } = require("./discord-rpc");
 const { hideWindow, showWindow } = require("./window");
 
+const { createGameExitMonitor } = require("./gameExitMonitor");
+
 const steamgrid = require("./steamgrid");
 const { resetOnboarding } = require("./onboarding");
 
@@ -745,6 +747,8 @@ function registerGameHandlers() {
             ? [handlerScript, ...gameHandlerArgs]
             : gameHandlerArgs;
 
+        const exitMonitor = createGameExitMonitor({ elevated: launchWithAdmin });
+        let launchFailed = false;
         const runGame = spawn(executablePath, spawnArgs, {
           detached: false,
           stdio: ["ignore", "pipe", "pipe"],
@@ -752,6 +756,7 @@ function registerGameHandlers() {
         });
 
         runGame.stdout.on("data", data => {
+          exitMonitor.write(data);
           console.log(`Game handler output: ${data}`);
         });
 
@@ -766,6 +771,7 @@ function registerGameHandlers() {
         });
 
         runGame.on("error", error => {
+          launchFailed = true;
           console.error(`Failed to start game ${game}:`, error);
           event.sender.send("game-launch-error", { game, error: error.message });
           runGameProcesses.delete(game);
@@ -773,14 +779,24 @@ function registerGameHandlers() {
           showWindow();
         });
 
-        runGame.on("exit", code => {
+        // close follows stdout drain, so the final duration is available.
+        runGame.on("close", code => {
           console.log(`Game ${game} exited with code ${code}`);
           runGameProcesses.delete(game);
           if (settings.hideOnGameLaunch !== false) {
             showWindow();
           }
           updateDiscordRPCToLibrary(`pc:${game}`);
-          event.sender.send("game-closed", { game });
+          event.sender.send("game-closed", {
+            game,
+            isCustom,
+            installation: {
+              ...installation,
+              ...(!isCustom ? { _sourceDir: path.dirname(gameDirectory) } : {}),
+              executable,
+            },
+            ...exitMonitor.result({ stopped: runGame.killed, failed: launchFailed }),
+          });
         });
 
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -793,7 +809,9 @@ function registerGameHandlers() {
           const isBP = win && win.webContents.getURL().includes("bigpicture");
 
           if (isBP) {
-            setTimeout(hideWindow, 10200);
+            setTimeout(() => {
+              if (runGameProcesses.get(game) === runGame) hideWindow();
+            }, 10200);
           } else {
             hideWindow();
           }
