@@ -71,6 +71,14 @@ export default function StoreAccountsDialog({
     try {
       const result = await window.electron.storeAccounts[action](store);
       if (!result.success) throw new Error(result.error);
+      // Connecting a store means you want to see its games, so make sure
+      // they actually show up instead of staying hidden behind a switch
+      if (action === "connect" && (!preferences.enabled || !preferences.stores.includes(store)))
+        update({
+          ...preferences,
+          enabled: true,
+          stores: [...new Set([...preferences.stores, store])],
+        });
       window.dispatchEvent(new Event("store-accounts-updated"));
     } catch (failure) {
       if (mounted.current)
@@ -341,7 +349,7 @@ export default function StoreAccountsDialog({
                   })
                 : t("storeAccounts.summaryHidden", "Owned games are hidden from your library")}
           </p>
-          {connected.length > 0 && preferences.enabled && visibleCount > 0 ? (
+          {onShowInLibrary && connected.length > 0 && preferences.enabled && visibleCount > 0 ? (
             <Button className="gap-2 text-secondary" onClick={onShowInLibrary}>
               {t("storeAccounts.viewInLibrary", "View in library")}
               <ArrowRight className="h-4 w-4" />

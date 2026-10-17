@@ -62,6 +62,9 @@ import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { validateInput } from "@/services/profanityFilterService";
 import ImportGamesDialog from "@/components/ImportGamesDialog";
+import ImportFromLaunchersDialog from "@/components/ImportFromLaunchersDialog";
+import StoreAccountsDialog from "@/components/StoreAccountsDialog";
+import { useStoreLibrary } from "@/hooks/useStoreLibrary";
 
 const DEPENDENCIES = [
   {
@@ -465,6 +468,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [pendingExit, setPendingExit] = useState(null);
   const [isExiting, setIsExiting] = useState(false);
   const [isImportGamesOpen, setIsImportGamesOpen] = useState(false);
+  const [isImportChooserOpen, setIsImportChooserOpen] = useState(false);
+  const [isStoreAccountsOpen, setIsStoreAccountsOpen] = useState(false);
+  const storeLibrary = useStoreLibrary();
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [referralSource, setReferralSource] = useState("");
   const [customReferral, setCustomReferral] = useState("");
@@ -1992,7 +1998,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       </p>
                       <Button
                         variant="outline"
-                        onClick={() => setIsImportGamesOpen(true)}
+                        onClick={() => {
+                          storeLibrary.refresh();
+                          setIsImportChooserOpen(true);
+                        }}
                         className="mt-auto w-full text-primary hover:bg-primary/10"
                       >
                         {t("welcome.setup.extras.importButton")}
@@ -2022,10 +2031,31 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     </div>
                   </div>
 
+                  <ImportFromLaunchersDialog
+                    open={isImportChooserOpen}
+                    onOpenChange={setIsImportChooserOpen}
+                    connectedStores={storeLibrary.accounts
+                      .filter(account => account.connected)
+                      .map(account => account.store)}
+                    onScanThisPC={() => {
+                      setIsImportChooserOpen(false);
+                      setIsImportGamesOpen(true);
+                    }}
+                    onConnectStores={() => {
+                      setIsImportChooserOpen(false);
+                      setIsStoreAccountsOpen(true);
+                    }}
+                  />
                   <ImportGamesDialog
                     open={isImportGamesOpen}
                     onOpenChange={setIsImportGamesOpen}
                     allowCatalogSwap={false}
+                  />
+                  <StoreAccountsDialog
+                    open={isStoreAccountsOpen}
+                    onOpenChange={setIsStoreAccountsOpen}
+                    preferences={storeLibrary.preferences}
+                    onPreferencesChange={storeLibrary.updatePreferences}
                   />
                 </SetupStep>
               )}
