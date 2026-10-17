@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Library, Loader2, RefreshCw, ShieldCheck, ArrowRight } from "lucide-react";
+import {
+  Library,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+  ArrowRight,
+  ExternalLink,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -96,7 +103,15 @@ export default function StoreAccountsDialog({
             {t(
               "storeAccounts.description",
               "Connect your accounts to browse games you own, including games that are not installed."
-            )}
+            )}{" "}
+            <button
+              type="button"
+              className="inline-flex items-center text-sm font-medium text-primary hover:underline"
+              onClick={() => window.electron.openURL("https://ascendara.app/docs/features/importing#store-accounts")}
+            >
+              {t("common.learnMore")}
+              <ExternalLink className="ml-1 h-3 w-3" />
+            </button>
           </DialogDescription>
         </DialogHeader>
 

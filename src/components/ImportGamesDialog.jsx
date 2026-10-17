@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   Download,
+  ExternalLink,
   Gamepad2,
   HardDrive,
   Image,
@@ -276,7 +277,21 @@ export default function ImportGamesDialog({
           <div className="mb-2 flex items-center gap-3 pr-8">
             <DialogTitle>{t("library.launcherImport.title")}</DialogTitle>
           </div>
-          <DialogDescription>{t("library.launcherImport.description")}</DialogDescription>
+          <DialogDescription>
+            {t("library.launcherImport.description")}{" "}
+            <button
+              type="button"
+              className="inline-flex items-center text-sm font-medium text-primary hover:underline"
+              onClick={() =>
+                window.electron.openURL(
+                  "https://ascendara.app/docs/features/importing#games-installed-on-this-pc"
+                )
+              }
+            >
+              {t("common.learnMore")}
+              <ExternalLink className="ml-1 h-3 w-3" />
+            </button>
+          </DialogDescription>
         </DialogHeader>
         <DialogClose asChild>
           <Button

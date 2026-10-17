@@ -1,4 +1,4 @@
-import { ChevronRight, HardDrive, UserRound } from "lucide-react";
+import { ChevronRight, ExternalLink, HardDrive, UserRound } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -57,7 +57,15 @@ export default function ImportFromLaunchersDialog({
         <DialogHeader className="px-6 pb-4 pt-6 text-left">
           <DialogTitle className="pr-6">{t("library.importChooser.title")}</DialogTitle>
           <DialogDescription className="pr-6 leading-relaxed">
-            {t("library.importChooser.description")}
+            {t("library.importChooser.description")}{" "}
+            <button
+              type="button"
+              className="inline-flex items-center text-sm font-medium text-primary hover:underline"
+              onClick={() => window.electron.openURL("https://ascendara.app/docs/features/importing")}
+            >
+              {t("common.learnMore")}
+              <ExternalLink className="ml-1 h-3 w-3" />
+            </button>
           </DialogDescription>
         </DialogHeader>
 
