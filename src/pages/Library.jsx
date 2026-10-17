@@ -1809,15 +1809,22 @@ const Library = () => {
                     }
                   }}
                   className={cn(
-                    "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-all",
+                    "relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
                     activeTab === tab.id
-                      ? "bg-primary/10 font-semibold text-primary"
+                      ? "font-semibold text-primary"
                       : "font-medium text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                   )}
                 >
+                  {activeTab === tab.id && (
+                    <motion.span
+                      layoutId="library-tab-active"
+                      className="absolute inset-0 rounded-lg bg-primary/10"
+                      transition={{ type: "spring", stiffness: 400, damping: 34 }}
+                    />
+                  )}
                   <span
                     className={cn(
-                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                      "relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
                       activeTab === tab.id
                         ? "bg-primary/15 text-primary"
                         : "text-muted-foreground"
@@ -1825,11 +1832,11 @@ const Library = () => {
                   >
                     {tab.icon}
                   </span>
-                  <span className="flex-1 text-left">{tab.label}</span>
+                  <span className="relative flex-1 text-left">{tab.label}</span>
                   {tab.count > 0 && (
                     <span
                       className={cn(
-                        "min-w-[1.25rem] rounded px-1 py-0.5 text-center text-[10px] font-bold tabular-nums transition-transform duration-150 group-hover/drag:translate-x-[-14px]",
+                        "relative min-w-[1.25rem] rounded px-1 py-0.5 text-center text-[10px] font-bold tabular-nums transition-transform duration-150 group-hover/drag:translate-x-[-14px]",
                         activeTab === tab.id
                           ? "bg-primary/20 text-primary"
                           : "bg-muted/80 text-muted-foreground"
