@@ -1946,7 +1946,22 @@ const DownloadCard = ({
           )}
 
         {/* Manual installer */}
-        {isPendingManualInstall && (
+        {isPendingManualInstall && downloadingData?.privatePackage && (
+          <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+            <p className="font-medium">Private package — review required</p>
+            <p className="text-sm text-muted-foreground">{downloadingData.message}</p>
+            <p className="text-xs text-muted-foreground">EXE installers require manual review and execution. Mount ISO files using your operating system; automatic ISO mounting is not supported. Extracted games can be imported by selecting their executable.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => window.electron.privateSources.openPackage(game.game).catch(e => toast.error(e.message))}>Show package in folder</Button>
+              {/\.(zip|7z|rar)$/i.test(game.privateSource?.package || "") && !game.privateSource?.extracted && <Button size="sm" onClick={async () => {
+                const result = await window.electron.retryExtract(game.game);
+                if (!result.success) toast.error(result.error);
+              }}>Extract archive</Button>}
+              <Button size="sm" variant="secondary" onClick={() => window.electron.privateSources.importGame(game.game).catch(e => toast.error(e.message))}>Select installed game executable</Button>
+            </div>
+          </div>
+        )}
+        {isPendingManualInstall && !downloadingData?.privatePackage && (
           <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
             <div className="flex items-start gap-2.5">
               {installerLaunched ? (

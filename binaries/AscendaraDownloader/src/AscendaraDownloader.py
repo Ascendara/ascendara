@@ -1547,6 +1547,17 @@ class AscendaraDownloader:
             if not self._preserve_stage:
                 cleanup_temporary(stage, self.download_dir)
         # Archives survive every failure above, including failed verification.
+        if self.game_info.get('privateSource'):
+            # Private packages never inherit automatic launch/post-download behavior.
+            self.game_info['privateSource']['extracted'] = True
+            self.game_info['executable'] = ''
+            self.game_info['downloadingData'] = dict(
+                downloading=False, pendingManualInstall=True, privatePackage=True,
+                progressCompleted='100.00', manualInstallDir=self.download_dir,
+                message='Archive extracted and verified. Review the files and select a game executable to import. Nothing was executed.')
+            self.game_info.pop('extractionSources', None)
+            safe_write_json(self.game_info_path, self.game_info)
+            return
         for archive in archives:
             if not archive.lower().endswith(('.zip', '.rar', '.7z')):
                 continue

@@ -922,7 +922,7 @@ export const syncCloudLibrary = async games => {
     }
 
     // Transform games to a storable format
-    const localGamesData = games.map(game => ({
+    const localGamesData = games.filter(game => !game.privateSource).map(game => ({
       name: game.game || game.name,
       // Store gameID for non-custom games (used for fetching game images/info)
       gameID: !game.isCustom && !game.custom && game.gameID ? game.gameID : null,

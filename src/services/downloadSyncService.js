@@ -126,7 +126,7 @@ const syncDownloads = async (force = false) => {
 
     // Get current downloads from electron
     const downloads = await window.electron.getDownloads();
-    const downloadsArray = downloads || [];
+    const downloadsArray = (downloads || []).filter(download => !download.privateSource);
     const currentCount = downloadsArray.length;
 
     // If we had downloads before but now have none, sync once more then stop

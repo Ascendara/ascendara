@@ -142,7 +142,7 @@ const _processNextInQueueInternal = async () => {
 
   // Start the download
   try {
-    await window.electron.downloadFile(
+    const result = await window.electron.downloadFile(
       nextItem.url,
       nextItem.gameName,
       nextItem.online || false,
@@ -167,7 +167,7 @@ const _processNextInQueueInternal = async () => {
         const games = await window.electron.getGames();
         const found = games.some(
           g =>
-            g.game === nextItem.gameName &&
+            g.game === (result?.game || nextItem.gameName) &&
             g.downloadingData &&
             (g.downloadingData.downloading || g.downloadingData.extracting)
         );

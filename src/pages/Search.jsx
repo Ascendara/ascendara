@@ -243,6 +243,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
     return savedSize ? parseFloat(savedSize) : 100;
   });
   const [settings, setSettings] = useState({ seeInappropriateContent: false });
+  const catalogRequestRef = useRef(0);
   const [displayedGames, setDisplayedGames] = useState([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -402,6 +403,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
 
   const refreshGames = useCallback(
     async (forceRefresh = false) => {
+      const requestId = ++catalogRequestRef.current;
       if (!forceRefresh && isCacheValid()) {
         setGames(gamesCache.data.games);
         setApiMetadata(gamesCache.data.metadata);
@@ -410,7 +412,12 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
 
       setIsRefreshing(true);
       try {
-        const response = await gameService.getAllGames();
+        const [response, currentSettings] = await Promise.all([
+          gameService.getAllGames(),
+          window.electron.getSettings(),
+        ]);
+        if (requestId !== catalogRequestRef.current) return;
+        if (currentSettings) setSettings(currentSettings);
         const gameData = {
           games: response.games,
           metadata: response.metadata,
@@ -428,7 +435,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
       } catch (error) {
         console.error("Error refreshing games:", error);
       } finally {
-        setIsRefreshing(false);
+        if (requestId === catalogRequestRef.current) setIsRefreshing(false);
       }
     },
     [isCacheValid]
@@ -465,6 +472,9 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
       };
       // Clear gameService memory cache
       gameService.clearMemoryCache();
+      setGames([]);
+      setDisplayedGames([]);
+      setApiMetadata(null);
       // Force refresh to get new data
       setLoading(true);
       refreshGames(true).finally(() => setLoading(false));
@@ -870,6 +880,9 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
       localStorage.removeItem(`play-later-image-${game.game}`);
     } else {
       const gameToSave = {
+        privateSource: game.privateSource,
+        privateMetadata: game.privateMetadata,
+        packageType: game.packageType,
         game: game.game,
         gameID: game.gameID,
         imgID: game.imgID,

@@ -104,6 +104,7 @@ async function check({ getDirectories, retryExtraction, resumeDownload }) {
         const info = await fs.readJson(file);
         const data = info.downloadingData;
         if (!isActive(data)) continue;
+        if (info.privateSource && require("./privateSources").active.has(folder)) continue;
         // Older downloaders did not record their PID; then any helper still
         // running might own this download, so leave it alone.
         const alive = data.ownerPid ? pids.has(data.ownerPid) : pids.size > 0;

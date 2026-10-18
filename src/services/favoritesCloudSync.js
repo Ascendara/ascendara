@@ -71,7 +71,9 @@ const writeJson = (key, value) => {
 
 const readFavorites = () => {
   const list = readJson(FAVORITES_KEY, []);
-  return Array.isArray(list) ? list.filter(name => typeof name === "string" && name) : [];
+  const meta = readJson(META_KEY, {});
+  return Array.isArray(list) ? list.filter(name => typeof name === "string" && name &&
+    !meta[name]?.privateSource && !String(meta[name]?.gameID || "").startsWith("private-")) : [];
 };
 
 // Firestore rejects undefined, so build the stored meta field by field.
@@ -232,7 +234,9 @@ const applyToLocal = (uid, entries) => {
   const listChanged =
     next.length !== current.length || next.some((name, i) => name !== current[i]);
   if (listChanged) {
-    writeJson(FAVORITES_KEY, next);
+    const privateFavorites = readJson(FAVORITES_KEY, []).filter(name =>
+      localMeta[name]?.privateSource || String(localMeta[name]?.gameID || "").startsWith("private-"));
+    writeJson(FAVORITES_KEY, [...new Set([...next, ...privateFavorites])]);
     window.dispatchEvent(new CustomEvent("favorites-updated"));
   }
 };

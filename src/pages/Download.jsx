@@ -1,4 +1,5 @@
 import GameReviews from "@/components/GameReviews";
+import PrivateGameDetails from "@/components/download/PrivateGameDetails";
 import AscendPerks from "@/components/download/AscendPerks";
 import {
   DirectoryConflictDialog,
@@ -175,6 +176,13 @@ const clearDownloadLock = () => {
 };
 
 export default function DownloadPage() {
+  const { state } = useLocation();
+  return state?.gameData?.privateSource
+    ? <PrivateGameDetails initialGame={state.gameData} />
+    : <PublicDownloadPage />;
+}
+
+function PublicDownloadPage() {
   const { state } = useLocation();
   const location = useLocation();
   const navigate = useNavigate();

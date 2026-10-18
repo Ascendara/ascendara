@@ -272,6 +272,7 @@ function registerDownloadHandlers() {
                   }
 
                   const download = {
+                    privateSource: !!gameData.privateSource,
                     id: gameData.game || dir,
                     name: gameData.game || dir,
                     progress: progress,
@@ -392,6 +393,10 @@ function registerDownloadHandlers() {
       browserAssetGameId,
       browserAssetLogoId
     ) => {
+      if (typeof link === "string" && link.startsWith("private:")) {
+        const [, sourceId, entryId] = link.split(":");
+        return require("./privateSources").start(sourceId, entryId, additionalDirIndex || 0);
+      }
       console.log(
         `Downloading file: ${link}, game: ${game}, online: ${online}, dlc: ${dlc}, isVr: ${isVr}, updateFlow: ${updateFlow}, version: ${version}, size: ${size}, additionalDirIndex: ${additionalDirIndex}, gameID: ${gameID}`
       );
@@ -933,6 +938,10 @@ function registerDownloadHandlers() {
         return await withDownloadOperation(
           sanitizeGameName(sanitizeText(game)),
           async () => {
+            // Wait for in-process private transfers to close their streams and
+            // finish writing metadata before the shared removal flow touches files.
+            const privateStopped = await require("./privateSources").stop(game);
+            if (privateStopped && !isKill && !deleteContents) return true;
             console.log(
               `Stopping download for game: ${game}, deleteContents: ${deleteContents}, isKill: ${isKill}`
             );
@@ -1246,7 +1255,8 @@ function registerDownloadHandlers() {
       const data = info.downloadingData;
       if (
         !data ||
-        !(data.error || data.stopped || data.verifyError?.length) ||
+        !(data.error || data.stopped || data.verifyError?.length ||
+          (info.privateSource && data.pendingManualInstall && /\.(zip|7z|rar)$/i.test(info.privateSource.package || ""))) ||
         (!info.extractionSources && Number.parseFloat(data.progressCompleted) < 100) ||
         (!info.extractionSources &&
           !Number.isFinite(Number.parseFloat(data.progressCompleted)))
@@ -1293,6 +1303,10 @@ function registerDownloadHandlers() {
           ? getPythonPath()
           : path.join(process.resourcesPath, "AscendaraDownloader");
       let args = ["--retry-extraction", metadata];
+      if (info.privateSource && isDev && isWindows) {
+        executable = getPythonPath();
+        args.unshift(path.resolve("binaries/AscendaraDownloader/src/AscendaraDownloader.py"));
+      }
       if (isDev && !isWindows)
         args.unshift(
           path.resolve("binaries/AscendaraDownloader/src/AscendaraDownloader.py")
@@ -1413,6 +1427,8 @@ function registerDownloadHandlers() {
 
   // Resume download handler
   const resumeDownload = async game => {
+    const privateResult = await require("./privateSources").resume(game);
+    if (privateResult) return privateResult;
     try {
       return await withDownloadOperation(
         sanitizeGameName(sanitizeText(game)),

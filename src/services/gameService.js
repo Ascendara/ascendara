@@ -459,6 +459,10 @@ const gameService = {
    * Uses a 12h localStorage cache keyed by source URL; force=true bypasses the cache.
    */
   async _loadCustomSourceData(customSource, { force = false, refetch = false } = {}) {
+    if (customSource?.privateSourceId) {
+      if (refetch) await window.electron.privateSources.refresh(customSource.privateSourceId);
+      return window.electron.privateSources.catalog(customSource.privateSourceId);
+    }
     const url = customSource?.url;
     if (!url) throw new Error("Missing custom source URL");
     const label =
@@ -812,6 +816,13 @@ const gameService = {
       localIndexPath: null,
       customSourceUrl: null,
     };
+  },
+
+  notifySourceChanged() {
+    this.clearMemoryCache();
+    window.dispatchEvent(
+      new CustomEvent("index-refreshed", { detail: { timestamp: Date.now() } })
+    );
   },
 
   async searchGameCovers(query) {

@@ -291,6 +291,7 @@ function registerCriticalHandlers() {
   tools.registerToolHandlers();
   updates.registerUpdateHandlers();
   downloads.registerDownloadHandlers();
+  require("./modules/privateSources").registerPrivateSourceHandlers();
   games.registerGameHandlers();
   require("./modules/store-accounts").registerStoreAccountHandlers();
   require("./modules/retro").registerRetroHandlers();

@@ -43,6 +43,7 @@ import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
 import ratingQueueService from "@/services/ratingQueueService";
 import installedGamesService from "@/services/installedGamesService";
 import { useImageLoader } from "@/hooks/useImageLoader";
+import usePrivateArtwork from "@/hooks/usePrivateArtwork";
 import verifiedGamesService from "@/services/verifiedGamesService";
 import {
   SEAMLESS_PROVIDERS,
@@ -61,13 +62,19 @@ function GameCardContent({ game, compact }) {
   const [isPlayLater, setIsPlayLater] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const cardRef = useRef(null);
-  const { cachedImage, loading, error } = useImageLoader(game?.imgID, {
+  const privateImage = usePrivateArtwork(isVisible ? game?.privateSource : null);
+  const {
+    cachedImage: publicImage,
+    loading,
+    error,
+  } = useImageLoader(game?.imgID, {
     quality: isVisible ? "high" : "low",
     priority: isVisible ? "high" : "low",
-    enabled: !!game?.imgID || (!game?.imgID && !!game?.game),
-    fallbackGameName: !game?.imgID ? game?.game : null,
+    enabled: !game?.privateSource && (!!game?.imgID || (!game?.imgID && !!game?.game)),
+    fallbackGameName: !game?.privateSource && !game?.imgID ? game?.game : null,
     fallbackSlot: "card",
   });
+  const cachedImage = game?.privateSource ? privateImage : publicImage;
   const [isInstalled, setIsInstalled] = useState(false);
   const [needsUpdate, setNeedsUpdate] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -157,7 +164,7 @@ function GameCardContent({ game, compact }) {
   // This ensures ratings are fetched one at a time to prevent API flooding
   // and cached persistently in localStorage
   useEffect(() => {
-    if (!game.gameID) return;
+    if (!game.gameID || game.privateSource) return;
 
     // If game already has a rating from the API response, use it
     if (game.rating && game.rating > 0) {
@@ -184,7 +191,7 @@ function GameCardContent({ game, compact }) {
 
   // Check if game is verified
   useEffect(() => {
-    if (!game?.gameID) return;
+    if (!game?.gameID || game.privateSource) return;
 
     verifiedGamesService.loadVerifiedGames().then(() => {
       if (isMounted.current) {
@@ -251,6 +258,7 @@ function GameCardContent({ game, compact }) {
       } else {
         updated = [...favorites, game.game];
         meta[game.game] = {
+          privateSource: game.privateSource,
           imgID: game.imgID || null,
           gameID: game.gameID || null,
           version: game.version || null,
@@ -285,6 +293,9 @@ function GameCardContent({ game, compact }) {
       } else {
         // Add to list with essential game data
         const gameToSave = {
+          privateSource: game.privateSource,
+          privateMetadata: game.privateMetadata,
+          packageType: game.packageType,
           game: game.game,
           gameID: game.gameID,
           imgID: game.imgID,

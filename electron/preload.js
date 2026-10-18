@@ -149,6 +149,23 @@ contextBridge.exposeInMainWorld("electron", {
 
   // External Source JSON (user-provided bucket JSON stored in <localIndex>/external-sources)
   getExternalSourcesDirectory: () => ipcRenderer.invoke("get-external-sources-directory"),
+  privateSources: {
+    list: () => ipcRenderer.invoke("private-sources-list"),
+    check: () => ipcRenderer.invoke("private-sources-check"),
+    save: input => ipcRenderer.invoke("private-source-save", input),
+    refresh: id => ipcRenderer.invoke("private-source-refresh", id),
+    remove: id => ipcRenderer.invoke("private-source-remove", id),
+    catalog: id => ipcRenderer.invoke("private-source-catalog", id),
+    artwork: (id, game, kind) => ipcRenderer.invoke("private-source-artwork", id, game, kind),
+    search: title => ipcRenderer.invoke("private-source-search", title),
+    match: (id, game, override) => ipcRenderer.invoke("private-source-match", id, game, override),
+    uploadArt: (id, game) => ipcRenderer.invoke("private-source-upload-art", id, game),
+    folder: () => ipcRenderer.invoke("private-source-folder"),
+    download: (id, game, directory = 0) => ipcRenderer.invoke("private-source-download", id, game, directory),
+    openPackage: game => ipcRenderer.invoke("private-source-open-package", game),
+    importGame: game => ipcRenderer.invoke("private-source-import-game", game),
+    export: id => ipcRenderer.invoke("private-source-export", id),
+  },
   setExternalSourceJson: (sourceId, data) =>
     ipcRenderer.invoke("set-external-source-json", sourceId, data),
   getExternalSourceJson: sourceId =>
