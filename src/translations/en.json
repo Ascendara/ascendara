@@ -1260,6 +1260,7 @@
     "back": "Back",
     "bigpicture": "Big Picture",
     "cancel": "Cancel",
+    "clear": "Clear",
     "close": "Close",
     "contextMenu": {
       "deleteGame": "Delete Game",
@@ -1310,6 +1311,7 @@
     "redownload": "Redownload",
     "refresh": "Refresh",
     "remove": "Remove",
+    "rename": "Rename",
     "reportDialog": {
       "authFailed": "Authentication Failed",
       "authFailedDesc": "Unable to authenticate. Please try again later.",
@@ -1701,6 +1703,7 @@
     "diskActivity": "Disk Activity",
     "diskRead": "Read",
     "diskWrite": "Write",
+    "downloadConflictError": "The download could not start (Conflict). Refresh the download link or choose another source. If this continues, check downloadmanager.log for the original error.",
     "downloadError": "Download Error",
     "downloading": "Downloading",
     "downloadsInProgress": "{{count}} download in progress",
@@ -1708,6 +1711,7 @@
     "errorReported": "Issue Reported Successfully",
     "errorReportedDescription": "Thank you for helping improve Ascendara. Ascendara developer team will investigate this issue.",
     "errors": {
+      "commandFailed": "Failed to run the command",
       "killFailed": "Failed to kill download",
       "pauseFailed": "Failed to pause download"
     },
@@ -3023,6 +3027,7 @@
     "lastRefresh": "Last refresh",
     "lastSynced": "Last synced",
     "lastUsed": "Last used",
+    "listDataInvalid": "This list's data is invalid.",
     "listDeleted": "List deleted successfully",
     "listImportSuccess": "List imported successfully",
     "listName": "List Name",
