@@ -5854,7 +5854,9 @@ function SettingsCategory({
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+          <h2 className="mb-0 text-lg font-semibold leading-tight tracking-tight">
+            {title}
+          </h2>
           {description && (
             <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
           )}
