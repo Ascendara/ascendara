@@ -4635,8 +4635,8 @@ function Settings() {
 
       {/* Custom Colors Dialog */}
       <AlertDialog open={showCustomColorsDialog}>
-        <AlertDialogContent className="max-h-[95vh] max-w-6xl overflow-y-auto">
-          <AlertDialogHeader>
+        <AlertDialogContent className="flex h-[92vh] max-h-[92vh] w-[95vw] max-w-7xl flex-col gap-4 overflow-hidden">
+          <AlertDialogHeader className="shrink-0">
             <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
               {t("settings.customColors") || "Customize Theme"}
             </AlertDialogTitle>
@@ -4647,7 +4647,7 @@ function Settings() {
           </AlertDialogHeader>
 
           {(selectedThemeVersion === 1 || selectedThemeVersion === "1") && (
-            <div className="flex items-center gap-2 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-500">
+            <div className="flex shrink-0 items-center gap-2 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-500">
               <AlertTriangle className="h-4 w-4 flex-shrink-0" />
               <span>
                 {t("settings.legacyThemeWarning") ||
@@ -4656,198 +4656,201 @@ function Settings() {
             </div>
           )}
 
-          <div className="space-y-4 py-4">
-            {/* Core Colors */}
-            <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                Core
-              </h4>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
-                <ColorPickerInput
-                  colorKey="background"
-                  label="Background"
-                  value={customColors.background}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="foreground"
-                  label="Text"
-                  value={customColors.foreground}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="primary"
-                  label="Primary"
-                  value={customColors.primary}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="secondary"
-                  label="Secondary"
-                  value={customColors.secondary}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="accent"
-                  label="Accent"
-                  value={customColors.accent}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="accentForeground"
-                  label="Accent Text"
-                  value={customColors.accentForeground}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="muted"
-                  label="Muted"
-                  value={customColors.muted}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="mutedForeground"
-                  label="Muted Text"
-                  value={customColors.mutedForeground}
-                  onColorChange={handleCustomColorChange}
-                />
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
+            <div className="min-h-0 space-y-5 pr-2 lg:overflow-y-auto">
+              {/* Core Colors */}
+              <div>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                  Core
+                </h4>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                  <ColorPickerInput
+                    colorKey="background"
+                    label="Background"
+                    value={customColors.background}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="foreground"
+                    label="Text"
+                    value={customColors.foreground}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="primary"
+                    label="Primary"
+                    value={customColors.primary}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="secondary"
+                    label="Secondary"
+                    value={customColors.secondary}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="accent"
+                    label="Accent"
+                    value={customColors.accent}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="accentForeground"
+                    label="Accent Text"
+                    value={customColors.accentForeground}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="muted"
+                    label="Muted"
+                    value={customColors.muted}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="mutedForeground"
+                    label="Muted Text"
+                    value={customColors.mutedForeground}
+                    onColorChange={handleCustomColorChange}
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Cards & Surfaces */}
-            <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                Surfaces
-              </h4>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
-                <ColorPickerInput
-                  colorKey="card"
-                  label="Card"
-                  value={customColors.card}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="cardForeground"
-                  label="Card Text"
-                  value={customColors.cardForeground}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="popover"
-                  label="Popover"
-                  value={customColors.popover}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="popoverForeground"
-                  label="Popover Text"
-                  value={customColors.popoverForeground}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="border"
-                  label="Border"
-                  value={customColors.border}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="input"
-                  label="Input"
-                  value={customColors.input}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="ring"
-                  label="Focus Ring"
-                  value={customColors.ring}
-                  onColorChange={handleCustomColorChange}
-                />
+              {/* Cards & Surfaces */}
+              <div>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                  Surfaces
+                </h4>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                  <ColorPickerInput
+                    colorKey="card"
+                    label="Card"
+                    value={customColors.card}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="cardForeground"
+                    label="Card Text"
+                    value={customColors.cardForeground}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="popover"
+                    label="Popover"
+                    value={customColors.popover}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="popoverForeground"
+                    label="Popover Text"
+                    value={customColors.popoverForeground}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="border"
+                    label="Border"
+                    value={customColors.border}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="input"
+                    label="Input"
+                    value={customColors.input}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="ring"
+                    label="Focus Ring"
+                    value={customColors.ring}
+                    onColorChange={handleCustomColorChange}
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Navigation */}
-            <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                Navigation
-              </h4>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
-                <ColorPickerInput
-                  colorKey="navBackground"
-                  label="Background"
-                  value={customColors.navBackground}
-                  onColorChange={handleCustomColorChange}
-                />
+              {/* Navigation */}
+              <div>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                  Navigation
+                </h4>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                  <ColorPickerInput
+                    colorKey="navBackground"
+                    label="Background"
+                    value={customColors.navBackground}
+                    onColorChange={handleCustomColorChange}
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Status & Feedback */}
-            <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                Status
-              </h4>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
-                <ColorPickerInput
-                  colorKey="success"
-                  label="Success"
-                  value={customColors.success}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="warning"
-                  label="Warning"
-                  value={customColors.warning}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="error"
-                  label="Error"
-                  value={customColors.error}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="info"
-                  label="Info"
-                  value={customColors.info}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="starFilled"
-                  label="Star Filled"
-                  value={customColors.starFilled}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="starEmpty"
-                  label="Star Empty"
-                  value={customColors.starEmpty}
-                  onColorChange={handleCustomColorChange}
-                />
+              {/* Status & Feedback */}
+              <div>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                  Status
+                </h4>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                  <ColorPickerInput
+                    colorKey="success"
+                    label="Success"
+                    value={customColors.success}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="warning"
+                    label="Warning"
+                    value={customColors.warning}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="error"
+                    label="Error"
+                    value={customColors.error}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="info"
+                    label="Info"
+                    value={customColors.info}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="starFilled"
+                    label="Star Filled"
+                    value={customColors.starFilled}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="starEmpty"
+                    label="Star Empty"
+                    value={customColors.starEmpty}
+                    onColorChange={handleCustomColorChange}
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Startup Screen */}
-            <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                Startup
-              </h4>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
-                <ColorPickerInput
-                  colorKey="startupBackground"
-                  label="Background"
-                  value={customColors.startupBackground}
-                  onColorChange={handleCustomColorChange}
-                />
-                <ColorPickerInput
-                  colorKey="startupAccent"
-                  label="Accent"
-                  value={customColors.startupAccent}
-                  onColorChange={handleCustomColorChange}
-                />
+              {/* Startup Screen */}
+              <div>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                  Startup
+                </h4>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                  <ColorPickerInput
+                    colorKey="startupBackground"
+                    label="Background"
+                    value={customColors.startupBackground}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="startupAccent"
+                    label="Accent"
+                    value={customColors.startupAccent}
+                    onColorChange={handleCustomColorChange}
+                  />
+                </div>
               </div>
             </div>
 
             {/* Live Preview */}
-            <div className="space-y-3">
+            <div className="min-h-0 space-y-3 pr-2 lg:overflow-y-auto">
+
               <h4 className="text-sm font-medium text-foreground">
                 {t("settings.colorSection.preview") || "Live Preview"}
               </h4>
@@ -5202,7 +5205,7 @@ function Settings() {
             </div>
           </div>
 
-          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+          <AlertDialogFooter className="shrink-0 flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:justify-between">
             <div className="flex gap-2">
               <Button
                 variant="outline"
