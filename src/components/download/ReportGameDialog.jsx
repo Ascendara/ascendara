@@ -1,37 +1,44 @@
 import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/context/LanguageContext";
-import { Loader, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { cn } from "@/lib/utils";
+import {
+  Ban,
+  ChevronRight,
+  CloudOff,
+  EyeOff,
+  FileText,
+  ImageUp,
+  Link2Off,
+  Loader,
+  TriangleAlert,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const FILE_ISSUE_REPORT_PATTERN =
   /\b(?:missing|corrupt(?:ed|ion)?|incomplete|damaged)\b.{0,30}\b(?:files?|downloads?|archives?|installations?)\b|\b(?:files?|downloads?|archives?|installations?)\b.{0,30}\b(?:missing|corrupt(?:ed|ion)?|incomplete|damaged)\b/i;
 
+// Wrong artwork is handled by ArtworkCorrectionDialog, not reports
 const REPORT_REASONS = [
-  ["gamedetails", "gameDetails"],
-  ["filesnotdownloading", "filesNotDownloading"],
-  ["notagame", "notAGame"],
-  ["linksnotworking", "linksNotWorking"],
-  ["image-error", "imageError"],
-  ["image-bad", "imageBad"],
+  { value: "linksnotworking", key: "linksNotWorking", icon: Link2Off },
+  { value: "filesnotdownloading", key: "filesNotDownloading", icon: CloudOff },
+  { value: "gamedetails", key: "gameDetails", icon: FileText },
+  { value: "notagame", key: "notAGame", icon: Ban },
+  { value: "image-bad", key: "imageBad", icon: EyeOff },
 ];
+
+// Reports land in a Discord embed field, which caps at 1024 characters
+const MAX_DETAILS_LENGTH = 1000;
 
 // A game can be reported once a day from this install
 const REPORTED_GAMES_KEY = "ascendara_reported_games";
@@ -65,7 +72,7 @@ const rememberReportedGame = gameData => {
   );
 };
 
-const fetchAuthToken = async () => {
+export const fetchAuthToken = async () => {
   const authHeaders = await window.electron.getAuthHeaders();
   const response = await fetch("https://api.ascendara.app/auth/token", {
     headers: authHeaders,
@@ -77,21 +84,30 @@ const fetchAuthToken = async () => {
   return token;
 };
 
-export default function ReportGameDialog({ open, onOpenChange, gameData, useV2 }) {
+export default function ReportGameDialog({
+  open,
+  onOpenChange,
+  gameData,
+  useV2,
+  onFixArtwork,
+}) {
   const { t } = useLanguage();
   const [isReporting, setIsReporting] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
   const showIndexRefreshWarning = FILE_ISSUE_REPORT_PATTERN.test(reportDetails);
+  const canSubmit = !!reportReason && !!reportDetails.trim();
 
-  const resetForm = () => {
-    setReportReason("");
-    setReportDetails("");
-  };
+  useEffect(() => {
+    if (!open) {
+      setReportReason("");
+      setReportDetails("");
+    }
+  }, [open]);
 
   const handleSubmitReport = async () => {
     if (isReporting) return;
-    if (!reportReason || !reportDetails.trim()) {
+    if (!canSubmit) {
       toast.error(t("download.reportError"));
       return;
     }
@@ -111,7 +127,7 @@ export default function ReportGameDialog({ open, onOpenChange, gameData, useV2 }
       const body = JSON.stringify({
         reportType: "GameBrowsing",
         reason: reportReason,
-        details: reportDetails,
+        details: reportDetails.trim(),
         ...(useV2 ? { gameID: gameData.gameID } : { gameName: gameData.game }),
       });
 
@@ -141,7 +157,6 @@ export default function ReportGameDialog({ open, onOpenChange, gameData, useV2 }
 
       rememberReportedGame(gameData);
       toast.success(t("download.toast.reportSubmitted"));
-      resetForm();
       onOpenChange(false);
     } catch (error) {
       console.error("Error submitting report:", error);
@@ -152,67 +167,127 @@ export default function ReportGameDialog({ open, onOpenChange, gameData, useV2 }
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
         <form
+          className="space-y-5"
           onSubmit={e => {
             e.preventDefault();
             handleSubmitReport();
           }}
         >
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("download.reportBroken")}: {gameData.game}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-4 text-sm text-muted-foreground">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    {t("download.reportReason")}
-                  </label>
-                  <Select value={reportReason} onValueChange={setReportReason}>
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={t("download.reportReasons.placeholder")}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {REPORT_REASONS.map(([value, key]) => (
-                        <SelectItem key={value} value={value}>
-                          {t(`download.reportReasons.${key}`)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    {t("download.reportDescription")}
-                  </label>
-                  <Textarea
-                    placeholder={t("download.reportDescription")}
-                    value={reportDetails}
-                    onChange={e => setReportDetails(e.target.value)}
-                    className="min-h-[100px]"
-                  />
-                </div>
-                {showIndexRefreshWarning && (
-                  <div
-                    role="alert"
-                    className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground"
+          <DialogHeader>
+            <DialogTitle>{t("download.reportDialog.title")}</DialogTitle>
+            <DialogDescription>
+              {t("download.reportDialog.description", { game: gameData.game })}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label className="text-foreground">{t("download.reportReason")}</Label>
+            <div role="radiogroup" className="grid gap-2 sm:grid-cols-2">
+              {REPORT_REASONS.map(({ value, key, icon: Icon }) => {
+                const selected = reportReason === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setReportReason(value)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
+                      selected
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-accent"
+                    )}
                   >
-                    <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                    <span>{t("download.refreshIndexBeforeReport")}</span>
-                  </div>
-                )}
+                    <div
+                      className={cn(
+                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
+                        selected ? "bg-primary text-secondary" : "bg-accent/30 text-foreground"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-foreground">
+                        {t(`download.reportReasons.${key}`)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {t(`download.reportReasonDescriptions.${key}`)}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {onFixArtwork && (
+            <button
+              type="button"
+              onClick={onFixArtwork}
+              className="flex w-full items-center gap-3 rounded-lg border border-dashed border-border px-3 py-2.5 text-left transition-colors hover:bg-accent"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent/30">
+                <ImageUp className="h-4 w-4 text-foreground" />
               </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-4 gap-2">
-            <AlertDialogCancel className="text-primary" onClick={resetForm}>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-foreground">
+                  {t("download.reportDialog.wrongArtwork")}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {t("download.reportDialog.wrongArtworkDesc")}
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="report-details" className="text-foreground">
+                {t("download.reportDialog.detailsLabel")}
+              </Label>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {reportDetails.length}/{MAX_DETAILS_LENGTH}
+              </span>
+            </div>
+            <Textarea
+              id="report-details"
+              placeholder={t("download.reportDescription")}
+              value={reportDetails}
+              maxLength={MAX_DETAILS_LENGTH}
+              onChange={e => setReportDetails(e.target.value)}
+              className="min-h-[110px] text-foreground"
+            />
+          </div>
+
+          {showIndexRefreshWarning && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground"
+            >
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <span>{t("download.refreshIndexBeforeReport")}</span>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="text-primary"
+              onClick={() => onOpenChange(false)}
+            >
               {t("common.cancel")}
-            </AlertDialogCancel>
-            <Button type="submit" className="text-secondary" disabled={isReporting}>
+            </Button>
+            <Button
+              type="submit"
+              className="text-secondary"
+              disabled={isReporting || !canSubmit}
+            >
               {isReporting ? (
                 <>
                   <Loader className="mr-2 h-4 w-4 animate-spin" />
@@ -222,9 +297,9 @@ export default function ReportGameDialog({ open, onOpenChange, gameData, useV2 }
                 t("download.submitReport")
               )}
             </Button>
-          </AlertDialogFooter>
+          </DialogFooter>
         </form>
-      </AlertDialogContent>
-    </AlertDialog>
+      </DialogContent>
+    </Dialog>
   );
 }

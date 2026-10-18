@@ -3,12 +3,15 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, Info, Clock, Check, Zap, TriangleAlert, MessageSquareText } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
-import ReportIssue from "./ReportIssue";
+import ReportGameDialog from "@/components/download/ReportGameDialog";
+import { useSettings } from "@/context/SettingsContext";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
 
 const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMore, onPlayLater, isPlayLater, onStartDownload }) => {
   const { t } = useLanguage();
-  const [isReportOpen, setIsReportOpen] = useState(false);
+  const { settings } = useSettings();
+  // Kept outside the menu so the dialog outlives it closing
+  const [reportGame, setReportGame] = useState(null);
 
   const handleClickOutside = useCallback((e) => {
     e.preventDefault();
@@ -40,9 +43,7 @@ const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMo
     return availableHosts.some(host => SEAMLESS_PROVIDERS.includes(host));
   }, [game?.download_links]);
 
-  if (!isOpen || !game) return null;
-
-  const menuContent = (
+  const menuContent = isOpen && game && (
     <AnimatePresence>
       <div
         className="fixed inset-0 z-[9999] flex items-start justify-start"
@@ -187,27 +188,29 @@ const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMo
               {/* Divider */}
               <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
-              {/* Report Issue */}
-              <motion.button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsReportOpen(true);
-                  onClose();
-                }}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
-                whileHover={{ x: 2 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
-                  <TriangleAlert className="h-4 w-4  text-foreground" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium  text-foreground">{t("common.reportIssue") || "Report Issue"}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {t("common.contextMenu.reportIssueDescription") || "Report a problem"}
+              {/* Report Game - FitGirl games are not reported to Ascendara */}
+              {settings.gameSource !== "fitgirl" && (
+                <motion.button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setReportGame(game);
+                    onClose();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-accent hover:translate-x-0.5"
+                  whileHover={{ x: 2 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                    <TriangleAlert className="h-4 w-4  text-foreground" />
                   </div>
-                </div>
-              </motion.button>
+                  <div className="flex-1">
+                    <div className="font-medium  text-foreground">{t("gameCard.reportGame")}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {t("gameCard.reportGameDescription")}
+                    </div>
+                  </div>
+                </motion.button>
+              )}
 
               {/* Give Feedback */}
               <motion.button
@@ -239,8 +242,15 @@ const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMo
 
   return (
     <>
-      {createPortal(menuContent, document.body)}
-      <ReportIssue isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} />
+      {menuContent && createPortal(menuContent, document.body)}
+      {reportGame && (
+        <ReportGameDialog
+          open={!!reportGame}
+          onOpenChange={open => !open && setReportGame(null)}
+          gameData={reportGame}
+          useV2={!!(settings.usingLocalIndex && reportGame.gameID)}
+        />
+      )}
     </>
   );
 };
