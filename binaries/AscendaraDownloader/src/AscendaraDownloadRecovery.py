@@ -150,4 +150,7 @@ def find_unrar():
         path = os.path.join(root, 'unrar')
         if os.path.isfile(path) and os.access(path, os.X_OK):
             return path
-    return shutil.which('unrar') or shutil.which('unrar-free')
+    candidate = shutil.which('unrar')
+    if candidate and not os.path.basename(os.path.realpath(candidate)).lower().startswith('unrar-free'):
+        return candidate
+    return None

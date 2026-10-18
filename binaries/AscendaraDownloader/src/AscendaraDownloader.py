@@ -1581,7 +1581,14 @@ class AscendaraDownloader:
             _launch_notification(self.withNotification, 'Download Started', f'Starting download for {self.game}')
         with create_robust_session() as api, create_robust_session() as session:
             client = GofileClient(api, self._check_cancelled)
-            items = client.resolve(url, password)
+            items = [
+                item for item in client.resolve(url, password)
+                if item['filename'].lower().endswith(('.zip', '.rar', '.7z'))
+                or re.search(r'\.[r-z]\d{2}$', item['filename'], re.I)
+                or _wanted(item['filename'])
+            ]
+            if not items:
+                raise RuntimeError('no_files_error: GOFile folder contains no downloadable files')
             client.authenticate_downloads(session)
             # This session must remain open through automatic archive repair.
             self._gofile_session = session

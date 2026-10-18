@@ -227,14 +227,23 @@ def _external_tool_env():
     (incompatible) library and dies with "undefined symbol: rl_print_keybinding".
     Restore the original value PyInstaller saves in LD_LIBRARY_PATH_ORIG, or strip it.
     """
-    if os.name == 'nt' or 'LD_LIBRARY_PATH' not in os.environ:
+    if os.name == 'nt':
+        return None
+    locale = os.environ.get('LC_ALL') or os.environ.get('LC_CTYPE') or os.environ.get('LANG') or ''
+    needs_utf8 = 'utf-8' not in locale.lower() and 'utf8' not in locale.lower()
+    if 'LD_LIBRARY_PATH' not in os.environ and not needs_utf8:
         return None
     env = os.environ.copy()
-    original = env.pop('LD_LIBRARY_PATH_ORIG', None)
-    if original:
-        env['LD_LIBRARY_PATH'] = original
-    else:
-        env.pop('LD_LIBRARY_PATH', None)
+    if 'LD_LIBRARY_PATH' in env:
+        original = env.pop('LD_LIBRARY_PATH_ORIG', None)
+        if original:
+            env['LD_LIBRARY_PATH'] = original
+        else:
+            env.pop('LD_LIBRARY_PATH', None)
+    if needs_utf8:
+        env.pop('LC_ALL', None)
+        env['LC_CTYPE'] = 'C.UTF-8'
+        env['LANG'] = 'C.UTF-8'
     return env
 
 
@@ -352,13 +361,13 @@ def _unrar_manifest(tool, archive, destination, listing_path, cancelled, activit
     for record in records:
         values = dict(line.lstrip().split(': ', 1) for line in record.splitlines() if ': ' in line)
         name = values.get('Name')
-        if name is None:
+        if name is None or not _wanted(name):
             continue
         _check_archive_target(archive, _member_path(destination, name))
         # Links and file references must not bypass staging path validation.
-        if values.get('Type') not in ('File', 'Directory'):
+        if values.get('Type') not in ('File', 'Directory') or values.get('Attributes', '').startswith('l'):
             raise ValueError(f'Refusing archive link or unsupported entry: {name}')
-        if values['Type'] == 'File' and _wanted(name):
+        if values['Type'] == 'File' and values.get('Size', '').isdigit():
             manifest[name.replace('\\', '/')] = {'size': int(values['Size'])}
     return manifest
 
@@ -421,13 +430,19 @@ def _extract_unrar(tool, archive, destination, names, cancelled, activity):
     # Archived read-only attributes can prevent unpacking continuation archives
     # and moving/deleting staging files on Linux.
     # A UTF-8 list avoids command-line size limits for large manifests.
-    with NamedTemporaryFile(mode='w', encoding='utf-8', suffix='.unrar-list') as selection:
+    with NamedTemporaryFile(mode='w', encoding='utf-8', suffix='.unrar-list', delete=False) as selection:
+        selection_path = selection.name
         for name in sorted(names):
             selection.write(name + '\n')
-        selection.flush()
-        filters = ['-scfl', '-n@' + selection.name] if names else []
-        _run_cli([tool, 'x', '-cfg-', '-y', '-o+', '-ai', '-psteamrip.com', '-@',
+    try:
+        filters = ['-scfl', '-n@' + selection_path] if names else []
+        _run_cli([tool, 'x', '-cfg-', '-y', '-o+', '-ol-', '-ai', '-psteamrip.com', '-@',
                   *filters, '--', archive, os.path.join(destination, '')], cancelled, activity)
+    finally:
+        try:
+            os.remove(selection_path)
+        except OSError:
+            pass
 
 
 def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
@@ -513,16 +528,16 @@ def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
             _native_error(code, 'Reading archive header')
             name = header.FileNameW or header.FileName.decode('utf-8', errors='strict')
             expected_size = header.UnpSize + (header.UnpSizeHigh << 32)
-            target = _member_path(root, name)
-            if (getattr(header, 'RedirType', 0)
-                    or header.HostOS == 3 and stat.S_ISLNK(header.FileAttr)
-                    or header.HostOS != 3 and header.FileAttr & 0x400):
-                raise ValueError(f'Refusing archive link: {name!r}')
             normalized = name.replace('\\', '/')
             skip = not _wanted(name) or members is not None and normalized not in members
             directory = bool(header.Flags & 0x20) or name.endswith(('/', '\\'))
             extracting_file = not skip and not directory
             if not skip:
+                target = _member_path(root, name)
+                if (getattr(header, 'RedirType', 0)
+                        or header.HostOS == 3 and stat.S_ISLNK(header.FileAttr)
+                        or header.HostOS != 3 and header.FileAttr & 0x400):
+                    raise ValueError(f'Refusing archive link: {name!r}')
                 _check_archive_target(archive_path, target)
                 try:
                     os.makedirs(target if directory else os.path.dirname(target), exist_ok=True)
@@ -709,10 +724,11 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
                         break
                     _native_error(code, 'Reading archive header')
                     name = header.FileNameW or header.FileName.decode('utf-8')
-                    _member_path(destination, name)
-                    if _wanted(name) and not header.Flags & 0x20:
-                        state['total'] += 1
-                        total_bytes += header.UnpSize + (header.UnpSizeHigh << 32)
+                    if _wanted(name):
+                        _member_path(destination, name)
+                        if not header.Flags & 0x20:
+                            state['total'] += 1
+                            total_bytes += header.UnpSize + (header.UnpSizeHigh << 32)
                     _native_error(api.process(handle, 0, None, None), 'Listing archive')
                     report()
             finally:
@@ -764,12 +780,12 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
             for record in records:
                 values = dict(line.split(' = ', 1) for line in record.splitlines() if ' = ' in line)
                 name = values.get('Path')
-                if not name:
+                if not name or not _wanted(name):
                     continue
                 _check_archive_target(archive, _member_path(destination, name))
                 if values.get('Symbolic Link') or values.get('Hard Link') or 'l' in values.get('Attributes', '').split(' ')[-1][:1]:
                     raise ValueError(f'Refusing archive link: {name}')
-                if values.get('Folder') != '+' and not values.get('Attributes', '').startswith('D') and _wanted(name):
+                if values.get('Folder') != '+' and not values.get('Attributes', '').startswith('D'):
                     manifest[name.replace('\\', '/')] = {'size': int(values['Size'])}
             total_bytes = sum(v['size'] for v in manifest.values())
             if total_bytes > shutil.disk_usage(destination).free:
@@ -784,8 +800,8 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
                     state['name'] = names[-1]
                 state['files'] = min(state['total'], state['files'] + len(names))
                 report()
-            _run_cli([tool, 'x', '-y', '-aoa', '-psteamrip.com', '-bsp1', '-bb1', '-sccUTF-8',
-                      '-xr!*.url', '-xr!_CommonRedist', '-o' + destination, '--', archive], cancelled, cli_activity)
+            _run_cli([tool, 'x', '-y', '-aoa', '-psteamrip.com', '-bsp1', '-bb1', '-sccUTF-8', '-ssc-',
+                      '-xr!*.url', '-xr!*_commonredist*', '-o' + destination, '--', archive], cancelled, cli_activity)
         elif kind == 'exe':
             name = os.path.basename(archive)
             shutil.copyfile(archive, _member_path(destination, name))
