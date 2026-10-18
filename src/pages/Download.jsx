@@ -13,6 +13,7 @@ import {
   VerifiedDialog,
 } from "@/components/download/DownloadDialogs";
 import DownloadHero from "@/components/download/DownloadHero";
+import DownloadToolbar from "@/components/download/DownloadToolbar";
 import DownloadNotices from "@/components/download/DownloadNotices";
 import DownloadPanel from "@/components/download/DownloadPanel";
 import GameOverview from "@/components/download/GameOverview";
@@ -25,13 +26,6 @@ import ArtworkCorrectionDialog, {
 import SystemRequirements from "@/components/download/SystemRequirements";
 import { canRetryExtraction, retryExtraction } from "@/services/extractionRetryService";
 import { AlertDialog, AlertDialogDescription } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
@@ -48,17 +42,6 @@ import {
 } from "@/services/downloadQueueService";
 import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
 import { forceSyncDownloads, notifyDownloadStart } from "@/services/downloadSyncService";
-import {
-  BadgeCheck,
-  Check,
-  CheckIcon,
-  ChevronLeft,
-  Clock,
-  Heart,
-  ImageUp,
-  Share,
-  TriangleAlert,
-} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
@@ -1926,143 +1909,30 @@ function PublicDownloadPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl pb-8 pt-4 fade-in">
-      {/* Toolbar */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-2 text-muted-foreground hover:text-foreground"
-          onClick={handleBack}
-        >
-          <ChevronLeft className="h-4 w-4" />
-          {t("common.back")}
-          <kbd className="rounded border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium leading-none">
-            Esc
-          </kbd>
-        </Button>
-
-        <TooltipProvider>
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={
-                    isFavorite
-                      ? "text-primary hover:bg-primary/10 hover:text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  }
-                  onClick={handleToggleFavorite}
-                >
-                  <Heart className={`h-4 w-4 ${isFavorite ? "fill-primary" : ""}`} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-secondary">
-                  {isFavorite
-                    ? t("library.favoritesGallery.removeFromFavorites") ||
-                      "Remove from favorites"
-                    : t("library.filters.favorites.label") || "Add to favorites"}
-                </p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`gap-1.5 ${
-                isPlayLater
-                  ? "text-primary hover:bg-primary/10 hover:text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              onClick={handlePlayLater}
-            >
-              {isPlayLater ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <Clock className="h-4 w-4" />
-              )}
-              {isPlayLater ? t("gameCard.addedToPlayLater") : t("gameCard.playLater")}
-            </Button>
-
-            {gameData.gameID && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1.5 text-muted-foreground hover:text-foreground"
-                    onClick={handleShareLink}
-                  >
-                    {showShareCopySuccess ? (
-                      <>
-                        <CheckIcon className="h-4 w-4" />
-                        {t("download.linkCopied")}
-                      </>
-                    ) : (
-                      <Share className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-secondary">{t("download.shareGame")}</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-
-            {settings.gameSource !== "fitgirl" && gameData.gameID && artworkReady && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {artworkVerified ? (
-                    <span className="inline-flex h-9 cursor-default items-center gap-1.5 rounded-md px-3 text-sm font-medium text-muted-foreground">
-                      <BadgeCheck className="h-4 w-4" />
-                      {t("download.artworkCorrection.verified")}
-                    </span>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1.5 text-muted-foreground hover:text-foreground"
-                      onClick={() => setShowArtworkDialog(true)}
-                      disabled={hasCorrectedArtwork(gameData)}
-                    >
-                      <ImageUp className="h-4 w-4" />
-                      {hasCorrectedArtwork(gameData)
-                        ? t("download.artworkCorrection.submittedButton")
-                        : t("download.artworkCorrection.button")}
-                    </Button>
-                  )}
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-secondary">
-                    {artworkOverride
-                      ? t("download.artworkCorrection.verifiedApprovedTooltip")
-                      : isVerified
-                        ? t("download.artworkCorrection.verifiedGameTooltip")
-                        : t("download.artworkCorrection.tooltip")}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-
-            {settings.gameSource !== "fitgirl" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1.5 text-muted-foreground hover:text-foreground"
-                onClick={() => setShowReportDialog(true)}
-                disabled={hasReportedGame(gameData)}
-              >
-                <TriangleAlert className="h-4 w-4" />
-                {hasReportedGame(gameData)
-                  ? t("download.reported")
-                  : t("download.reportBroken")}
-              </Button>
-            )}
-          </div>
-        </TooltipProvider>
-      </div>
+      <DownloadToolbar
+        onBack={handleBack}
+        isFavorite={isFavorite}
+        onToggleFavorite={handleToggleFavorite}
+        isPlayLater={isPlayLater}
+        onTogglePlayLater={handlePlayLater}
+        canShare={!!gameData.gameID}
+        shareCopied={showShareCopySuccess}
+        onShare={handleShareLink}
+        canReport={settings.gameSource !== "fitgirl"}
+        artwork={
+          gameData.gameID && artworkReady
+            ? {
+                verified: artworkVerified,
+                approved: !!artworkOverride,
+                gameVerified: isVerified,
+                submitted: hasCorrectedArtwork(gameData),
+              }
+            : null
+        }
+        onFixArtwork={() => setShowArtworkDialog(true)}
+        reported={hasReportedGame(gameData)}
+        onReport={() => setShowReportDialog(true)}
+      />
 
       <div className="space-y-6">
         <DownloadNotices

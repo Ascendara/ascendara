@@ -1707,6 +1707,16 @@
       "torrentDisabled": "Enable torrenting in Settings to download this game.",
       "torrentSent": "Torrent sent to qBittorrent"
     },
+    "toolbar": {
+      "copied": "Copied!",
+      "favorite": "Favorite",
+      "favorited": "Favorited",
+      "inPlayLater": "In Play Later",
+      "reportIssue": "Report an issue",
+      "reportIssueHint": "Something wrong with this game? Let us know.",
+      "share": "Share",
+      "wrongArtwork": "Wrong artwork"
+    },
     "topCriticScore": "Top Critic Score",
     "trainer": "Trainer Menu",
     "understand": "I Understand, Continue",
