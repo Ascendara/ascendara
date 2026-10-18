@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Gift,
   Gamepad2,
+  BookOpen,
   Zap,
   Loader,
   ArrowUpFromLine,
@@ -295,6 +296,7 @@ function GameCardContent({ game, compact, viewCount }) {
           category: game.category || null,
           dlc: game.dlc || false,
           online: game.online || false,
+          storyOnly: game.storyOnly || false,
           download_links: game.download_links || null,
           desc: game.desc || null,
         };
@@ -333,6 +335,7 @@ function GameCardContent({ game, compact, viewCount }) {
           category: game.category,
           dlc: game.dlc,
           online: game.online,
+          storyOnly: game.storyOnly,
           download_links: game.download_links,
           desc: game.desc,
           addedAt: Date.now(),
@@ -430,7 +433,8 @@ function GameCardContent({ game, compact, viewCount }) {
     },
   ].filter(Boolean);
 
-  const hasStats = gameRating > 0 || viewCount > 0 || game.dlc || game.online;
+  const hasStats =
+    gameRating > 0 || viewCount > 0 || game.dlc || game.online || game.storyOnly;
 
   return (
     <>
@@ -558,7 +562,7 @@ function GameCardContent({ game, compact, viewCount }) {
                   </Tooltip>
                 )}
 
-                {(game.dlc || game.online) && (
+                {(game.dlc || game.online || game.storyOnly) && (
                   <div className="ml-auto flex items-center gap-1">
                     {game.dlc && (
                       <Tooltip>
@@ -583,6 +587,19 @@ function GameCardContent({ game, compact, viewCount }) {
                         </TooltipTrigger>
                         <TooltipContent>
                           <p className="text-secondary">{t("gameCard.onlineTooltip")}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {game.storyOnly && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex cursor-default items-center gap-1 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-400">
+                            <BookOpen className="h-3 w-3" />
+                            {t("gameCard.storyOnly")}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-secondary">{t("download.storyOnlyTooltip")}</p>
                         </TooltipContent>
                       </Tooltip>
                     )}

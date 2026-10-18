@@ -1656,6 +1656,8 @@
     },
     "steamLoading": "Loading game information...",
     "steamRating": "This game is rated {{rating}} apples. Apple ratings are different than Star ratings on Ascendara, and are more of a general rating of the game.",
+    "storyOnly": "STORY ONLY",
+    "storyOnlyTooltip": "Only the single-player story mode is available. Online and multiplayer modes will not work.",
     "submitReport": "Submit Report",
     "submitting": "Submitting...",
     "switchProvider": "Switch Provider",
@@ -1928,6 +1930,7 @@
       "updated": "Updated",
       "version": "Version"
     },
+    "storyOnly": "Story",
     "unfavorite": "Remove from favorites",
     "update": "Update",
     "updateAvailable": "Update Available",

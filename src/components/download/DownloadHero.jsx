@@ -209,6 +209,14 @@ export default function DownloadHero({
                   {t("download.online")}
                 </Chip>
               )}
+              {gameData.storyOnly && (
+                <Chip
+                  className="bg-amber-500/15 text-amber-500"
+                  tooltip={t("download.storyOnlyTooltip")}
+                >
+                  {t("download.storyOnly")}
+                </Chip>
+              )}
               {gameData.dlc && (
                 <Chip
                   className="bg-blue-500/15 text-blue-500"

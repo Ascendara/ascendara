@@ -8,6 +8,8 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
+import gameService from "@/services/gameService";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ArrowRightLeft,
@@ -84,6 +86,24 @@ export default function GameHero({
   const { t } = useLanguage();
   const hasVersion = game.version && game.version !== "-1";
   const executableName = game.executable?.split(/[\\/]/).pop();
+
+  // Installed game files predate the storyOnly flag, so read it from the index
+  const [indexStoryOnly, setIndexStoryOnly] = useState(false);
+  useEffect(() => {
+    setIndexStoryOnly(false);
+    if (game.storyOnly !== undefined || !game.gameID || game.isCustom) return;
+    let cancelled = false;
+    gameService
+      .findGameByGameID(game.gameID)
+      .then(match => {
+        if (!cancelled) setIndexStoryOnly(!!match?.storyOnly);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [game.gameID, game.storyOnly, game.isCustom]);
+  const storyOnly = game.storyOnly ?? indexStoryOnly;
 
   return (
     <TooltipProvider>
@@ -181,6 +201,14 @@ export default function GameHero({
                   tooltip={t("download.onlineTooltip")}
                 >
                   {t("download.online")}
+                </Chip>
+              )}
+              {storyOnly && (
+                <Chip
+                  className="bg-amber-500/15 text-amber-500"
+                  tooltip={t("download.storyOnlyTooltip")}
+                >
+                  {t("download.storyOnly")}
                 </Chip>
               )}
               {game.dlc && (
