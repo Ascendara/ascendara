@@ -4,14 +4,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Download, Info, Clock, Check, Zap, TriangleAlert, MessageSquareText } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import ReportGameDialog from "@/components/download/ReportGameDialog";
+import ArtworkCorrectionDialog, {
+  hasCorrectedArtwork,
+} from "@/components/download/ArtworkCorrectionDialog";
 import { useSettings } from "@/context/SettingsContext";
+import artworkOverrideService from "@/services/artworkOverrideService";
+import verifiedGamesService from "@/services/verifiedGamesService";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
 
 const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMore, onPlayLater, isPlayLater, onStartDownload }) => {
   const { t } = useLanguage();
   const { settings } = useSettings();
-  // Kept outside the menu so the dialog outlives it closing
+  // Kept outside the menu so the dialogs outlive it closing
   const [reportGame, setReportGame] = useState(null);
+  const [artworkGame, setArtworkGame] = useState(null);
 
   const handleClickOutside = useCallback((e) => {
     e.preventDefault();
@@ -249,6 +255,26 @@ const GameContextMenu = ({ isOpen, onClose, position, game, onDownload, onReadMo
           onOpenChange={open => !open && setReportGame(null)}
           gameData={reportGame}
           useV2={!!(settings.usingLocalIndex && reportGame.gameID)}
+          onFixArtwork={
+            reportGame.gameID &&
+            !reportGame.privateSource &&
+            !hasCorrectedArtwork(reportGame) &&
+            // Approved or verified artwork is already known to be right
+            !artworkOverrideService.peek(reportGame.gameID) &&
+            !verifiedGamesService.isVerified(reportGame.gameID)
+              ? () => {
+                  setArtworkGame(reportGame);
+                  setReportGame(null);
+                }
+              : undefined
+          }
+        />
+      )}
+      {artworkGame && (
+        <ArtworkCorrectionDialog
+          open={!!artworkGame}
+          onOpenChange={open => !open && setArtworkGame(null)}
+          gameData={artworkGame}
         />
       )}
     </>

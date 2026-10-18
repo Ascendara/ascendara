@@ -19,6 +19,9 @@ import GameOverview from "@/components/download/GameOverview";
 import ReportGameDialog, {
   hasReportedGame,
 } from "@/components/download/ReportGameDialog";
+import ArtworkCorrectionDialog, {
+  hasCorrectedArtwork,
+} from "@/components/download/ArtworkCorrectionDialog";
 import SystemRequirements from "@/components/download/SystemRequirements";
 import { canRetryExtraction, retryExtraction } from "@/services/extractionRetryService";
 import { AlertDialog, AlertDialogDescription } from "@/components/ui/alert-dialog";
@@ -36,6 +39,7 @@ import { sanitizeText } from "@/lib/utils";
 import { useGameViews } from "@/hooks/useGameViews";
 import imageCacheService from "@/services/imageCacheService";
 import steamGridImageService from "@/services/steamGridImageService";
+import artworkOverrideService from "@/services/artworkOverrideService";
 import { cacheDownloadData } from "@/services/retryGameDownloadService";
 import {
   addToQueue,
@@ -45,11 +49,13 @@ import {
 import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
 import { forceSyncDownloads, notifyDownloadStart } from "@/services/downloadSyncService";
 import {
+  BadgeCheck,
   Check,
   CheckIcon,
   ChevronLeft,
   Clock,
   Heart,
+  ImageUp,
   Share,
   TriangleAlert,
 } from "lucide-react";
@@ -315,6 +321,11 @@ function PublicDownloadPage() {
   const [showNoDownloadPath, setShowNoDownloadPath] = useState(false);
   const [cachedImage, setCachedImage] = useState(null);
   const [coverGridUrl, setCoverGridUrl] = useState(null);
+  // Approved community artwork correction; wins over name-matched artwork
+  const [artworkOverride, setArtworkOverride] = useState(null);
+  // False until we know whether an override exists, so the wrong art never flashes
+  const [artworkReady, setArtworkReady] = useState(true);
+  const [showArtworkDialog, setShowArtworkDialog] = useState(false);
   const [isValidLink, setIsValidLink] = useState(true);
   const [torrentRunning, setIsTorrentRunning] = useState(false);
   const [showCopySuccess, setShowCopySuccess] = useState(false);
@@ -1578,6 +1589,15 @@ function PublicDownloadPage() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    let cancelled = false;
+    const usesOverrides = !!(gameData?.gameID && !gameData.privateSource);
+    const cachedOverride = usesOverrides
+      ? artworkOverrideService.peek(gameData.gameID)
+      : null;
+    setArtworkOverride(cachedOverride || null);
+    setCoverGridUrl(cachedOverride?.gridUrl || null);
+    setArtworkReady(!usesOverrides || cachedOverride !== undefined);
+
     const loadCachedImage = async () => {
       if (gameData?.imgID) {
         const image = await imageCacheService.getImage(gameData.imgID);
@@ -1600,9 +1620,21 @@ function PublicDownloadPage() {
     // and is applied directly at render time if this comes back null.
     const loadCoverGrid = async () => {
       if (!gameData?.game) return;
+      if (usesOverrides) {
+        // Refreshes the cached answer too, so newly approved fixes show up
+        const override = await artworkOverrideService.fetch(gameData.gameID);
+        if (cancelled) return;
+        setArtworkOverride(override);
+        setArtworkReady(true);
+        if (override?.gridUrl) {
+          setCoverGridUrl(override.gridUrl);
+          return;
+        }
+        if (cachedOverride?.gridUrl) setCoverGridUrl(null);
+      }
       try {
         const full = await steamGridImageService.getFullAssets(gameData.game);
-        if (full?.grid) {
+        if (!cancelled && full?.grid) {
           setCoverGridUrl(full.grid);
         }
       } catch (e) {
@@ -1612,6 +1644,9 @@ function PublicDownloadPage() {
     loadCoverGrid();
     loadCachedImage();
     checkDownloadPath();
+    return () => {
+      cancelled = true;
+    };
   }, [gameData, navigate]);
 
   useEffect(() => {
@@ -1843,6 +1878,9 @@ function PublicDownloadPage() {
           ? "seamless"
           : "manual";
 
+  // Approved correction or a verified game means the artwork is known to be right
+  const artworkVerified = !!artworkOverride || isVerified;
+
   const rawProviderLink = downloadLinks[selectedProvider]?.[0];
   const providerLink = rawProviderLink?.startsWith("//")
     ? `https:${rawProviderLink}`
@@ -1851,9 +1889,11 @@ function PublicDownloadPage() {
   const steamCover = steamData?.cover
     ? steamService.formatImageUrl(steamData.cover.url, "cover_big")
     : null;
-  const bannerImage = steamData?.screenshots?.[0]
-    ? steamService.formatImageUrl(steamData.screenshots[0].url, "screenshot_huge")
-    : cachedImage;
+  const bannerImage =
+    artworkOverride?.heroUrl ||
+    (steamData?.screenshots?.[0]
+      ? steamService.formatImageUrl(steamData.screenshots[0].url, "screenshot_huge")
+      : cachedImage);
 
   return (
     <div className="mx-auto w-full max-w-7xl pb-8 pt-4 fade-in">
@@ -1942,6 +1982,41 @@ function PublicDownloadPage() {
               </Tooltip>
             )}
 
+            {settings.gameSource !== "fitgirl" && gameData.gameID && artworkReady && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {artworkVerified ? (
+                    <span className="inline-flex h-9 cursor-default items-center gap-1.5 rounded-md px-3 text-sm font-medium text-muted-foreground">
+                      <BadgeCheck className="h-4 w-4" />
+                      {t("download.artworkCorrection.verified")}
+                    </span>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowArtworkDialog(true)}
+                      disabled={hasCorrectedArtwork(gameData)}
+                    >
+                      <ImageUp className="h-4 w-4" />
+                      {hasCorrectedArtwork(gameData)
+                        ? t("download.artworkCorrection.submittedButton")
+                        : t("download.artworkCorrection.button")}
+                    </Button>
+                  )}
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-secondary">
+                    {artworkOverride
+                      ? t("download.artworkCorrection.verifiedApprovedTooltip")
+                      : isVerified
+                        ? t("download.artworkCorrection.verifiedGameTooltip")
+                        : t("download.artworkCorrection.tooltip")}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
             {settings.gameSource !== "fitgirl" && (
               <Button
                 variant="ghost"
@@ -1982,9 +2057,10 @@ function PublicDownloadPage() {
           <div className="min-w-0 lg:col-start-1">
             <DownloadHero
               gameData={gameData}
-              bannerImage={bannerImage}
-              coverImage={coverGridUrl || steamCover}
+              bannerImage={artworkReady ? bannerImage : null}
+              coverImage={artworkReady ? coverGridUrl || steamCover : null}
               coverFallback={steamCover}
+              artworkLoading={!artworkReady}
               isVerified={isVerified}
               onShowVerified={() => setShowVerifiedDialog(true)}
               gameRating={gameRating}
@@ -2082,7 +2158,23 @@ function PublicDownloadPage() {
         onOpenChange={setShowReportDialog}
         gameData={gameData}
         useV2={!!(settings.usingLocalIndex && gameData.gameID)}
+        onFixArtwork={
+          gameData.gameID && !artworkVerified && !hasCorrectedArtwork(gameData)
+            ? () => {
+                setShowReportDialog(false);
+                setShowArtworkDialog(true);
+              }
+            : undefined
+        }
       />
+
+      {gameData.gameID && (
+        <ArtworkCorrectionDialog
+          open={showArtworkDialog}
+          onOpenChange={setShowArtworkDialog}
+          gameData={gameData}
+        />
+      )}
 
       <TimemachineDialog
         gameData={gameData}

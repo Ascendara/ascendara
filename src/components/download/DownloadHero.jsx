@@ -82,6 +82,7 @@ export default function DownloadHero({
   bannerImage,
   coverImage,
   coverFallback,
+  artworkLoading,
   isVerified,
   onShowVerified,
   gameRating,
@@ -116,8 +117,11 @@ export default function DownloadHero({
 
         {/* Identity */}
         <div
-          className={`relative flex items-end gap-5 px-6 pb-5 ${coverImage ? "-mt-24" : "-mt-10"}`}
+          className={`relative flex items-end gap-5 px-6 pb-5 ${coverImage || artworkLoading ? "-mt-24" : "-mt-10"}`}
         >
+          {artworkLoading && !coverImage && (
+            <div className="h-44 w-[7.5rem] shrink-0 animate-pulse rounded-lg bg-muted shadow-lg ring-1 ring-white/10" />
+          )}
           {coverImage && (
             <img
               src={coverImage}
