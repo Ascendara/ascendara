@@ -33,6 +33,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { sanitizeText } from "@/lib/utils";
+import { useGameViews } from "@/hooks/useGameViews";
 import imageCacheService from "@/services/imageCacheService";
 import steamGridImageService from "@/services/steamGridImageService";
 import { cacheDownloadData } from "@/services/retryGameDownloadService";
@@ -349,6 +350,8 @@ function PublicDownloadPage() {
   });
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
   const [isVerified, setIsVerified] = useState(false);
+  // Read-only: the ref is never attached, so opening this page does not count a view
+  const [, viewCount] = useGameViews(gameData?.gameID, !gameData?.privateSource);
   const [showVerifiedDialog, setShowVerifiedDialog] = useState(false);
   const [torboxDisabledForSession, setTorboxDisabledForSession] = useState(false);
   const [isExternalSourcesMode, setIsExternalSourcesMode] = useState(false);
@@ -1985,6 +1988,7 @@ function PublicDownloadPage() {
               isVerified={isVerified}
               onShowVerified={() => setShowVerifiedDialog(true)}
               gameRating={gameRating}
+              viewCount={viewCount}
               hasWrittenReviews={
                 writtenReviews.gameID === gameData.gameID && writtenReviews.count > 0
               }

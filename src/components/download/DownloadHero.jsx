@@ -15,13 +15,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatLatestUpdate } from "@/lib/utils";
+import { formatLatestUpdate, formatCompactNumber } from "@/lib/utils";
 import hltbService from "@/services/hltbService";
 import {
   Apple,
   CircleSlash,
   Clock,
   ExternalLink,
+  Eye,
   FileQuestion,
   History,
   ShieldCheck,
@@ -84,6 +85,7 @@ export default function DownloadHero({
   isVerified,
   onShowVerified,
   gameRating,
+  viewCount,
   hasWrittenReviews,
   onReadReviews,
   steamRating,
@@ -182,6 +184,17 @@ export default function DownloadHero({
                 >
                   <Apple className="h-3 w-3 fill-current" />
                   {steamRating}
+                </Chip>
+              )}
+              {viewCount > 0 && (
+                <Chip
+                  className="bg-muted text-muted-foreground"
+                  tooltip={t("gameCard.viewsTooltip")}
+                >
+                  <Eye className="h-3 w-3" />
+                  <span className="tabular-nums">
+                    {t("gameCard.views", { views: formatCompactNumber(viewCount) })}
+                  </span>
                 </Chip>
               )}
               {gameData.online && (
