@@ -10,6 +10,15 @@
  * Note: This will run the build_ascendara.py script to build the index files, then build the app.
  */
 
+const path = require("path");
+try {
+  const projectRoot = path.resolve(__dirname, "..");
+  if (process.cwd() !== projectRoot && require("fs").existsSync(path.join(projectRoot, "package.json"))) {
+    process.chdir(projectRoot);
+  }
+} catch (e) {
+  // Ignore cwd change failures in packaged environments
+}
 require("dotenv").config();
 
 // Finder-launched apps do not inherit Homebrew paths. Child game processes need Wine too.
@@ -20,7 +29,6 @@ if (process.platform !== "win32") {
 const { app, BrowserWindow, Tray, Menu, nativeImage, powerMonitor } = require("electron");
 const http = require("http");
 const { proxyLocalRequest } = require("./modules/local-api-proxy");
-const path = require("path");
 const fs = require("fs-extra");
 const { isLinux } = require("./modules/config");
 const {
@@ -74,6 +82,76 @@ if (isDev) {
 let tray = null;
 let localServer = null;
 let watcherProcess = null;
+let devViteProcess = null;
+
+function isLocalPortOpen(port, host = "localhost") {
+  const net = require("net");
+  return new Promise(resolve => {
+    const socket = net.createConnection({ port, host });
+    let settled = false;
+    const finish = open => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(open);
+    };
+    socket.setTimeout(500);
+    socket.once("connect", () => finish(true));
+    socket.once("timeout", () => finish(false));
+    socket.once("error", () => finish(false));
+  });
+}
+
+async function ensureDevServerRunning() {
+  if (!isDev) return;
+  if (await isLocalPortOpen(5173)) return;
+
+  const viteBin = path.resolve(__dirname, "../node_modules/vite/bin/vite.js");
+  if (!fs.existsSync(viteBin)) return;
+
+  console.log("Dev server not running on port 5173, starting Vite automatically...");
+  const { spawn } = require("child_process");
+  devViteProcess = spawn(process.execPath, [viteBin], {
+    cwd: path.resolve(__dirname, ".."),
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: "1",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+
+  devViteProcess.stdout.on("data", data => {
+    console.log(`[VITE] ${data.toString().trim()}`);
+  });
+  devViteProcess.stderr.on("data", data => {
+    console.error(`[VITE ERROR] ${data.toString().trim()}`);
+  });
+  devViteProcess.on("exit", () => {
+    devViteProcess = null;
+  });
+
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    if (await isLocalPortOpen(5173)) {
+      console.log("Vite dev server is ready on http://localhost:5173");
+      return;
+    }
+    await new Promise(resolve => setTimeout(resolve, 150));
+  }
+}
+
+function terminateDevServer() {
+  if (devViteProcess && !devViteProcess.killed) {
+    if (process.platform === "win32") {
+      const { exec } = require("child_process");
+      exec(`taskkill /pid ${devViteProcess.pid} /T /F`, () => {});
+    } else {
+      devViteProcess.kill("SIGTERM");
+    }
+    devViteProcess = null;
+  }
+}
 
 /**
  * Launch crash reporter
@@ -409,14 +487,18 @@ async function initializeApp() {
           });
       });
 
-      // Handle server errors (e.g., port in use)
-      localServer.on("error", err => {
-        console.error("Local server error:", err.message);
+      await new Promise(resolve => {
+        localServer.once("error", err => {
+          console.error("Local server error:", err.message);
+          resolve();
+        });
+        localServer.listen(46859, "127.0.0.1", () => {
+          console.log("Local server running at http://localhost:46859");
+          resolve();
+        });
       });
-
-      localServer.listen(46859, "127.0.0.1", () => {
-        console.log("Local server running at http://localhost:46859");
-      });
+    } else {
+      await ensureDevServerRunning();
     }
 
     // Register critical IPC handlers first (needed for window to function)
@@ -445,20 +527,21 @@ async function initializeApp() {
       }, 500);
     });
 
-    // Handle pending protocol URLs
+    // Handle pending protocol URLs and command line protocol URL (Windows/Linux)
     const pendingUrls = protocol.getPendingUrls();
-    if (pendingUrls.length > 0) {
-      mainWindow.webContents.once("did-finish-load", () => {
-        pendingUrls.forEach(url => protocol.handleProtocolUrl(url));
-      });
+    const protocolUrl = protocol.findProtocolUrlInArgs(process.argv);
+    if (protocolUrl && !pendingUrls.includes(protocolUrl)) {
+      pendingUrls.push(protocolUrl);
     }
-
-    // Handle protocol URL from command line (Windows)
-    const protocolUrl = process.argv.find(arg => arg.startsWith("ascendara://"));
-    if (protocolUrl) {
-      mainWindow.webContents.once("did-finish-load", () => {
-        protocol.handleProtocolUrl(protocolUrl);
-      });
+    if (pendingUrls.length > 0) {
+      const deliverPendingUrls = () => {
+        pendingUrls.forEach(url => protocol.handleProtocolUrl(url));
+      };
+      if (mainWindow.webContents.isLoading()) {
+        mainWindow.webContents.once("did-finish-load", deliverPendingUrls);
+      } else {
+        deliverPendingUrls();
+      }
     }
 
     // Force repaint after system resume or display wake to fix idle black screens
@@ -515,6 +598,7 @@ async function initializeApp() {
     // Cleanup Discord RPC and achievement watcher
     discordRpc.destroyDiscordRPC();
     terminateWatcher();
+    terminateDevServer();
   });
 
   // Will quit cleanup
@@ -523,6 +607,7 @@ async function initializeApp() {
 
     // Ensure watcher is terminated
     terminateWatcher();
+    terminateDevServer();
 
     // Final check for any remaining achievement watcher processes
     // NOTE: Do NOT kill AscendaraDownloader.exe - downloads should continue in background

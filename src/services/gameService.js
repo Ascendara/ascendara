@@ -928,7 +928,25 @@ const gameService = {
       }
 
       // O(1) lookup from the map
-      const game = memoryCache.gameIdMap.get(gameID);
+      let game = memoryCache.gameIdMap.get(gameID);
+
+      // If not found and a custom/private source is active, fall back to the local index
+      if (!game && memoryCache.customSourceUrl) {
+        const settings = await window.electron?.getSettings?.();
+        if (settings?.localIndex) {
+          const localData = await this.fetchDataFromLocalIndex(settings.localIndex).catch(
+            () => null
+          );
+          const localMatch = localData?.games?.find(g => g.gameID === gameID);
+          if (localMatch) {
+            game = {
+              ...localMatch,
+              download_links: localMatch.download_links || {},
+            };
+          }
+        }
+      }
+
       if (!game) {
         console.warn(`No game found with game ID: ${gameID}`);
         return null;

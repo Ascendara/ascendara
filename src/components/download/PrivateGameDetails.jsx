@@ -85,9 +85,20 @@ export default function PrivateGameDetails({ initialGame }) {
     navigate("/downloads");
   };
   const metadata = game.privateMetadata || {};
+  const handleBack = () => {
+    if (
+      window.history.state &&
+      typeof window.history.state.idx === "number" &&
+      window.history.state.idx > 0
+    ) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  };
   return (
     <div className="container mx-auto max-w-6xl space-y-6 p-6">
-      <Button variant="ghost" className="gap-2" onClick={() => navigate(-1)}>
+      <Button variant="ghost" className="gap-2" onClick={handleBack}>
         <ArrowLeft className="h-4 w-4" />
         {t("common.back")}
       </Button>

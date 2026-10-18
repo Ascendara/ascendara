@@ -15,7 +15,30 @@ let lastHandleTime = 0;
 let pendingUrls = new Set();
 const pendingCheckoutSessions = new Set();
 const pendingBrowserDownloads = new Set();
+const pendingGameUrls = new Set();
 const URL_DEBOUNCE_TIME = 2000;
+
+function findProtocolUrlInArgs(args = process.argv) {
+  if (!Array.isArray(args)) return null;
+  for (const rawArg of args) {
+    if (typeof rawArg !== "string") continue;
+    const cleaned = rawArg.trim().replace(/^["']+|["']+$/g, "");
+    if (cleaned.startsWith("ascendara://")) {
+      return cleaned;
+    }
+  }
+  return null;
+}
+
+function parseGameIdFromUrl(cleanUrl) {
+  if (typeof cleanUrl !== "string") return "";
+  const route = cleanUrl.slice("ascendara://".length).split(/[/?#]/)[0];
+  if (route !== "game") return "";
+  return cleanUrl
+    .replace(/^ascendara:\/\/game\/?\??/i, "")
+    .replace(/[/?#].*$/, "")
+    .trim();
+}
 
 /**
  * Bring the main window to the foreground, restoring/showing it if needed.
@@ -47,8 +70,13 @@ function focusMainWindow() {
 function handleProtocolUrl(url) {
   if (!url) return;
 
-  const cleanUrl = url.trim();
+  const cleanUrl = url.trim().replace(/^["']+|["']+$/g, "");
   if (!cleanUrl.startsWith("ascendara://")) return;
+
+  const earlyGameId = parseGameIdFromUrl(cleanUrl);
+  if (earlyGameId) {
+    pendingGameUrls.add(earlyGameId);
+  }
 
   const existingWindow = BrowserWindow.getAllWindows().find(win => win);
 
@@ -155,8 +183,9 @@ function handleProtocolUrl(url) {
         }
       } else if (route === "game") {
         try {
-          const gameID = cleanUrl.split("?").pop().replace("/", "");
+          const gameID = parseGameIdFromUrl(cleanUrl);
           if (gameID) {
+            pendingGameUrls.add(gameID);
             console.log("Sending game URL to renderer with gameID:", gameID);
             existingWindow.webContents.send("protocol-game-url", { gameID });
           }
@@ -206,6 +235,10 @@ function registerProtocolHandlers() {
   ipcMain.handle("get-pending-urls", () => {
     return getPendingUrls();
   });
+  ipcMain.handle("get-pending-game-urls", () => [...pendingGameUrls]);
+  ipcMain.handle("acknowledge-game-url", (_event, gameID) =>
+    pendingGameUrls.delete(gameID)
+  );
   ipcMain.handle("get-pending-browser-downloads", () => [...pendingBrowserDownloads]);
   ipcMain.handle("acknowledge-browser-download", (_event, url) =>
     pendingBrowserDownloads.delete(url)
@@ -297,7 +330,7 @@ function setupSingleInstance() {
         // Otherwise (e.g. user just relaunched the app normally), signal the
         // existing instance to bring its window to the front - this matters
         // when it was started hidden (start minimized on login).
-        const protocolUrl = process.argv.find(arg => arg.startsWith("ascendara://"));
+        const protocolUrl = findProtocolUrlInArgs(process.argv);
         fs.writeFileSync(protocolFile, protocolUrl || "ascendara://show-window", "utf8");
         console.log(
           protocolUrl
@@ -311,6 +344,13 @@ function setupSingleInstance() {
         // Stale lock file, remove it
         console.log("Removing stale lock file");
         fs.unlinkSync(lockFile);
+        if (fs.existsSync(protocolFile)) {
+          try {
+            fs.unlinkSync(protocolFile);
+          } catch (e) {
+            // Ignore
+          }
+        }
       }
     } catch (error) {
       console.error("Error reading lock file:", error);
@@ -329,6 +369,17 @@ function setupSingleInstance() {
     JSON.stringify({ pid: process.pid, timestamp: Date.now() }),
     "utf8"
   );
+
+  // Queue any startup protocol URL from argv immediately so the renderer can
+  // retrieve it even if it initializes before did-finish-load fires.
+  const startupProtocolUrl = findProtocolUrlInArgs(process.argv);
+  if (startupProtocolUrl) {
+    pendingUrls.add(startupProtocolUrl);
+    const startupGameId = parseGameIdFromUrl(startupProtocolUrl);
+    if (startupGameId) {
+      pendingGameUrls.add(startupGameId);
+    }
+  }
 
   // Watch for protocol file changes (other instances passing URLs to us)
   let protocolFileWatcher = null;
@@ -398,15 +449,7 @@ function setupSingleInstance() {
 
     // Find protocol URL in command line arguments
     // On Linux, the URL might be passed differently
-    let protocolUrl = commandLine.find(arg => arg.startsWith("ascendara://"));
-
-    // If not found in direct args, check if it's in the last argument (common on Linux)
-    if (!protocolUrl && commandLine.length > 0) {
-      const lastArg = commandLine[commandLine.length - 1];
-      if (lastArg && lastArg.startsWith("ascendara://")) {
-        protocolUrl = lastArg;
-      }
-    }
+    let protocolUrl = findProtocolUrlInArgs(commandLine);
 
     if (protocolUrl) {
       console.log("Protocol URL found in second instance:", protocolUrl);
@@ -434,6 +477,7 @@ function setupSingleInstance() {
 
 module.exports = {
   handleProtocolUrl,
+  findProtocolUrlInArgs,
   getPendingUrls,
   clearPendingUrls,
   registerProtocolHandlers,

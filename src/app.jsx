@@ -1066,6 +1066,7 @@ const AppRoutes = () => {
   const hasShownUpdateReadyNotification = useRef(false);
   const protocolHandlerRef = useRef(null);
   const unsubscribeProtocolRef = useRef(null);
+  const lastHandledGameProtocolRef = useRef({ gameID: null, time: 0 });
 
   useEffect(() => {
     const loadIconPath = async () => {
@@ -1155,16 +1156,35 @@ const AppRoutes = () => {
 
       try {
         // Set up game protocol URL listener
-        const handleGameProtocol = async (event, { gameID }) => {
+        const handleGameProtocol = async (event, payload) => {
+          const gameID = typeof payload === "string" ? payload : payload?.gameID;
           console.log("Received game protocol URL with gameID:", gameID);
           if (!gameID) {
             console.error("No gameID received in game protocol URL");
-            return;
+            return false;
           }
 
+          // Clean the gameID by removing any query parameters or slashes
+          const cleanGameID = String(gameID).replace(/[?/]/g, "").trim();
+          window.electron?.acknowledgeGameUrl?.(cleanGameID);
+          if (!cleanGameID) {
+            console.error("Empty gameID after cleaning:", gameID);
+            return false;
+          }
+
+          const now = Date.now();
+          if (
+            lastHandledGameProtocolRef.current.gameID === cleanGameID &&
+            now - lastHandledGameProtocolRef.current.time < 2000
+          ) {
+            return true;
+          }
+          lastHandledGameProtocolRef.current = { gameID: cleanGameID, time: now };
+
+          // Prevent the default landing page redirect from overriding the download page
+          setHasInitialRedirect(true);
+
           try {
-            // Clean the gameID by removing any query parameters or slashes
-            const cleanGameID = gameID.replace(/[?/]/g, "");
             console.log("Looking up game with cleaned gameID:", cleanGameID);
 
             // Find the game using the efficient lookup service
@@ -1175,7 +1195,7 @@ const AppRoutes = () => {
               toast.error("Game not found", {
                 description: "The requested game could not be found.",
               });
-              return;
+              return false;
             }
 
             console.log("Navigating to download page with game:", game.game);
@@ -1189,11 +1209,13 @@ const AppRoutes = () => {
                 },
               },
             });
+            return true;
           } catch (error) {
             console.error("Error handling game protocol:", error);
             toast.error("Error", {
               description: "Failed to load game information.",
             });
+            return false;
           }
         };
 
@@ -1204,6 +1226,18 @@ const AppRoutes = () => {
         unsubscribeProtocolRef.current = window.electron.onProtocolGameUrl(
           protocolHandlerRef.current
         );
+
+        // Drain any game protocol URLs that arrived while the app was starting up
+        try {
+          const pendingGameIds = await window.electron.getPendingGameUrls?.();
+          if (Array.isArray(pendingGameIds) && pendingGameIds.length > 0) {
+            for (const pendingId of pendingGameIds) {
+              await handleGameProtocol(null, { gameID: pendingId });
+            }
+          }
+        } catch (error) {
+          console.error("Error reading pending game protocol URLs:", error);
+        }
 
         // Check if we're forcing a loading screen from settings
         const forceLoading = localStorage.getItem("forceLoading");

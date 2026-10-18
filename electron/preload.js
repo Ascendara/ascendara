@@ -426,6 +426,8 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   // PROTOCOL & DEEP LINKS
   //===========================================================================
+  getPendingGameUrls: () => ipcRenderer.invoke("get-pending-game-urls"),
+  acknowledgeGameUrl: gameID => ipcRenderer.invoke("acknowledge-game-url", gameID),
   getPendingBrowserDownloads: () => ipcRenderer.invoke("get-pending-browser-downloads"),
   acknowledgeBrowserDownload: url =>
     ipcRenderer.invoke("acknowledge-browser-download", url),

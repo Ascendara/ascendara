@@ -78,7 +78,12 @@ function createWindow() {
   mainWindow.once("ready-to-show", () => {
     console.log("ready-to-show event fired");
     windowShown = true;
-    const shouldStartHidden = process.argv.includes("--hidden");
+    const hasProtocolArg = process.argv.some(
+      arg =>
+        typeof arg === "string" &&
+        arg.trim().replace(/^["']+|["']+$/g, "").startsWith("ascendara://")
+    );
+    const shouldStartHidden = process.argv.includes("--hidden") && !hasProtocolArg;
 
     if (shouldStartHidden) {
       mainWindowHidden = true;

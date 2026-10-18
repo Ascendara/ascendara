@@ -150,6 +150,14 @@
     "extraMetadata": {
       "main": "electron/app.js"
     },
+    "protocols": [
+      {
+        "name": "Ascendara",
+        "schemes": [
+          "ascendara"
+        ]
+      }
+    ],
     "win": {
       "target": "nsis",
       "extraResources": [

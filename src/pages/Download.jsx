@@ -200,6 +200,25 @@ function PublicDownloadPage() {
   const { settings, setSettings } = useSettings();
   const { isAuthenticated, userData } = useAuth();
 
+  const handleBack = () => {
+    if (
+      window.history.state &&
+      typeof window.history.state.idx === "number" &&
+      window.history.state.idx > 0
+    ) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  };
+
+  useEffect(() => {
+    if (state?.gameData) {
+      setGameData(state.gameData);
+      setIsUpdating(state.gameData.isUpdating || false);
+    }
+  }, [state?.gameData]);
+
   useEffect(() => {
     fetchProviderPatterns()
       .then(setProviderPatterns)
@@ -1701,7 +1720,7 @@ function PublicDownloadPage() {
       // This page can stay mounted while hidden (e.g. behind the persistent
       // Search page), so only react to Escape while /download is the active route.
       if (event.key === "Escape" && location.pathname === "/download") {
-        navigate(-1);
+        handleBack();
       }
     };
 
@@ -1777,6 +1796,16 @@ function PublicDownloadPage() {
 
   const downloadLinks = gameData?.download_links || {};
   const hasProviders = Object.keys(downloadLinks).length > 0;
+  // On Ascendara's index, no links of any kind (not just none usable with the
+  // current settings) means the files were taken down because they stopped working
+  const filesUnavailable =
+    settings.gameSource !== "fitgirl" &&
+    !isExternalSourcesMode &&
+    !Object.values(downloadLinks).some(
+      links =>
+        Array.isArray(links) &&
+        links.some(link => typeof link === "string" && link.trim().length > 0)
+    );
 
   const providers = hasProviders
     ? Object.entries(downloadLinks)
@@ -1903,7 +1932,7 @@ function PublicDownloadPage() {
           variant="ghost"
           size="sm"
           className="gap-2 text-muted-foreground hover:text-foreground"
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
         >
           <ChevronLeft className="h-4 w-4" />
           {t("common.back")}
@@ -2085,6 +2114,7 @@ function PublicDownloadPage() {
               gameData={gameData}
               settings={settings}
               providers={providers}
+              filesUnavailable={filesUnavailable}
               selectedProvider={selectedProvider}
               onProviderChange={setSelectedProvider}
               torboxEnabled={torboxEnabled}

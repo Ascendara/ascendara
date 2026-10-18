@@ -1458,6 +1458,17 @@
     "downloadSource": "Download Source",
     "enableProtection": "Enable Protection",
     "failedToLoadSpecs": "Failed to load system specs",
+    "filesUnavailable": {
+      "checkBack": "There's nothing to fix on your side. If working files become available again, the download options will come back after you refresh your game index.",
+      "description": "There are no working download links for this game right now. The files were most likely taken down because they no longer work.",
+      "learnMore": "Learn why this happens",
+      "reasons": {
+        "notWorking": "A game update, server-side check, or broken files stopped the release from working",
+        "onlineFix": "The online fix stopped working, for example because its shared account was banned",
+        "removed": "The files were removed from every download provider"
+      },
+      "title": "Game files are not available"
+    },
     "firstReleasedOn": "Game Released",
     "gameNeedsEmulator": "This requires an emulator to run.",
     "gameNeedsVR": "VR may be required for this game.",

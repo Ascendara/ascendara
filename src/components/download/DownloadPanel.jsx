@@ -21,6 +21,7 @@ import {
   CopyIcon,
   Download,
   ExternalLink,
+  FileX,
   Loader,
   Puzzle,
   TriangleAlert,
@@ -74,6 +75,57 @@ function StepList({ steps }) {
   );
 }
 
+const FILES_UNAVAILABLE_DOCS_URL =
+  "https://ascendara.app/docs/troubleshooting/common-issues#game-files-are-not-available";
+
+/**
+ * Shown instead of the download card when a game has no download links at all,
+ * which means its files were taken down because they no longer work.
+ */
+function FilesUnavailable() {
+  const { t } = useLanguage();
+  return (
+    <section className="rounded-xl border border-yellow-500/30 bg-card p-5 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-500/10">
+          <FileX className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-semibold leading-tight text-foreground">
+            {t("download.filesUnavailable.title")}
+          </h2>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {t("download.filesUnavailable.description")}
+          </p>
+        </div>
+      </div>
+
+      <ul className="mt-4 space-y-2 text-xs text-muted-foreground">
+        {["onlineFix", "notWorking", "removed"].map(reason => (
+          <li key={reason} className="flex items-start gap-2.5">
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-500/70" />
+            <span className="leading-relaxed">
+              {t(`download.filesUnavailable.reasons.${reason}`)}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-4 rounded-lg bg-muted/40 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+        {t("download.filesUnavailable.checkBack")}
+      </div>
+
+      <button
+        onClick={() => window.electron.openURL(FILES_UNAVAILABLE_DOCS_URL)}
+        className="mt-3 inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+      >
+        {t("download.filesUnavailable.learnMore")}
+        <ExternalLink className="h-3 w-3 shrink-0" />
+      </button>
+    </section>
+  );
+}
+
 /**
  * The download card on the game page. `mode` decides which flow is shown:
  * "fitgirl" | "torrent" | "seamless" | "manual".
@@ -106,8 +158,11 @@ export default function DownloadPanel({
   onRetryBrowserLink,
   showBrowserDownloadTip,
   onBrowserDownloadTipChange,
+  filesUnavailable,
 }) {
   const { t } = useLanguage();
+  if (filesUnavailable) return <FilesUnavailable />;
+
   const usingTorbox = torboxAvailable && !torboxDisabledForSession;
   const opensInBrowser =
     selectedProvider === "buzzheavier" || selectedProvider === "megadb";
