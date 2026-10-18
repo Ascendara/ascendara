@@ -155,17 +155,19 @@ export default function DownloadHero({
             </h1>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              {gameData.version && (
-                <Chip className="bg-primary/15 text-primary">
-                  {gameData.version}
-                  {showTimemachine && (
-                    <History
-                      onClick={onOpenTimemachine}
-                      className="h-3.5 w-3.5 cursor-pointer hover:text-primary/80"
-                    />
-                  )}
-                </Chip>
-              )}
+              {gameData.version &&
+                (showTimemachine ? (
+                  <Chip
+                    className="bg-primary/15 text-primary transition-colors hover:bg-primary/25"
+                    tooltip={t("download.timemachine.openTooltip")}
+                    onClick={onOpenTimemachine}
+                  >
+                    {gameData.version}
+                    <History className="h-3.5 w-3.5" />
+                  </Chip>
+                ) : (
+                  <Chip className="bg-primary/15 text-primary">{gameData.version}</Chip>
+                ))}
               {gameRating > 0 && (
                 <Chip
                   className="bg-yellow-400/15 text-yellow-600 dark:text-yellow-400"

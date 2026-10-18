@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/LanguageContext";
-import { AlertTriangle, Library, RotateCcw } from "lucide-react";
+import { AlertTriangle, History, Library, RotateCcw, Undo2 } from "lucide-react";
 
 const TONES = {
   primary: "border-primary/40 bg-primary/10 text-primary",
@@ -32,15 +32,47 @@ export default function DownloadNotices({
   showAntivirusWarning,
   onEnableProtection,
   onDismissAntivirusWarning,
+  olderVersion,
+  onBackToLatest,
+  onOpenTimemachine,
 }) {
   const { t } = useLanguage();
 
-  if (!showRetryExtraction && !isGameInstalled && !showAntivirusWarning) {
+  if (!showRetryExtraction && !isGameInstalled && !showAntivirusWarning && !olderVersion) {
     return null;
   }
 
   return (
     <div className="space-y-2">
+      {olderVersion && (
+        <Notice
+          tone="primary"
+          icon={History}
+          actions={
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-primary hover:bg-primary/10 hover:text-primary"
+                onClick={onOpenTimemachine}
+              >
+                {t("download.timemachine.otherVersions")}
+              </Button>
+              <Button size="sm" className="gap-1.5 text-secondary" onClick={onBackToLatest}>
+                <Undo2 className="h-3.5 w-3.5" />
+                {t("download.timemachine.backToLatest")}
+              </Button>
+            </>
+          }
+        >
+          <span className="font-medium">{t("download.timemachine.viewingOlderTitle")}</span>{" "}
+          {t("download.timemachine.viewingOlder", {
+            version: olderVersion.version || t("download.timemachine.unknownVersion"),
+            latest: olderVersion.latest || t("download.timemachine.unknownVersion"),
+          })}
+        </Notice>
+      )}
+
       {showRetryExtraction && (
         <Notice
           tone="warning"

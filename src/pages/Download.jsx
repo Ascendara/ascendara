@@ -178,6 +178,8 @@ function PublicDownloadPage() {
   const navigate = useNavigate();
   const [providerPatterns, setProviderPatterns] = useState(null);
   const [gameData, setGameData] = useState(state?.gameData);
+  // The live entry, kept while an older Time Machine version is being viewed
+  const [latestGameData, setLatestGameData] = useState(null);
   const [isUpdating, setIsUpdating] = useState(state?.gameData?.isUpdating || false);
   const { t } = useLanguage();
   const { settings, setSettings } = useSettings();
@@ -198,9 +200,41 @@ function PublicDownloadPage() {
   useEffect(() => {
     if (state?.gameData) {
       setGameData(state.gameData);
+      setLatestGameData(null);
       setIsUpdating(state.gameData.isUpdating || false);
     }
   }, [state?.gameData]);
+
+  const handleTimemachineSelect = release => {
+    const latest = latestGameData || gameData;
+    if (release.live) {
+      setGameData(latest);
+      setLatestGameData(null);
+      return;
+    }
+    setLatestGameData(latest);
+    // Older entries can predate gameIDs and use other covers, so the page keeps
+    // the live game's identity and only takes what belongs to that version
+    setGameData({
+      ...latest,
+      ...release.game,
+      gameID: latest.gameID,
+      game: latest.game,
+      imgID: latest.imgID,
+      storyOnly: latest.storyOnly,
+      hasHistory: true,
+    });
+  };
+
+  const handleBackToLatest = () => {
+    if (!latestGameData) return;
+    setGameData(latestGameData);
+    setLatestGameData(null);
+    toast.success(t("download.timemachine.backToLatestToast"), {
+      description: latestGameData.version || undefined,
+      duration: 3000,
+    });
+  };
 
   useEffect(() => {
     fetchProviderPatterns()
@@ -1949,6 +1983,13 @@ function PublicDownloadPage() {
           }
           onEnableProtection={handleEnableProtection}
           onDismissAntivirusWarning={handleDismissAntivirusWarning}
+          olderVersion={
+            latestGameData
+              ? { version: gameData.version, latest: latestGameData.version }
+              : null
+          }
+          onBackToLatest={handleBackToLatest}
+          onOpenTimemachine={() => setShowTimemachineSelection(true)}
         />
 
         {/* Game on the left, everything needed to download it on the right */}
@@ -1973,7 +2014,10 @@ function PublicDownloadPage() {
               steamRating={steamData?.rating ? (steamData.rating / 10).toFixed(1) : null}
               releaseDate={steamData?.release_date}
               hltbData={hltbData}
-              showTimemachine={timemachineSetting}
+              showTimemachine={
+                timemachineSetting &&
+                (!!gameData.hasHistory || !gameService.indexTracksHistory())
+              }
               onOpenTimemachine={() => setShowTimemachineSelection(true)}
             />
           </div>
@@ -2078,7 +2122,8 @@ function PublicDownloadPage() {
 
       <TimemachineDialog
         gameData={gameData}
-        onVersionSelect={version => setGameData(version)}
+        latestGameData={latestGameData || gameData}
+        onVersionSelect={handleTimemachineSelect}
         open={showTimemachineSelection}
         onOpenChange={setShowTimemachineSelection}
       />

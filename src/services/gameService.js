@@ -803,6 +803,12 @@ const gameService = {
     return memoryCache.localIndexPath;
   },
 
+  // The API marks indexes whose games carry hasHistory; without that mark a
+  // missing hasHistory says nothing about whether older versions exist
+  indexTracksHistory() {
+    return memoryCache.metadata?.timemachine === true;
+  },
+
   clearMemoryCache() {
     console.log("[GameService] Clearing memory cache");
     memoryCache = {
