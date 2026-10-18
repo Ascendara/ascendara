@@ -6,9 +6,8 @@ import {
   Users,
   MessageCircle,
   Settings,
-  Smartphone,
+   Smartphone,
   Bell,
-  Sparkles,
   Clock,
   BadgeCheck,
   Crown,
@@ -130,27 +129,27 @@ const AscendNavBar = ({
 
   const isItemActive = item => (item.matches || [item.id]).includes(activeSection);
 
+  const planTitle = ascendAccess?.isVerified
+    ? t("ascend.subscription.verified")
+    : ascendAccess?.isSubscribed
+      ? t("ascend.subscription.active")
+      : trialDaysRemaining > 0
+        ? t("ascend.subscription.trialDays", { days: trialDaysRemaining })
+        : t("ascend.subscription.trialExpired");
+
   const planChip = ascendAccess?.isVerified
     ? {
         icon: BadgeCheck,
         label: t("ascend.subscription.verifiedLabel"),
-        title: t("ascend.subscription.verified"),
+        title: planTitle,
         className: "border-blue-500/30 bg-blue-500/10 text-blue-500",
       }
     : ascendAccess?.isSubscribed
-      ? {
-          icon: Sparkles,
-          label: "Pro",
-          title: t("ascend.subscription.active"),
-          className: "border-green-500/30 bg-green-500/10 text-green-500",
-        }
+      ? null
       : {
           icon: Clock,
           label: `${Math.max(trialDaysRemaining, 0)}d`,
-          title:
-            trialDaysRemaining > 0
-              ? t("ascend.subscription.trialDays", { days: trialDaysRemaining })
-              : t("ascend.subscription.trialExpired"),
+          title: planTitle,
           className:
             trialDaysRemaining <= 3
               ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
@@ -214,7 +213,7 @@ const AscendNavBar = ({
               <span className="hidden sm:inline">{t("ascend.subscription.upgradeShort")}</span>
               <span className="opacity-80">· {planChip.label}</span>
             </button>
-          ) : (
+          ) : planChip ? (
             <button
               onClick={() => onSectionChange("premium")}
               title={planChip.title}
@@ -223,7 +222,7 @@ const AscendNavBar = ({
               <planChip.icon className="h-3.5 w-3.5" />
               {planChip.label}
             </button>
-          )}
+          ) : null}
 
           <button
             onClick={() => onSectionChange("notifications")}
@@ -278,7 +277,7 @@ const AscendNavBar = ({
                     <Megaphone className="h-3.5 w-3.5 shrink-0 text-purple-500" />
                   )}
                 </p>
-                <p className="truncate text-xs text-muted-foreground">{planChip.title}</p>
+                <p className="truncate text-xs text-muted-foreground">{planTitle}</p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
