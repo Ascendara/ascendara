@@ -644,6 +644,7 @@ contextBridge.exposeInMainWorld("electron", {
   fetchApiImage: (endpoint, imgID, timestamp, signature) =>
     ipcRenderer.invoke("fetch-api-image", endpoint, imgID, timestamp, signature),
   getSteamGridUrls: gameName => ipcRenderer.invoke("steamgrid-get-urls", gameName),
+  getSteamGridGrid: gameName => ipcRenderer.invoke("steamgrid-get-grid", gameName),
   getSteamGridHeader: gameName => ipcRenderer.invoke("steamgrid-get-header", gameName),
   searchSteamGridGames: term => ipcRenderer.invoke("steamgrid-search-games", term),
   getSteamGridGameArtwork: gameId =>

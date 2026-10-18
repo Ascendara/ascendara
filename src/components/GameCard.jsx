@@ -49,6 +49,7 @@ import installedGamesService from "@/services/installedGamesService";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import usePrivateArtwork from "@/hooks/usePrivateArtwork";
 import verifiedGamesService from "@/services/verifiedGamesService";
+import gamePagePreparer from "@/services/gamePagePreparer";
 import {
   SEAMLESS_PROVIDERS,
   TORBOX_PROVIDERS,
@@ -117,6 +118,7 @@ function GameCardContent({ game, compact, viewCount }) {
   const [isVerified, setIsVerified] = useState(false);
   const [showVerifiedDialog, setShowVerifiedDialog] = useState(false);
   const isMounted = useRef(true);
+  const prefetchTimer = useRef(null);
   const dialogJustClosed = useRef(false);
   const { t } = useLanguage();
   const { settings } = useSettings();
@@ -187,6 +189,7 @@ function GameCardContent({ game, compact, viewCount }) {
     return () => {
       active = false;
       isMounted.current = false;
+      clearTimeout(prefetchTimer.current);
     };
   }, [game.game, game.version]);
 
@@ -230,6 +233,25 @@ function GameCardContent({ game, compact, viewCount }) {
     });
   }, [game?.gameID]);
 
+  // Opens the download page once its artwork and details are ready, so
+  // nothing loads or swaps in after it appears
+  const openDownloadPage = useCallback(async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    await gamePagePreparer.prepare(game);
+    if (!isMounted.current) return;
+    setIsLoading(false);
+    navigate("/download", {
+      state: {
+        gameData: {
+          ...game,
+          download_links: game.download_links || {},
+          isUpdating: needsUpdate,
+        },
+      },
+    });
+  }, [navigate, game, needsUpdate, isLoading]);
+
   // Handle Card Click (Navigation)
   const handleCardClick = useCallback(() => {
     // Prevent navigation if dialog was just closed
@@ -237,18 +259,8 @@ function GameCardContent({ game, compact, viewCount }) {
       dialogJustClosed.current = false;
       return;
     }
-
-    const downloadLinks = game.download_links || {};
-    navigate("/download", {
-      state: {
-        gameData: {
-          ...game,
-          download_links: downloadLinks,
-          isUpdating: needsUpdate,
-        },
-      },
-    });
-  }, [navigate, game, needsUpdate]);
+    openDownloadPage();
+  }, [openDownloadPage]);
 
   // Handle Download Button Click
   const handleDownload = useCallback(
@@ -257,22 +269,9 @@ function GameCardContent({ game, compact, viewCount }) {
       e?.stopPropagation();
 
       if (isInstalled && !needsUpdate) return;
-      setIsLoading(true);
-
-      const downloadLinks = game.download_links || {};
-      setTimeout(() => {
-        navigate("/download", {
-          state: {
-            gameData: {
-              ...game,
-              download_links: downloadLinks,
-              isUpdating: needsUpdate,
-            },
-          },
-        });
-      });
+      openDownloadPage();
     },
-    [navigate, game, isInstalled, needsUpdate, t]
+    [openDownloadPage, isInstalled, needsUpdate]
   );
 
   // Handle Favorite Click
@@ -447,6 +446,14 @@ function GameCardContent({ game, compact, viewCount }) {
               handleCardClick();
             }
           }}
+          onPointerEnter={() => {
+            // Only once the pointer rests here, so sweeping across a grid
+            // doesn't queue lookups ahead of the game actually opened
+            clearTimeout(prefetchTimer.current);
+            prefetchTimer.current = setTimeout(() => gamePagePreparer.prefetch(game), 200);
+          }}
+          onPointerLeave={() => clearTimeout(prefetchTimer.current)}
+          aria-busy={isLoading}
           className="press group relative flex h-[420px] cursor-pointer flex-col overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10"
         >
           {/* Image Section */}
@@ -511,6 +518,13 @@ function GameCardContent({ game, compact, viewCount }) {
                 </div>
               )}
             </div>
+
+            {isLoading && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/55 text-white backdrop-blur-[2px] animate-in fade-in-0">
+                <Loader className="h-6 w-6 animate-spin" />
+                <span className="text-xs font-medium">{t("gameCard.loading")}</span>
+              </div>
+            )}
 
             {/* Bottom-left: fresh update ribbon */}
             {updateInfo?.isRecent && !needsUpdate && (

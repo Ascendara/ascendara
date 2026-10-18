@@ -450,6 +450,16 @@ function registerMiscHandlers() {
     }
   });
 
+  // Portrait cover only, for the game detail page (2 requests instead of 5)
+  ipcMain.handle("steamgrid-get-grid", async (_, gameName) => {
+    try {
+      return await steamgrid.getGridUrl(gameName);
+    } catch (error) {
+      console.error("[SteamGrid] getGridUrl IPC error:", error);
+      return { gameId: null, url: null };
+    }
+  });
+
   // Lightweight: one-image header lookup for browse/search UI (2 requests
   // instead of 5). Use this by default; switch to steamgrid-get-urls only
   // when all four asset variants are actually needed.

@@ -1547,6 +1547,7 @@
     "openCriticBetaWarning": "This API endpoint is in beta and there may be issues. If OpenCritic shows a different game, please report the game by clicking 'Report' to the right of the title.",
     "outdatedIndexWarning": "This game's index is outdated. Please refresh the page to see the latest information.",
     "platforms": "Platforms",
+    "preparingGame": "Fetching game information...",
     "pressEscToGoBack": "Click Me or ESC key to go back",
     "protectYourself": {
       "learnHow": "How to protect yourself from fake downloads",

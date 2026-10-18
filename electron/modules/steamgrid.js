@@ -244,17 +244,29 @@ function cleanGameName(gameName) {
     .trim();
 }
 
+// cleanName -> SteamGridDB game id (or null), so header, cover and full lookups
+// for the same game share one search
+const gameIdCache = new Map();
+const GAME_ID_CACHE_LIMIT = 2000;
+
 async function resolveGameId(gameName, authHeaders, reportErrors = false) {
   const cleanName = cleanGameName(gameName);
   if (!cleanName) return null;
+  if (gameIdCache.has(cleanName)) return gameIdCache.get(cleanName);
   try {
     const searchRes = await throttledGet(
       `${PROXY_BASE_URL}/search/autocomplete/${encodeURIComponent(cleanName)}`,
       authHeaders
     );
-    if (searchRes.data?.success && searchRes.data.data?.length > 0) {
-      return searchRes.data.data[0].id;
+    const gameId =
+      searchRes.data?.success && searchRes.data.data?.length > 0
+        ? searchRes.data.data[0].id
+        : null;
+    if (gameIdCache.size >= GAME_ID_CACHE_LIMIT) {
+      gameIdCache.delete(gameIdCache.keys().next().value);
     }
+    gameIdCache.set(cleanName, gameId);
+    return gameId;
   } catch (e) {
     console.warn(`[SteamGrid] URL search failed for "${cleanName}":`, e.message);
     if (reportErrors) throw e;
@@ -290,6 +302,29 @@ async function getHeaderUrl(gameName) {
       // Stop early on rate-limit; caller will retry later via frontend cache expiry
       if (e.response?.status === 429) break;
     }
+  }
+  return { gameId, url: null };
+}
+
+/**
+ * Portrait cover only: one search + one asset query. For the game detail page,
+ * which shows the 600x900 grid and nothing else from SteamGridDB.
+ */
+async function getGridUrl(gameName) {
+  if (!gameName || typeof gameName !== "string") return { gameId: null, url: null };
+  const authHeaders = authHelper.generateAuthHeaders();
+  const gameId = await resolveGameId(gameName, authHeaders);
+  if (!gameId) return { gameId: null, url: null };
+  try {
+    const res = await throttledGet(
+      `${PROXY_BASE_URL}/grids/game/${gameId}?styles=alternate&dimensions=600x900&mimes=image/jpeg,image/png&sort=score`,
+      authHeaders
+    );
+    if (res.data?.success && res.data.data?.length > 0) {
+      return { gameId, url: res.data.data[0].url || null };
+    }
+  } catch (e) {
+    console.warn(`[SteamGrid] Cover fetch failed for "${gameName}":`, e.message);
   }
   return { gameId, url: null };
 }
@@ -409,6 +444,7 @@ async function getGameArtwork(gameId) {
 module.exports = {
   fetchGameAssets,
   getImageUrls,
+  getGridUrl,
   getHeaderUrl,
   searchGames,
   getGameArtwork,

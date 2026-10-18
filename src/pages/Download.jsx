@@ -34,6 +34,7 @@ import { useGameViews } from "@/hooks/useGameViews";
 import imageCacheService from "@/services/imageCacheService";
 import steamGridImageService from "@/services/steamGridImageService";
 import artworkOverrideService from "@/services/artworkOverrideService";
+import gamePagePreparer from "@/services/gamePagePreparer";
 import { cacheDownloadData } from "@/services/retryGameDownloadService";
 import {
   addToQueue,
@@ -45,6 +46,7 @@ import { forceSyncDownloads, notifyDownloadStart } from "@/services/downloadSync
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
+import { Loader } from "lucide-react";
 import { toast } from "sonner";
 import TimemachineDialog from "@/components/TimemachineDialog";
 import steamService from "@/services/gameInfoService";
@@ -306,14 +308,6 @@ function PublicDownloadPage() {
     console.log("Received game data:", gameData);
   }, [gameData, navigate]);
 
-  // Fetch Steam data when game data changes
-  // Steam API is always available (hardcoded), so we always fetch
-  useEffect(() => {
-    if (gameData && gameData.game) {
-      fetchSteamData(gameData.game);
-    }
-  }, [gameData]);
-
   // Fetch HowLongToBeat completion times
   useEffect(() => {
     setHltbData(null);
@@ -355,10 +349,14 @@ function PublicDownloadPage() {
   );
   const [isDev, setIsDev] = useState(false);
   const [showNoDownloadPath, setShowNoDownloadPath] = useState(false);
-  const [cachedImage, setCachedImage] = useState(null);
-  const [coverGridUrl, setCoverGridUrl] = useState(null);
+  // Set when the opening card already resolved this page's artwork and info
+  const [initialPrepared] = useState(() => gamePagePreparer.peek(state?.gameData));
+  // False while the page holds back to gather its artwork, so nothing swaps in view
+  const [pagePrepared, setPagePrepared] = useState(!!initialPrepared || !state?.gameData);
+  const [cachedImage, setCachedImage] = useState(initialPrepared?.cachedImage ?? null);
+  const [coverGridUrl, setCoverGridUrl] = useState(initialPrepared?.coverGridUrl ?? null);
   // Approved community artwork correction; wins over name-matched artwork
-  const [artworkOverride, setArtworkOverride] = useState(null);
+  const [artworkOverride, setArtworkOverride] = useState(initialPrepared?.override ?? null);
   // False until we know whether an override exists, so the wrong art never flashes
   const [artworkReady, setArtworkReady] = useState(true);
   const [showArtworkDialog, setShowArtworkDialog] = useState(false);
@@ -376,7 +374,7 @@ function PublicDownloadPage() {
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [showQueuePrompt, setShowQueuePrompt] = useState(false);
   const [pendingDownloadData, setPendingDownloadData] = useState(null);
-  const [steamData, setSteamData] = useState(null);
+  const [steamData, setSteamData] = useState(initialPrepared?.steamData ?? null);
   const [steamError, setSteamError] = useState(null);
   const [steamLoading, setSteamLoading] = useState(false);
   const [hltbData, setHltbData] = useState(null);
@@ -1625,61 +1623,97 @@ function PublicDownloadPage() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    let cancelled = false;
-    const usesOverrides = !!(gameData?.gameID && !gameData.privateSource);
-    const cachedOverride = usesOverrides
-      ? artworkOverrideService.peek(gameData.gameID)
-      : null;
-    setArtworkOverride(cachedOverride || null);
-    setCoverGridUrl(cachedOverride?.gridUrl || null);
-    setArtworkReady(!usesOverrides || cachedOverride !== undefined);
-
-    const loadCachedImage = async () => {
-      if (gameData?.imgID) {
-        const image = await imageCacheService.getImage(gameData.imgID);
-        setCachedImage(image);
-        return;
-      }
-      // Fallback: custom-source games (no imgID) -> resolve SteamGrid cover by name
-      if (gameData?.game) {
-        const peeked = steamGridImageService.peek(gameData.game);
-        if (peeked) {
-          setCachedImage(steamGridImageService.pickUrl(peeked, "hero"));
-          return;
-        }
-        const assets = await steamGridImageService.getAssets(gameData.game);
-        setCachedImage(steamGridImageService.pickUrl(assets, "hero"));
-      }
-    };
-    // Resolve a portrait SteamGridDB cover (600x900) for the detail-page cover
-    // slot. SGDB is the primary art source; Steam header_image is the fallback
-    // and is applied directly at render time if this comes back null.
-    const loadCoverGrid = async () => {
-      if (!gameData?.game) return;
-      if (usesOverrides) {
-        // Refreshes the cached answer too, so newly approved fixes show up
-        const override = await artworkOverrideService.fetch(gameData.gameID);
-        if (cancelled) return;
-        setArtworkOverride(override);
-        setArtworkReady(true);
-        if (override?.gridUrl) {
-          setCoverGridUrl(override.gridUrl);
-          return;
-        }
-        if (cachedOverride?.gridUrl) setCoverGridUrl(null);
-      }
-      try {
-        const full = await steamGridImageService.getFullAssets(gameData.game);
-        if (!cancelled && full?.grid) {
-          setCoverGridUrl(full.grid);
-        }
-      } catch (e) {
-        // Silent: Steam cover fallback renders automatically
-      }
-    };
-    loadCoverGrid();
-    loadCachedImage();
     checkDownloadPath();
+    if (!gameData) return;
+    let cancelled = false;
+
+    const applyPrepared = prepared => {
+      setArtworkOverride(prepared.override);
+      setCoverGridUrl(prepared.coverGridUrl);
+      setCachedImage(prepared.cachedImage);
+      setArtworkReady(true);
+      setSteamData(prepared.steamData);
+      setSteamError(prepared.steamData ? null : "No game data found");
+      setSteamLoading(false);
+    };
+
+    // Usually ready already: the card that opened this page prepared it
+    const ready = gamePagePreparer.peek(gameData);
+    if (ready) {
+      applyPrepared(ready);
+      setPagePrepared(true);
+      return;
+    }
+    // Opened from somewhere that didn't prepare it: hold the page until it's
+    // ready, falling back to loading in place if that takes too long
+    setPagePrepared(false);
+    gamePagePreparer.prepare(gameData).then(prepared => {
+      if (cancelled) return;
+      if (prepared) {
+        applyPrepared(prepared);
+      } else {
+        loadProgressively();
+      }
+      setPagePrepared(true);
+    });
+
+    function loadProgressively() {
+      const usesOverrides = !!(gameData?.gameID && !gameData.privateSource);
+      const cachedOverride = usesOverrides
+        ? artworkOverrideService.peek(gameData.gameID)
+        : null;
+      setArtworkOverride(cachedOverride || null);
+      setCoverGridUrl(cachedOverride?.gridUrl || null);
+      setArtworkReady(!usesOverrides || cachedOverride !== undefined);
+
+      const loadCachedImage = async () => {
+        if (gameData?.imgID) {
+          const image = await imageCacheService.getImage(gameData.imgID);
+          setCachedImage(image);
+          return;
+        }
+        // Fallback: custom-source games (no imgID) -> resolve SteamGrid cover by name
+        if (gameData?.game) {
+          const peeked = steamGridImageService.peek(gameData.game);
+          if (peeked) {
+            setCachedImage(steamGridImageService.pickUrl(peeked, "hero"));
+            return;
+          }
+          const assets = await steamGridImageService.getAssets(gameData.game);
+          setCachedImage(steamGridImageService.pickUrl(assets, "hero"));
+        }
+      };
+      // Resolve a portrait SteamGridDB cover (600x900) for the detail-page cover
+      // slot. SGDB is the primary art source; Steam header_image is the fallback
+      // and is applied directly at render time if this comes back null.
+      const loadCoverGrid = async () => {
+        if (!gameData?.game) return;
+        if (usesOverrides) {
+          // Refreshes the cached answer too, so newly approved fixes show up
+          const override = await artworkOverrideService.fetch(gameData.gameID);
+          if (cancelled) return;
+          setArtworkOverride(override);
+          setArtworkReady(true);
+          if (override?.gridUrl) {
+            setCoverGridUrl(override.gridUrl);
+            return;
+          }
+          if (cachedOverride?.gridUrl) setCoverGridUrl(null);
+        }
+        try {
+          const cover = await steamGridImageService.getCover(gameData.game);
+          if (!cancelled && cover) {
+            setCoverGridUrl(cover);
+          }
+        } catch (e) {
+          // Silent: Steam cover fallback renders automatically
+        }
+      };
+      if (gameData.game) fetchSteamData(gameData.game);
+      loadCoverGrid();
+      loadCachedImage();
+    }
+
     return () => {
       cancelled = true;
     };
@@ -1940,6 +1974,27 @@ function PublicDownloadPage() {
     (steamData?.screenshots?.[0]
       ? steamService.formatImageUrl(steamData.screenshots[0].url, "screenshot_huge")
       : cachedImage);
+
+  if (!pagePrepared) {
+    return (
+      <div className="mx-auto flex min-h-[60vh] w-full max-w-7xl flex-col items-center justify-center gap-4 pb-8 pt-4 fade-in">
+        <div className="relative flex h-14 w-14 items-center justify-center">
+          <div className="absolute inset-0 animate-ping rounded-full bg-primary/15" />
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+            <Loader className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        </div>
+        <div className="text-center">
+          <p className="text-base font-semibold text-foreground">
+            {t("download.preparingGame")}
+          </p>
+          <p className="mt-1 max-w-sm truncate text-sm text-muted-foreground">
+            {sanitizeText(gameData.game)}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl pb-8 pt-4 fade-in">

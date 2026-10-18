@@ -12,6 +12,9 @@
  */
 
 const LS_PREFIX = "ascendara_sgdb_urls::";
+// Portrait covers live apart: the header lookup mirrors its 460x215 image into
+// `grid`, so the shared entry can't tell a real cover from a header
+const COVER_LS_PREFIX = "ascendara_sgdb_cover::";
 const NEGATIVE_TTL = 24 * 60 * 60 * 1000; // 1 day for "not found" entries
 const POSITIVE_TTL = 14 * 24 * 60 * 60 * 1000; // 14 days for successful hits
 
@@ -30,6 +33,69 @@ class SteamGridImageService {
   constructor() {
     this.memoryCache = new Map(); // key -> assets
     this.inflight = new Map(); // key -> Promise<assets>
+    this.coverCache = new Map(); // key -> cover URL or null
+    this.coverInflight = new Map(); // key -> Promise<cover URL or null>
+  }
+
+  /**
+   * Cached portrait (600x900) cover. Returns undefined when nothing is cached,
+   * null when the game is known to have no cover.
+   */
+  peekCover(name) {
+    const key = normalizeKey(name);
+    if (!key) return undefined;
+    if (this.coverCache.has(key)) return this.coverCache.get(key);
+    try {
+      const parsed = JSON.parse(localStorage.getItem(COVER_LS_PREFIX + key));
+      if (!parsed || typeof parsed.timestamp !== "number") return undefined;
+      const ttl = parsed.url ? POSITIVE_TTL : NEGATIVE_TTL;
+      if (Date.now() - parsed.timestamp > ttl) return undefined;
+      this.coverCache.set(key, parsed.url || null);
+      return parsed.url || null;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Portrait cover for the game detail page: 2 upstream requests, then cached. */
+  async getCover(name) {
+    const key = normalizeKey(name);
+    if (!key) return null;
+    const cached = this.peekCover(name);
+    if (cached !== undefined) return cached;
+    if (this.coverInflight.has(key)) return this.coverInflight.get(key);
+
+    const promise = (async () => {
+      let url = null;
+      try {
+        if (window.electron?.getSteamGridGrid) {
+          const res = await window.electron.getSteamGridGrid(name);
+          url = res?.url ?? null;
+        } else {
+          url = (await this.getFullAssets(name)).grid;
+        }
+      } catch (e) {
+        console.warn("[SteamGridImage] cover lookup failed for", name, e);
+        return null; // not cached, so a later visit retries
+      }
+      this.coverCache.set(key, url);
+      try {
+        localStorage.setItem(
+          COVER_LS_PREFIX + key,
+          JSON.stringify({ url, timestamp: Date.now() })
+        );
+      } catch {
+        // Storage quota or disabled - memory cache still works
+      }
+      return url;
+    })();
+
+    this.coverInflight.set(key, promise);
+    try {
+      return await promise;
+    } finally {
+      this.coverInflight.delete(key);
+    }
   }
 
   _readLS(name) {

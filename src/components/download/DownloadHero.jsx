@@ -17,6 +17,8 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { formatLatestUpdate, formatCompactNumber } from "@/lib/utils";
 import hltbService from "@/services/hltbService";
+import { isImageReady, markImageReady } from "@/services/gamePagePreparer";
+import { useState } from "react";
 import {
   Apple,
   CircleSlash,
@@ -40,6 +42,25 @@ const estimateInstallSize = size => {
   const estimate = parseFloat(match[1]) * 2.1;
   return match[2] === "gb" ? `~${estimate.toFixed(1)} GB` : `~${Math.round(estimate)} MB`;
 };
+
+// Shown at once when the image is already loaded (usually preloaded before the
+// page opened); otherwise it fades in a single time. Remounts never replay it.
+function BannerImage({ src }) {
+  const [shown, setShown] = useState(() => isImageReady(src));
+  const [fades] = useState(() => !isImageReady(src));
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden="true"
+      onLoad={() => {
+        markImageReady(src);
+        setShown(true);
+      }}
+      className={`h-full w-full object-cover ${fades ? "transition-opacity duration-300" : ""} ${shown ? "opacity-100" : "opacity-0"}`}
+    />
+  );
+}
 
 function Chip({ className, tooltip, children, onClick, ...props }) {
   const Element = onClick ? "button" : "span";
@@ -104,14 +125,7 @@ export default function DownloadHero({
       <section className="relative overflow-hidden rounded-xl border border-border/40 bg-card">
         {/* Banner */}
         <div className="relative h-52 w-full overflow-hidden">
-          {bannerImage && (
-            <img
-              src={bannerImage}
-              alt=""
-              aria-hidden="true"
-              className="h-full w-full object-cover"
-            />
-          )}
+          {bannerImage && <BannerImage key={bannerImage} src={bannerImage} />}
           <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
         </div>
 
