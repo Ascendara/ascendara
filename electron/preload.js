@@ -163,8 +163,8 @@ contextBridge.exposeInMainWorld("electron", {
     folder: () => ipcRenderer.invoke("private-source-folder"),
     download: (id, game, directory = 0) => ipcRenderer.invoke("private-source-download", id, game, directory),
     openPackage: game => ipcRenderer.invoke("private-source-open-package", game),
-    importGame: game => ipcRenderer.invoke("private-source-import-game", game),
-    export: id => ipcRenderer.invoke("private-source-export", id),
+    importGame: (game, labels) => ipcRenderer.invoke("private-source-import-game", game, labels),
+    export: (id, labels) => ipcRenderer.invoke("private-source-export", id, labels),
   },
   setExternalSourceJson: (sourceId, data) =>
     ipcRenderer.invoke("set-external-source-json", sourceId, data),

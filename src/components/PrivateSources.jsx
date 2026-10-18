@@ -18,6 +18,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { privateSourceMessage } from "@/lib/privateSourceMessages";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,7 +103,7 @@ export default function PrivateSources() {
   useEffect(() => {
     load()
       .then(check)
-      .catch((e) => toast.error(e.message));
+      .catch((e) => toast.error(privateSourceMessage(t, e)));
     const interval = setInterval(check, CHECK_INTERVAL_MS);
     return () => clearInterval(interval);
   }, []);
@@ -112,7 +113,7 @@ export default function PrivateSources() {
       await fn();
       await load();
     } catch (e) {
-      toast.error(e.message);
+      toast.error(privateSourceMessage(t, e));
     } finally {
       setBusy(false);
     }
@@ -135,7 +136,7 @@ export default function PrivateSources() {
     run(async () => {
       const result = await window.electron.privateSources.refresh(s.id);
       gameService.notifySourceChanged();
-      if (result.error) toast.error(result.error);
+      if (result.error) toast.error(privateSourceMessage(t, result.error));
     });
   const remove = (s) =>
     run(async () => {
@@ -231,7 +232,9 @@ export default function PrivateSources() {
                 </p>
                 {!online && s.error && (
                   <p role="status" className="mt-0.5 text-xs text-destructive">
-                    {t("privateSources.offlineError", { error: s.error })}
+                    {t("privateSources.offlineError", {
+                      error: privateSourceMessage(t, s.error),
+                    })}
                   </p>
                 )}
               </div>
@@ -281,7 +284,9 @@ export default function PrivateSources() {
                       className="gap-2"
                       disabled={!s.count}
                       onSelect={() =>
-                        run(() => window.electron.privateSources.export(s.id))
+                        run(() => window.electron.privateSources.export(s.id, {
+                            fileType: t("privateSources.exportFileType"),
+                          }))
                       }
                     >
                       <Download className="h-4 w-4" />
@@ -631,7 +636,7 @@ export default function PrivateSources() {
                   });
                   gameService.notifySourceChanged();
                   setDraft(null);
-                  if (result.error) toast.error(result.error);
+                  if (result.error) toast.error(privateSourceMessage(t, result.error));
                 })
               }
             >

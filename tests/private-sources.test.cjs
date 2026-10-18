@@ -54,7 +54,7 @@ test("symlink directory escapes are skipped and rejected", async t => {
   try { await fs.symlink(outside, path.join(root, "link"), process.platform === "win32" ? "junction" : "dir"); }
   catch (e) { if (e.code === "EPERM") return t.skip("OS does not permit symlinks"); throw e; }
   assert.equal((await core.scan(root, "local")).games.length, 0);
-  await assert.rejects(core.confined(root, "link/secret.zip"), /escapes/);
+  await assert.rejects(core.confined(root, "link/secret.zip"), /pathEscapesRoot/);
 });
 test("metadata ranks exact titles and separates sequels", () => {
   const ranked = core.rankCandidates("Portal 2", [{ name: "Portal", id: 1 }, { name: "Portal 2", id: 2 }]);
@@ -69,10 +69,10 @@ test("HTTP valid index, malformed JSON, authentication, redirects, size limit", 
   });
   assert.equal((await core.fetchIndex(url)).games.length, 1);
   mode = "json"; await assert.rejects(core.fetchIndex(url));
-  mode = "auth"; await assert.rejects(core.fetchIndex(url), /401/);
+  mode = "auth"; await assert.rejects(core.fetchIndex(url), /"status":401/);
   assert.equal((await core.fetchIndex(url, { token: "test" })).games.length, 1);
-  mode = "redirect"; await assert.rejects(core.fetchIndex(url), /redirects/);
-  mode = "size"; await assert.rejects(core.fetchBuffer(url, {}, 10), /size limit/);
+  mode = "redirect"; await assert.rejects(core.fetchIndex(url), /redirectsNotAllowed/);
+  mode = "size"; await assert.rejects(core.fetchBuffer(url, {}, 10), /responseTooLarge/);
 });
 test("offline source rejects", async () => {
   const s = http.createServer(); await new Promise(r => s.listen(0, "127.0.0.1", r));
@@ -84,9 +84,9 @@ test("HTTP transfer, progress, checksum and no-overwrite", async t => {
   const destination = path.join(root, "test.zip"); let progress = 0;
   await core.transfer({ source: { type: "http", location: url }, game, destination, onProgress: n => { progress = n; } });
   assert.equal(progress, bytes.length); assert.equal(await core.checksum(destination), sha256);
-  await assert.rejects(core.transfer({ source: { type: "http", location: url }, game, destination }), /exists/);
-  await assert.rejects(core.transfer({ source: { type: "http", location: url }, game: { ...game, sha256: "0".repeat(64) }, destination: path.join(root, "bad.zip") }), /checksum/);
-  await assert.rejects(core.transfer({ source: { type: "http", location: url }, game: { ...game, size: 1 }, destination: path.join(root, "size.zip") }), /size/);
+  await assert.rejects(core.transfer({ source: { type: "http", location: url }, game, destination }), /destinationExists/);
+  await assert.rejects(core.transfer({ source: { type: "http", location: url }, game: { ...game, sha256: "0".repeat(64) }, destination: path.join(root, "bad.zip") }), /checksumMismatch/);
+  await assert.rejects(core.transfer({ source: { type: "http", location: url }, game: { ...game, size: 1 }, destination: path.join(root, "size.zip") }), /sizeMismatch/);
 });
 test("Range resume and full-response fallback", async t => {
   const root = await temp(t); let range, honor = true;
@@ -115,5 +115,5 @@ test("local copy validates size and checksum", async t => {
   await fs.mkdir(path.join(root, "games")); await fs.writeFile(path.join(root, game.path), bytes);
   await core.transfer({ source: { type: "local", location: root }, game, destination });
   assert.equal(await core.checksum(destination), sha256);
-  await assert.rejects(core.transfer({ source: { type: "smb", location: root }, game: { ...game, size: 1 }, destination: destination + "2" }), /size changed/);
+  await assert.rejects(core.transfer({ source: { type: "smb", location: root }, game: { ...game, size: 1 }, destination: destination + "2" }), /sourceFileChanged/);
 });

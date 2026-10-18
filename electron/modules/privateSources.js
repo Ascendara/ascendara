@@ -28,12 +28,12 @@ function token(s) {
 }
 function find(sources, id) {
   const s = sources.find(s => s.id === id);
-  if (!s) throw new Error("Private source was removed");
+  if (!s) throw core.fail("sourceRemoved");
   return s;
 }
 function entry(s, id) {
   const g = s.index?.games.find(g => g.id === id);
-  if (!g) throw new Error("Package is missing; refresh the source");
+  if (!g) throw core.fail("packageMissing");
   return { ...g, ...s.overrides?.[id] };
 }
 async function refresh(s) {
@@ -51,16 +51,16 @@ async function probe(s) {
   const controller = new AbortController();
   let timer;
   const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => { controller.abort(); reject(new Error("Source did not respond")); }, 8000);
+    timer = setTimeout(() => { controller.abort(); reject(core.fail("notResponding")); }, 8000);
   });
   const check = async () => {
     if (s.type === "http") {
       const res = await core.request(s.location, { token: token(s), headers: { Range: "bytes=0-0" }, signal: controller.signal });
       res.destroy();
-    } else if (!(await fs.stat(s.location)).isDirectory()) throw new Error("Folder is not available");
+    } else if (!(await fs.stat(s.location)).isDirectory()) throw core.fail("folderUnavailable");
   };
   try { await Promise.race([check(), timeout]); return { status: "online", error: null }; }
-  catch (e) { return { status: "offline", error: e.code === "ENOENT" ? "Folder is not available" : e.message }; }
+  catch (e) { return { status: "offline", error: e.code === "ENOENT" ? core.fail("folderUnavailable").message : e.message }; }
   finally { clearTimeout(timer); }
 }
 async function steamSearch(title) {
@@ -72,11 +72,11 @@ async function steamSearch(title) {
       image: `https://cdn.akamai.steamstatic.com/steam/apps/${c.id}/header.jpg` })));
 }
 async function steamDetails(id) {
-  if (!/^\d+$/.test(String(id))) throw new Error("Invalid Steam identifier");
+  if (!/^\d+$/.test(String(id))) throw core.fail("invalidSteamId");
   const data = JSON.parse((await core.fetchBuffer(
     `https://store.steampowered.com/api/appdetails?appids=${id}&l=english`
   )).toString())[id];
-  if (!data?.success) throw new Error("Steam metadata unavailable");
+  if (!data?.success) throw core.fail("steamUnavailable");
   const g = data.data;
   return { title: g.name, identifiers: { steam: String(id) }, metadata: {
     description: String(g.short_description || "").replace(/<[^>]*>/g, ""),
@@ -116,10 +116,10 @@ function imageMime(buffer) {
   if (buffer.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) return "image/png";
   if (buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) return "image/jpeg";
   if (buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") return "image/webp";
-  throw new Error("Artwork must be PNG, JPEG or WebP");
+  throw core.fail("invalidArtwork");
 }
 async function artwork(s, g, kind = "cover") {
-  if (!["cover", "hero"].includes(kind)) throw new Error("Invalid artwork kind");
+  if (!["cover", "hero"].includes(kind)) throw core.fail("invalidArtworkKind");
   const ref = g.artwork?.[kind];
   const key = crypto.createHash("sha256").update(`${s.id}:${g.id}:${kind}:${ref}:${g.identifiers?.steam}:${g.artRevision || ""}`).digest("hex");
   const file = path.join(root(), "artwork", key);
@@ -130,7 +130,7 @@ async function artwork(s, g, kind = "cover") {
       if (s.type === "http") buffer = await core.fetchBuffer(core.resolveReference(s.location, ref), { token: token(s) }, 2 * 1024 ** 2);
       else {
         const local = await core.confined(s.location, ref);
-        if ((await fs.stat(local)).size > 2 * 1024 ** 2) throw new Error("Artwork exceeds 2 MB");
+        if ((await fs.stat(local)).size > 2 * 1024 ** 2) throw core.fail("artworkTooLarge");
         buffer = await fs.readFile(local);
       }
     } else if (g.identifiers?.steam) buffer = await core.fetchBuffer(
@@ -158,9 +158,9 @@ async function start(sourceId, entryId, additionalDirIndex = 0, resume) {
   const s = find(await read(), sourceId), g = entry(s, entryId);
   const settings = getSettingsManager().getSettings();
   const base = additionalDirIndex === 0 ? settings.downloadDirectory : settings.additionalDirectories?.[additionalDirIndex - 1];
-  if (!resume && !base) throw new Error("Choose a download directory in Settings first");
+  if (!resume && !base) throw core.fail("noDownloadFolder");
   const name = resume?.info.game || `${sanitizeGameName(g.title).slice(0, 100) || "Game"} (${s.id.slice(0, 6)}-${crypto.createHash("sha256").update(g.id).digest("hex").slice(0, 6)})`;
-  if (active.has(name)) throw new Error("This package is already downloading");
+  if (active.has(name)) throw core.fail("alreadyDownloading");
   const dir = resume?.dir || path.join(await fs.realpath(base), name);
   if (!resume) await fs.mkdir(dir); // Exclusive creation: never overwrite an existing library game.
   const file = path.join(dir, `${name}.ascendara.json`);
@@ -169,7 +169,7 @@ async function start(sourceId, entryId, additionalDirIndex = 0, resume) {
     size: `${(g.size / 1024 ** 3).toFixed(2)} GB`, executable: "",
     privateSource: { sourceId, entryId, title: g.title, path: g.path, size: g.size, sha256: g.sha256 } };
   if (resume && (info.privateSource.path !== g.path || info.privateSource.size !== g.size || info.privateSource.sha256 !== g.sha256))
-    throw new Error("Package changed since download started; start a fresh download");
+    throw core.fail("packageChanged");
   const controller = new AbortController();
   info.downloadingData = { downloading: true, progressCompleted: "0", progressDownloadSpeeds: "0 MB/s", ownerPid: process.pid };
   const save = async () => { await fs.writeJson(file + ".tmp", info, { spaces: 2 }); await fs.rename(file + ".tmp", file); };
@@ -189,12 +189,12 @@ async function start(sourceId, entryId, additionalDirIndex = 0, resume) {
       await pendingWrite;
       info.downloadingData = { downloading: false, pendingManualInstall: true, progressCompleted: "100",
         manualInstallDir: dir, privatePackage: true,
-        message: "Package verified. Review it before extracting, mounting, or importing. No installer has been executed." };
+        message: "privateSources.status.packageVerified" };
       info.privateSource.package = path.basename(destination);
     } catch (e) {
       await pendingWrite.catch(() => {});
       info.downloadingData = { downloading: false, stopped: true, progressCompleted: info.downloadingData.progressCompleted,
-        message: controller.signal.aborted ? "Transfer cancelled. Retry to continue." : e.message };
+        message: controller.signal.aborted ? "privateSources.status.transferCancelled" : e.message };
     }
     await save(); active.delete(name);
   })().catch(e => { active.delete(name); console.error("Private transfer state error:", e.message); });
@@ -210,7 +210,7 @@ async function stop(game) {
 async function resume(game) {
   const target = await locateDownload(game);
   if (!target) return null;
-  if (target.info.privateSource.package) throw new Error("Package is already downloaded; review it in Downloads");
+  if (target.info.privateSource.package) throw core.fail("alreadyDownloaded");
   const p = target.info.privateSource;
   return start(p.sourceId, p.entryId, 0, target);
 }
@@ -220,13 +220,13 @@ function registerPrivateSourceHandlers() {
     const sources = await read();
     const previous = input?.id ? find(sources, input.id) : null;
     if (!input || !["http", "local", "smb"].includes(input.type) || typeof input.location !== "string" || !input.name?.trim())
-      throw new Error("Name, connection type and location are required");
+      throw core.fail("missingFields");
     if (input.type === "http") core.httpUrl(input.location);
     else if (input.type === "smb" && process.platform === "win32") {
-      if (!/^\\\\[^\\/]+\\[^\\/]+/.test(input.location) || /^\\\\[?.]\\/.test(input.location)) throw new Error("Use a UNC share such as \\\\SERVER\\Games");
-    } else if (!path.isAbsolute(input.location)) throw new Error("Select an absolute local or OS-mounted share path");
+      if (!/^\\\\[^\\/]+\\[^\\/]+/.test(input.location) || /^\\\\[?.]\\/.test(input.location)) throw core.fail("invalidUncPath");
+    } else if (!path.isAbsolute(input.location)) throw core.fail("relativePath");
     const exclude = input.exclude || [], ignore = input.ignore || [];
-    if (!Array.isArray(exclude) || !Array.isArray(ignore) || exclude.length + ignore.length > 1000) throw new Error("Invalid exclusions");
+    if (!Array.isArray(exclude) || !Array.isArray(ignore) || exclude.length + ignore.length > 1000) throw core.fail("invalidExclusions");
     [...exclude, ...ignore].forEach(core.relativePath);
     const s = { ...previous, id: previous?.id || crypto.randomUUID(), name: input.name.trim().slice(0, 100),
       type: input.type, location: input.location, exclude, ignore, metadataEnabled: input.metadataEnabled === true };
@@ -235,8 +235,8 @@ function registerPrivateSourceHandlers() {
     }
     if (input.token) {
       if (s.type !== "http" || !safeStorage.isEncryptionAvailable() || safeStorage.getSelectedStorageBackend?.() === "basic_text")
-        throw new Error("Secure OS credential storage is unavailable");
-      if (input.token.length > 4096 || /[\r\n]/.test(input.token)) throw new Error("Invalid token");
+        throw core.fail("secureStorageUnavailable");
+      if (input.token.length > 4096 || /[\r\n]/.test(input.token)) throw core.fail("invalidToken");
       s.secret = safeStorage.encryptString(input.token).toString("base64");
     }
     if (input.clearToken) delete s.secret;
@@ -263,7 +263,7 @@ function registerPrivateSourceHandlers() {
     const s = find(await read(), id); try { return await artwork(s, entry(s, game), kind); } catch { return null; }
   });
   ipcMain.handle("private-source-search", async (_, title) => {
-    if (typeof title !== "string" || title.length > 300) throw new Error("Invalid search title");
+    if (typeof title !== "string" || title.length > 300) throw core.fail("invalidSearch");
     return steamSearch(title);
   });
   ipcMain.handle("private-source-match", (_, id, game, override) => serial(async () => {
@@ -278,7 +278,7 @@ function registerPrivateSourceHandlers() {
     const sources = await read(), s = find(sources, id); entry(s, game);
     const choice = await dialog.showOpenDialog({ properties: ["openFile"], filters: [{ name: "Artwork", extensions: ["png", "jpg", "jpeg", "webp"] }] });
     if (choice.canceled) return false;
-    if ((await fs.stat(choice.filePaths[0])).size > 2 * 1024 ** 2) throw new Error("Artwork exceeds 2 MB");
+    if ((await fs.stat(choice.filePaths[0])).size > 2 * 1024 ** 2) throw core.fail("artworkTooLarge");
     const buffer = await fs.readFile(choice.filePaths[0]); imageMime(buffer);
     const key = crypto.randomUUID(); await fs.ensureDir(path.join(root(), "artwork"));
     await fs.writeFile(path.join(root(), "artwork", key), buffer);
@@ -291,32 +291,32 @@ function registerPrivateSourceHandlers() {
   ipcMain.handle("private-source-download", (_, id, game, directory) => start(id, game, directory));
   ipcMain.handle("private-source-open-package", async (_, game) => {
     const target = await locateDownload(game);
-    if (!target?.info.privateSource.package) throw new Error("Package is not ready");
+    if (!target?.info.privateSource.package) throw core.fail("packageNotReady");
     const file = await core.confined(target.dir, target.info.privateSource.package);
     shell.showItemInFolder(file); return true;
   });
-  ipcMain.handle("private-source-import-game", async (_, game) => {
+  ipcMain.handle("private-source-import-game", async (_, game, labels = {}) => {
     const target = await locateDownload(game);
-    if (!target?.info.downloadingData?.pendingManualInstall || active.has(game)) throw new Error("Package is not ready for import");
-    const choice = await dialog.showOpenDialog({ title: "Select the installed game executable (not its installer)", defaultPath: target.dir, properties: ["openFile"] });
+    if (!target?.info.downloadingData?.pendingManualInstall || active.has(game)) throw core.fail("packageNotReady");
+    const choice = await dialog.showOpenDialog({ title: labels.pickTitle, defaultPath: target.dir, properties: ["openFile"] });
     if (choice.canceled) return false;
     const relative = path.relative(target.dir, choice.filePaths[0]).split(path.sep).join("/");
     const selected = await core.confined(target.dir, relative);
     if (!((await fs.stat(selected)).isFile()) || /\.(iso|zip|7z|rar|json|txt)$/i.test(selected) ||
         selected === path.join(target.dir, target.info.privateSource.package))
-      throw new Error("Select an installed game executable inside this library folder. For installations elsewhere, use Library → Add game.");
-    if (process.platform === "win32" && !/\.exe$/i.test(selected)) throw new Error("Select a Windows executable");
-    const answer = await dialog.showMessageBox({ type: "warning", buttons: ["Cancel", "Import game"], defaultId: 0, cancelId: 0,
-      message: "Import this executable into your Library?", detail: `${selected}\nOnly import files you trust. This does not run the executable.` });
+      throw core.fail("executableOutsideLibrary");
+    if (process.platform === "win32" && !/\.exe$/i.test(selected)) throw core.fail("windowsExecutableRequired");
+    const answer = await dialog.showMessageBox({ type: "warning", buttons: [labels.cancel, labels.confirm], defaultId: 0, cancelId: 0,
+      message: labels.message, detail: `${selected}\n${labels.detail}` });
     if (answer.response !== 1) return false;
     target.info.executable = selected; delete target.info.downloadingData;
     await fs.writeJson(target.file + ".tmp", target.info, { spaces: 2 }); await fs.rename(target.file + ".tmp", target.file);
     return true;
   });
-  ipcMain.handle("private-source-export", async (_, id) => {
+  ipcMain.handle("private-source-export", async (_, id, labels = {}) => {
     const s = find(await read(), id);
-    if (!s.index) throw new Error("Refresh the source first");
-    const choice = await dialog.showSaveDialog({ defaultPath: "index.json", filters: [{ name: "Private index", extensions: ["json"] }] });
+    if (!s.index) throw core.fail("rescanFirst");
+    const choice = await dialog.showSaveDialog({ defaultPath: "index.json", filters: [{ name: labels.fileType, extensions: ["json"] }] });
     if (choice.canceled) return false;
     await fs.writeJson(choice.filePath, { ...s.index, name: s.name, games: s.index.games.map(g => {
       const v = entry(s, g.id); return { ...g, title: v.title, metadata: v.metadata, identifiers: v.identifiers };

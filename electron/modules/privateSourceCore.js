@@ -9,20 +9,25 @@ const { Transform } = require("node:stream");
 const TYPES = new Set(["exe", "iso", "zip", "7z", "rar"]);
 const MAX_INDEX = 8 * 1024 * 1024;
 const MAX_FILE = 16 * 1024 ** 4;
+// Messages are en.json keys under privateSources.errors so the app can translate them;
+// parameters ride along as JSON after a "|".
+function fail(code, params) {
+  return new Error(`privateSources.errors.${code}${params ? `|${JSON.stringify(params)}` : ""}`);
+}
 
 function relativePath(value) {
   if (typeof value !== "string" || !value || value.length > 2048 ||
       /[\\:%?#<>"|*]/.test(value) || [...value].some(c => c.charCodeAt(0) < 32) || value.startsWith("/") ||
       value.split("/").some(p => !p || p === "." || p === ".." || /[. ]$/.test(p) ||
         /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(p))) {
-    throw new Error("Unsafe relative path");
+    throw fail("unsafePath");
   }
   return value;
 }
 function httpUrl(value) {
   const url = new URL(value);
   if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.hash)
-    throw new Error("Only HTTP(S) URLs without embedded credentials are supported");
+    throw fail("unsupportedUrl");
   return url;
 }
 function resolveReference(base, ref) {
@@ -35,7 +40,7 @@ async function confined(root, ref) {
   const target = await fs.promises.realpath(path.join(realRoot, ...ref.split("/")));
   const rel = path.relative(realRoot, target);
   if (!rel || rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel))
-    throw new Error("Path escapes source root");
+    throw fail("pathEscapesRoot");
   return target;
 }
 function cleanTitle(filename) {
@@ -49,20 +54,20 @@ function text(value, max = 500) {
 }
 function validateIndex(raw) {
   if (!raw || raw.version !== 1 || !Array.isArray(raw.games) || raw.games.length > 10000)
-    throw new Error("Expected a version 1 private index with at most 10,000 games");
+    throw fail("invalidIndex");
   const ids = new Set(), paths = new Set();
   const sourceId = text(raw.sourceId, 100);
-  if (!sourceId) throw new Error("Index requires sourceId");
+  if (!sourceId) throw fail("missingSourceId");
   const games = raw.games.map(g => {
-    if (!g || typeof g !== "object") throw new Error("Invalid game entry");
+    if (!g || typeof g !== "object") throw fail("invalidGameEntry");
     const id = text(g.id, 100);
     const ref = relativePath(g.path);
     const type = path.posix.extname(ref).slice(1).toLowerCase();
-    if (!/^[a-z0-9][a-z0-9 _.-]{0,99}$/i.test(id) || ids.has(id) || paths.has(ref.toLowerCase())) throw new Error("Invalid or duplicate game ID or path");
+    if (!/^[a-z0-9][a-z0-9 _.-]{0,99}$/i.test(id) || ids.has(id) || paths.has(ref.toLowerCase())) throw fail("duplicateGame");
     ids.add(id); paths.add(ref.toLowerCase());
-    if (!TYPES.has(type) || (g.type && g.type !== type)) throw new Error("Unsupported package type");
-    if (!Number.isSafeInteger(g.size) || g.size < 0 || g.size > MAX_FILE) throw new Error("Invalid file size");
-    if (g.sha256 && !/^[a-f0-9]{64}$/i.test(g.sha256)) throw new Error("Invalid SHA-256");
+    if (!TYPES.has(type) || (g.type && g.type !== type)) throw fail("unsupportedPackage");
+    if (!Number.isSafeInteger(g.size) || g.size < 0 || g.size > MAX_FILE) throw fail("invalidFileSize");
+    if (g.sha256 && !/^[a-f0-9]{64}$/i.test(g.sha256)) throw fail("invalidChecksum");
     const artwork = {};
     for (const key of ["cover", "hero"]) if (g.artwork?.[key]) artwork[key] = relativePath(g.artwork[key]);
     return { id, sourceId, path: ref, type, size: g.size, sha256: g.sha256?.toLowerCase(),
@@ -76,15 +81,15 @@ function validateIndex(raw) {
 }
 async function scan(root, sourceId, { exclude = [], ignore = [] } = {}) {
   if (!Array.isArray(exclude) || !Array.isArray(ignore) || exclude.length + ignore.length > 1000)
-    throw new Error("Invalid exclusions");
+    throw fail("invalidExclusions");
   [...exclude, ...ignore].forEach(relativePath);
   const games = [];
   let visited = 0;
   async function walk(dir, prefix = "", depth = 0) {
-    if (depth > 32) throw new Error("Source exceeds maximum directory depth (32)");
+    if (depth > 32) throw fail("tooDeep");
     const entries = await fs.promises.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
-      if (++visited > 100000) throw new Error("Source exceeds scan limit (100,000 entries)");
+      if (++visited > 100000) throw fail("tooManyEntries");
       const ref = prefix + entry.name;
       if (entry.isSymbolicLink() || exclude.some(e => ref === e || ref.startsWith(e + "/")) || ignore.includes(ref)) continue;
       if (entry.isDirectory()) await walk(await confined(root, ref), ref + "/", depth + 1);
@@ -92,7 +97,7 @@ async function scan(root, sourceId, { exclude = [], ignore = [] } = {}) {
         const stat = await fs.promises.stat(await confined(root, ref));
         games.push({ id: crypto.createHash("sha256").update(ref).digest("hex").slice(0, 24),
           title: cleanTitle(entry.name), path: ref, size: stat.size });
-        if (games.length > 10000) throw new Error("Too many packages");
+        if (games.length > 10000) throw fail("tooManyPackages");
       }
     }
   }
@@ -107,23 +112,23 @@ function request(url, { token, headers = {}, signal } = {}) {
     }, res => {
       // No redirects: credentials and private paths never move to another origin.
       if (res.statusCode >= 300 && res.statusCode < 400) {
-        res.resume(); reject(new Error("Source redirects are not allowed"));
+        res.resume(); reject(fail("redirectsNotAllowed"));
       } else if (![200, 206].includes(res.statusCode)) {
-        res.resume(); reject(new Error(`Source HTTP ${res.statusCode}`));
+        res.resume(); reject(fail("httpStatus", { status: res.statusCode }));
       } else resolve(res);
     });
-    req.setTimeout(30000, () => req.destroy(new Error("Source request timed out")));
+    req.setTimeout(30000, () => req.destroy(fail("requestTimedOut")));
     req.on("error", reject);
   });
 }
 async function fetchBuffer(url, options = {}, limit = MAX_INDEX) {
   const res = await request(url, options);
   const parts = []; let size = 0;
-  const deadline = setTimeout(() => res.destroy(new Error("Source response timed out")), 60000);
+  const deadline = setTimeout(() => res.destroy(fail("requestTimedOut")), 60000);
   try {
     for await (const chunk of res) {
       size += chunk.length;
-      if (size > limit) { res.destroy(); throw new Error("Source response exceeds size limit"); }
+      if (size > limit) { res.destroy(); throw fail("responseTooLarge"); }
       parts.push(chunk);
     }
     return Buffer.concat(parts);
@@ -143,7 +148,7 @@ async function transfer({ source, game, destination, token, signal, onProgress =
   const part = destination + ".part";
   for (const file of [destination, part]) {
     const st = await fs.promises.lstat(file).catch(e => { if (e.code !== "ENOENT") throw e; });
-    if (st && (file === destination || !st.isFile() || st.nlink !== 1)) throw new Error("Destination already exists or is unsafe");
+    if (st && (file === destination || !st.isFile() || st.nlink !== 1)) throw fail("destinationExists");
   }
   let offset = source.type === "http" && game.sha256
     ? (await fs.promises.stat(part).catch(() => ({ size: 0 }))).size : 0;
@@ -155,26 +160,26 @@ async function transfer({ source, game, destination, token, signal, onProgress =
     });
     if (input.statusCode === 206) {
       const expected = `bytes ${offset}-${game.size - 1}/${game.size}`;
-      if (input.headers["content-range"] !== expected) { input.destroy(); throw new Error("Invalid HTTP Content-Range"); }
+      if (input.headers["content-range"] !== expected) { input.destroy(); throw fail("invalidContentRange"); }
     } else offset = 0; // Range unsupported: restart safely, never append a full response.
     if (input.headers["content-encoding"] && input.headers["content-encoding"] !== "identity") {
-      input.destroy(); throw new Error("Encoded package responses are unsupported");
+      input.destroy(); throw fail("encodedResponse");
     }
   } else {
     const file = await confined(source.location, game.path);
-    if ((await fs.promises.stat(file)).size !== game.size) throw new Error("Source file size changed; refresh the source");
+    if ((await fs.promises.stat(file)).size !== game.size) throw fail("sourceFileChanged");
     input = fs.createReadStream(file);
   }
   let done = offset;
   const meter = new Transform({ transform(chunk, encoding, cb) {
     done += chunk.length;
-    if (done > game.size) return cb(new Error("File size exceeds index"));
+    if (done > game.size) return cb(fail("sizeMismatch"));
     onProgress(done, game.size); cb(null, chunk);
   } });
   await pipeline(input, meter, fs.createWriteStream(part, { flags: offset ? "a" : "w", mode: 0o600 }), { signal });
-  if (done !== game.size) throw new Error("File size does not match index");
+  if (done !== game.size) throw fail("sizeMismatch");
   if (game.sha256 && await checksum(part) !== game.sha256) {
-    await fs.promises.unlink(part); throw new Error("SHA-256 checksum mismatch");
+    await fs.promises.unlink(part); throw fail("checksumMismatch");
   }
   signal?.throwIfAborted();
   await fs.promises.link(part, destination);
@@ -191,5 +196,5 @@ function rankCandidates(title, candidates) {
     return { ...c, confidence: key === other ? 1 : 2 * overlap / (a.size + b.size) };
   }).sort((a, b) => b.confidence - a.confidence);
 }
-module.exports = { TYPES, relativePath, httpUrl, resolveReference, confined, cleanTitle, validateIndex,
+module.exports = { TYPES, fail, relativePath, httpUrl, resolveReference, confined, cleanTitle, validateIndex,
   scan, request, fetchBuffer, fetchIndex, checksum, transfer, rankCandidates };

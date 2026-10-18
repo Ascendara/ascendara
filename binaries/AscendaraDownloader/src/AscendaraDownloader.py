@@ -1554,7 +1554,7 @@ class AscendaraDownloader:
             self.game_info['downloadingData'] = dict(
                 downloading=False, pendingManualInstall=True, privatePackage=True,
                 progressCompleted='100.00', manualInstallDir=self.download_dir,
-                message='Archive extracted and verified. Review the files and select a game executable to import. Nothing was executed.')
+                message='privateSources.status.archiveExtracted')
             self.game_info.pop('extractionSources', None)
             safe_write_json(self.game_info_path, self.game_info)
             return

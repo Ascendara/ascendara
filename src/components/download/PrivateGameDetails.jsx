@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import usePrivateArtwork from "@/hooks/usePrivateArtwork";
 import {
@@ -19,6 +20,7 @@ import {
   hasActiveDownloads,
 } from "@/services/downloadQueueService";
 import gameService from "@/services/gameService";
+import { privateSourceMessage } from "@/lib/privateSourceMessages";
 import { toast } from "sonner";
 
 export default function PrivateGameDetails({ initialGame }) {
@@ -33,6 +35,7 @@ export default function PrivateGameDetails({ initialGame }) {
   const [busy, setBusy] = useState(false);
   const [directory, setDirectory] = useState(0);
   const { settings } = useSettings();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const source = game.privateSource;
   const image = usePrivateArtwork(source, revision);
@@ -41,7 +44,7 @@ export default function PrivateGameDetails({ initialGame }) {
     try {
       await fn();
     } catch (e) {
-      toast.error(e.message);
+      toast.error(privateSourceMessage(t, e));
     } finally {
       setBusy(false);
     }
@@ -71,7 +74,7 @@ export default function PrivateGameDetails({ initialGame }) {
         additionalDirIndex: directory,
         privateSource: source,
       });
-      toast.success("Added to the download queue");
+      toast.success(t("privateSources.details.queued"));
     } else {
       await window.electron.privateSources.download(
         source.sourceId,
@@ -86,7 +89,7 @@ export default function PrivateGameDetails({ initialGame }) {
     <div className="container mx-auto max-w-6xl space-y-6 p-6">
       <Button variant="ghost" className="gap-2" onClick={() => navigate(-1)}>
         <ArrowLeft className="h-4 w-4" />
-        Back
+        {t("common.back")}
       </Button>
       <section className="overflow-hidden rounded-2xl border bg-card">
         <div className="relative flex min-h-64 items-end bg-gradient-to-br from-primary/20 via-muted to-background p-8">
@@ -101,7 +104,7 @@ export default function PrivateGameDetails({ initialGame }) {
           <div className="relative space-y-3">
             <Badge variant="secondary">
               <Server className="mr-2 h-3 w-3" />
-              Private · {game.releasedBy}
+              {t("privateSources.details.badge", { source: game.releasedBy })}
             </Badge>
             <h1 className="text-4xl font-bold">{game.game}</h1>
             <p className="text-muted-foreground">
@@ -112,8 +115,7 @@ export default function PrivateGameDetails({ initialGame }) {
         <div className="grid gap-8 p-8 md:grid-cols-[1fr_300px]">
           <div className="space-y-5">
             <p className="whitespace-pre-wrap text-muted-foreground">
-              {metadata.description ||
-                "No description yet. Match this package to a game, or add your own details."}
+              {metadata.description || t("privateSources.details.noDescription")}
             </p>
             <div className="flex flex-wrap gap-2">
               {metadata.genres?.map((g) => (
@@ -124,9 +126,9 @@ export default function PrivateGameDetails({ initialGame }) {
             </div>
             <dl className="grid grid-cols-2 gap-3 text-sm">
               {[
-                ["Released", metadata.releaseDate],
-                ["Developer", metadata.developer],
-                ["Publisher", metadata.publisher],
+                [t("privateSources.details.released"), metadata.releaseDate],
+                [t("privateSources.details.developer"), metadata.developer],
+                [t("privateSources.details.publisher"), metadata.publisher],
               ]
                 .filter(([, v]) => v)
                 .map(([label, value]) => (
@@ -143,7 +145,7 @@ export default function PrivateGameDetails({ initialGame }) {
                 onClick={() => setMatching(true)}
               >
                 <Search className="mr-2 h-4 w-4" />
-                Match Game / Edit details
+                {t("privateSources.details.matchGame")}
               </Button>
               <Button
                 variant="outline"
@@ -159,13 +161,12 @@ export default function PrivateGameDetails({ initialGame }) {
                 }
               >
                 <ImagePlus className="mr-2 h-4 w-4" />
-                Upload artwork
+                {t("privateSources.details.uploadArtwork")}
               </Button>
             </div>
             {game.privateMatch === "needs-review" && (
               <p className="text-sm text-amber-600">
-                No unambiguous match was found. Choose a candidate in Match
-                Game.
+                {t("privateSources.details.needsReview")}
               </p>
             )}
             {metadata.screenshots?.length > 0 && (
@@ -174,7 +175,7 @@ export default function PrivateGameDetails({ initialGame }) {
                   <img
                     key={url}
                     src={url}
-                    alt="Game screenshot"
+                    alt={t("privateSources.details.screenshot")}
                     loading="lazy"
                     className="rounded-lg"
                   />
@@ -183,8 +184,12 @@ export default function PrivateGameDetails({ initialGame }) {
             )}
           </div>
           <aside className="space-y-4 rounded-xl border bg-background/50 p-5">
-            <h2 className="font-semibold">Download package</h2>
-            <Label htmlFor="private-destination">Library destination</Label>
+            <h2 className="font-semibold">
+              {t("privateSources.details.downloadTitle")}
+            </h2>
+            <Label htmlFor="private-destination">
+              {t("privateSources.details.destination")}
+            </Label>
             <select
               id="private-destination"
               className="w-full rounded-md border bg-background p-2 text-sm"
@@ -196,7 +201,7 @@ export default function PrivateGameDetails({ initialGame }) {
                 ...(settings.additionalDirectories || []),
               ].map((dir, i) => (
                 <option key={i} value={i}>
-                  {dir || "Choose a download folder in Settings"}
+                  {dir || t("privateSources.details.noDownloadFolder")}
                 </option>
               ))}
             </select>
@@ -206,7 +211,9 @@ export default function PrivateGameDetails({ initialGame }) {
               onClick={() => run(() => download(true))}
             >
               <Download className="h-4 w-4" />
-              {busy ? "Preparing…" : "Download / Queue"}
+              {busy
+                ? t("privateSources.details.preparing")
+                : t("privateSources.details.downloadOrQueue")}
             </Button>
             <Button
               variant="outline"
@@ -214,13 +221,10 @@ export default function PrivateGameDetails({ initialGame }) {
               disabled={busy || !settings.downloadDirectory}
               onClick={() => run(() => download(false))}
             >
-              Start concurrently
+              {t("privateSources.details.startNow")}
             </Button>
             <p className="text-xs text-muted-foreground">
-              Downloads appear in the normal Download Manager. Packages require
-              review before installation. Executables are never started
-              automatically. ISO mounting is performed manually using your
-              operating system.
+              {t("privateSources.details.downloadNote")}
             </p>
           </aside>
         </div>
@@ -228,14 +232,14 @@ export default function PrivateGameDetails({ initialGame }) {
       <Dialog open={matching} onOpenChange={setMatching}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Match Game</DialogTitle>
+            <DialogTitle>{t("privateSources.details.matchTitle")}</DialogTitle>
             <DialogDescription>
-              Search sends this title directly to Steam. Select a result only if
-              it identifies your package correctly, or save your own title and
-              description.
+              {t("privateSources.details.matchDescription")}
             </DialogDescription>
           </DialogHeader>
-          <Label htmlFor="private-title">Title / search</Label>
+          <Label htmlFor="private-title">
+            {t("privateSources.details.searchLabel")}
+          </Label>
           <div className="flex gap-2">
             <Input
               id="private-title"
@@ -250,14 +254,17 @@ export default function PrivateGameDetails({ initialGame }) {
                   const items =
                     await window.electron.privateSources.search(query);
                   setCandidates(items);
-                  if (!items.length) toast.info("No matches found");
+                  if (!items.length)
+                    toast.info(t("privateSources.details.noMatches"));
                 })
               }
             >
-              Search Steam
+              {t("privateSources.details.searchSteam")}
             </Button>
           </div>
-          <Label htmlFor="private-description">Description</Label>
+          <Label htmlFor="private-description">
+            {t("privateSources.details.descriptionLabel")}
+          </Label>
           <textarea
             id="private-description"
             className="min-h-24 rounded-md border bg-background p-3 text-sm"
@@ -269,7 +276,7 @@ export default function PrivateGameDetails({ initialGame }) {
             disabled={busy || !query.trim()}
             onClick={() => run(() => update({ title: query, description }))}
           >
-            Save custom details
+            {t("privateSources.details.saveDetails")}
           </Button>
           <div className="space-y-2">
             {candidates.map((c) => (
@@ -286,7 +293,9 @@ export default function PrivateGameDetails({ initialGame }) {
                 />
                 <span className="flex-1 font-medium">{c.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  {Math.round(c.confidence * 100)}% title similarity
+                  {t("privateSources.details.similarity", {
+                    percent: Math.round(c.confidence * 100),
+                  })}
                 </span>
               </button>
             ))}

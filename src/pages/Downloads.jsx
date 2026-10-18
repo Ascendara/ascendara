@@ -60,6 +60,7 @@ import {
   forceSyncDownloads,
 } from "@/services/downloadSyncService";
 import { cn } from "@/lib/utils";
+import { privateSourceMessage } from "@/lib/privateSourceMessages";
 import SpeedGraph, { formatSpeed, markDownloadStart } from "@/components/SpeedGraph";
 
 // Helper function to check if download speed is above 50 MB/s
@@ -1520,6 +1521,7 @@ const DownloadCard = ({
 
   const predefinedErrorPatterns = [
     "content_type_error",
+    "privateSources.",
     "no_files_error",
     "provider_blocked_error",
     "download_connection_error",
@@ -1616,6 +1618,7 @@ const DownloadCard = ({
   const getErrorMessage = () => {
     const msg = downloadingData.message;
     if (!msg) return null;
+    if (game.privateSource) return privateSourceMessage(t, msg);
 
     if (msg.trim().toLowerCase() === "conflict")
       return t(
@@ -1948,16 +1951,53 @@ const DownloadCard = ({
         {/* Manual installer */}
         {isPendingManualInstall && downloadingData?.privatePackage && (
           <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-            <p className="font-medium">Private package — review required</p>
-            <p className="text-sm text-muted-foreground">{downloadingData.message}</p>
-            <p className="text-xs text-muted-foreground">EXE installers require manual review and execution. Mount ISO files using your operating system; automatic ISO mounting is not supported. Extracted games can be imported by selecting their executable.</p>
+            <p className="font-medium">{t("privateSources.package.title")}</p>
+            <p className="text-sm text-muted-foreground">
+              {privateSourceMessage(t, downloadingData.message)}
+            </p>
+            <p className="text-xs text-muted-foreground">{t("privateSources.package.note")}</p>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => window.electron.privateSources.openPackage(game.game).catch(e => toast.error(e.message))}>Show package in folder</Button>
-              {/\.(zip|7z|rar)$/i.test(game.privateSource?.package || "") && !game.privateSource?.extracted && <Button size="sm" onClick={async () => {
-                const result = await window.electron.retryExtract(game.game);
-                if (!result.success) toast.error(result.error);
-              }}>Extract archive</Button>}
-              <Button size="sm" variant="secondary" onClick={() => window.electron.privateSources.importGame(game.game).catch(e => toast.error(e.message))}>Select installed game executable</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  window.electron.privateSources
+                    .openPackage(game.game)
+                    .catch(e => toast.error(privateSourceMessage(t, e)))
+                }
+              >
+                {t("privateSources.package.showInFolder")}
+              </Button>
+              {/\.(zip|7z|rar)$/i.test(game.privateSource?.package || "") &&
+                !game.privateSource?.extracted && (
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      const result = await window.electron.retryExtract(game.game);
+                      if (!result.success)
+                        toast.error(privateSourceMessage(t, result.error));
+                    }}
+                  >
+                    {t("privateSources.package.extract")}
+                  </Button>
+                )}
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  window.electron.privateSources
+                    .importGame(game.game, {
+                      pickTitle: t("privateSources.package.pickTitle"),
+                      cancel: t("common.cancel"),
+                      confirm: t("privateSources.package.importConfirm"),
+                      message: t("privateSources.package.importMessage"),
+                      detail: t("privateSources.package.importDetail"),
+                    })
+                    .catch(e => toast.error(privateSourceMessage(t, e)))
+                }
+              >
+                {t("privateSources.package.selectExecutable")}
+              </Button>
             </div>
           </div>
         )}
