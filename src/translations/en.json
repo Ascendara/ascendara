@@ -1867,7 +1867,9 @@
       "mostPopularDesc": "Among the most downloaded and played games on Ascendara",
       "selectionCriteria": "Verified games are carefully selected based on community feedback, download statistics, and quality assurance testing."
     },
-    "viewDetails": "View Details"
+    "viewDetails": "View Details",
+    "views": "{{views}} views",
+    "viewsTooltip": "How many Ascendara users have come across this game while browsing."
   },
   "gameScreen": {
     "aboutGame": "About This Game",

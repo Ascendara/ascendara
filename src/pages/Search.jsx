@@ -38,6 +38,7 @@ import {
   Info,
   ArrowUpFromLine,
   Download,
+  Eye,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { subscribeToStatus, getCurrentStatus } from "@/services/serverStatus";
@@ -52,10 +53,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useNavigate, useLocation } from "react-router-dom";
 import imageCacheService from "@/services/imageCacheService";
-import { formatLatestUpdate, sanitizeText } from "@/lib/utils";
+import { formatLatestUpdate, sanitizeText, formatCompactNumber } from "@/lib/utils";
 import verifiedGamesService from "@/services/verifiedGamesService";
 import installedGamesService from "@/services/installedGamesService";
 import { useImageLoader } from "@/hooks/useImageLoader";
+import { useGameViews } from "@/hooks/useGameViews";
 
 // Module-level cache with timestamp
 let gamesCache = {
@@ -1427,6 +1429,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                   handleDownload={handleDownload}
                   handleContextMenu={handleContextMenu}
                   featuredGameId={featuredGameId}
+                  trackViews={!isFitGirlSource}
                 />
                 {hasMore && (
                   <div ref={loaderRef} className="flex justify-center py-8">
@@ -1491,24 +1494,39 @@ function useWindowSize() {
 
 // Memoized game card wrapper to prevent re-renders
 const MemoizedGameCard = memo(
-  ({ game, onDownload, onContextMenu }) => (
-    <div data-game-name={game.game} onContextMenu={e => onContextMenu?.(e, game)}>
-      <GameCard game={game} onDownload={onDownload} />
-    </div>
-  ),
+  ({ game, onDownload, onContextMenu, trackViews }) => {
+    const [viewRef, viewCount] = useGameViews(
+      game.gameID,
+      trackViews && !game.privateSource
+    );
+    return (
+      <div
+        ref={viewRef}
+        data-game-name={game.game}
+        onContextMenu={e => onContextMenu?.(e, game)}
+      >
+        <GameCard game={game} onDownload={onDownload} viewCount={viewCount} />
+      </div>
+    );
+  },
   (prevProps, nextProps) => {
     // Only re-render if the game object reference changes
     return (
       prevProps.game === nextProps.game &&
       prevProps.onDownload === nextProps.onDownload &&
-      prevProps.onContextMenu === nextProps.onContextMenu
+      prevProps.onContextMenu === nextProps.onContextMenu &&
+      prevProps.trackViews === nextProps.trackViews
     );
   }
 );
 
 // Featured game card — spans 2 columns with larger image and description
-const FeaturedGameCard = memo(({ game, onDownload, onContextMenu }) => {
+const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) => {
   const navigate = useNavigate();
+  const [viewRef, viewCount] = useGameViews(
+    game?.gameID,
+    trackViews && !game?.privateSource
+  );
   const { cachedImage, loading } = useImageLoader(game?.imgID, {
     quality: "high",
     priority: "high",
@@ -1566,6 +1584,7 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu }) => {
 
   return (
     <div
+      ref={viewRef}
       className="group relative col-span-1 cursor-pointer overflow-hidden rounded-xl border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/15 md:col-span-2"
       style={{ minHeight: "380px" }}
       onClick={handleClick}
@@ -1638,6 +1657,14 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu }) => {
               {formatLatestUpdate(game.latest_update)}
             </span>
           )}
+          {viewCount > 0 && (
+            <span className="flex items-center gap-1" title={t("gameCard.viewsTooltip")}>
+              <Eye className="h-3 w-3" />
+              <span className="tabular-nums">
+                {t("gameCard.views", { views: formatCompactNumber(viewCount) })}
+              </span>
+            </span>
+          )}
         </div>
 
         {/* Categories + DLC/Online badges */}
@@ -1704,6 +1731,7 @@ const GameGrid = memo(
     handleDownload,
     handleContextMenu,
     featuredGameId,
+    trackViews,
   }) => {
     // Identify featured game from the full list (only show when not searching)
     const isSearching = !!debouncedSearchQuery?.trim();
@@ -1752,6 +1780,7 @@ const GameGrid = memo(
             game={featuredGame}
             onDownload={downloadCallbacks.get(featuredKey)}
             onContextMenu={handleContextMenu}
+            trackViews={trackViews}
           />
         )}
         {regularGames.map(game => {
@@ -1763,6 +1792,7 @@ const GameGrid = memo(
               game={game}
               onContextMenu={handleContextMenu}
               onDownload={downloadCallbacks.get(key)}
+              trackViews={trackViews}
             />
           );
         })}

@@ -42,3 +42,13 @@ export function formatLatestUpdate(latest_update) {
     return updateDate.toLocaleDateString(undefined, options);
   }
 }
+
+const compactNumberFormat = new Intl.NumberFormat(undefined, {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+// 950 -> "950", 1234 -> "1.2K", 3400000 -> "3.4M"
+export function formatCompactNumber(value) {
+  return Number.isFinite(value) ? compactNumberFormat.format(value) : "";
+}

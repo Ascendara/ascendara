@@ -17,6 +17,7 @@ import {
   Star,
   ShieldCheck,
   Heart,
+  Eye,
 } from "lucide-react";
 import {
   TooltipProvider,
@@ -39,7 +40,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import torboxService from "@/services/torboxService";
-import { sanitizeText, formatLatestUpdate } from "@/lib/utils";
+import { sanitizeText, formatLatestUpdate, formatCompactNumber } from "@/lib/utils";
 import ratingQueueService from "@/services/ratingQueueService";
 import installedGamesService from "@/services/installedGamesService";
 import { useImageLoader } from "@/hooks/useImageLoader";
@@ -55,7 +56,7 @@ const GameCard = memo(function GameCard(props) {
   return props.game ? <GameCardContent {...props} /> : null;
 });
 
-function GameCardContent({ game, compact }) {
+function GameCardContent({ game, compact, viewCount }) {
   const navigate = useNavigate();
   const [showAllTags, setShowAllTags] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -425,6 +426,23 @@ function GameCardContent({ game, compact }) {
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="text-secondary">{t("gameCard.ratingTooltip")}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {viewCount > 0 && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex cursor-help items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 backdrop-blur-sm animate-in fade-in-50 slide-in-from-left-3">
+                          <Eye className="h-3 w-3 text-white/80" />
+                          <span className="text-xs font-bold tabular-nums text-white">
+                            {formatCompactNumber(viewCount)}
+                          </span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-secondary">{t("gameCard.viewsTooltip")}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
