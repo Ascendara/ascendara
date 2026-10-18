@@ -1312,7 +1312,7 @@ function Settings() {
           </aside>
 
           <div className="min-w-0">
-            <SettingsCategory {...categoryProps("general")} columns>
+            <SettingsCategory {...categoryProps("general")} layout="grid">
               <Card id="appearance-settings" className="border border-border/60 shadow-none p-6">
                 {/* Appearance Section */}
                 <div className="space-y-4">
@@ -1587,59 +1587,63 @@ function Settings() {
               </Card>
 
               {/* Language Settings Card */}
-              <Card id="language" className="border border-border/60 shadow-none p-6">
-                <div className="mb-2 flex items-center gap-2">
-                  <Languages className="mb-2 h-5 w-5 text-primary" />
-                  <h2 className="text-base font-semibold text-foreground">
-                    {t("settings.languageSettings")}
-                  </h2>
-                </div>
-                <div className="space-y-6">
-                  <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.languageSettingsDescription")}
-                    </p>
-                    <Select
-                      value={language}
-                      onValueChange={value => {
-                        handleLanguageChange(value);
-                        changeLanguage(value);
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue>
-                          <div className="flex items-center gap-2">
-                            <span>
-                              {availableLanguages.find(l => l.id === language)?.icon}
-                            </span>
-                            <span>
-                              {availableLanguages.find(l => l.id === language)?.name}
-                            </span>
-                          </div>
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableLanguages.map(lang => (
-                          <SelectItem key={lang.id} value={lang.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{lang.icon}</span>
-                              <span>{lang.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p
-                      className="text-md inline-flex cursor-pointer items-center font-medium text-muted-foreground duration-200 hover:translate-x-1"
+              {/* Spans both columns so it sits full width under Appearance and Application */}
+              <Card
+                id="language"
+                className="border border-border/60 p-6 shadow-none xl:col-span-2"
+              >
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                        {t("settings.languageSettings")}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.languageSettingsDescription")}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-primary"
                       onClick={() => navigate("/extralanguages")}
                     >
+                      <Languages className="h-4 w-4" />
                       {t("settings.selectMoreLanguages")}
-                      <ArrowRight className="ml-1 h-4 w-4" />
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.languageSetNote")}
-                    </p>
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+                    {availableLanguages.map(lang => (
+                      <button
+                        key={lang.id}
+                        type="button"
+                        onClick={() => {
+                          handleLanguageChange(lang.id);
+                          changeLanguage(lang.id);
+                        }}
+                        className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-all hover:bg-accent/50 ${
+                          language === lang.id
+                            ? "border-primary bg-primary/5"
+                            : "border-border"
+                        }`}
+                      >
+                        <span className="text-xl leading-none">{lang.icon}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                          {lang.name}
+                        </span>
+                        {language === lang.id && (
+                          <CheckCircle className="h-4 w-4 shrink-0 text-primary" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Info className="h-3.5 w-3.5 shrink-0" />
+                    {t("settings.languageSetNote")}
+                  </p>
                 </div>
               </Card>
             </SettingsCategory>
@@ -4846,11 +4850,11 @@ function Settings() {
                   />
                 </div>
               </div>
+
             </div>
 
             {/* Live Preview */}
             <div className="min-h-0 space-y-3 pr-2 lg:overflow-y-auto">
-
               <h4 className="text-sm font-medium text-foreground">
                 {t("settings.colorSection.preview") || "Live Preview"}
               </h4>
@@ -5848,6 +5852,7 @@ function SettingsCategory({
   description,
   active,
   columns = false,
+  layout,
   children,
 }) {
   return (
@@ -5865,12 +5870,15 @@ function SettingsCategory({
           )}
         </div>
       </header>
-      {/* Multi-card categories flow into two balanced columns on wide windows */}
+      {/* Multi-card categories flow into two balanced columns on wide windows;
+          the grid layout instead keeps cards in the same row at equal height */}
       <div
         className={
-          columns
-            ? "gap-4 xl:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid"
-            : "space-y-4"
+          layout === "grid"
+            ? "grid gap-4 xl:grid-cols-2"
+            : columns
+              ? "gap-4 xl:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid"
+              : "space-y-4"
         }
       >
         {children}
