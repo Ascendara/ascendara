@@ -643,6 +643,9 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("fetch-api-image", endpoint, imgID, timestamp, signature),
   getSteamGridUrls: gameName => ipcRenderer.invoke("steamgrid-get-urls", gameName),
   getSteamGridHeader: gameName => ipcRenderer.invoke("steamgrid-get-header", gameName),
+  searchSteamGridGames: term => ipcRenderer.invoke("steamgrid-search-games", term),
+  getSteamGridGameArtwork: gameId =>
+    ipcRenderer.invoke("steamgrid-get-game-artwork", gameId),
   getHltbGameTimes: gameName => ipcRenderer.invoke("hltb-get-game-times", gameName),
 
   // Service status checks use the restricted request handler.

@@ -352,4 +352,64 @@ async function getImageUrls(gameName, { reportErrors = false } = {}) {
   return result;
 }
 
-module.exports = { fetchGameAssets, getImageUrls, getHeaderUrl };
+/**
+ * SteamGridDB games matching a name, for the artwork correction picker.
+ * Returns [{ id, name, year, verified }].
+ */
+async function searchGames(term) {
+  const cleanName = typeof term === "string" ? cleanGameName(term) : "";
+  if (!cleanName) return [];
+  const res = await throttledGet(
+    `${PROXY_BASE_URL}/search/autocomplete/${encodeURIComponent(cleanName)}`,
+    authHelper.generateAuthHeaders()
+  );
+  if (!res.data?.success || !Array.isArray(res.data.data)) return [];
+  return res.data.data.slice(0, 12).map(game => ({
+    id: game.id,
+    name: game.name,
+    year: game.release_date ? new Date(game.release_date * 1000).getFullYear() : null,
+    verified: !!game.verified,
+  }));
+}
+
+/**
+ * Portrait covers (600x900) and the top banner for one SteamGridDB game, for
+ * the artwork correction picker. Returns { grids: [{ id, url, thumb }], hero }.
+ */
+async function getGameArtwork(gameId) {
+  if (!Number.isSafeInteger(gameId) || gameId <= 0) {
+    throw new Error("Invalid SteamGridDB game id");
+  }
+  const authHeaders = authHelper.generateAuthHeaders();
+  const gridsRes = await throttledGet(
+    `${PROXY_BASE_URL}/grids/game/${gameId}?dimensions=600x900&mimes=image/jpeg,image/png&sort=score`,
+    authHeaders
+  );
+  const grids = gridsRes.data?.success && Array.isArray(gridsRes.data.data)
+    ? gridsRes.data.data
+        .filter(grid => grid?.url)
+        .slice(0, 24)
+        .map(grid => ({ id: grid.id, url: grid.url, thumb: grid.thumb || grid.url }))
+    : [];
+
+  let hero = null;
+  try {
+    const heroRes = await throttledGet(
+      `${PROXY_BASE_URL}/heroes/game/${gameId}?dimensions=1920x620,3840x1240&mimes=image/jpeg,image/png&sort=score`,
+      authHeaders
+    );
+    const top = heroRes.data?.success ? heroRes.data.data?.[0] : null;
+    if (top?.url) hero = { id: top.id, url: top.url };
+  } catch (e) {
+    console.warn(`[SteamGrid] Hero lookup failed for game ${gameId}:`, e.message);
+  }
+  return { grids, hero };
+}
+
+module.exports = {
+  fetchGameAssets,
+  getImageUrls,
+  getHeaderUrl,
+  searchGames,
+  getGameArtwork,
+};

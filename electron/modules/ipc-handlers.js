@@ -462,6 +462,25 @@ function registerMiscHandlers() {
     }
   });
 
+  // Artwork correction picker: SteamGridDB matches for a name, then one game's covers
+  ipcMain.handle("steamgrid-search-games", async (_, term) => {
+    try {
+      return await steamgrid.searchGames(term);
+    } catch (error) {
+      console.error("[SteamGrid] searchGames IPC error:", error);
+      return null;
+    }
+  });
+
+  ipcMain.handle("steamgrid-get-game-artwork", async (_, gameId) => {
+    try {
+      return await steamgrid.getGameArtwork(gameId);
+    } catch (error) {
+      console.error("[SteamGrid] getGameArtwork IPC error:", error);
+      return null;
+    }
+  });
+
   // Read local file
   ipcMain.handle("read-local-file", async (_, filePath, encoding = "utf8") => {
     try {
