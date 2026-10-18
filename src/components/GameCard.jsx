@@ -1,5 +1,5 @@
 import { useState, memo, useCallback, useEffect, useMemo, useRef } from "react";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,12 +12,14 @@ import {
   Clock,
   Check,
   Info,
-  Download,
   Trophy,
   Star,
   ShieldCheck,
   Heart,
   Eye,
+  HardDrive,
+  Tag,
+  Sparkles,
 } from "lucide-react";
 import {
   TooltipProvider,
@@ -52,13 +54,36 @@ import {
   TORBOX_ELIGIBLE_SEAMLESS,
 } from "@/config/providers";
 
+const MAX_VISIBLE_TAGS = 3;
+const RECENT_UPDATE_DAYS = 14;
+
+// Short, card-friendly update label plus whether it counts as a recent update
+function getUpdateInfo(latest_update) {
+  if (!latest_update) return null;
+  const date = new Date(latest_update);
+  if (Number.isNaN(date.getTime())) return null;
+  const diffDays = Math.floor((Date.now() - date) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return null;
+  const isRecent = diffDays < RECENT_UPDATE_DAYS;
+  return {
+    isRecent,
+    label: isRecent
+      ? formatLatestUpdate(latest_update)
+      : date.toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
+    full: date.toLocaleDateString(undefined, { dateStyle: "long" }),
+  };
+}
+
 const GameCard = memo(function GameCard(props) {
   return props.game ? <GameCardContent {...props} /> : null;
 });
 
 function GameCardContent({ game, compact, viewCount }) {
   const navigate = useNavigate();
-  const [showAllTags, setShowAllTags] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isPlayLater, setIsPlayLater] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -134,10 +159,13 @@ function GameCardContent({ game, compact, viewCount }) {
   }, []);
 
   const gameCategories = Array.isArray(game.category) ? game.category : [];
+  const categories = gameCategories.slice(0, MAX_VISIBLE_TAGS);
+  const hiddenCategories = gameCategories.slice(MAX_VISIBLE_TAGS);
 
-  const categories = useMemo(() => {
-    return showAllTags ? gameCategories : gameCategories.slice(0, 3);
-  }, [gameCategories, showAllTags]);
+  const updateInfo = useMemo(
+    () => getUpdateInfo(game.latest_update),
+    [game.latest_update]
+  );
 
   useEffect(() => {
     let active = true;
@@ -348,21 +376,77 @@ function GameCardContent({ game, compact, viewCount }) {
   }
 
   // --- RENDER CARD MODE ---
+  // Pick the host the download page will use so the button can hint at the provider
+  const seamlessHosts = SEAMLESS_PROVIDERS;
+  const torboxHosts = TORBOX_PROVIDERS;
+  const prioritizedTorbox = settings.prioritizeTorboxOverSeamless;
+  const allHosts = Object.keys(game.download_links || {});
+
+  let host;
+  if (allHosts.includes("buzzheavier")) {
+    host = "buzzheavier";
+  } else {
+    host =
+      allHosts.find(h =>
+        prioritizedTorbox
+          ? ["gofile", "datanodes", ...torboxHosts].includes(h)
+          : seamlessHosts.concat(torboxHosts).includes(h)
+      ) || allHosts[0];
+  }
+
+  let provider = "default";
+  if (prioritizedTorbox && TORBOX_ELIGIBLE_SEAMLESS.includes(host)) {
+    provider = "torbox";
+  } else if (seamlessHosts.includes(host)) {
+    provider = "seamless";
+  } else if (torboxHosts.includes(host)) {
+    provider = "torbox";
+  }
+
+  // Only show provider badge for download state
+  const showProviderBadge = !isLoading && !isInstalled && provider !== "default";
+  const torboxEnabled = provider === "torbox" && torboxService.isEnabled(settings);
+
+  const specs = [
+    game.size && {
+      key: "size",
+      icon: HardDrive,
+      label: t("gameCard.specs.size"),
+      value: game.size,
+    },
+    game.version && {
+      key: "version",
+      icon: Tag,
+      label: t("gameCard.specs.version"),
+      value: game.version,
+    },
+    updateInfo && {
+      key: "updated",
+      icon: Calendar,
+      label: t("gameCard.specs.updated"),
+      value: updateInfo.label,
+      title: updateInfo.full,
+      highlight: updateInfo.isRecent,
+    },
+  ].filter(Boolean);
+
+  const hasStats = gameRating > 0 || viewCount > 0 || game.dlc || game.online;
+
   return (
     <>
-      <Card
-        ref={cardRef}
-        onClick={e => {
-          // Double-check dialog wasn't just closed
-          if (!dialogJustClosed.current) {
-            handleCardClick();
-          }
-        }}
-        className="press group relative flex h-[420px] cursor-pointer flex-col justify-between overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10"
-      >
-        <CardContent className="p-0">
+      <TooltipProvider delayDuration={300}>
+        <Card
+          ref={cardRef}
+          onClick={() => {
+            // Double-check dialog wasn't just closed
+            if (!dialogJustClosed.current) {
+              handleCardClick();
+            }
+          }}
+          className="press group relative flex h-[420px] cursor-pointer flex-col overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10"
+        >
           {/* Image Section */}
-          <div className="relative overflow-hidden rounded-t-lg">
+          <div className="relative shrink-0 overflow-hidden rounded-t-lg">
             <AspectRatio ratio={16 / 9} className="overflow-hidden rounded-t-lg">
               {loading && !cachedImage && (
                 <Skeleton className="absolute inset-0 h-full w-full bg-muted" />
@@ -376,322 +460,294 @@ function GameCardContent({ game, compact, viewCount }) {
                       loading ? "opacity-0" : "opacity-100"
                     } group-hover:scale-110`}
                   />
-                  {/* Subtle vignette */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30" />
                 </>
               )}
             </AspectRatio>
 
-            {/* Top Status Bar */}
-            <div className="absolute left-0 right-0 top-0 flex items-start justify-between p-3">
-              {/* Rating and Verified Badge */}
-              <div className="flex items-center gap-1.5">
-                {isVerified && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div
-                          onClick={e => {
-                            e.stopPropagation();
-                            setShowVerifiedDialog(true);
-                          }}
-                          className="group/verified relative flex cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-primary via-primary/90 to-primary/80 p-1.5 backdrop-blur-md transition-all duration-300 animate-in fade-in-50 slide-in-from-left-3 hover:scale-110 hover:from-primary hover:via-primary/95 hover:to-primary/85"
-                          style={{
-                            boxShadow:
-                              "0 0 15px rgba(59, 130, 246, 0.6), 0 0 30px rgba(59, 130, 246, 0.4), 0 0 45px rgba(59, 130, 246, 0.2)",
-                            filter: "drop-shadow(0 0 8px rgba(59, 130, 246, 0.5))",
-                          }}
-                        >
-                          <ShieldCheck className="h-4 w-4 text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.5)]" />
-                          <div className="absolute -inset-1 animate-pulse rounded-full bg-primary/40 blur-lg" />
-                          <div
-                            className="absolute -inset-2 animate-pulse rounded-full bg-primary/20 blur-xl"
-                            style={{ animationDelay: "0.5s" }}
-                          />
-                        </div>
-                      </TooltipTrigger>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {gameRating > 0 && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex cursor-help items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 backdrop-blur-sm animate-in fade-in-50 slide-in-from-left-3">
-                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                          <span className="text-xs font-bold text-white">
-                            {Math.round(gameRating)}
-                          </span>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-secondary">{t("gameCard.ratingTooltip")}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {viewCount > 0 && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex cursor-help items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 backdrop-blur-sm animate-in fade-in-50 slide-in-from-left-3">
-                          <Eye className="h-3 w-3 text-white/80" />
-                          <span className="text-xs font-bold tabular-nums text-white">
-                            {formatCompactNumber(viewCount)}
-                          </span>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-secondary">{t("gameCard.viewsTooltip")}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </div>
+            {/* Top: verified + install status */}
+            <div className="absolute left-0 right-0 top-0 flex items-start justify-between gap-2 p-2.5">
+              {isVerified ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        setShowVerifiedDialog(true);
+                      }}
+                      className="flex items-center gap-1 rounded-full bg-primary px-2 py-1 text-[11px] font-semibold text-secondary shadow-[0_0_12px_rgba(59,130,246,0.55)] transition-transform animate-in fade-in-50 slide-in-from-left-3 hover:scale-105"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {t("gameCard.verified.short")}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-secondary">
+                      {t("gameCard.verified.badge")} · {t("gameCard.verified.clickForInfo")}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <span />
+              )}
 
-              {/* Status Badge */}
               {(isInstalled || needsUpdate) && (
                 <div
-                  className={`rounded-full px-2.5 py-1 backdrop-blur-sm animate-in fade-in-50 slide-in-from-right-3 ${
-                    needsUpdate
-                      ? "bg-amber-500/90 text-white"
-                      : "bg-green-500/90 text-white"
+                  className={`flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold text-white shadow-sm backdrop-blur-sm animate-in fade-in-50 slide-in-from-right-3 ${
+                    needsUpdate ? "bg-amber-500/90" : "bg-green-500/90"
                   }`}
                 >
-                  <span className="text-xs font-semibold">
-                    {needsUpdate
-                      ? t("gameCard.updateAvailable")
-                      : t("gameCard.installed")}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Bottom Info Bar on Image */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 pt-8">
-              <h3 className="line-clamp-2 text-lg font-bold leading-tight text-white">
-                {sanitizeText(game.game)}
-              </h3>
-            </div>
-          </div>
-
-          {/* Content Section */}
-          <div className="flex flex-grow flex-col space-y-2.5 overflow-y-auto p-4">
-            {/* Categories + DLC/Online pills */}
-            <div className="flex flex-wrap gap-1.5">
-              {game.dlc && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge className="cursor-default gap-1 border-0 bg-violet-500/15 px-2 py-0.5 text-xs text-violet-400 hover:bg-violet-500/25">
-                        <Gift className="h-3 w-3" />
-                        DLC
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{t("gameCard.dlcTooltip")}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              {game.online && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge className="cursor-default gap-1 border-0 bg-sky-500/15 px-2 py-0.5 text-xs text-sky-400 hover:bg-sky-500/25">
-                        <Gamepad2 className="h-3 w-3" />
-                        Online
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{t("gameCard.onlineTooltip")}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              {categories.map((cat, index) => (
-                <Badge
-                  key={`${cat}-${index}`}
-                  variant="secondary"
-                  className="text-secondary-foreground border-0 bg-secondary/50 px-2 py-0.5 text-xs"
-                >
-                  {cat}
-                </Badge>
-              ))}
-              {!showAllTags && gameCategories.length > 3 && (
-                <Badge
-                  variant="outline"
-                  className="cursor-pointer border-muted-foreground/30 px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent"
-                  onClick={e => {
-                    e.stopPropagation();
-                    setShowAllTags(true);
-                  }}
-                >
-                  +{gameCategories.length - 3}
-                </Badge>
-              )}
-              {showAllTags && (
-                <Badge
-                  variant="outline"
-                  className="cursor-pointer border-muted-foreground/30 px-2 py-0.5 text-xs text-muted-foreground transition-colors animate-in fade-in-50 hover:bg-accent"
-                  onClick={e => {
-                    e.stopPropagation();
-                    setShowAllTags(false);
-                  }}
-                >
-                  {t("gameCard.showLess")}
-                </Badge>
-              )}
-            </div>
-
-            {/* Game Info - Inline */}
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              {game.size && (
-                <div className="flex items-center gap-1">
-                  <Download className="h-3 w-3" />
-                  <span className="font-medium">{game.size}</span>
-                </div>
-              )}
-              {game.version && (
-                <div className="flex items-center">
-                  <span className="font-medium">v{game.version}</span>
-                </div>
-              )}
-              {game.latest_update && (
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  <span>{formatLatestUpdate(game.latest_update)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-2 border-t p-4">
-          {/* Play Later + Favorite Buttons */}
-          {!isInstalled && (
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`flex-1 gap-2 transition-all duration-200 ${isPlayLater ? "text-primary hover:bg-primary/5" : "text-muted-foreground hover:text-foreground"}`}
-                onClick={handlePlayLater}
-              >
-                {isPlayLater ? (
-                  <>
-                    <Check className="h-3.5 w-3.5" />
-                    <span className="text-xs font-medium">
-                      {t("gameCard.addedToPlayLater")}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Clock className="h-3.5 w-3.5" />
-                    <span className="text-xs font-medium">{t("gameCard.playLater")}</span>
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`shrink-0 px-2.5 transition-all duration-200 ${isFavorite ? "text-primary hover:bg-primary/5" : "text-muted-foreground hover:text-foreground"}`}
-                onClick={handleFavorite}
-              >
-                <Heart className={`h-3.5 w-3.5 ${isFavorite ? "fill-primary" : ""}`} />
-              </Button>
-            </div>
-          )}
-          {(() => {
-            // Determine button state and provider
-            const buttonState = isLoading
-              ? "loading"
-              : needsUpdate
-                ? "update"
-                : isInstalled
-                  ? "installed"
-                  : "download";
-
-            const seamlessHosts = SEAMLESS_PROVIDERS;
-            const torboxHosts = TORBOX_PROVIDERS;
-            const prioritizedTorbox = settings.prioritizeTorboxOverSeamless;
-            const downloadLinks = game.download_links || {};
-            const allHosts = Object.keys(downloadLinks);
-
-            let host;
-            if (allHosts.includes("buzzheavier")) {
-              host = "buzzheavier";
-            } else {
-              host =
-                allHosts.find(h =>
-                  prioritizedTorbox
-                    ? ["gofile", "datanodes", ...torboxHosts].includes(h)
-                    : seamlessHosts.concat(torboxHosts).includes(h)
-                ) || allHosts[0];
-            }
-
-            let provider = "default";
-            if (prioritizedTorbox && TORBOX_ELIGIBLE_SEAMLESS.includes(host)) {
-              provider = "torbox";
-            } else if (seamlessHosts.includes(host)) {
-              provider = "seamless";
-            } else if (torboxHosts.includes(host)) {
-              provider = "torbox";
-            }
-
-            // Only show provider badge for download state
-            const showProviderBadge =
-              !isLoading && !isInstalled && provider !== "default";
-            const torboxEnabled =
-              provider === "torbox" && torboxService.isEnabled(settings);
-
-            return (
-              <div className="w-full">
-                <Button
-                  variant={
-                    needsUpdate ? "default" : isInstalled ? "secondary" : "default"
-                  }
-                  className={`w-full gap-2 font-semibold transition-all duration-200 ${
-                    needsUpdate
-                      ? "bg-amber-500 text-white hover:bg-amber-600"
-                      : isInstalled
-                        ? "bg-green-500/10 text-green-500 hover:bg-green-500/20"
-                        : "bg-primary text-secondary hover:bg-primary/90"
-                  } ${isLoading ? "opacity-70" : ""}`}
-                  onClick={handleDownload}
-                  disabled={isLoading || (isInstalled && !needsUpdate)}
-                >
-                  {isLoading && <Loader className="h-4 w-4 animate-spin" />}
-                  {!isLoading && needsUpdate && <ArrowUpFromLine className="h-4 w-4" />}
-                  {!isLoading && isInstalled && !needsUpdate && (
-                    <Check className="h-4 w-4" />
+                  {needsUpdate ? (
+                    <ArrowUpFromLine className="h-3 w-3" />
+                  ) : (
+                    <Check className="h-3 w-3" />
                   )}
-                  {!isLoading && !isInstalled && !needsUpdate && (
-                    <Info className="h-4 w-4" />
-                  )}
+                  {needsUpdate ? t("gameCard.updateAvailable") : t("gameCard.installed")}
+                </div>
+              )}
+            </div>
 
-                  <span>
-                    {isLoading
-                      ? t("gameCard.loading")
-                      : needsUpdate
-                        ? t("gameCard.update")
-                        : isInstalled
-                          ? t("gameCard.installed")
-                          : t("gameCard.viewDetails")}
-                  </span>
-
-                  {showProviderBadge && (
-                    <div className="ml-auto flex items-center gap-1">
-                      {torboxEnabled && <TorboxIcon className="h-4 w-4" />}
-                      {provider === "seamless" && (
-                        <Zap fill="currentColor" className="h-3 w-3" />
-                      )}
-                    </div>
-                  )}
-                </Button>
+            {/* Bottom-left: fresh update ribbon */}
+            {updateInfo?.isRecent && !needsUpdate && (
+              <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-[11px] font-medium text-emerald-300 backdrop-blur-sm">
+                <Sparkles className="h-3 w-3" />
+                {t("gameCard.recentlyUpdated")}
               </div>
-            );
-          })()}
-        </CardFooter>
-      </Card>
+            )}
+          </div>
+
+          {/* Body */}
+          <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-4 pb-3 pt-3">
+            <h3
+              className="line-clamp-2 text-base font-bold leading-snug text-foreground"
+              title={sanitizeText(game.game)}
+            >
+              {sanitizeText(game.game)}
+            </h3>
+
+            {/* Stats: rating, views, features */}
+            {hasStats && (
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                {gameRating > 0 && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex cursor-help items-center gap-1 font-semibold text-foreground">
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        <span className="tabular-nums">{Math.round(gameRating)}</span>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-secondary">{t("gameCard.ratingTooltip")}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                {viewCount > 0 && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex cursor-help items-center gap-1">
+                        <Eye className="h-3.5 w-3.5" />
+                        <span className="tabular-nums">
+                          {t("gameCard.views", { views: formatCompactNumber(viewCount) })}
+                        </span>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-secondary">{t("gameCard.viewsTooltip")}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+
+                {(game.dlc || game.online) && (
+                  <div className="ml-auto flex items-center gap-1">
+                    {game.dlc && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex cursor-default items-center gap-1 rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-violet-400">
+                            <Gift className="h-3 w-3" />
+                            {t("gameCard.dlc")}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-secondary">{t("gameCard.dlcTooltip")}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {game.online && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex cursor-default items-center gap-1 rounded-md bg-sky-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-sky-400">
+                            <Gamepad2 className="h-3 w-3" />
+                            {t("gameCard.online")}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-secondary">{t("gameCard.onlineTooltip")}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tags: single row, overflow collapses into +N */}
+            {gameCategories.length > 0 && (
+              <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+                {categories.map((cat, index) => (
+                  <Badge
+                    key={`${cat}-${index}`}
+                    variant="secondary"
+                    className="text-secondary-foreground min-w-0 shrink truncate border-0 bg-secondary/50 px-2 py-0.5 text-[11px] font-medium"
+                  >
+                    <span className="truncate">{cat}</span>
+                  </Badge>
+                ))}
+                {hiddenCategories.length > 0 && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge
+                        variant="outline"
+                        className="shrink-0 cursor-help border-muted-foreground/30 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                      >
+                        +{hiddenCategories.length}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-secondary">{hiddenCategories.join(", ")}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            )}
+
+            {/* Spec strip: size / version / updated */}
+            {specs.length > 0 && (
+              <div
+                className="mt-auto grid divide-x divide-border/60 rounded-lg bg-muted/40"
+                style={{ gridTemplateColumns: `repeat(${specs.length}, minmax(0, 1fr))` }}
+              >
+                {specs.map(({ key, icon: Icon, label, value, title, highlight }) => (
+                  <div key={key} className="min-w-0 px-2.5 py-1.5" title={title || value}>
+                    <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <Icon className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{label}</span>
+                    </div>
+                    <div
+                      className={`truncate text-xs font-semibold tabular-nums ${
+                        highlight ? "text-emerald-500" : "text-foreground"
+                      }`}
+                    >
+                      {value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex shrink-0 items-center gap-2 border-t p-3">
+            <Button
+              variant={needsUpdate ? "default" : isInstalled ? "secondary" : "default"}
+              className={`min-w-0 flex-1 gap-2 font-semibold transition-all duration-200 ${
+                needsUpdate
+                  ? "bg-amber-500 text-white hover:bg-amber-600"
+                  : isInstalled
+                    ? "bg-green-500/10 text-green-500 hover:bg-green-500/20"
+                    : "bg-primary text-secondary hover:bg-primary/90"
+              } ${isLoading ? "opacity-70" : ""}`}
+              onClick={handleDownload}
+              disabled={isLoading || (isInstalled && !needsUpdate)}
+            >
+              {isLoading && <Loader className="h-4 w-4 animate-spin" />}
+              {!isLoading && needsUpdate && <ArrowUpFromLine className="h-4 w-4" />}
+              {!isLoading && isInstalled && !needsUpdate && <Check className="h-4 w-4" />}
+              {!isLoading && !isInstalled && !needsUpdate && <Info className="h-4 w-4" />}
+
+              <span className="truncate">
+                {isLoading
+                  ? t("gameCard.loading")
+                  : needsUpdate
+                    ? t("gameCard.update")
+                    : isInstalled
+                      ? t("gameCard.installed")
+                      : t("gameCard.viewDetails")}
+              </span>
+
+              {showProviderBadge && (torboxEnabled || provider === "seamless") && (
+                <div className="ml-auto flex items-center gap-1">
+                  {torboxEnabled && <TorboxIcon className="h-4 w-4" />}
+                  {provider === "seamless" && (
+                    <Zap fill="currentColor" className="h-3 w-3" />
+                  )}
+                </div>
+              )}
+            </Button>
+
+            {!isInstalled && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={
+                        isPlayLater
+                          ? t("gameCard.removeFromPlayLater")
+                          : t("gameCard.addToPlayLater")
+                      }
+                      className={`h-10 w-10 shrink-0 transition-all duration-200 ${
+                        isPlayLater
+                          ? "bg-primary/10 text-primary hover:bg-primary/15"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      onClick={handlePlayLater}
+                    >
+                      {isPlayLater ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <Clock className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-secondary">
+                      {isPlayLater
+                        ? t("gameCard.removeFromPlayLater")
+                        : t("gameCard.addToPlayLater")}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={
+                        isFavorite ? t("gameCard.unfavorite") : t("gameCard.favorite")
+                      }
+                      className={`h-10 w-10 shrink-0 transition-all duration-200 ${
+                        isFavorite
+                          ? "bg-primary/10 text-primary hover:bg-primary/15"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      onClick={handleFavorite}
+                    >
+                      <Heart className={`h-4 w-4 ${isFavorite ? "fill-primary" : ""}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-secondary">
+                      {isFavorite ? t("gameCard.unfavorite") : t("gameCard.favorite")}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            )}
+          </div>
+        </Card>
+      </TooltipProvider>
 
       {/* Verified Game Info Dialog - Rendered outside Card to prevent click-through */}
       <AlertDialog

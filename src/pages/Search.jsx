@@ -37,8 +37,9 @@ import {
   Check,
   Info,
   ArrowUpFromLine,
-  Download,
   Eye,
+  Star,
+  Tag,
 } from "lucide-react";
 import gameService from "@/services/gameService";
 import { subscribeToStatus, getCurrentStatus } from "@/services/serverStatus";
@@ -55,6 +56,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import imageCacheService from "@/services/imageCacheService";
 import { formatLatestUpdate, sanitizeText, formatCompactNumber } from "@/lib/utils";
 import verifiedGamesService from "@/services/verifiedGamesService";
+import ratingQueueService from "@/services/ratingQueueService";
 import installedGamesService from "@/services/installedGamesService";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { useGameViews } from "@/hooks/useGameViews";
@@ -1535,8 +1537,22 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) 
   const [isInstalled, setIsInstalled] = useState(false);
   const [needsUpdate, setNeedsUpdate] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [gameRating, setGameRating] = useState(game?.rating || 0);
   const isMounted = useRef(true);
   const { t } = useLanguage();
+
+  useEffect(() => {
+    if (!game?.gameID || game.privateSource) return;
+    if (game.rating > 0) {
+      setGameRating(game.rating);
+      return;
+    }
+    const cachedRating = ratingQueueService.getCachedRating(game.gameID);
+    if (cachedRating > 0) setGameRating(cachedRating);
+    return ratingQueueService.subscribe(game.gameID, rating => {
+      if (isMounted.current && rating > 0) setGameRating(rating);
+    });
+  }, [game?.gameID, game?.rating, game?.privateSource]);
 
   useEffect(() => {
     installedGamesService
@@ -1642,54 +1658,80 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) 
           {sanitizeText(game.game)}
         </h2>
 
-        {/* Meta row */}
-        <div className="mb-3 flex items-center gap-3 text-xs text-white/70">
-          {game.size && (
-            <span className="flex items-center gap-1">
-              <Download className="h-3 w-3" />
-              {game.size}
-            </span>
-          )}
-          {game.version && <span>v{game.version}</span>}
-          {game.latest_update && (
-            <span className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              {formatLatestUpdate(game.latest_update)}
-            </span>
-          )}
-          {viewCount > 0 && (
-            <span className="flex items-center gap-1" title={t("gameCard.viewsTooltip")}>
-              <Eye className="h-3 w-3" />
-              <span className="tabular-nums">
-                {t("gameCard.views", { views: formatCompactNumber(viewCount) })}
+        {/* Stats: rating, views, features */}
+        {(gameRating > 0 || viewCount > 0 || game.dlc || game.online) && (
+          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-white/80">
+            {gameRating > 0 && (
+              <span
+                className="flex items-center gap-1 font-semibold text-white"
+                title={t("gameCard.ratingTooltip")}
+              >
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                <span className="tabular-nums">{Math.round(gameRating)}</span>
               </span>
-            </span>
-          )}
-        </div>
+            )}
+            {viewCount > 0 && (
+              <span className="flex items-center gap-1" title={t("gameCard.viewsTooltip")}>
+                <Eye className="h-3.5 w-3.5" />
+                <span className="tabular-nums">
+                  {t("gameCard.views", { views: formatCompactNumber(viewCount) })}
+                </span>
+              </span>
+            )}
+            {game.dlc && (
+              <span className="flex items-center gap-1 rounded-md bg-violet-500/25 px-1.5 py-0.5 text-[11px] font-semibold text-violet-200">
+                <Gift className="h-3 w-3" />
+                {t("gameCard.dlcTooltip")}
+              </span>
+            )}
+            {game.online && (
+              <span className="flex items-center gap-1 rounded-md bg-sky-500/25 px-1.5 py-0.5 text-[11px] font-semibold text-sky-200">
+                <Gamepad2 className="h-3 w-3" />
+                {t("gameCard.onlineTooltip")}
+              </span>
+            )}
+          </div>
+        )}
 
-        {/* Categories + DLC/Online badges */}
-        <div className="mb-4 flex flex-wrap items-center gap-1.5">
-          {game.dlc && (
-            <span className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs text-white/90 backdrop-blur-sm">
-              <Gift className="h-3 w-3" />
-              {t("gameCard.dlcTooltip")}
-            </span>
-          )}
-          {game.online && (
-            <span className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs text-white/90 backdrop-blur-sm">
-              <Gamepad2 className="h-3 w-3" />
-              {t("gameCard.onlineTooltip")}
-            </span>
-          )}
-          {gameCategories.map(cat => (
-            <span
-              key={cat}
-              className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs text-white/90 backdrop-blur-sm"
-            >
-              {cat}
-            </span>
-          ))}
-        </div>
+        {/* Specs: size / version / updated */}
+        {(game.size || game.version || game.latest_update) && (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs text-white/90">
+            {game.size && (
+              <span className="flex items-center gap-1.5 rounded-md bg-black/40 px-2 py-1 backdrop-blur-sm">
+                <HardDrive className="h-3 w-3 text-white/60" />
+                <span className="font-semibold tabular-nums">{game.size}</span>
+              </span>
+            )}
+            {game.version && (
+              <span className="flex items-center gap-1.5 rounded-md bg-black/40 px-2 py-1 backdrop-blur-sm">
+                <Tag className="h-3 w-3 text-white/60" />
+                <span className="font-semibold tabular-nums">{game.version}</span>
+              </span>
+            )}
+            {game.latest_update && (
+              <span className="flex items-center gap-1.5 rounded-md bg-black/40 px-2 py-1 backdrop-blur-sm">
+                <Calendar className="h-3 w-3 text-white/60" />
+                <span className="font-semibold">
+                  {formatLatestUpdate(game.latest_update)}
+                </span>
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Categories */}
+        {gameCategories.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-1.5">
+            {gameCategories.map(cat => (
+              <span
+                key={cat}
+                className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs text-white/90 backdrop-blur-sm"
+              >
+                {cat}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Button */}
         <div onClick={e => e.stopPropagation()}>
