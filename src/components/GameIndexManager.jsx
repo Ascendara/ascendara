@@ -96,7 +96,12 @@ const AnimatedNumber = ({ value }) => {
   return display != null ? display.toLocaleString() : "—";
 };
 
-const GameIndexManager = ({ embedded = false, view = "index", onBack, renderManager }) => {
+const GameIndexManager = ({
+  embedded = false,
+  view = "index",
+  onBack,
+  renderManager,
+}) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -467,7 +472,8 @@ const GameIndexManager = ({ embedded = false, view = "index", onBack, renderMana
     try {
       const result = await window.electron.openDirectoryDialog();
       if (result) {
-        await window.electron.updateSetting("localIndex", result);
+        await updateSetting("localIndex", result);
+        gameService.notifySourceChanged();
         setLocalIndexPath(result);
         toast.success(t("localRefresh.locationChanged") || "Storage location updated");
       }
@@ -1741,7 +1747,8 @@ const GameIndexManager = ({ embedded = false, view = "index", onBack, renderMana
                         onClick={() => setSourceBucketUrlDraft(RECOMMENDED_BUCKET_URL)}
                         className="text-xs text-primary hover:underline"
                       >
-                        {t("localRefresh.sourceBucketUseRecommended") || "Use recommended"}
+                        {t("localRefresh.sourceBucketUseRecommended") ||
+                          "Use recommended"}
                       </button>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1804,7 +1811,8 @@ const GameIndexManager = ({ embedded = false, view = "index", onBack, renderMana
                     ) : (
                       communitySources.map(entry => {
                         const inUse =
-                          activeKind.id === "community" && entry.url === customSource?.url;
+                          activeKind.id === "community" &&
+                          entry.url === customSource?.url;
                         return (
                           <div
                             key={entry.url}
@@ -1821,7 +1829,9 @@ const GameIndexManager = ({ embedded = false, view = "index", onBack, renderMana
                             />
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <p className="truncate text-sm font-medium">{entry.name}</p>
+                                <p className="truncate text-sm font-medium">
+                                  {entry.name}
+                                </p>
                                 {entry.torrentOnly && (
                                   <Badge
                                     variant="outline"
@@ -1919,7 +1929,9 @@ const GameIndexManager = ({ embedded = false, view = "index", onBack, renderMana
                             />
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <p className="truncate text-sm font-medium">{list.name}</p>
+                                <p className="truncate text-sm font-medium">
+                                  {list.name}
+                                </p>
                                 {list.format && (
                                   <Badge variant="outline" className="text-[10px]">
                                     {list.format}
@@ -2031,8 +2043,7 @@ const GameIndexManager = ({ embedded = false, view = "index", onBack, renderMana
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">
                       {relayState === "done"
-                        ? t("localRefresh.relayDone") ||
-                          "Thanks, the index is up to date"
+                        ? t("localRefresh.relayDone") || "Thanks, the index is up to date"
                         : t("localRefresh.relayTitle") ||
                           "The game index can't update itself right now"}
                     </p>
@@ -2074,180 +2085,187 @@ const GameIndexManager = ({ embedded = false, view = "index", onBack, renderMana
             {/* Overview and its settings sit side by side on wide windows */}
             <div className="grid gap-4 xl:grid-cols-2">
               <div className="flex flex-col gap-4">
-              <Card className="relative flex flex-1 flex-col overflow-hidden border border-border/60 p-6 shadow-none">
-                <AnimatePresence>
-                  {justRefreshed && (
-                    <motion.div
-                      key="refresh-sweep"
-                      initial={{ x: "-100%", opacity: 1 }}
-                      animate={{ x: "100%" }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.9, ease: "easeOut" }}
-                      className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent"
-                    />
-                  )}
-                </AnimatePresence>
-                <div className="relative space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="mb-0 whitespace-nowrap text-base font-semibold text-foreground">
-                      {t("localRefresh.ascendaraIndex") || "Ascendara Index"}
-                    </h3>
-                    {customSourcesMode ? (
-                      <Badge variant="outline" className="whitespace-nowrap text-muted-foreground">
-                        {t("externalSources.notInUse")}
-                      </Badge>
-                    ) : (
-                      settings?.usingLocalIndex && (
-                        <Badge className="gap-1 whitespace-nowrap bg-green-500/15 text-green-600 hover:bg-green-500/15 dark:text-green-400">
-                          <Zap className="h-3 w-3" />
-                          {t("localRefresh.usingLocalIndex") || "Active"}
-                        </Badge>
-                      )
+                <Card className="relative flex flex-1 flex-col overflow-hidden border border-border/60 p-6 shadow-none">
+                  <AnimatePresence>
+                    {justRefreshed && (
+                      <motion.div
+                        key="refresh-sweep"
+                        initial={{ x: "-100%", opacity: 1 }}
+                        animate={{ x: "100%" }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.9, ease: "easeOut" }}
+                        className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent"
+                      />
                     )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {t("localRefresh.heroDescAscendara")}
-                  </p>
-                </div>
-
-                <dl className="relative mt-5 grid grid-cols-3 gap-3">
-                  <div className="min-w-0 rounded-lg bg-muted/40 p-3">
-                    <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t("localRefresh.games") || "Games"}
-                    </dt>
-                    <dd className="mt-1 text-2xl font-bold leading-none tabular-nums">
-                      <AnimatedNumber value={indexInfo?.gameCount} />
-                    </dd>
-                  </div>
-                  <div className="min-w-0 rounded-lg bg-muted/40 p-3">
-                    <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t("localRefresh.lastRefresh") || "Last refresh"}
-                    </dt>
-                    <dd className="mt-1 truncate text-sm font-semibold">
-                      {lastRefreshTime
-                        ? formatLastRefreshTime(lastRefreshTime)
-                        : t("localRefresh.never") || "Never"}
-                    </dd>
-                  </div>
-                  <div className="min-w-0 rounded-lg bg-muted/40 p-3">
-                    <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t("localRefresh.indexUpdated") || "Index age"}
-                    </dt>
-                    <dd className="mt-1 truncate text-sm font-semibold tabular-nums">
-                      {indexInfo?.date
-                        ? new Date(indexInfo.date).toLocaleDateString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                          })
-                        : "—"}
-                    </dd>
-                  </div>
-                </dl>
-
-                {/* Keeps the refresh button at the bottom when the column stretches */}
-                <div className="min-h-4 flex-1" />
-                <Button
-                  className="relative w-full gap-2 overflow-hidden text-secondary"
-                  onClick={async () => {
-                    if (downloadingIndex) return;
-                    try {
-                      await window.electron.downloadSharedIndex(localIndexPath);
-                    } catch (e) {
-                      console.error("Failed to start download:", e);
-                      toast.error(
-                        t("localRefresh.indexDownloadFailed") || "Failed to start download"
-                      );
-                    }
-                  }}
-                  disabled={!!downloadingIndex}
-                >
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.span
-                      key={downloadingIndex ? "busy" : justRefreshed ? "done" : "idle"}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      transition={{ duration: 0.15 }}
-                      className="inline-flex items-center gap-2"
-                    >
-                      {downloadingIndex ? (
-                        <>
-                          <Loader className="h-4 w-4 animate-spin" />
-                          {t("localRefresh.refreshingIndex")}
-                        </>
-                      ) : justRefreshed ? (
-                        <>
-                          <CircleCheck className="h-4 w-4" />
-                          {t("localRefresh.upToDate")}
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="h-4 w-4" />
-                          {hasIndexBefore
-                            ? t("localRefresh.refreshNow") || "Refresh now"
-                            : t("localRefresh.getStarted") || "Get the index"}
-                        </>
-                      )}
-                    </motion.span>
                   </AnimatePresence>
-                </Button>
-              </Card>
+                  <div className="relative space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="mb-0 whitespace-nowrap text-base font-semibold text-foreground">
+                        {t("localRefresh.ascendaraIndex") || "Ascendara Index"}
+                      </h3>
+                      {customSourcesMode ? (
+                        <Badge
+                          variant="outline"
+                          className="whitespace-nowrap text-muted-foreground"
+                        >
+                          {t("externalSources.notInUse")}
+                        </Badge>
+                      ) : (
+                        settings?.usingLocalIndex && (
+                          <Badge className="gap-1 whitespace-nowrap bg-green-500/15 text-green-600 hover:bg-green-500/15 dark:text-green-400">
+                            <Zap className="h-3 w-3" />
+                            {t("localRefresh.usingLocalIndex") || "Active"}
+                          </Badge>
+                        )
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {t("localRefresh.heroDescAscendara")}
+                    </p>
+                  </div>
 
-              {/* Everything that isn't the Ascendara index lives on its own page */}
-              <Card
-                className={cn(
-                  "flex items-start gap-4 border px-6 py-4 shadow-none",
-                  customSourcesMode ? "border-primary/30" : "border-border/60"
-                )}
-              >
-                <div
+                  <dl className="relative mt-5 grid grid-cols-3 gap-3">
+                    <div className="min-w-0 rounded-lg bg-muted/40 p-3">
+                      <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {t("localRefresh.games") || "Games"}
+                      </dt>
+                      <dd className="mt-1 text-2xl font-bold tabular-nums leading-none">
+                        <AnimatedNumber value={indexInfo?.gameCount} />
+                      </dd>
+                    </div>
+                    <div className="min-w-0 rounded-lg bg-muted/40 p-3">
+                      <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {t("localRefresh.lastRefresh") || "Last refresh"}
+                      </dt>
+                      <dd className="mt-1 truncate text-sm font-semibold">
+                        {lastRefreshTime
+                          ? formatLastRefreshTime(lastRefreshTime)
+                          : t("localRefresh.never") || "Never"}
+                      </dd>
+                    </div>
+                    <div className="min-w-0 rounded-lg bg-muted/40 p-3">
+                      <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {t("localRefresh.indexUpdated") || "Index age"}
+                      </dt>
+                      <dd className="mt-1 truncate text-sm font-semibold tabular-nums">
+                        {indexInfo?.date
+                          ? new Date(indexInfo.date).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : "—"}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  {/* Keeps the refresh button at the bottom when the column stretches */}
+                  <div className="min-h-4 flex-1" />
+                  <Button
+                    className="relative w-full gap-2 overflow-hidden text-secondary"
+                    onClick={async () => {
+                      if (downloadingIndex) return;
+                      try {
+                        await window.electron.downloadSharedIndex(localIndexPath);
+                      } catch (e) {
+                        console.error("Failed to start download:", e);
+                        toast.error(
+                          t("localRefresh.indexDownloadFailed") ||
+                            "Failed to start download"
+                        );
+                      }
+                    }}
+                    disabled={!!downloadingIndex}
+                  >
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.span
+                        key={downloadingIndex ? "busy" : justRefreshed ? "done" : "idle"}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.15 }}
+                        className="inline-flex items-center gap-2"
+                      >
+                        {downloadingIndex ? (
+                          <>
+                            <Loader className="h-4 w-4 animate-spin" />
+                            {t("localRefresh.refreshingIndex")}
+                          </>
+                        ) : justRefreshed ? (
+                          <>
+                            <CircleCheck className="h-4 w-4" />
+                            {t("localRefresh.upToDate")}
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4" />
+                            {hasIndexBefore
+                              ? t("localRefresh.refreshNow") || "Refresh now"
+                              : t("localRefresh.getStarted") || "Get the index"}
+                          </>
+                        )}
+                      </motion.span>
+                    </AnimatePresence>
+                  </Button>
+                </Card>
+
+                {/* Everything that isn't the Ascendara index lives on its own page */}
+                <Card
                   className={cn(
-                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-                    customSourcesMode
-                      ? "bg-primary/10 text-primary"
-                      : "bg-muted text-muted-foreground"
+                    "flex items-start gap-4 border px-6 py-4 shadow-none",
+                    customSourcesMode ? "border-primary/30" : "border-border/60"
                   )}
                 >
-                  <Globe className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="mb-0 text-base font-semibold text-foreground">
-                      {t("externalSources.title")}
-                    </h3>
-                    <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                      {t("localRefresh.experimental") || "Experimental"}
-                    </Badge>
+                  <div
+                    className={cn(
+                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                      customSourcesMode
+                        ? "bg-primary/10 text-primary"
+                        : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    <Globe className="h-5 w-5" />
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {customSourcesMode
-                      ? t("externalSources.activeDesc", { name: activeName })
-                      : t("externalSources.linkDesc")}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={() => navigate("/sources")}
-                    >
-                      {t("externalSources.manage")}
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </Button>
-                    {customSourcesMode && (
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="mb-0 text-base font-semibold text-foreground">
+                        {t("externalSources.title")}
+                      </h3>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] uppercase tracking-wide"
+                      >
+                        {t("localRefresh.experimental") || "Experimental"}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {customSourcesMode
+                        ? t("externalSources.activeDesc", { name: activeName })
+                        : t("externalSources.linkDesc")}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
                       <Button
                         size="sm"
-                        variant="ghost"
-                        className="text-muted-foreground"
-                        disabled={modeLocked}
-                        onClick={() => handleToggleCustomSourcesMode(false)}
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => navigate("/sources")}
                       >
-                        {t("externalSources.useAscendaraIndex")}
+                        {t("externalSources.manage")}
+                        <ArrowRight className="h-3.5 w-3.5" />
                       </Button>
-                    )}
+                      {customSourcesMode && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-muted-foreground"
+                          disabled={modeLocked}
+                          onClick={() => handleToggleCustomSourcesMode(false)}
+                        >
+                          {t("externalSources.useAscendaraIndex")}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
               </div>
 
               <Card className="divide-y divide-border/60 border border-border/60 shadow-none">

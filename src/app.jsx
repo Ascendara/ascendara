@@ -14,6 +14,7 @@ import SupportDialog from "@/components/SupportDialog";
 import PlatformWarningDialog from "@/components/PlatformWarningDialog";
 import WatcherWarnDialog from "@/components/WatcherWarnDialog";
 import BrokenVersionDialog from "@/components/BrokenVersionDialog";
+import IndexRecoveryNotice from "@/components/IndexRecoveryNotice";
 import FirstIndexDialog from "@/components/FirstIndexDialog";
 import BranchWelcomeDialog from "@/components/BranchWelcomeDialog";
 import UpdateOverlay from "@/components/UpdateOverlay";
@@ -739,7 +740,9 @@ const UserActivityTracker = React.memo(() => {
     return window.electron?.onGameClosed?.((_, data) => {
       if (!data?.quickExit) return;
       toast.warning(i18n.t("gameScreen.quickExitDialog.title"), {
-        description: i18n.t("gameScreen.quickExitDialog.description", { game: data.game }),
+        description: i18n.t("gameScreen.quickExitDialog.description", {
+          game: data.game,
+        }),
         duration: Infinity,
         closeButton: true,
         action: {
@@ -1684,6 +1687,7 @@ const AppRoutes = () => {
     <>
       <MenuBar />
       {!effectiveShowWelcome && <BrowserDownloadHandler />}
+      {!effectiveShowWelcome && <IndexRecoveryNotice />}
       {effectiveShowWelcome ? (
         <div className="min-h-screen bg-background text-foreground">
           <motion.div
@@ -1725,7 +1729,9 @@ const AppRoutes = () => {
             {/* The local index moved into Settings; keep old links working */}
             <Route
               path="localrefresh"
-              element={<Navigate to="/settings" replace state={{ scrollTo: "game-index" }} />}
+              element={
+                <Navigate to="/settings" replace state={{ scrollTo: "game-index" }} />
+              }
             />
             <Route path="profile" element={<Profile />} />
             <Route path="ascend" element={<Ascend />} />

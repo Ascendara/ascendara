@@ -19,6 +19,8 @@ const PREFETCH_RECENT = 100;
 const PREFETCH_CONCURRENCY = 5;
 
 let activeSync = null;
+let activeSyncPath = null;
+let activeSyncForced = false;
 const pendingCovers = new Map(); // imgID -> Promise<boolean>
 // A 404 from the bucket is never cached and is billed as a read, so remember
 // misses for the session instead of asking again.
@@ -141,11 +143,20 @@ async function runSync(indexPath, force, blacklist) {
  * @returns {Promise<{updated: boolean, games?: number}>}
  */
 function syncCommunityIndex(indexPath, { force = false, blacklist = [] } = {}) {
-  if (!activeSync) {
-    activeSync = runSync(indexPath, force, blacklist).finally(() => {
-      activeSync = null;
-    });
+  if (activeSync) {
+    if (activeSyncPath === indexPath && (!force || activeSyncForced)) return activeSync;
+    // A repair must not inherit a non-forced sync (or another folder's result).
+    return activeSync
+      .catch(() => {})
+      .then(() => syncCommunityIndex(indexPath, { force, blacklist }));
   }
+  activeSyncPath = indexPath;
+  activeSyncForced = force;
+  activeSync = runSync(indexPath, force, blacklist).finally(() => {
+    activeSync = null;
+    activeSyncPath = null;
+    activeSyncForced = false;
+  });
   return activeSync;
 }
 

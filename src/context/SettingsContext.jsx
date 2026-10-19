@@ -100,12 +100,19 @@ export function SettingsProvider({ children }) {
           ? newSettings(settingsRef.current)
           : newSettings; // Don't merge - use newSettings directly to avoid losing values
 
-      // Update local state
+      // Persist only changed keys so a stale snapshot cannot reset values
+      // written by the main process (including the active index path).
+      const changes = Object.fromEntries(
+        Object.entries(updatedSettings).filter(
+          ([key, value]) => !Object.is(value, settingsRef.current[key])
+        )
+      );
+      settingsRef.current = updatedSettings;
       setSettingsState(updatedSettings);
 
       // Save to electron
       try {
-        await window.electron.saveSettings(updatedSettings);
+        await window.electron.saveSettings(changes);
       } catch (error) {
         console.error("Error saving settings:", error);
       }
@@ -120,6 +127,7 @@ export function SettingsProvider({ children }) {
         typeof newSettings === "function"
           ? newSettings(settingsRef.current)
           : { ...settingsRef.current, ...newSettings };
+      settingsRef.current = updatedSettings;
       setSettingsState(updatedSettings);
     },
     [] // No dependencies - uses ref
@@ -128,6 +136,7 @@ export function SettingsProvider({ children }) {
   const updateSetting = useCallback(
     async (key, value) => {
       const updatedSettings = { ...settingsRef.current, [key]: value };
+      settingsRef.current = updatedSettings;
       setSettingsState(updatedSettings);
       try {
         await window.electron.updateSetting(key, value);
@@ -181,10 +190,9 @@ export function SettingsProvider({ children }) {
 
     // Listen for settings changes from other parts of the app
     const handleSettingsChange = (event, newSettings) => {
-      setSettingsState(prevSettings => ({
-        ...prevSettings,
-        ...newSettings,
-      }));
+      const updatedSettings = { ...settingsRef.current, ...newSettings };
+      settingsRef.current = updatedSettings;
+      setSettingsState(updatedSettings);
     };
 
     // Keep the callback shape used by the existing settings listener.

@@ -346,6 +346,12 @@ function registerSettingsHandlers() {
       ...options,
     };
 
+    // Bulk saves may contain an uninitialized renderer default. Clearing the
+    // index path must be explicit via update-setting, not a stale snapshot.
+    if (!options.localIndex && currentSettings.localIndex) {
+      sanitizedOptions.localIndex = currentSettings.localIndex;
+    }
+
     // Handle downloadDirectory separately to ensure it's not lost
     if (directory) {
       sanitizedOptions.downloadDirectory = directory;

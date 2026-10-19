@@ -41,7 +41,18 @@ function registerLocalRefreshHandlers() {
   });
 
   ipcMain.handle("download-shared-index", async (_, outputPath) => {
+    if (publicIndexDownloading) {
+      return { success: true, message: "Download already in progress" };
+    }
+    outputPath =
+      outputPath ||
+      settingsManager.getSettings().localIndex ||
+      path.join(app.getPath("appData"), "ascendara", "localindex");
+    if (!settingsManager.updateSetting("localIndex", outputPath)) {
+      throw new Error("Failed to save the index location");
+    }
     const mainWindow = BrowserWindow.getAllWindows()[0];
+    mainWindow?.webContents.send("settings-updated", settingsManager.getSettings());
 
     // Set downloading flag and notify renderer
     publicIndexDownloading = true;
@@ -135,6 +146,65 @@ function registerLocalRefreshHandlers() {
   };
 
   ipcMain.handle("sync-community-index", syncIndexQuietly);
+
+  // Inspect the file itself: a saved path or previous successful download is
+  // not proof that the catalog still exists and can be read.
+  const inspectLocalIndex = async () => {
+    const settings = settingsManager.getSettings();
+    if (settings.customSourcesMode) return { status: "custom" };
+    const indexPath = settings.localIndex;
+    if (!indexPath) return { status: "missing-path" };
+    try {
+      const data = await fs.readJson(path.join(indexPath, "ascendara_games.json"));
+      if (!Array.isArray(data?.games) || data.games.length === 0) {
+        return { status: "empty", path: indexPath };
+      }
+      return { status: "ready", path: indexPath, games: data.games.length };
+    } catch (error) {
+      return {
+        status: error.code === "ENOENT" ? "missing" : "unreadable",
+        path: indexPath,
+        error: error.message,
+      };
+    }
+  };
+  ipcMain.handle("get-local-index-health", inspectLocalIndex);
+
+  ipcMain.handle("repair-local-index", async () => {
+    try {
+      const settings = settingsManager.getSettings();
+      if (settings.customSourcesMode) {
+        return {
+          success: false,
+          error: "Manage the selected source in Game Index settings.",
+        };
+      }
+      const indexPath =
+        settings.localIndex ||
+        path.join(app.getPath("appData"), "ascendara", "localindex");
+      if (!settingsManager.updateSetting("localIndex", indexPath)) {
+        throw new Error("Could not save the game index location.");
+      }
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send("settings-updated", settingsManager.getSettings());
+      }
+      // Force replacement of an empty/corrupt file, regardless of its timestamp.
+      await syncCommunityIndex(indexPath, {
+        force: true,
+        blacklist: settings.blacklistIDs,
+      });
+      const health = await inspectLocalIndex();
+      if (health.status !== "ready") {
+        throw new Error(
+          "The downloaded game index could not be loaded. Check its storage location in Settings."
+        );
+      }
+      prefetchCovers(indexPath);
+      return { success: true, ...health };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
 
   ipcMain.handle("get-index-status", () => getIndexStatus());
 

@@ -156,14 +156,18 @@ contextBridge.exposeInMainWorld("electron", {
     refresh: id => ipcRenderer.invoke("private-source-refresh", id),
     remove: id => ipcRenderer.invoke("private-source-remove", id),
     catalog: id => ipcRenderer.invoke("private-source-catalog", id),
-    artwork: (id, game, kind) => ipcRenderer.invoke("private-source-artwork", id, game, kind),
+    artwork: (id, game, kind) =>
+      ipcRenderer.invoke("private-source-artwork", id, game, kind),
     search: title => ipcRenderer.invoke("private-source-search", title),
-    match: (id, game, override) => ipcRenderer.invoke("private-source-match", id, game, override),
+    match: (id, game, override) =>
+      ipcRenderer.invoke("private-source-match", id, game, override),
     uploadArt: (id, game) => ipcRenderer.invoke("private-source-upload-art", id, game),
     folder: () => ipcRenderer.invoke("private-source-folder"),
-    download: (id, game, directory = 0) => ipcRenderer.invoke("private-source-download", id, game, directory),
+    download: (id, game, directory = 0) =>
+      ipcRenderer.invoke("private-source-download", id, game, directory),
     openPackage: game => ipcRenderer.invoke("private-source-open-package", game),
-    importGame: (game, labels) => ipcRenderer.invoke("private-source-import-game", game, labels),
+    importGame: (game, labels) =>
+      ipcRenderer.invoke("private-source-import-game", game, labels),
     export: (id, labels) => ipcRenderer.invoke("private-source-export", id, labels),
   },
   setExternalSourceJson: (sourceId, data) =>
@@ -243,6 +247,8 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("get-local-refresh-progress", outputPath),
   downloadSharedIndex: outputPath =>
     ipcRenderer.invoke("download-shared-index", outputPath),
+  getLocalIndexHealth: () => ipcRenderer.invoke("get-local-index-health"),
+  repairLocalIndex: () => ipcRenderer.invoke("repair-local-index"),
   syncCommunityIndex: () => ipcRenderer.invoke("sync-community-index"),
   getIndexCover: imgID => ipcRenderer.invoke("get-index-cover", imgID),
   getIndexStatus: () => ipcRenderer.invoke("get-index-status"),
@@ -312,7 +318,8 @@ contextBridge.exposeInMainWorld("electron", {
     refresh: store => ipcRenderer.invoke("store-accounts-refresh", store),
     disconnect: store => ipcRenderer.invoke("store-accounts-disconnect", store),
     cancel: store => ipcRenderer.invoke("store-accounts-cancel", store),
-    openGame: (store, id, intent) => ipcRenderer.invoke("store-accounts-open-game", store, id, intent),
+    openGame: (store, id, intent) =>
+      ipcRenderer.invoke("store-accounts-open-game", store, id, intent),
     gameDetails: (store, id) => ipcRenderer.invoke("store-game-details", store, id),
     artwork: (store, id) => ipcRenderer.invoke("store-game-artwork", store, id),
   },

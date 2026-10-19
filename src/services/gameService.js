@@ -43,7 +43,10 @@ function extractHydraVersion(title) {
   if (!title) return null;
   const m = title.match(HYDRA_VERSION_RE);
   if (m) {
-    let raw = m[0].trim().replace(/^[([]|[)\]]$/g, "").trim();
+    let raw = m[0]
+      .trim()
+      .replace(/^[([]|[)\]]$/g, "")
+      .trim();
     if (raw.toLowerCase().startsWith("v")) raw = raw.slice(1);
     return raw.trim() || null;
   }
@@ -158,7 +161,8 @@ async function fetchCustomSourceJson(url) {
       method: "GET",
       headers: {
         Accept: "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         Referer: "https://ascendara.app/",
       },
       timeout: CUSTOM_SOURCE_REQUEST_TIMEOUT,
@@ -166,9 +170,11 @@ async function fetchCustomSourceJson(url) {
     if (!res.ok) {
       let errorMsg = `Custom source HTTP ${res.status}`;
       if (res.status === 403) {
-        errorMsg += " - Access forbidden. This source may require authentication or have geographic restrictions.";
+        errorMsg +=
+          " - Access forbidden. This source may require authentication or have geographic restrictions.";
       } else if (res.status === 404) {
-        errorMsg += " - Source not found. The URL may be incorrect or the source may have been removed.";
+        errorMsg +=
+          " - Source not found. The URL may be incorrect or the source may have been removed.";
       } else if (res.status === 429) {
         errorMsg += " - Too many requests. Please wait before trying again.";
       }
@@ -180,15 +186,18 @@ async function fetchCustomSourceJson(url) {
   const res = await fetch(url, {
     headers: {
       Accept: "application/json",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     },
   });
   if (!res.ok) {
     let errorMsg = `Custom source HTTP ${res.status}`;
     if (res.status === 403) {
-      errorMsg += " - Access forbidden. This source may require authentication or have geographic restrictions.";
+      errorMsg +=
+        " - Access forbidden. This source may require authentication or have geographic restrictions.";
     } else if (res.status === 404) {
-      errorMsg += " - Source not found. The URL may be incorrect or the source may have been removed.";
+      errorMsg +=
+        " - Source not found. The URL may be incorrect or the source may have been removed.";
     } else if (res.status === 429) {
       errorMsg += " - Too many requests. Please wait before trying again.";
     } else {
@@ -205,7 +214,8 @@ function readCustomSourceCache(url, { ignoreTtl = false } = {}) {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.timestamp || !parsed?.games) return null;
-    if (!ignoreTtl && Date.now() - parsed.timestamp > CUSTOM_SOURCE_CACHE_DURATION) return null;
+    if (!ignoreTtl && Date.now() - parsed.timestamp > CUSTOM_SOURCE_CACHE_DURATION)
+      return null;
     return parsed;
   } catch {
     return null;
@@ -300,7 +310,8 @@ const gameService = {
       memoryCache.games &&
       memoryCache.metadata &&
       memoryCache.timestamp &&
-      memoryCache.customSourceUrl === activeCustomUrl
+      memoryCache.customSourceUrl === activeCustomUrl &&
+      (activeCustomUrl || memoryCache.localIndexPath === settings?.localIndex)
     ) {
       const age = now - memoryCache.timestamp;
       if (age < CACHE_DURATION) {
@@ -364,10 +375,7 @@ const gameService = {
 
     // Always load from local index
     if (localIndexPath) {
-      console.log(
-        "[GameService] Attempting to load local index from:",
-        localIndexPath
-      );
+      console.log("[GameService] Attempting to load local index from:", localIndexPath);
       try {
         const data = await this.fetchDataFromLocalIndex(localIndexPath);
         console.log("[GameService] Local index loaded:", {
@@ -460,7 +468,8 @@ const gameService = {
    */
   async _loadCustomSourceData(customSource, { force = false, refetch = false } = {}) {
     if (customSource?.privateSourceId) {
-      if (refetch) await window.electron.privateSources.refresh(customSource.privateSourceId);
+      if (refetch)
+        await window.electron.privateSources.refresh(customSource.privateSourceId);
       return window.electron.privateSources.catalog(customSource.privateSourceId);
     }
     const url = customSource?.url;
@@ -560,12 +569,7 @@ const gameService = {
     };
 
     if (url) writeCustomSourceCache(url, { games, metadata });
-    console.log(
-      "[GameService] Custom source loaded:",
-      label,
-      games.length,
-      "games"
-    );
+    console.log("[GameService] Custom source loaded:", label, games.length, "games");
     return { games, metadata };
   },
 
@@ -597,15 +601,10 @@ const gameService = {
       throw new Error("Pasted JSON is empty");
     }
     if (!Array.isArray(parsed?.downloads)) {
-      throw new Error(
-        "JSON is missing a 'downloads' array - is this a Hydra source?"
-      );
+      throw new Error("JSON is missing a 'downloads' array - is this a Hydra source?");
     }
     const label =
-      customSource?.name ||
-      customSource?.title ||
-      customSource?.label ||
-      "Custom";
+      customSource?.name || customSource?.title || customSource?.label || "Custom";
     const data = this._mapAndCacheHydraJson(parsed, {
       url: customSource.url,
       label,
@@ -665,8 +664,12 @@ const gameService = {
     }
   },
 
-
-  async updateCache(data, isLocalIndex = false, localIndexPath = null, customSourceUrl = null) {
+  async updateCache(
+    data,
+    isLocalIndex = false,
+    localIndexPath = null,
+    customSourceUrl = null
+  ) {
     try {
       const now = Date.now();
 
@@ -771,9 +774,7 @@ const gameService = {
     if (!target) return null;
     const { games, metadata } = await this.getCachedData();
     if (metadata?.customSource || !Array.isArray(games)) return null;
-    return (
-      games.find(game => this.normalizeForMatch(game.game) === target) || null
-    );
+    return games.find(game => this.normalizeForMatch(game.game) === target) || null;
   },
 
   async getGamesByCategory(category) {
