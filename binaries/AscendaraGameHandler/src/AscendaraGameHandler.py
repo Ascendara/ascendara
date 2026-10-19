@@ -388,12 +388,13 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
 
     os.chmod(umu_bin, 0o755)
 
-    prefix_path = linux_config["compat_data"]
+    prefix_path = os.path.join(linux_config["compat_data"], "pfx")
     os.makedirs(prefix_path, exist_ok=True)
 
     env = _clean_pyinstaller_env(os.environ.copy())
     env["GAMEID"] = linux_config.get("umu_id") or "umu-default"
     env["WINEPREFIX"] = prefix_path
+    env["STEAM_COMPAT_DATA_PATH"] = linux_config["compat_data"]
 
     # optional PROTONPATH - if empty, umu-run uses UMU-Proton
     if linux_config.get("proton_path"):
