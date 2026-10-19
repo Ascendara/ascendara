@@ -395,7 +395,11 @@ function registerDownloadHandlers() {
     ) => {
       if (typeof link === "string" && link.startsWith("private:")) {
         const [, sourceId, entryId] = link.split(":");
-        return require("./privateSources").start(sourceId, entryId, additionalDirIndex || 0);
+        return require("./privateSources").start(
+          sourceId,
+          entryId,
+          additionalDirIndex || 0
+        );
       }
       console.log(
         `Downloading file: ${link}, game: ${game}, online: ${online}, dlc: ${dlc}, isVr: ${isVr}, updateFlow: ${updateFlow}, version: ${version}, size: ${size}, additionalDirIndex: ${additionalDirIndex}, gameID: ${gameID}`
@@ -801,12 +805,14 @@ function registerDownloadHandlers() {
 
         downloadProcesses.set(sanitizedGame, downloadProcess);
         downloadProcess.unref();
+        return { success: true };
       } catch (error) {
         console.error("Error in download-file handler:", error);
         event.sender.send("download-error", {
           game: sanitizedGame,
           error: error.message,
         });
+        return { success: false, error: error.message };
       }
     }
   );
@@ -1255,8 +1261,14 @@ function registerDownloadHandlers() {
       const data = info.downloadingData;
       if (
         !data ||
-        !(data.error || data.stopped || data.verifyError?.length ||
-          (info.privateSource && data.pendingManualInstall && /\.(zip|7z|rar)$/i.test(info.privateSource.package || ""))) ||
+        !(
+          data.error ||
+          data.stopped ||
+          data.verifyError?.length ||
+          (info.privateSource &&
+            data.pendingManualInstall &&
+            /\.(zip|7z|rar)$/i.test(info.privateSource.package || ""))
+        ) ||
         (!info.extractionSources && Number.parseFloat(data.progressCompleted) < 100) ||
         (!info.extractionSources &&
           !Number.isFinite(Number.parseFloat(data.progressCompleted)))
@@ -1305,7 +1317,9 @@ function registerDownloadHandlers() {
       let args = ["--retry-extraction", metadata];
       if (info.privateSource && isDev && isWindows) {
         executable = getPythonPath();
-        args.unshift(path.resolve("binaries/AscendaraDownloader/src/AscendaraDownloader.py"));
+        args.unshift(
+          path.resolve("binaries/AscendaraDownloader/src/AscendaraDownloader.py")
+        );
       }
       if (isDev && !isWindows)
         args.unshift(

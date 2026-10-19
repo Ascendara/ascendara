@@ -305,7 +305,12 @@ function useBigPicturePage() {
     forceStart = false
   ) => {
     const seamlessProviders = SEAMLESS_PROVIDERS;
-    const links = game.download_links;
+    let links = game.download_links || {};
+    if (!Object.keys(links).length && game.gameID) {
+      const catalogGame = await gameService.findGameByGameID(game.gameID);
+      links = catalogGame?.download_links || {};
+      if (catalogGame) game = { ...game, ...catalogGame };
+    }
 
     // Determine torbox providers based on prioritizeTorboxOverSeamless setting
     const prioritizeTorbox = settings.prioritizeTorboxOverSeamless;
@@ -365,6 +370,23 @@ function useBigPicturePage() {
       }
     }
 
+    // TorBox-only hosts need the same desktop handoff as an explicitly selected host.
+    if (!downloadUrl && torboxService.isEnabled(settings)) {
+      for (const provider of torboxProviders) {
+        const candidates = links[provider];
+        const link = Array.isArray(candidates)
+          ? candidates.find(value => typeof value === "string" && value.trim())
+          : typeof candidates === "string"
+            ? candidates
+            : null;
+        if (link) {
+          selectedProvider = provider;
+          downloadUrl = link;
+          break;
+        }
+      }
+    }
+
     if (!downloadUrl || !selectedProvider) {
       toast.error(t("bigPicture.downloadError"));
       return;
@@ -415,7 +437,7 @@ function useBigPicturePage() {
         const isVrGame = game.category?.includes("Virtual Reality");
 
         // Start the download
-        await window.electron.downloadFile(
+        const result = await window.electron.downloadFile(
           downloadUrl,
           sanitizedGameName,
           game.online || false,
@@ -429,11 +451,14 @@ function useBigPicturePage() {
           game.gameID || ""
         );
 
+        if (result?.success === false) {
+          throw new Error(result.error || t("bigPicture.downloadError"));
+        }
         toast.success(t("bigPicture.downloadStarted"));
         changeView("downloads");
       } catch (error) {
         console.error("Error starting download:", error);
-        toast.error(t("bigPicture.downloadError"));
+        toast.error(error.message || t("bigPicture.downloadError"));
       }
     } else {
       // Non-seamless or TorBox download - show exit dialog
