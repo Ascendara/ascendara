@@ -81,7 +81,10 @@ function createWindow() {
     const hasProtocolArg = process.argv.some(
       arg =>
         typeof arg === "string" &&
-        arg.trim().replace(/^["']+|["']+$/g, "").startsWith("ascendara://")
+        arg
+          .trim()
+          .replace(/^["']+|["']+$/g, "")
+          .startsWith("ascendara://")
     );
     const shouldStartHidden = process.argv.includes("--hidden") && !hasProtocolArg;
 
@@ -274,6 +277,7 @@ function showWindow() {
     // Add setAlwaysOnTop temporarily to force focus
     mainWindow.setAlwaysOnTop(true);
     mainWindow.focus();
+    mainWindow.webContents.focus();
     // Remove the always on top flag after focusing
     setTimeout(() => {
       if (!mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(false);

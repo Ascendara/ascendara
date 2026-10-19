@@ -1,4 +1,4 @@
-import { getGamepadInput } from "./gamepad";
+import { getGamepadInput, resetGamepadInput } from "./gamepad";
 import { readNavigationInput } from "./controllerNavigation";
 
 // One poll per animation frame, regardless of how many screens/dialogs are mounted.
@@ -7,6 +7,26 @@ const observers = new Set();
 let frame = null;
 let owner = null;
 let running = false;
+let listening = false;
+
+function resumeInput() {
+  resetGamepadInput();
+  owner = null;
+  for (const consumer of consumers) consumer.state = {};
+  if (frame !== null) cancelAnimationFrame(frame);
+  frame = null;
+  start();
+}
+
+function listen() {
+  if (listening) return;
+  listening = true;
+  window.addEventListener("focus", resumeInput);
+  window.addEventListener("blur", resumeInput);
+  window.addEventListener("gamepadconnected", resumeInput);
+  window.addEventListener("gamepaddisconnected", resumeInput);
+  document.addEventListener("visibilitychange", resumeInput);
+}
 
 function tick(now) {
   frame = null;
@@ -16,8 +36,10 @@ function tick(now) {
     let nextOwner = null;
     for (const consumer of consumers) {
       const options = consumer.getOptions();
-      if (options.enabled !== false &&
-          (!nextOwner || options.priority >= nextOwner.getOptions().priority)) {
+      if (
+        options.enabled !== false &&
+        (!nextOwner || options.priority >= nextOwner.getOptions().priority)
+      ) {
         nextOwner = consumer;
       }
     }
@@ -25,7 +47,12 @@ function tick(now) {
     owner = nextOwner;
     for (const consumer of consumers) {
       const options = consumer.getOptions();
-      const blocked = document.hidden || consumer !== owner || options.blocked || changed;
+      const blocked =
+        !document.hasFocus() ||
+        document.hidden ||
+        consumer !== owner ||
+        options.blocked ||
+        changed;
       const action = readNavigationInput(input, consumer.state, now, blocked);
       if (action) consumer.onAction(action);
     }
@@ -37,6 +64,7 @@ function tick(now) {
 }
 
 function start() {
+  listen();
   if (frame === null && !running) frame = requestAnimationFrame(tick);
 }
 
@@ -45,17 +73,30 @@ function stopIfIdle() {
   if (frame !== null) cancelAnimationFrame(frame);
   frame = null;
   owner = null;
+  resetGamepadInput();
+  window.removeEventListener("focus", resumeInput);
+  window.removeEventListener("blur", resumeInput);
+  window.removeEventListener("gamepadconnected", resumeInput);
+  window.removeEventListener("gamepaddisconnected", resumeInput);
+  document.removeEventListener("visibilitychange", resumeInput);
+  listening = false;
 }
 
 export function subscribeController(onAction, getOptions) {
   const consumer = { onAction, getOptions, state: {} };
   consumers.add(consumer);
   start();
-  return () => { consumers.delete(consumer); stopIfIdle(); };
+  return () => {
+    consumers.delete(consumer);
+    stopIfIdle();
+  };
 }
 
 export function observeController(observer) {
   observers.add(observer);
   start();
-  return () => { observers.delete(observer); stopIfIdle(); };
+  return () => {
+    observers.delete(observer);
+    stopIfIdle();
+  };
 }
