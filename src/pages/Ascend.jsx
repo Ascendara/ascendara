@@ -164,7 +164,6 @@ const Ascend = () => {
     loadingCloudLibrary,
     expandedGame,
     handleExpandGame,
-    cloudLibraryImages,
     isGameInstalledLocally,
     loadingGameAchievements,
     gameAchievements,
@@ -628,7 +627,6 @@ const Ascend = () => {
               formatPlaytimeDetailed={formatPlaytimeDetailed}
               cloudLibrary={cloudLibrary}
               loadingCloudLibrary={loadingCloudLibrary}
-              cloudLibraryImages={cloudLibraryImages}
               handleSyncLibrary={handleSyncLibrary}
               isSyncingLibrary={isSyncingLibrary}
               handleRestoreFromCloud={handleRestoreFromCloud}
@@ -802,7 +800,6 @@ const Ascend = () => {
               loadingCloudLibrary={loadingCloudLibrary}
               expandedGame={expandedGame}
               handleExpandGame={handleExpandGame}
-              cloudLibraryImages={cloudLibraryImages}
               isGameInstalledLocally={isGameInstalledLocally}
               loadingGameAchievements={loadingGameAchievements}
               gameAchievements={gameAchievements}
@@ -875,7 +872,6 @@ const Ascend = () => {
               restoringBackup={restoringBackup}
               handleRestoreBackup={handleRestoreBackup}
               handleDownloadBackup={handleDownloadBackup}
-              cloudLibraryImages={cloudLibraryImages}
             />
           );
 

@@ -9,8 +9,6 @@ import { getUserAuthHeaders, userAuthenticatedFetch } from "@/utils/authHelper";
 import { retroBackupPlatform } from "@/services/retroService";
 import { restoreCloudSave } from "@/services/restoreCloudSave";
 import { checkForUpdates } from "@/services/updateCheckingService";
-import gameService from "@/services/gameService";
-import imageCacheService from "@/services/imageCacheService";
 import {
   calculateLevelFromXP,
   getLevelConstants,
@@ -184,7 +182,6 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   });
   const [loadingLocalStats, setLoadingLocalStats] = useState(true);
   const [recentGames, setRecentGames] = useState([]);
-  const [gameImages, setGameImages] = useState({});
 
   // Cloud Library state
   const [cloudLibrary, setCloudLibrary] = useState(null);
@@ -193,7 +190,6 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [isSyncingLibrary, setIsSyncingLibrary] = useState(false);
   const [isRestoringFromCloud, setIsRestoringFromCloud] = useState(false);
   const [localGames, setLocalGames] = useState([]);
-  const [cloudLibraryImages, setCloudLibraryImages] = useState({});
   const [librarySearchQuery, setLibrarySearchQuery] = useState("");
   const [librarySortBy, setLibrarySortBy] = useState("name"); // name, playtime, recent
   const [expandedGame, setExpandedGame] = useState(null); // Game name for expanded view
@@ -702,21 +698,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         .slice(0, 4);
       setRecentGames(sortedGames);
 
-      // Load game images via IPC (no localStorage caching - data URLs blow
-      // out the per-origin localStorage quota; IPC is fast)
-      const images = {};
-      for (const game of sortedGames) {
-        try {
-          const gameId = game.game || game.name;
-          const imageBase64 = await window.electron.getGameImage(gameId);
-          if (imageBase64) {
-            images[gameId] = `data:image/jpeg;base64,${imageBase64}`;
-          }
-        } catch (error) {
-          console.error("Error loading game image:", error);
-        }
-      }
-      setGameImages(images);
+
     } catch (e) {
       console.error("Failed to load local stats:", e);
     }
@@ -937,47 +919,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
 
       setLocalGames(allLocalGames);
 
-      // Load images for games
-      const images = {};
 
-      // First, load images for local games (no localStorage caching - quota
-      // issues with base64 data URLs; IPC reads from disk are fast)
-      for (const game of allLocalGames.slice(0, 20)) {
-        // Limit to first 20 for performance
-        try {
-          const gameId = game.game || game.name;
-          const imageBase64 = await window.electron.getGameImage(gameId);
-          if (imageBase64) {
-            images[gameId] = `data:image/jpeg;base64,${imageBase64}`;
-          }
-        } catch (error) {
-          console.error("Error loading game image:", error);
-        }
-      }
-
-      // Then, load images for cloud-only games (not installed locally) using API
-      if (cloudResult.data?.games) {
-        const localGameNames = new Set(
-          allLocalGames.map(g => (g.game || g.name)?.toLowerCase())
-        );
-        const cloudOnlyGames = cloudResult.data.games.filter(
-          g => !localGameNames.has(g.name?.toLowerCase()) && !g.isCustom && g.gameID
-        );
-
-        for (const game of cloudOnlyGames.slice(0, 20)) {
-          // Limit for performance (no localStorage caching for data URLs)
-          try {
-            const gameData = await gameService.findGameByGameID(game.gameID);
-            if (!gameData?.imgID) continue;
-            const image = await imageCacheService.getImage(gameData.imgID);
-            if (image) images[game.name] = image;
-          } catch (error) {
-            console.error("Error loading cloud game image:", error);
-          }
-        }
-      }
-
-      setCloudLibraryImages(images);
     } catch (e) {
       console.error("Failed to load cloud library:", e);
       setCloudLibraryError(e.message || "Failed to load cloud library");
@@ -1343,7 +1285,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         toast.success(t("ascend.cloudLibrary.gameDeleted") || "Game removed from cloud");
 
         // Optimistically update local state instead of re-fetching the whole
-        // library (which re-downloads every game image sequentially and made
+        // library (which reloads the entire library and made
         // deleting a single game feel like a full page reload).
         setCloudLibrary(prev => {
           if (!prev?.games) return prev;
@@ -1366,11 +1308,6 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
             unlockedAchievements,
             gamesWithAchievements: gamesWithAchievements.length,
           };
-        });
-        setCloudLibraryImages(prev => {
-          const next = { ...prev };
-          delete next[gameName];
-          return next;
         });
         setExpandedGame(null);
         setGameAchievements(null);
@@ -2820,7 +2757,6 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     formatPlaytime,
     loadingLocalStats,
     recentGames,
-    gameImages,
     loadingProfileStats,
     profileStats,
     handleSyncProfile,
@@ -2925,7 +2861,6 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     loadingCloudLibrary,
     expandedGame,
     handleExpandGame,
-    cloudLibraryImages,
     isGameInstalledLocally,
     loadingGameAchievements,
     gameAchievements,

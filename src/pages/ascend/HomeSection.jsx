@@ -1,3 +1,4 @@
+import AscendGameImage from "@/components/AscendGameImage";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -88,7 +89,6 @@ export default function HomeSection({
   formatPlaytimeDetailed,
   cloudLibrary,
   loadingCloudLibrary,
-  cloudLibraryImages,
   handleSyncLibrary,
   isSyncingLibrary,
   handleRestoreFromCloud,
@@ -323,18 +323,8 @@ export default function HomeSection({
                 transition={{ delay: 0.1 + index * 0.04 }}
                 className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/60 p-2.5"
               >
-                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-                  {cloudLibraryImages[game.name] ? (
-                    <img
-                      src={cloudLibraryImages[game.name]}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Gamepad2 className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                  )}
+                <div className="h-12 w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
+                  <AscendGameImage name={game.name || game.game} />
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{game.name}</p>

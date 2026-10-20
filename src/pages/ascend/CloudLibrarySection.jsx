@@ -1,3 +1,4 @@
+import AscendGameImage from "@/components/AscendGameImage";
 import { motion } from "framer-motion";
 import SectionHeader from "./SectionHeader";
 import { StatStrip, EmptyState } from "./primitives";
@@ -54,7 +55,6 @@ export default function CloudLibrarySection({
   loadingCloudLibrary,
   expandedGame,
   handleExpandGame,
-  cloudLibraryImages,
   isGameInstalledLocally,
   loadingGameAchievements,
   gameAchievements,
@@ -219,18 +219,8 @@ export default function CloudLibrarySection({
                   onClick={() => handleExpandGame(game.name)}
                 >
                   {/* Game Image */}
-                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-muted">
-                    {cloudLibraryImages[game.name] ? (
-                      <img
-                        src={cloudLibraryImages[game.name]}
-                        alt={game.name}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <Gamepad2 className="h-8 w-8 text-muted-foreground/50" />
-                      </div>
-                    )}
+                  <div className="relative h-20 w-36 shrink-0 overflow-hidden rounded-xl bg-muted">
+                    <AscendGameImage name={game.name || game.game} />
                     {gameAchStats?.percentage === 100 && (
                       <div className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 shadow-lg">
                         <Trophy className="h-3.5 w-3.5 text-white" />
@@ -253,8 +243,7 @@ export default function CloudLibrarySection({
                             </TooltipTrigger>
                             <TooltipContent>
                               <p className="text-secondary">
-                                {t("ascend.cloudLibrary.storedInCloud") ||
-                                  "Stored in the Cloud. Game image not available."}
+                                {t("ascend.cloudLibrary.cloudOnly") || "Cloud only"}
                               </p>
                             </TooltipContent>
                           </Tooltip>

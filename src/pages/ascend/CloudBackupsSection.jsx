@@ -1,3 +1,4 @@
+import AscendGameImage from "@/components/AscendGameImage";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "framer-motion";
@@ -165,7 +166,7 @@ function BackupMeta({ backup, t }) {
   );
 }
 
-function GameBackupCard({ gameName, gameBackups, image, index, ...actionProps }) {
+function GameBackupCard({ gameName, gameBackups, index, ...actionProps }) {
   const { t } = actionProps;
   const [showOlder, setShowOlder] = useState(false);
   const [latest, ...older] = gameBackups;
@@ -180,14 +181,8 @@ function GameBackupCard({ gameName, gameBackups, image, index, ...actionProps })
     >
       <Panel className="overflow-hidden">
         <div className="flex flex-wrap items-center gap-4 p-4">
-          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-muted">
-            {image ? (
-              <img src={image} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <FallbackIcon className="h-6 w-6 text-muted-foreground" />
-              </div>
-            )}
+          <div className="h-14 w-24 shrink-0 overflow-hidden rounded-xl bg-muted">
+            <AscendGameImage name={gameName} fallback={FallbackIcon} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -265,7 +260,6 @@ export default function CloudBackupsSection({
   restoringBackup,
   handleRestoreBackup,
   handleDownloadBackup,
-  cloudLibraryImages,
 }) {
   const { i18n } = useTranslation();
   const hasAccess = ascendAccess.isSubscribed || ascendAccess.isVerified;
@@ -390,7 +384,6 @@ export default function CloudBackupsSection({
                   key={gameName}
                   gameName={gameName}
                   gameBackups={gameBackups}
-                  image={cloudLibraryImages?.[gameName]}
                   index={index}
                   {...actionProps}
                 />
