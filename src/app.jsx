@@ -37,6 +37,7 @@ import {
 } from "@/services/ascendStatusService";
 import { setActivity, ActivityType } from "@/services/userStatusService";
 import { initializeDownloadSync, stopDownloadSync } from "@/services/downloadSyncService";
+import { initializeDesktopLibrarySync, stopDesktopLibrarySync } from "@/services/desktopLibrarySyncService";
 import {
   initializeFavoritesSync,
   stopFavoritesSync,
@@ -893,6 +894,7 @@ const DownloadSyncInitializer = () => {
   const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
+    initializeDesktopLibrarySync(isAuthenticated ? user : null);
     const checkAccess = async () => {
       if (isAuthenticated && user) {
         try {
@@ -924,6 +926,7 @@ const DownloadSyncInitializer = () => {
     checkAccess();
 
     return () => {
+      stopDesktopLibrarySync();
       stopDownloadSync();
       stopFavoritesSync();
     };
