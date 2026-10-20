@@ -34,6 +34,9 @@ const gamesSizeCache = {
   lastCalculated: 0,
   directorySizes: [],
 };
+// Shared by concurrent callers (app startup prefetch, Library, health checks)
+// so they wait on one directory walk instead of each starting their own.
+let gamesSizeInFlight = null;
 
 /**
  * Get disk space using Node.js built-in fs.statfs
@@ -57,31 +60,70 @@ async function getDiskSpace(directory) {
  * Calculate size of directory recursively
  */
 async function getDirectorySize(directoryPath) {
-  let totalSize = 0;
   try {
-    const files = await nativeFs.promises.readdir(directoryPath);
+    // Dirents tell us the entry type without an lstat per entry, and walking
+    // siblings in parallel lets libuv's thread pool overlap the disk I/O.
+    const entries = await nativeFs.promises.readdir(directoryPath, {
+      withFileTypes: true,
+    });
 
-    for (const file of files) {
-      const filePath = path.join(directoryPath, file);
-      // use lstat instead of stat to NOT follow symlinks
-      const stats = await nativeFs.promises.lstat(filePath);
+    const sizes = await Promise.all(
+      entries.map(async entry => {
+        if (entry.isSymbolicLink()) return 0; // Ignoring symbolic links (like z:)
+        const entryPath = path.join(directoryPath, entry.name);
+        if (entry.isDirectory()) return getDirectorySize(entryPath);
+        try {
+          return (await nativeFs.promises.lstat(entryPath)).size;
+        } catch {
+          return 0;
+        }
+      })
+    );
 
-      if (stats.isSymbolicLink()) {
-        continue; // Ignoring symbolic links (like z:)
-      }
-
-      if (stats.isDirectory()) {
-        totalSize += await getDirectorySize(filePath);
-      } else {
-        totalSize += stats.size;
-      }
-    }
-
-    return totalSize;
+    return sizes.reduce((total, size) => total + size, 0);
   } catch (error) {
     console.error(`Error calculating size for ${directoryPath}:`, error);
     return 0;
   }
+}
+
+function getGamesSizeCacheFile() {
+  return path.join(app.getPath("userData"), "games-size-cache.json");
+}
+
+/**
+ * Load the last games size result from disk so the first request after launch
+ * can answer immediately instead of waiting on a full directory walk.
+ */
+function loadPersistedGamesSize() {
+  try {
+    const data = JSON.parse(nativeFs.readFileSync(getGamesSizeCacheFile(), "utf8"));
+    if (Array.isArray(data.directorySizes)) {
+      gamesSizeCache.totalSize = data.totalSize || 0;
+      gamesSizeCache.directorySizes = data.directorySizes;
+      gamesSizeCache.lastCalculated = data.lastCalculated || 0;
+    }
+  } catch {}
+}
+
+async function calculateGamesSize(directories) {
+  const directorySizes = await Promise.all(
+    directories.map(async dir => {
+      try {
+        return { path: dir, size: await getDirectorySize(dir) };
+      } catch (err) {
+        return { path: dir, size: 0, error: err.message };
+      }
+    })
+  );
+  const totalSize = directorySizes.reduce((total, dir) => total + dir.size, 0);
+
+  gamesSizeCache.totalSize = totalSize;
+  gamesSizeCache.directorySizes = directorySizes;
+  gamesSizeCache.lastCalculated = Date.now();
+  fs.writeJson(getGamesSizeCacheFile(), gamesSizeCache).catch(() => {});
+
+  return { totalSize, directorySizes };
 }
 
 /**
@@ -179,6 +221,7 @@ function getHardwareId() {
  */
 function registerSystemHandlers() {
   const settingsManager = getSettingsManager();
+  loadPersistedGamesSize();
 
   // Get hardware ID for trial verification
   ipcMain.handle("get-hardware-id", async () => {
@@ -289,17 +332,6 @@ function registerSystemHandlers() {
   ipcMain.handle("get-installed-games-size", async () => {
     const settings = settingsManager.getSettings();
     try {
-      const now = Date.now();
-
-      if (gamesSizeCache.lastCalculated > now - 5 * 60 * 1000) {
-        return {
-          success: true,
-          calculating: false,
-          totalSize: gamesSizeCache.totalSize,
-          directorySizes: gamesSizeCache.directorySizes,
-        };
-      }
-
       const directories = [];
       if (settings.downloadDirectory && settings.downloadDirectory.trim() !== "") {
         directories.push(settings.downloadDirectory);
@@ -318,23 +350,37 @@ function registerSystemHandlers() {
         return { success: false, calculating: false, totalSize: 0, directorySizes: [] };
       }
 
-      let totalSize = 0;
-      const directorySizes = [];
-
-      for (const dir of directories) {
-        try {
-          const size = await getDirectorySize(dir);
-          directorySizes.push({ path: dir, size });
-          totalSize += size;
-        } catch (err) {
-          directorySizes.push({ path: dir, size: 0, error: err.message });
+      const refresh = () => {
+        if (!gamesSizeInFlight) {
+          gamesSizeInFlight = calculateGamesSize(directories).finally(() => {
+            gamesSizeInFlight = null;
+          });
         }
+        return gamesSizeInFlight;
+      };
+
+      // A cached result is only usable if it covers the same set of directories
+      const cachedPaths = gamesSizeCache.directorySizes.map(dir => dir.path);
+      const cacheMatches =
+        gamesSizeCache.lastCalculated > 0 &&
+        cachedPaths.length === directories.length &&
+        directories.every(dir => cachedPaths.includes(dir));
+
+      if (cacheMatches) {
+        // Serve the cached size right away and refresh it in the background
+        // once it is older than 5 minutes.
+        if (gamesSizeCache.lastCalculated < Date.now() - 5 * 60 * 1000) {
+          refresh().catch(() => {});
+        }
+        return {
+          success: true,
+          calculating: false,
+          totalSize: gamesSizeCache.totalSize,
+          directorySizes: gamesSizeCache.directorySizes,
+        };
       }
 
-      gamesSizeCache.totalSize = totalSize;
-      gamesSizeCache.directorySizes = directorySizes;
-      gamesSizeCache.lastCalculated = now;
-
+      const { totalSize, directorySizes } = await refresh();
       return { success: true, calculating: false, totalSize, directorySizes };
     } catch (error) {
       console.error("Error getting installed games size:", error);
