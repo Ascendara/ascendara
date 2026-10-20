@@ -22,7 +22,8 @@ function createStoreGames({
 }) {
   const artworkJobs = new Map();
   const scans = new Map();
-  let queue = Promise.resolve();
+  const queues = Array.from({ length: 4 }, () => Promise.resolve());
+  let nextQueue = 0;
   function owned(store, id) {
     assertStore(store);
     if (typeof id !== "string") throw new Error("Invalid store game");
@@ -36,7 +37,11 @@ function createStoreGames({
   async function installed(store, id, fresh = false) {
     let scan = scans.get(store);
     if (fresh || !scan || scan.until < Date.now()) {
-      scan = { until: Date.now() + 15000, result: discover(store) };
+      scan = { until: Infinity, result: null };
+      scan.result = Promise.resolve().then(() => discover(store)).then(result => {
+        scan.until = Date.now() + 15000;
+        return result;
+      });
       scans.set(store, scan);
     }
     try {
@@ -44,7 +49,7 @@ function createStoreGames({
         matchesInstallation(store, id, game),
       );
     } catch {
-      scans.delete(store);
+      if (scans.get(store) === scan) scans.delete(store);
       throw new Error("Could not check installed games. Try again.");
     }
   }
@@ -94,10 +99,12 @@ function createStoreGames({
       .update(`${store}:${id}`)
       .digest("hex");
     const assetDirectory = path.join(directory, hash);
+    const cached = await readArtwork(assetDirectory);
+    if (cached.grid && cached.hero && cached.logo) return cached;
     if (!artworkJobs.has(hash)) {
-      // Reuse the imported-library artwork downloader, with one download job at a
-      // time so opening a large store library cannot flood the artwork service.
-      const task = queue
+      // Bound downloads without making the entire library wait on one slow game.
+      const slot = nextQueue++ % queues.length;
+      const task = queues[slot]
         .catch(() => {})
         .then(async () => {
           const options =
@@ -112,7 +119,7 @@ function createStoreGames({
               : {};
           await downloadAssets({ game: game.name, assetDirectory }, options);
         });
-      queue = task;
+      queues[slot] = task;
       artworkJobs.set(hash, task);
       task.catch(() => {
         artworkJobs.delete(hash);
@@ -120,6 +127,9 @@ function createStoreGames({
     }
     await artworkJobs.get(hash);
     owned(store, id);
+    return readArtwork(assetDirectory);
+  }
+  async function readArtwork(assetDirectory) {
     const result = {};
     for (const type of ["grid", "hero", "logo"]) {
       for (const extension of ["png", "jpg", "jpeg"]) {

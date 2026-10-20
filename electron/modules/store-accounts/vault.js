@@ -9,6 +9,7 @@ function assertStore(store) {
 
 // This vault is deliberately separate from settings, library backups and cloud sync.
 function createVault(directory, safeStorage) {
+  const cache = new Map();
   function available() {
     return safeStorage.isEncryptionAvailable() &&
       safeStorage.getSelectedStorageBackend?.() !== "basic_text";
@@ -19,13 +20,25 @@ function createVault(directory, safeStorage) {
   }
   function read(store) {
     const file = filename(store);
-    if (!fs.existsSync(file)) return null;
+    if (!fs.existsSync(file)) {
+      cache.delete(store);
+      return null;
+    }
     if (!available()) throw new Error("Secure storage is unavailable. Unlock your system keyring and restart Ascendara.");
-    if (fs.lstatSync(file).isSymbolicLink() || fs.statSync(file).size > 16 * 1024 * 1024)
+    const stat = fs.lstatSync(file);
+    if (stat.isSymbolicLink() || stat.size > 16 * 1024 * 1024)
       throw new Error("Invalid account storage");
-    return JSON.parse(safeStorage.decryptString(fs.readFileSync(file)));
+    const stamp = `${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
+    let entry = cache.get(store);
+    if (entry?.stamp !== stamp) {
+      entry = { stamp, value: JSON.parse(safeStorage.decryptString(fs.readFileSync(file))) };
+      cache.set(store, entry);
+    }
+    // Callers update account records; never expose the cached object to mutation.
+    return structuredClone(entry.value);
   }
   function write(store, value) {
+    cache.delete(store);
     const file = filename(store);
     if (!available()) throw new Error("Secure storage is unavailable. Unlock your system keyring and restart Ascendara.");
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -38,7 +51,10 @@ function createVault(directory, safeStorage) {
       if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
     }
   }
-  function remove(store) { fs.rmSync(filename(store), { force: true }); }
+  function remove(store) {
+    cache.delete(store);
+    fs.rmSync(filename(store), { force: true });
+  }
   return { available, read, write, remove };
 }
 module.exports = { STORES, assertStore, createVault };

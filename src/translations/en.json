@@ -2853,6 +2853,10 @@
       "title": "Move to folder…"
     },
     "multiselect": "Multiselection",
+    "selectAllVisible": "Select all results",
+    "clearSelection": "Clear selection",
+    "selectionHint": "Select custom or connected-store games to remove from your library. Store games stay in your account. Press Esc to cancel.",
+    "multiselectInstalledHelp": "Games installed through Ascendara cannot be selected for bulk deletion. Open the game's page to delete it individually.",
     "neverPlayed": "You haven't played this game yet",
     "neverPlayed2": "Never Played",
     "newBadge": "NEW",
@@ -2977,7 +2981,9 @@
     "thisIsNamedThat": "This folder is already named that",
     "tools": {
       "bulkRemove": "Remove Selected Games",
-      "selected": "Multiselection is enabled"
+      "selected": "Multiselection is enabled",
+      "selectedCount": "{{count}} selected",
+      "removeAction": "Remove"
     },
     "toolsMenu": "Library tools",
     "totalSpace": "Total",

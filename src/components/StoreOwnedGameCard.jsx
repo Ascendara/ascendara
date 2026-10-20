@@ -57,6 +57,9 @@ export default function StoreOwnedGameCard({
   favorite,
   onToggleFavorite,
   onRemove,
+  selectionMode = false,
+  isSelected = false,
+  onSelect,
 }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -85,8 +88,15 @@ export default function StoreOwnedGameCard({
   const installed = Boolean(details?.installed);
   const isRunning = useGameRunning(game.game) || Boolean(details?.running);
   const playTime = game.playTime;
-  const showDetails = () =>
-    navigate("/gamescreen", { state: { gameData: game, libraryPage: true } });
+  const showDetails = () => {
+    if (selectionMode) onSelect?.();
+    else navigate("/gamescreen", { state: { gameData: game, libraryPage: true } });
+  };
+  const selectionCheckbox = selectionMode && (
+    <input type="checkbox" checked={isSelected} readOnly tabIndex={-1}
+      aria-label={game.game}
+      className={cn("pointer-events-none z-20 h-5 w-5 shrink-0 accent-primary", viewMode === "list" ? "ml-1" : "absolute left-2 top-2 rounded bg-background shadow")} />
+  );
   const onKeyDown = event => {
     if (event.target !== event.currentTarget) return;
     if (event.key === "Enter" || event.key === " ") {
@@ -99,6 +109,7 @@ export default function StoreOwnedGameCard({
     : t("library.view.addFavorite");
   const toggleFavorite = event => {
     event.stopPropagation();
+    if (selectionMode) return onSelect?.();
     onToggleFavorite();
   };
   const runStoreAction = async intent => {
@@ -121,6 +132,7 @@ export default function StoreOwnedGameCard({
   const handleContextMenu = event => {
     event.preventDefault();
     event.stopPropagation();
+    if (selectionMode) return;
 
     const { clientX: x, clientY: y } = event;
     let adjustedX = x + MENU_WIDTH > window.innerWidth ? Math.max(0, window.innerWidth - MENU_WIDTH) : x;
@@ -223,7 +235,10 @@ export default function StoreOwnedGameCard({
     return (
       <div
         ref={card}
-        role="button"
+        role={selectionMode ? "checkbox" : "button"}
+        aria-checked={selectionMode ? Boolean(isSelected) : undefined}
+        aria-label={game.game}
+        style={selectionMode && isSelected ? { outline: "2px solid hsl(var(--primary))", outlineOffset: 2, backgroundColor: "hsl(var(--primary) / 0.1)" } : undefined}
         tabIndex={0}
         onClick={showDetails}
         onKeyDown={onKeyDown}
@@ -231,6 +246,7 @@ export default function StoreOwnedGameCard({
         className="group relative flex cursor-pointer items-center gap-4 rounded-xl border border-border/60 bg-card p-2 pr-4 shadow-sm transition-all duration-200 hover:border-primary/30 hover:bg-accent/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         {contextMenuPortal}
+        {selectionCheckbox}
 
         <div className="relative h-[72px] w-56 shrink-0 overflow-hidden rounded-lg bg-zinc-900 shadow-sm md:w-64">
           {banner ? (
@@ -296,7 +312,7 @@ export default function StoreOwnedGameCard({
           </span>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className={cn("flex shrink-0 items-center gap-1", selectionMode && "hidden")}>
           <Button
             variant="ghost"
             size="icon"
@@ -335,7 +351,10 @@ export default function StoreOwnedGameCard({
   return (
     <Card
       ref={card}
-      role="button"
+      role={selectionMode ? "checkbox" : "button"}
+      aria-checked={selectionMode ? Boolean(isSelected) : undefined}
+      aria-label={game.game}
+      style={selectionMode && isSelected ? { outline: "2px solid hsl(var(--primary))", outlineOffset: 2, backgroundColor: "hsl(var(--primary) / 0.1)" } : undefined}
       tabIndex={0}
       onClick={showDetails}
       onKeyDown={onKeyDown}
@@ -345,6 +364,7 @@ export default function StoreOwnedGameCard({
       className="press group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
       {contextMenuPortal}
+      {selectionCheckbox}
 
       <CardContent className="p-0">
         <div className="relative aspect-[2/3] overflow-hidden">
@@ -366,7 +386,8 @@ export default function StoreOwnedGameCard({
           <div
             className={cn(
               "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 transition-opacity duration-200",
-              isHovered ? "opacity-100" : "opacity-0"
+              selectionMode && "hidden",
+              isHovered && !selectionMode ? "opacity-100" : "pointer-events-none opacity-0"
             )}
           >
             <p className="mb-2 line-clamp-2 text-sm font-semibold leading-tight text-white">

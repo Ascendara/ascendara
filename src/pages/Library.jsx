@@ -41,6 +41,7 @@ import {
   Loader,
   Import,
   CheckSquareIcon,
+  CircleHelp,
   ArrowUpAZ,
   ArrowDownAZ,
   ImageUp,
@@ -72,6 +73,8 @@ import {
   List as ListIcon,
   ChevronRight,
   Wrench,
+  Info,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -117,6 +120,7 @@ import ImportGamesDialog from "@/components/ImportGamesDialog";
 import StoreAccountsDialog from "@/components/StoreAccountsDialog";
 import ImportFromLaunchersDialog from "@/components/ImportFromLaunchersDialog";
 import StoreOwnedGameCard from "@/components/StoreOwnedGameCard";
+import DeferredLibraryCard from "@/components/DeferredLibraryCard";
 import { useStoreLibrary } from "@/hooks/useStoreLibrary";
 import { storeGameKey, storeLibraryEntries, storeNames } from "@/lib/storeLibrary";
 import LibraryBackupsDialog from "@/components/LibraryBackupsDialog";
@@ -160,29 +164,55 @@ const getLibraryCardKey = game =>
 const Library = () => {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedGames, setSelectedGames] = useState([]);
+  const [isBulkRemoving, setIsBulkRemoving] = useState(false);
+  useEffect(() => {
+    if (!selectionMode || isBulkRemoving) return;
+    const cancelSelection = event => {
+      if (event.key === "Escape") {
+        setSelectionMode(false);
+        setSelectedGames([]);
+      }
+    };
+    window.addEventListener("keydown", cancelSelection);
+    return () => window.removeEventListener("keydown", cancelSelection);
+  }, [selectionMode, isBulkRemoving]);
   const handleSelectGame = game => {
-    if (!game.isCustom) return;
+    if (isBulkRemoving || game._isDownloading || game._isQueued || (!game.isCustom && !game._isStoreOwned)) return;
+    const key = getLibraryCardKey(game);
     setSelectedGames(prev =>
-      prev.includes(game.game) ? prev.filter(g => g !== game.game) : [...prev, game.game]
+      prev.includes(key) ? prev.filter(g => g !== key) : [...prev, key]
     );
   };
 
-  // Bulk remove selected custom games
+  // Store-owned entries are hidden; local custom entries are removed from disk.
   const handleBulkRemove = async () => {
-    if (selectedGames.length === 0) return;
+    if (selectedGames.length === 0 || isBulkRemoving) return;
+    setIsBulkRemoving(true);
     try {
-      for (const gameName of selectedGames) {
-        for (const entry of libraryRecords.filter(
-          item => item.isCustom && item.game === gameName
-        )) {
-          await window.electron.removeCustomGame(gameName, entry);
-        }
+      const selected = new Set(selectedGames);
+      const storeGames = ownedStoreGames.filter(game => selected.has(getLibraryCardKey(game)));
+      if (storeGames.length && !storeLibrary.updatePreferences({
+        ...storeLibrary.preferences,
+        hiddenGames: [...new Set([
+          ...(storeLibrary.preferences.hiddenGames || []),
+          ...storeGames.map(game => storeGameKey(game.store, game.id)),
+        ])],
+      })) {
+        throw new Error("Could not save hidden store games");
+      }
+      for (const entry of libraryRecords.filter(
+        item => item.isCustom && selected.has(getLibraryCardKey(item))
+      )) {
+        await window.electron.removeCustomGame(entry.game, entry);
       }
       setSelectedGames([]);
       setSelectionMode(false);
       await loadGames();
     } catch (error) {
       console.error("Bulk remove failed:", error);
+      toast.error(t("storeAccounts.display.saveError", "Could not save this preference. Please try again."));
+    } finally {
+      setIsBulkRemoving(false);
     }
   };
 
@@ -1222,8 +1252,10 @@ const Library = () => {
   const loadGames = async () => {
     try {
       // Get games from main process
-      const installedGames = await window.electron.getGames();
-      const customGames = await window.electron.getCustomGames();
+      const [installedGames, customGames] = await Promise.all([
+        window.electron.getGames(),
+        window.electron.getCustomGames(),
+      ]);
 
       // Ensure we have arrays to work with
       const safeInstalledGames = Array.isArray(installedGames) ? installedGames : [];
@@ -2175,8 +2207,9 @@ const Library = () => {
       {/* ── Main Content ─────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Sticky toolbar */}
-        <div className="flex shrink-0 items-center gap-3 bg-background/95 px-6 py-3 shadow-[0_1px_0_0_hsl(var(--border)/0.4)] backdrop-blur-sm">
-          <div className="relative flex-1">
+        <div className="flex shrink-0 flex-col gap-2 bg-background/95 px-6 py-3 shadow-[0_1px_0_0_hsl(var(--border)/0.4)] backdrop-blur-sm">
+        <div className="flex items-center gap-3">
+          <div className="relative min-w-0 flex-1">
             <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
@@ -2487,10 +2520,15 @@ const Library = () => {
                 <TooltipTrigger asChild>
                   <button
                     className={cn(
-                      "rounded-md p-2 hover:bg-secondary/50",
-                      selectionMode && "bg-primary/10 text-primary"
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-all",
+                      selectionMode
+                        ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/15"
+                        : "border-border/60 bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
                     )}
                     type="button"
+                    aria-label={t("library.multiselect")}
+                    aria-pressed={selectionMode}
+                    disabled={isBulkRemoving}
                     onClick={() => {
                       setSelectionMode(prev => !prev);
                       setSelectedGames([]);
@@ -2505,30 +2543,66 @@ const Library = () => {
               </Tooltip>
             )}
           </TooltipProvider>
+        </div>
 
           {activeTab === "all" && selectionMode && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-primary">
-                {t("library.tools.selected", { count: selectedGames.length })}
+            <div className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-primary/20 bg-primary/5 py-1 pl-3 pr-1">
+              <span className="text-sm font-semibold text-primary" aria-live="polite">
+                {t("library.tools.selectedCount", {
+                  count: selectedGames.length,
+                  defaultValue: "{{count}} selected",
+                })}
               </span>
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={selectedGames.length === 0}
-                onClick={handleBulkRemove}
-              >
-                {t("library.tools.bulkRemove")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSelectionMode(false);
-                  setSelectedGames([]);
-                }}
-              >
-                {t("common.cancel")}
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={t("library.selectionHint")}
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-secondary">
+                    {t("library.selectionHint")}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <div className="ml-auto flex flex-wrap items-center gap-1">
+                <Button variant="ghost" size="sm" className="h-8" disabled={isBulkRemoving || !tabGames.some(game => !game.isFolder && !game._isDownloading && !game._isQueued && (game.isCustom || game._isStoreOwned))}
+                  onClick={() => setSelectedGames(prev => [...new Set([...prev, ...tabGames.filter(game => !game.isFolder && !game._isDownloading && !game._isQueued && (game.isCustom || game._isStoreOwned)).map(getLibraryCardKey)])])}>
+                  {t("library.selectAllVisible")}
+                </Button>
+                {selectedGames.length > 0 && (
+                  <Button variant="ghost" size="sm" className="h-8" disabled={isBulkRemoving} onClick={() => setSelectedGames([])}>
+                    {t("library.clearSelection")}
+                  </Button>
+                )}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-8"
+                  disabled={selectedGames.length === 0 || isBulkRemoving}
+                  onClick={handleBulkRemove}
+                >
+                  {isBulkRemoving ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  {t("library.tools.removeAction", { defaultValue: "Remove" })}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground"
+                  aria-label={t("common.cancel")}
+                  disabled={isBulkRemoving}
+                  onClick={() => {
+                    setSelectionMode(false);
+                    setSelectedGames([]);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
 
@@ -2654,9 +2728,12 @@ const Library = () => {
             activeTab === "hiddenFolders") &&
             (() => {
               const renderGameCard = game => (
-                <div key={getLibraryCardKey(game)}>
+                <DeferredLibraryCard key={getLibraryCardKey(game)} viewMode={viewMode} name={game.game || game.name}>
                   {game._isStoreOwned ? (
                     <StoreOwnedGameCard game={game} viewMode={viewMode}
+                      selectionMode={selectionMode}
+                      isSelected={selectedGames.includes(getLibraryCardKey(game))}
+                      onSelect={() => handleSelectGame(game)}
                       favorite={favorites.includes(game.game)}
                       onToggleFavorite={() => toggleFavorite(game.game)}
                       onRemove={() => hideStoreGame(game)} />
@@ -2676,7 +2753,7 @@ const Library = () => {
                       />
                     </DroppableFolderCard>
                   ) : (
-                    <DraggableGameCard game={game}>
+                    <DraggableGameCard game={game} disabled={selectionMode}>
                       <InstalledGameCard
                         game={game}
                         onPlay={() =>
@@ -2685,7 +2762,7 @@ const Library = () => {
                         favorites={favorites}
                         onToggleFavorite={() => toggleFavorite(game.game || game.name)}
                         selectionMode={selectionMode}
-                        isSelected={selectedGames.includes(game.game)}
+                        isSelected={selectedGames.includes(getLibraryCardKey(game))}
                         onSelectCheckbox={() => handleSelectGame(game)}
                         updateInfo={game.gameID ? gameUpdates[game.gameID] : null}
                         onRemoved={handleGameRemoved}
@@ -2694,7 +2771,7 @@ const Library = () => {
                       />
                     </DraggableGameCard>
                   )}
-                </div>
+                </DeferredLibraryCard>
               );
 
               const gridClass =
@@ -4566,6 +4643,43 @@ const InstalledGameCard = memo(
       }
     };
 
+    const selectionAccessibility = selectionMode && game.isCustom ? {
+      role: "checkbox",
+      "aria-checked": Boolean(isSelected),
+      "aria-label": game.game || game.name,
+      tabIndex: 0,
+      onKeyDown: event => {
+        if (event.target === event.currentTarget && (event.key === " " || event.key === "Enter")) {
+          event.preventDefault();
+          handleCardClick(event);
+        }
+      },
+    } : {};
+
+    const bulkDeleteHelp = selectionMode && !game.isCustom && (
+      <TooltipProvider delayDuration={150}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label={t("library.multiselectInstalledHelp")}
+              onClick={event => event.stopPropagation()}
+              onPointerDown={event => event.stopPropagation()}
+              className={cn(
+                "z-20 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background/90 text-muted-foreground shadow backdrop-blur-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                viewMode === "list" ? "ml-1" : "absolute left-2 top-2"
+              )}
+            >
+              <CircleHelp className="h-5 w-5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs text-secondary">
+            {t("library.multiselectInstalledHelp")}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+
     const contextMenuPortal =
       contextMenuOpen &&
       createPortal(
@@ -4966,13 +5080,15 @@ const InstalledGameCard = memo(
 
         {viewMode === "list" ? (
           <div
+            {...selectionAccessibility}
             className={cn(
               "group relative flex items-center gap-4 rounded-xl border border-border/60 bg-card p-2 pr-4 shadow-sm transition-all duration-200",
               !game._isDownloading &&
                 !game._isQueued &&
                 "cursor-pointer hover:border-primary/30 hover:bg-accent/30 hover:shadow-md",
               (game._isDownloading || game._isQueued) && "cursor-default opacity-60",
-              isSelected && "border-primary/50 ring-2 ring-primary",
+              selectionMode && !game.isCustom && "opacity-60",
+              isSelected && "border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background",
               isRemoving &&
                 "pointer-events-none duration-300 animate-out fade-out slide-out-to-left-2"
             )}
@@ -4981,13 +5097,14 @@ const InstalledGameCard = memo(
           >
             {contextMenuPortal}
 
+            {bulkDeleteHelp}
             {selectionMode && game.isCustom && (
               <input
                 type="checkbox"
                 checked={isSelected}
                 tabIndex={-1}
                 readOnly
-                className="pointer-events-none ml-1 h-4 w-4 shrink-0 rounded border-muted accent-primary"
+                className="pointer-events-none ml-1 h-5 w-5 shrink-0 rounded border-muted accent-primary"
               />
             )}
 
@@ -5052,7 +5169,7 @@ const InstalledGameCard = memo(
                   </p>
                 )}
               </div>
-              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <div className={cn("flex min-w-0 flex-wrap items-center gap-1.5", selectionMode && "hidden")}>
                 {typeof game.launchCount === "undefined" &&
                   !game.isCustom &&
                   !game._isDownloading &&
@@ -5145,7 +5262,7 @@ const InstalledGameCard = memo(
             </div>
 
             {/* Actions */}
-            <div className="flex shrink-0 items-center gap-1">
+            <div className={cn("flex shrink-0 items-center gap-1", selectionMode && "hidden")}>
               <Button
                 variant="ghost"
                 size="icon"
@@ -5187,13 +5304,15 @@ const InstalledGameCard = memo(
           </div>
         ) : (
           <Card
+            {...selectionAccessibility}
             className={cn(
               "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
               !game._isDownloading &&
                 !game._isQueued &&
                 "press hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
               (game._isDownloading || game._isQueued) && "cursor-default opacity-60",
-              isSelected && "ring-2 ring-primary",
+              selectionMode && !game.isCustom && "opacity-60",
+              isSelected && "border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background",
               selectionMode && game.isCustom && "selectable-card",
               !game._isDownloading && !game._isQueued && "cursor-pointer",
               isRemoving &&
@@ -5204,6 +5323,7 @@ const InstalledGameCard = memo(
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
+            {bulkDeleteHelp}
             {selectionMode && game.isCustom && (
               <div className="absolute left-2 top-2 z-20 flex items-center justify-center rounded bg-white/80 p-0.5 shadow backdrop-blur-sm">
                 <input
@@ -5284,7 +5404,7 @@ const InstalledGameCard = memo(
                   <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-green-500 to-emerald-400" />
                 )}
                 {/* Badges row */}
-                <div className="absolute left-2 top-2 z-20 flex flex-col items-start gap-1">
+                <div className={cn("absolute left-2 top-2 z-20 flex flex-col items-start gap-1", selectionMode && "hidden")}>
                   {typeof game.launchCount === "undefined" &&
                     !game.isCustom &&
                     !game._isDownloading &&
@@ -5304,7 +5424,8 @@ const InstalledGameCard = memo(
                 <div
                   className={cn(
                     "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 transition-opacity duration-200",
-                    isHovered ? "opacity-100" : "opacity-0"
+                    selectionMode && "hidden",
+                    isHovered && !selectionMode ? "opacity-100" : "pointer-events-none opacity-0"
                   )}
                 >
                   <p className="mb-2 line-clamp-2 text-sm font-semibold leading-tight text-white">
@@ -6833,14 +6954,15 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
 // Drag and Drop Components
 
 // Draggable wrapper for game cards
-const DraggableGameCard = ({ game, children }) => {
+const DraggableGameCard = ({ game, children, disabled = false }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: "GAME",
     item: { ...game },
+    canDrag: !disabled,
     collect: monitor => ({
       isDragging: monitor.isDragging(),
     }),
-  }));
+  }), [game, disabled]);
 
   return (
     <div ref={drag} style={{ opacity: isDragging ? 0.5 : 1 }}>
