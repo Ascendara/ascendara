@@ -103,7 +103,7 @@ const GameScreenshots = ({ screenshots = [], className }) => {
       )}
 
       {/* Main carousel */}
-      <div className="relative overflow-hidden rounded-lg">
+      <div className="relative overflow-hidden rounded-lg border border-border/40">
         <div className="relative aspect-video bg-black/10">
           <img
             src={screenshots[currentIndex].formatted_url || screenshots[currentIndex].url}
@@ -146,7 +146,7 @@ const GameScreenshots = ({ screenshots = [], className }) => {
 
       {/* Thumbnail navigation */}
       {screenshots.length > 1 && (
-        <div className="scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent mt-2 flex gap-2 overflow-x-auto pb-1">
+        <div className="scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent -mx-1 mt-3 flex gap-2 overflow-x-auto px-1 py-1">
           {screenshots.map((screenshot, index) => (
             <button
               key={index}

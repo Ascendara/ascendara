@@ -78,7 +78,7 @@ export default function GameReviews({ gameID, onRating, onReviewCount, sectionRe
   return (
     <section
       ref={sectionRef}
-      className="mt-8 w-full rounded-xl border border-border bg-card p-6"
+      className="mt-8 w-full rounded-xl border-none bg-card p-6"
       aria-labelledby="game-reviews-title"
     >
       <div className="mb-5">

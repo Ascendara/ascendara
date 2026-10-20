@@ -128,7 +128,7 @@ export default function DownloadToolbar({
       <TooltipProvider>
         <div className="flex flex-wrap items-center gap-2">
           {/* Both of these save the game to the user's library */}
-          <div className="flex items-center rounded-lg border border-border/60 bg-card/60 p-0.5">
+          <div className="flex items-center rounded-lg bg-card/60 p-0.5">
             <ToggleButton active={isFavorite} icon={Heart} onClick={onToggleFavorite}>
               {isFavorite ? t("download.toolbar.favorited") : t("download.toolbar.favorite")}
             </ToggleButton>

@@ -121,7 +121,7 @@ export default function GameOverview({ gameData, steamData, steamLoading, steamE
                 "screenshot_huge"
               ),
             }))}
-            className="h-[500px] w-full rounded-lg border border-border shadow-inner"
+            className="w-full"
           />
         </section>
       )}
