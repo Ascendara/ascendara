@@ -1,17 +1,56 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { ExternalLink, FolderOpen, Gamepad2, Heart, MoreHorizontal, Play, Trash2 } from "lucide-react";
+import {
+  Download,
+  ExternalLink,
+  FolderOpen,
+  Gamepad2,
+  Heart,
+  MessageSquareText,
+  Play,
+  Timer,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useStoreGame } from "@/hooks/useStoreGame";
+import { useGameRunning } from "@/hooks/useGameRunning";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
 import { storeNames } from "@/lib/storeLibrary";
 
-// Games owned on a connected store. They mirror the regular library card;
-// launching or installing happens from the game's details page.
+const MENU_WIDTH = 260;
+const MENU_HEIGHT = 250;
+
+function MenuItem({ icon: Icon, iconClassName, destructive, title, description, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5",
+        destructive ? "hover:bg-destructive/10" : "hover:bg-accent"
+      )}
+    >
+      <div
+        className={cn(
+          "flex h-8 w-8 items-center justify-center rounded-md",
+          iconClassName || (destructive ? "bg-red-500/20" : "bg-accent/30")
+        )}
+      >
+        <Icon className="h-4 w-4 text-foreground" />
+      </div>
+      <div className="flex-1">
+        <div className="font-medium text-foreground">{title}</div>
+        <div className="text-xs text-muted-foreground">{description}</div>
+      </div>
+    </button>
+  );
+}
+
+// Games owned on a connected store. They mirror the regular library card,
+// including its right-click menu; launching or installing goes through the store.
 export default function StoreOwnedGameCard({
   game,
   viewMode,
@@ -24,7 +63,8 @@ export default function StoreOwnedGameCard({
   const card = useRef(null);
   const [visible, setVisible] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -42,6 +82,9 @@ export default function StoreOwnedGameCard({
 
   const { artwork, details } = useStoreGame(game, visible);
   const store = storeNames[game.store];
+  const installed = Boolean(details?.installed);
+  const isRunning = useGameRunning(game.game) || Boolean(details?.running);
+  const playTime = game.playTime;
   const showDetails = () =>
     navigate("/gamescreen", { state: { gameData: game, libraryPage: true } });
   const onKeyDown = event => {
@@ -74,51 +117,106 @@ export default function StoreOwnedGameCard({
       toast.error(error.message);
     }
   };
-  const showContextMenu = event => {
+
+  const handleContextMenu = event => {
     event.preventDefault();
     event.stopPropagation();
-    setMenuOpen(true);
+
+    const { clientX: x, clientY: y } = event;
+    let adjustedX = x + MENU_WIDTH > window.innerWidth ? Math.max(0, window.innerWidth - MENU_WIDTH) : x;
+    let adjustedY = y + MENU_HEIGHT > window.innerHeight ? y - MENU_HEIGHT : y;
+    if (adjustedY < 0) {
+      adjustedY = Math.max(0, Math.min(y, window.innerHeight - MENU_HEIGHT));
+    }
+    setContextMenuPosition({ x: adjustedX, y: adjustedY });
+    setContextMenuOpen(true);
   };
-  const menu = (
-    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost" size="icon"
-          aria-label={t("common.contextMenu.menu", "Game options")}
-          className={cn("h-8 w-8 shrink-0", viewMode === "list" ? "text-foreground" : "text-white")}
+  const fromMenu = action => event => {
+    event.stopPropagation();
+    setContextMenuOpen(false);
+    action();
+  };
+
+  const contextMenuPortal =
+    contextMenuOpen &&
+    createPortal(
+      <div
+        className="fixed inset-0 z-[9999] flex items-start justify-start"
+        onClick={event => {
+          event.preventDefault();
+          event.stopPropagation();
+          setContextMenuOpen(false);
+        }}
+        onContextMenu={event => event.preventDefault()}
+      >
+        <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+
+        <div
+          className="absolute transition-all duration-200 animate-in fade-in zoom-in-95"
+          style={{ top: contextMenuPosition.y, left: contextMenuPosition.x }}
           onClick={event => event.stopPropagation()}
         >
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onClick={event => event.stopPropagation()}>
-        <DropdownMenuItem onSelect={showDetails}>
-          <Gamepad2 className="mr-2 h-4 w-4" />
-          {t("storeAccounts.gameOptions.details", "View details")}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void runStoreAction("auto")}>
-          <Play className="mr-2 h-4 w-4" />
-          {details?.installed
-            ? t("common.play", "Play")
-            : t("storeAccounts.installNamed", { defaultValue: "Install with {{store}}", store })}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void runStoreAction("store")}>
-          <ExternalLink className="mr-2 h-4 w-4" />
-          {t("storeAccounts.openNamed", { defaultValue: "Open in {{store}}", store })}
-        </DropdownMenuItem>
-        {details?.installed && (
-          <DropdownMenuItem onSelect={() => void openDirectory()}>
-            <FolderOpen className="mr-2 h-4 w-4" />
-            {t("common.contextMenu.openDirectory", "Open file location")}
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onSelect={onRemove} className="text-destructive focus:text-destructive">
-          <Trash2 className="mr-2 h-4 w-4" />
-          {t("storeAccounts.gameOptions.remove", "Remove from Library")}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+          <div className="max-h-[80vh] min-w-[260px] overflow-hidden rounded-xl border border-border/50 bg-popover/95 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center justify-center border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent px-3 py-3">
+              {artwork.logo ? (
+                <img src={artwork.logo} alt={game.game} className="h-8 max-w-[200px] object-contain" />
+              ) : (
+                <span className="text-sm font-semibold text-foreground">{game.game}</span>
+              )}
+            </div>
+
+            <div className="max-h-[calc(80vh-60px)] overflow-y-auto p-1.5">
+              <MenuItem
+                icon={installed ? Play : Download}
+                iconClassName="bg-primary/20"
+                title={
+                  installed
+                    ? t("common.contextMenu.playGame")
+                    : t("storeAccounts.installNamed", { defaultValue: "Install with {{store}}", store })
+                }
+                description={
+                  installed
+                    ? t("storeAccounts.playDescription", { defaultValue: "Launch it through {{store}}", store })
+                    : t("storeAccounts.installDescription", { defaultValue: "Install it through {{store}}", store })
+                }
+                onClick={fromMenu(() => void runStoreAction("auto"))}
+              />
+              <MenuItem
+                icon={ExternalLink}
+                title={t("storeAccounts.openNamed", { defaultValue: "Open in {{store}}", store })}
+                description={t("storeAccounts.openDescription", "View the game's store page")}
+                onClick={fromMenu(() => void runStoreAction("store"))}
+              />
+              {installed && (
+                <MenuItem
+                  icon={FolderOpen}
+                  title={t("common.contextMenu.openDirectory")}
+                  description={t("common.contextMenu.openDirectoryDescription")}
+                  onClick={fromMenu(() => void openDirectory())}
+                />
+              )}
+              <MenuItem
+                icon={Trash2}
+                destructive
+                title={t("common.contextMenu.removeGame")}
+                description={t("storeAccounts.removeDescription", "Hide it from your library")}
+                onClick={fromMenu(onRemove)}
+              />
+
+              <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+              <MenuItem
+                icon={MessageSquareText}
+                title={t("common.giveFeedback")}
+                description={t("common.contextMenu.shareFeedbackDescription")}
+                onClick={fromMenu(() => window.electron.openURL("https://ascendara.app/feedback"))}
+              />
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
 
   if (viewMode === "list") {
     const banner = artwork.hero || artwork.grid;
@@ -129,9 +227,11 @@ export default function StoreOwnedGameCard({
         tabIndex={0}
         onClick={showDetails}
         onKeyDown={onKeyDown}
-        onContextMenu={showContextMenu}
+        onContextMenu={handleContextMenu}
         className="group relative flex cursor-pointer items-center gap-4 rounded-xl border border-border/60 bg-card p-2 pr-4 shadow-sm transition-all duration-200 hover:border-primary/30 hover:bg-accent/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
+        {contextMenuPortal}
+
         <div className="relative h-[72px] w-56 shrink-0 overflow-hidden rounded-lg bg-zinc-900 shadow-sm md:w-64">
           {banner ? (
             <img
@@ -160,21 +260,43 @@ export default function StoreOwnedGameCard({
               </span>
             )}
           </div>
+          {isRunning && (
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-green-500 to-emerald-400" />
+          )}
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
           <h3 className="truncate text-sm font-semibold leading-tight text-foreground">
             {game.game}
           </h3>
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              {store}
-            </span>
-          </div>
+          {isRunning && (
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <span className="flex items-center gap-1.5 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-semibold text-green-600 dark:text-green-400">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+                {t("library.view.playing")}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden h-12 w-36 shrink-0 flex-col items-end justify-center gap-1 border-l border-border/50 pl-4 text-right lg:flex">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+            {t("library.view.playtime")}
+          </span>
+          <span className="flex items-center gap-1.5 text-xs font-medium tabular-nums text-foreground">
+            <Timer className="h-3.5 w-3.5 text-muted-foreground" />
+            {(() => {
+              if (!playTime || playTime < 60) return t("library.view.notPlayed");
+              const h = Math.floor(playTime / 3600);
+              const m = Math.floor((playTime % 3600) / 60);
+              return h === 0
+                ? t("library.view.playtimeMinutes", { minutes: m })
+                : t("library.view.playtimeHours", { hours: h, minutes: m });
+            })()}
+          </span>
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          {menu}
           <Button
             variant="ghost"
             size="icon"
@@ -190,6 +312,21 @@ export default function StoreOwnedGameCard({
               className={cn("h-4 w-4", favorite ? "fill-primary text-primary" : "fill-none")}
             />
           </Button>
+          <Button
+            size="sm"
+            className="h-8 gap-1.5 px-3 text-secondary"
+            onClick={event => {
+              event.stopPropagation();
+              void runStoreAction("auto");
+            }}
+          >
+            {installed ? (
+              <Play className="h-3.5 w-3.5 fill-current" />
+            ) : (
+              <Download className="h-3.5 w-3.5" />
+            )}
+            {installed ? t("library.view.play") : t("storeAccounts.install", "Install")}
+          </Button>
         </div>
       </div>
     );
@@ -202,11 +339,13 @@ export default function StoreOwnedGameCard({
       tabIndex={0}
       onClick={showDetails}
       onKeyDown={onKeyDown}
-      onContextMenu={showContextMenu}
+      onContextMenu={handleContextMenu}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className="press group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
+      {contextMenuPortal}
+
       <CardContent className="p-0">
         <div className="relative aspect-[2/3] overflow-hidden">
           {artwork.grid ? (
@@ -220,14 +359,9 @@ export default function StoreOwnedGameCard({
               <Gamepad2 className="h-12 w-12 text-muted-foreground/30" />
             </div>
           )}
-          <div className="absolute left-2 top-2 z-20">
-            <span className="rounded-full border border-white/10 bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm backdrop-blur-md">
-              {store}
-            </span>
-          </div>
-          <div className="absolute right-2 top-2 z-20 rounded-md bg-black/70 text-white">
-            {menu}
-          </div>
+          {isRunning && (
+            <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-green-500 to-emerald-400" />
+          )}
           {/* Hover overlay with title + favorite, same as installed games */}
           <div
             className={cn(
@@ -238,7 +372,12 @@ export default function StoreOwnedGameCard({
             <p className="mb-2 line-clamp-2 text-sm font-semibold leading-tight text-white">
               {game.game}
             </p>
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                {isRunning && (
+                  <span className="text-xs font-medium text-green-400">Playing</span>
+                )}
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
@@ -263,7 +402,14 @@ export default function StoreOwnedGameCard({
           {game.game}
         </h3>
         <p className="text-xs text-muted-foreground">
-          {t("storeAccounts.display.ownedOn", { defaultValue: "Owned on {{store}}", store })}
+          {(() => {
+            if (!playTime || playTime < 60) return t("library.neverPlayed");
+            const h = Math.floor(playTime / 3600);
+            const m = Math.floor((playTime % 3600) / 60);
+            if (h === 0) return `${m} minutes`;
+            if (m === 0) return `${h} hours`;
+            return `${h} hours ${m} minutes`;
+          })()}
         </p>
       </CardFooter>
     </Card>
