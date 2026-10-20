@@ -4361,7 +4361,16 @@
       "winePrefixPlaceholder": "~/.wine",
       "wineSection": "Wine"
     },
-    "yourLocalIndex": "Your Game Index"
+    "yourLocalIndex": "Your Game Index",
+    "locationCheck": {
+      "dismiss": "Dismiss",
+      "duplicate": "That folder is already one of your download locations.",
+      "noPermission": "Ascendara can't create files in that folder. Pick a different one.",
+      "protect": "Protect folder",
+      "protectFailed": "Windows Security couldn't protect this folder.",
+      "protecting": "Waiting for Windows...",
+      "saveFailed": "Couldn't save this download location. Please try again."
+    }
   },
   "storeAccounts": {
     "cancel": "Cancel",
