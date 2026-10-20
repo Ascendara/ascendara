@@ -686,27 +686,34 @@ function Settings() {
     [settings.ludusavi, setSettingsLocal]
   );
 
+  const dismissLocationCheck = useCallback(() => {
+    setCheckingLocation(null);
+    locationCheck.reset();
+  }, [locationCheck.reset]);
+
+  // Start checking a picked folder straight away; confirming Ascendara can write
+  // there and saving it run alongside, and undo the pick if either fails
   const handleDirectorySelect = useCallback(async () => {
     try {
       const directory = await window.electron.openDirectoryDialog();
-      if (directory) {
-        const canCreate = await window.electron.canCreateFiles(directory);
-        if (!canCreate) {
-          toast.error(t("settings.locationCheck.noPermission"));
-          return;
-        }
-        setDownloadPath(directory);
-        handleSettingChange("downloadDirectory", directory);
-        setCheckingLocation({ directory, isDefault: true });
-        locationCheck.run(directory);
+      if (!directory) return;
+      const previousPath = downloadPath;
+      setDownloadPath(directory);
+      setCheckingLocation({ directory, isDefault: true });
+      locationCheck.run(directory);
+      if (!(await window.electron.canCreateFiles(directory))) {
+        setDownloadPath(previousPath);
+        dismissLocationCheck();
+        toast.error(t("settings.locationCheck.noPermission"));
+        return;
       }
+      handleSettingChange("downloadDirectory", directory);
     } catch (error) {
       console.error("Error selecting directory:", error);
       toast.error(t("settings.errors.directorySelect"));
     }
-  }, [handleSettingChange, locationCheck.run, t]);
+  }, [downloadPath, handleSettingChange, locationCheck.run, dismissLocationCheck, t]);
 
-  // Pick an additional download location, save it, then check it in its row
   const handleAddLocationSelect = useCallback(async () => {
     try {
       const directory = await window.electron.openDirectoryDialog();
@@ -724,18 +731,27 @@ function Settings() {
         toast.error(t("settings.locationCheck.duplicate"));
         return;
       }
-      if (!(await window.electron.canCreateFiles(directory))) {
-        toast.error(t("settings.locationCheck.noPermission"));
-        return;
-      }
       const newPaths = [...(settings.additionalDirectories || []), directory];
-      if (!(await window.electron.updateSetting("additionalDirectories", newPaths))) {
-        toast.error(t("settings.locationCheck.saveFailed"));
-        return;
-      }
+      const undo = message => {
+        setSettingsLocal(prev => ({
+          ...prev,
+          additionalDirectories: (prev.additionalDirectories || []).filter(
+            path => path !== directory
+          ),
+        }));
+        dismissLocationCheck();
+        toast.error(message);
+      };
       setSettingsLocal({ additionalDirectories: newPaths });
       setCheckingLocation({ directory, isDefault: false });
       locationCheck.run(directory);
+      if (!(await window.electron.canCreateFiles(directory))) {
+        undo(t("settings.locationCheck.noPermission"));
+        return;
+      }
+      if (!(await window.electron.updateSetting("additionalDirectories", newPaths))) {
+        undo(t("settings.locationCheck.saveFailed"));
+      }
     } catch (error) {
       console.error("Error selecting directory:", error);
       toast.error(t("settings.errors.directorySelect"));
@@ -745,13 +761,9 @@ function Settings() {
     settings.additionalDirectories,
     setSettingsLocal,
     locationCheck.run,
+    dismissLocationCheck,
     t,
   ]);
-
-  const dismissLocationCheck = useCallback(() => {
-    setCheckingLocation(null);
-    locationCheck.reset();
-  }, [locationCheck.reset]);
 
   // A passed check folds away on its own after a moment
   useEffect(() => {

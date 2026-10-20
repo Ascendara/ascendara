@@ -55,15 +55,17 @@ const hashFile = async filePath =>
 
 /**
  * Download one test file into testDir, watch that it isn't removed or changed,
- * then make sure it can still be moved and deleted. Resolves to
- * { ok, reason?, error? } where reason is downloadFailed, blocked, deleted or locked.
+ * then make sure it can still be moved and deleted. onPhase(phase, progress)
+ * reports each phase, with download progress from 0 to 1 while downloading.
+ * Resolves to { ok, reason?, error? } where reason is downloadFailed, blocked,
+ * deleted or locked.
  */
 async function verifyTestDownload(url, testDir, onPhase) {
   const fileDir = path.join(testDir, crypto.randomUUID());
   const filePath = path.join(fileDir, path.basename(new URL(url).pathname));
   const fail = (reason, error) => ({ ok: false, reason, error });
 
-  onPhase("downloading");
+  onPhase("downloading", 0);
   let response;
   try {
     response = await fetch(url, { cache: "no-store" });
@@ -72,17 +74,38 @@ async function verifyTestDownload(url, testDir, onPhase) {
     return fail("downloadFailed", error.message);
   }
 
-  let expectedHash;
+  // Stream to disk like a real download, so a scanner can step in mid-write
+  const total = Number(response.headers.get("content-length")) || 0;
+  const hash = crypto.createHash("sha256");
+  let file;
+  let received = 0;
+  let lastReport = 0;
+  let writeFailed = false;
   try {
-    const data = Buffer.from(await response.arrayBuffer());
-    expectedHash = crypto.createHash("sha256").update(data).digest("hex");
     await fs.ensureDir(fileDir);
-    await fs.writeFile(filePath, data);
+    file = await nativeFs.promises.open(filePath, "w");
+    for await (const chunk of response.body) {
+      hash.update(chunk);
+      writeFailed = true;
+      await file.write(chunk);
+      writeFailed = false;
+      received += chunk.length;
+      if (total && Date.now() - lastReport > 100) {
+        lastReport = Date.now();
+        // content-length is the compressed size when the server compresses
+        onPhase("downloading", Math.min(received / total, 1));
+      }
+    }
+    // Scanners often act when the file is closed
+    writeFailed = true;
+    await file.close();
+    file = null;
   } catch (error) {
-    // Network errors mid-body and write errors both land here; a blocked write
-    // is the common case for flagged files.
-    return fail(error.code ? "blocked" : "downloadFailed", error.message);
+    await file?.close().catch(() => {});
+    // A failed write or close is the file being blocked; anything else is the network
+    return fail(writeFailed || !file ? "blocked" : "downloadFailed", error.message);
   }
+  const expectedHash = hash.digest("hex");
 
   onPhase("watching");
   const watchUntil = Date.now() + VERIFY_WATCH_MS;
@@ -606,8 +629,8 @@ function registerSystemHandlers() {
       }
 
       for (const [index, url] of VERIFY_DOWNLOAD_FILES.entries()) {
-        const fileResult = await verifyTestDownload(url, testDir, phase =>
-          sendProgress({ stage: "file", index, status: "running", phase })
+        const fileResult = await verifyTestDownload(url, testDir, (phase, progress) =>
+          sendProgress({ stage: "file", index, status: "running", phase, progress })
         );
         result.files.push({ url, ...fileResult });
         sendProgress({

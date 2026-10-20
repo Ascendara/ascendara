@@ -8,17 +8,24 @@ const idleChecks = () => ({
   files: Array.from({ length: FILE_COUNT }, () => ({ status: "idle" })),
 });
 
-// The bar eases toward each stage's value; the watch stages last about five
-// seconds, so the bar creeps linearly across them instead of jumping.
+// The bar eases toward each stage's value. Downloads fill their range as bytes
+// arrive; the watch stages last about five seconds, so the bar creeps linearly
+// across them instead of jumping.
 const watchBar = "[&>div]:duration-[5000ms] [&>div]:ease-linear";
 const stepBar = "[&>div]:duration-700";
+const downloadBar = "[&>div]:duration-300";
 const STAGES = {
-  basic: { value: 12, message: "basic", barClass: stepBar },
-  testDownloading: { value: 25, message: "testing", barClass: stepBar },
-  testWatching: { value: 50, message: "watching", barClass: watchBar },
+  basic: { value: 8, message: "basic", barClass: stepBar },
+  testDownloading: { from: 10, value: 35, message: "testing", barClass: downloadBar },
+  testWatching: { value: 52, message: "watching", barClass: watchBar },
   testCleanup: { value: 55, message: "cleanup", barClass: stepBar },
-  doubleDownloading: { value: 62, message: "doubleChecking", barClass: stepBar },
-  doubleWatching: { value: 92, message: "doubleWatching", barClass: watchBar },
+  doubleDownloading: {
+    from: 57,
+    value: 80,
+    message: "doubleChecking",
+    barClass: downloadBar,
+  },
+  doubleWatching: { value: 95, message: "doubleWatching", barClass: watchBar },
   doubleCleanup: { value: 97, message: "cleanup", barClass: stepBar },
   passed: { value: 100, message: "passed", barClass: stepBar },
   issues: { value: 100, message: "issues", barClass: stepBar },
@@ -41,6 +48,7 @@ export function useDownloadFolderCheck() {
         const check = {
           status: progress.status,
           phase: progress.phase,
+          progress: progress.progress,
           reason: progress.reason,
         };
         setChecks(prev => {
@@ -115,10 +123,14 @@ export function useDownloadFolderCheck() {
     const file = checks.files[index];
     const prefix = index === 0 ? "test" : "double";
     if (!file) return STAGES.doubleCleanup;
-    if (file.status !== "running") return STAGES[`${prefix}Downloading`];
     if (file.phase === "watching") return STAGES[`${prefix}Watching`];
     if (file.phase === "cleanup") return STAGES[`${prefix}Cleanup`];
-    return STAGES[`${prefix}Downloading`];
+    const download = STAGES[`${prefix}Downloading`];
+    const fraction = file.status === "running" ? file.progress || 0 : 0;
+    return {
+      ...download,
+      value: download.from + (download.value - download.from) * fraction,
+    };
   })();
 
   return { state, stage, passed, basicFailed, antivirusIssue, errors, run, reset };
