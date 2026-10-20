@@ -38,6 +38,79 @@ const gamesSizeCache = {
 // so they wait on one directory walk instead of each starting their own.
 let gamesSizeInFlight = null;
 
+// Files antivirus software commonly flags in game downloads, used to check
+// whether a download folder is safe from quarantines.
+const VERIFY_DOWNLOAD_FILES = [
+  "https://cdn.ascendara.app/setup/1/OnlineFix64.dll",
+  "https://cdn.ascendara.app/setup/2/OnlineFix64.dll",
+];
+const VERIFY_WATCH_MS = 5000;
+const VERIFY_POLL_MS = 250;
+
+const hashFile = async filePath =>
+  crypto
+    .createHash("sha256")
+    .update(await fs.readFile(filePath))
+    .digest("hex");
+
+/**
+ * Download one test file into testDir, watch that it isn't removed or changed,
+ * then make sure it can still be moved and deleted. Resolves to
+ * { ok, reason?, error? } where reason is downloadFailed, blocked, deleted or locked.
+ */
+async function verifyTestDownload(url, testDir, onPhase) {
+  const fileDir = path.join(testDir, crypto.randomUUID());
+  const filePath = path.join(fileDir, path.basename(new URL(url).pathname));
+  const fail = (reason, error) => ({ ok: false, reason, error });
+
+  onPhase("downloading");
+  let response;
+  try {
+    response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Server responded with ${response.status}`);
+  } catch (error) {
+    return fail("downloadFailed", error.message);
+  }
+
+  let expectedHash;
+  try {
+    const data = Buffer.from(await response.arrayBuffer());
+    expectedHash = crypto.createHash("sha256").update(data).digest("hex");
+    await fs.ensureDir(fileDir);
+    await fs.writeFile(filePath, data);
+  } catch (error) {
+    // Network errors mid-body and write errors both land here; a blocked write
+    // is the common case for flagged files.
+    return fail(error.code ? "blocked" : "downloadFailed", error.message);
+  }
+
+  onPhase("watching");
+  const watchUntil = Date.now() + VERIFY_WATCH_MS;
+  while (Date.now() < watchUntil) {
+    await new Promise(resolve => setTimeout(resolve, VERIFY_POLL_MS));
+    if (!(await fs.pathExists(filePath))) {
+      return fail("deleted", "The file was removed after it downloaded.");
+    }
+  }
+  try {
+    if ((await hashFile(filePath)) !== expectedHash) {
+      return fail("deleted", "The file was changed after it downloaded.");
+    }
+  } catch (error) {
+    return fail("deleted", error.message);
+  }
+
+  onPhase("cleanup");
+  try {
+    const movedPath = `${filePath}.moved`;
+    await fs.rename(filePath, movedPath);
+    await fs.unlink(movedPath);
+  } catch (error) {
+    return fail("locked", error.message);
+  }
+  return { ok: true };
+}
+
 /**
  * Get disk space using Node.js built-in fs.statfs
  */
@@ -491,6 +564,64 @@ function registerSystemHandlers() {
       return true;
     } catch (error) {
       return false;
+    }
+  });
+
+  // Check that games can actually land in a download folder: basic file
+  // operations, then known antivirus false positives that must download, stay
+  // put for a few seconds and still be movable and deletable afterwards.
+  // runId is echoed in progress events so the page can ignore an older run.
+  ipcMain.handle("verify-download-directory", async (event, directory, runId) => {
+    const sendProgress = progress => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send("download-directory-verify-progress", { runId, ...progress });
+      }
+    };
+    const testDir = path.join(directory, `.ascendara-check-${crypto.randomUUID()}`);
+    const result = { basic: { ok: false }, files: [] };
+
+    try {
+      sendProgress({ stage: "basic", status: "running" });
+      try {
+        await fs.ensureDir(testDir);
+        const filePath = path.join(testDir, "test.txt");
+        const movedPath = path.join(testDir, "test-moved.txt");
+        const content = `ascendara ${Date.now()}`;
+        await fs.writeFile(filePath, content);
+        await fs.appendFile(filePath, "\nappended");
+        if ((await fs.readFile(filePath, "utf8")) !== `${content}\nappended`) {
+          throw new Error("A test file read back with different contents.");
+        }
+        await fs.rename(filePath, movedPath);
+        await fs.unlink(movedPath);
+        if (await fs.pathExists(movedPath)) {
+          throw new Error("A test file couldn't be deleted.");
+        }
+        result.basic = { ok: true };
+      } catch (error) {
+        result.basic = { ok: false, error: error.message };
+        return result;
+      } finally {
+        sendProgress({ stage: "basic", status: result.basic.ok ? "ok" : "failed" });
+      }
+
+      for (const [index, url] of VERIFY_DOWNLOAD_FILES.entries()) {
+        const fileResult = await verifyTestDownload(url, testDir, phase =>
+          sendProgress({ stage: "file", index, status: "running", phase })
+        );
+        result.files.push({ url, ...fileResult });
+        sendProgress({
+          stage: "file",
+          index,
+          status: fileResult.ok ? "ok" : "failed",
+          reason: fileResult.reason,
+        });
+      }
+      return result;
+    } finally {
+      await fs.remove(testDir).catch(error => {
+        console.error("Failed to remove download folder check:", error);
+      });
     }
   });
 

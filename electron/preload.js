@@ -541,6 +541,12 @@ contextBridge.exposeInMainWorld("electron", {
   // Resolves the absolute filesystem path for a File dragged into the app from the OS.
   getPathForFile: file => webUtils.getPathForFile(file),
   canCreateFiles: directory => ipcRenderer.invoke("can-create-files", directory),
+  verifyDownloadDirectory: (directory, runId) =>
+    ipcRenderer.invoke("verify-download-directory", directory, runId),
+  onDownloadDirectoryVerifyProgress: callback =>
+    preloadIpc.subscribe("download-directory-verify-progress", callback, {
+      selectArgs: args => [args[0]],
+    }),
   checkFileExists: filePath => ipcRenderer.invoke("check-file-exists", filePath),
   getDriveSpace: path => ipcRenderer.invoke("get-drive-space", path),
   getAssetPath: filename => ipcRenderer.invoke("get-asset-path", filename),
