@@ -33,6 +33,7 @@ import {
   PlusCircle,
   SquareArrowRight,
   FolderDownIcon,
+  FolderCheck,
   HardDrive,
   Wine,
   AlertTriangle,
@@ -65,6 +66,11 @@ import ImportGamesDialog from "@/components/ImportGamesDialog";
 import ImportFromLaunchersDialog from "@/components/ImportFromLaunchersDialog";
 import StoreAccountsDialog from "@/components/StoreAccountsDialog";
 import { useStoreLibrary } from "@/hooks/useStoreLibrary";
+import { useDownloadFolderCheck } from "@/hooks/useDownloadFolderCheck";
+import {
+  DownloadFolderCheckProgress,
+  DownloadFolderCheckResult,
+} from "@/components/DownloadFolderCheck";
 
 const DEPENDENCIES = [
   {
@@ -455,6 +461,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
   // Result of the last Defender exclusion attempt: { success, reason, error }
   const [protectResult, setProtectResult] = useState(null);
   const [showNoDefenderWarning, setShowNoDefenderWarning] = useState(false);
+  // Reset whenever the folder or its protection changes so the check runs again
+  const folderCheck = useDownloadFolderCheck();
   const [dependencyStatus, setDependencyStatus] = useState(idleDependencyStatus);
   // null until the user installs or skips: "installed" | "partial" | "skipped"
   const [depsOutcome, setDepsOutcome] = useState(null);
@@ -498,7 +506,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
       "about",
       "referral",
       "directory",
-      ...(isOnWindows ? ["protectDirectories", "dependencies"] : ["linuxDeps"]),
+      ...(isOnWindows
+        ? ["protectDirectories", "verifyDirectory", "dependencies"]
+        : ["linuxDeps"]),
       "personalize",
       "extras",
       "finish",
@@ -719,8 +729,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
     }
 
     setDownloadDirectory(directory);
-    // A new folder needs its own Defender exclusion
+    // A new folder needs its own Defender exclusion and folder check
     setProtectResult(null);
+    folderCheck.reset();
     await checkDirectorySpace(directory);
 
     try {
@@ -740,11 +751,19 @@ const Welcome = ({ welcomeData, onComplete }) => {
     }
   };
 
+  // Start the check when its step opens, unless it already ran for this folder
+  useEffect(() => {
+    if (step === "verifyDirectory" && folderCheck.state === "idle" && downloadDirectory) {
+      folderCheck.run(downloadDirectory);
+    }
+  }, [step, folderCheck.state, downloadDirectory]);
+
   const handleEnableProtection = async () => {
     setProtectLoading(true);
     try {
       const result = await window.electron.folderExclusion(true);
       setProtectResult(result || { success: false, reason: "failed" });
+      if (result?.success) folderCheck.reset();
     } catch (error) {
       console.error("Failed to enable directory protection:", error);
       setProtectResult({ success: false, reason: "failed", error: error.message });
@@ -1898,6 +1917,84 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 </SetupStep>
               )}
 
+              {step === "verifyDirectory" && (
+                <SetupStep
+                  key="verifyDirectory"
+                  icon={FolderCheck}
+                  title={t("welcome.setup.verify.title")}
+                  subtitle={t("welcome.setup.verify.subtitle")}
+                  footer={
+                    folderCheck.state !== "done" ? (
+                      <>
+                        <Button size="lg" disabled className={primaryButtonClass}>
+                          <Loader className="mr-2 h-5 w-5 animate-spin" />
+                          {t("welcome.setup.verify.checking")}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={handleNext}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          {t("welcome.setup.verify.skip")}
+                        </Button>
+                      </>
+                    ) : folderCheck.passed ? (
+                      <Button
+                        size="lg"
+                        onClick={handleNext}
+                        className={primaryButtonClass}
+                      >
+                        {t("welcome.continue")}
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          size="lg"
+                          onClick={() => folderCheck.run(downloadDirectory)}
+                          className={primaryButtonClass}
+                        >
+                          <RefreshCw className="mr-2 h-5 w-5" />
+                          {t("welcome.setup.verify.retry")}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={handleNext}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          {t("welcome.setup.verify.continueAnyway")}
+                        </Button>
+                      </>
+                    )
+                  }
+                >
+                  <div className={`${cardClass} space-y-3 text-left`}>
+                    <div className="flex items-center gap-2 rounded-lg border border-primary/15 bg-background/60 px-3 py-2">
+                      <FolderDownIcon className="h-4 w-4 shrink-0 text-primary" />
+                      <span className="truncate font-mono text-sm" title={downloadDirectory}>
+                        {downloadDirectory}
+                      </span>
+                    </div>
+                    <DownloadFolderCheckProgress check={folderCheck} />
+                  </div>
+
+                  <div className="mt-3">
+                    <DownloadFolderCheckResult check={folderCheck}>
+                      {folderCheck.antivirusIssue && !protectResult?.success && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center text-primary hover:underline"
+                          onClick={() => goToStep("protectDirectories", -1)}
+                        >
+                          <ShieldCheck className="mr-1 h-4 w-4" />
+                          {t("welcome.setup.verify.goProtect")}
+                        </button>
+                      )}
+                    </DownloadFolderCheckResult>
+                  </div>
+                </SetupStep>
+              )}
+
               {step === "personalize" && (
                 <SetupStep
                   key="personalize"
@@ -2842,6 +2939,16 @@ const Welcome = ({ welcomeData, onComplete }) => {
                           ? t("welcome.setup.finish.on")
                           : t("welcome.setup.finish.off"),
                         ok: !!protectResult?.success,
+                      },
+                      isOnWindows && {
+                        icon: FolderCheck,
+                        label: t("welcome.setup.finish.folderCheck"),
+                        value: folderCheck.passed
+                          ? t("welcome.setup.finish.folderCheckPassed")
+                          : folderCheck.state === "done"
+                            ? t("welcome.setup.finish.folderCheckIssues")
+                            : t("welcome.setup.finish.folderCheckSkipped"),
+                        ok: folderCheck.passed,
                       },
                       isOnWindows && {
                         icon: PackageOpen,

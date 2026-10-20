@@ -1748,6 +1748,29 @@
     "viewOnOpenCritic": "View on OpenCritic",
     "yourPC": "Your PC"
   },
+  "downloadFolderCheck": {
+    "details": "Details",
+    "errors": {
+      "antivirus": "Your antivirus blocked or removed a test file. It may also delete important game files while they download, which can stop games from working. Protect this folder, or add it as an exclusion in your antivirus, then try again.",
+      "antivirusTitle": "Your antivirus is interfering with downloads",
+      "basic": "Ascendara couldn't manage files in this folder, so downloads will likely fail here. Try a different folder.",
+      "basicTitle": "Ascendara can't use this folder",
+      "download": "The test files couldn't be downloaded, so the check didn't finish. Check your internet connection and try again.",
+      "downloadTitle": "The check couldn't finish"
+    },
+    "passed": "All good. Games can download to this folder without being touched.",
+    "retry": "Try again",
+    "stage": {
+      "basic": "Making sure Ascendara can save files here...",
+      "cleanup": "Tidying up...",
+      "doubleChecking": "Double-checking with another file...",
+      "doubleWatching": "Almost there, keeping an eye on it...",
+      "issues": "Found something worth a look",
+      "passed": "All done!",
+      "testing": "Trying a test download...",
+      "watching": "Making sure your antivirus leaves it alone..."
+    }
+  },
   "downloads": {
     "actionRequired": "Action Required",
     "actions": {
@@ -4769,6 +4792,10 @@
         "componentsPartial": "Some didn't install",
         "componentsSkipped": "Skipped",
         "folder": "Download folder",
+        "folderCheck": "Folder check",
+        "folderCheckIssues": "Issues found",
+        "folderCheckPassed": "Passed",
+        "folderCheckSkipped": "Skipped",
         "manual": "Manual",
         "off": "Off",
         "on": "On",
@@ -4814,7 +4841,15 @@
         "whatItDoes": "Ascendara can ask Windows Security to skip this folder:",
         "working": "Waiting for Windows..."
       },
-      "stepOf": "Step {{current}} of {{total}}"
+      "stepOf": "Step {{current}} of {{total}}",
+      "verify": {
+        "checking": "Checking your folder...",
+        "continueAnyway": "Continue anyway",
+        "goProtect": "Protect this folder",
+        "skip": "Skip check",
+        "subtitle": "Ascendara will download a couple of test files to make sure nothing in this folder gets blocked or deleted. This takes a few seconds.",
+        "title": "Checking your download folder"
+      }
     },
     "shareAndImprove": "Share & Improve",
     "shareAnonymousData": "Share Anonymous Data",
