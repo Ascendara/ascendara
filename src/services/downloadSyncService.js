@@ -8,10 +8,10 @@ let syncInterval = null;
 let isAuthenticated = false;
 let currentUser = null;
 let hasAscendAccess = false;
-let lastDownloadCount = 0;
-let isSyncing = false;
 let lastSyncSignature = null;
 let lastSyncAt = 0;
+let syncInFlight = false;
+let syncRequested = false;
 
 // Stopped, failed and waiting downloads stay in the list indefinitely, so an
 // unchanged list is only re-sent this often instead of on every tick.
@@ -60,10 +60,12 @@ export const initializeDownloadSync = (user, ascendAccess = false) => {
     return;
   }
 
-  // Don't start interval yet - will be started when downloads begin
-  console.log(
-    "[DownloadSync] Service initialized - polling will start when downloads begin"
-  );
+  // Discover existing downloads after restarting or signing in.
+  startSyncInterval();
+  void syncDownloads(true);
+
+  // Keep checking for downloads started by any route.
+  console.log("[DownloadSync] Service initialized");
 };
 
 /**
@@ -79,6 +81,7 @@ export const stopDownloadSync = () => {
   hasAscendAccess = false;
   lastSyncSignature = null;
   lastSyncAt = 0;
+  syncRequested = false;
   syncBackoff.success();
   commandBackoff.success();
 };
@@ -90,19 +93,6 @@ const startSyncInterval = () => {
   if (!syncInterval && hasAscendAccess) {
     console.log("[DownloadSync] Starting sync interval (5s)");
     syncInterval = setInterval(syncDownloads, 5000);
-    isSyncing = true;
-  }
-};
-
-/**
- * Stop the sync interval
- */
-const stopSyncInterval = () => {
-  if (syncInterval) {
-    console.log("[DownloadSync] Stopping sync interval - no active downloads");
-    clearInterval(syncInterval);
-    syncInterval = null;
-    isSyncing = false;
   }
 };
 
@@ -118,6 +108,12 @@ const syncDownloads = async (force = false) => {
     return;
   }
 
+  if (syncInFlight) {
+    syncRequested ||= force;
+    return;
+  }
+  syncInFlight = true;
+  const user = currentUser;
   try {
     // Check if electron API is available
     if (!window.electron || typeof window.electron.getDownloads !== "function") {
@@ -127,30 +123,19 @@ const syncDownloads = async (force = false) => {
     // Get current downloads from electron
     const downloads = await window.electron.getDownloads();
     const downloadsArray = (downloads || []).filter(download => !download.privateSource);
-    const currentCount = downloadsArray.length;
+    if (user !== currentUser) return;
 
-    // If we had downloads before but now have none, sync once more then stop
-    if (lastDownloadCount > 0 && currentCount === 0) {
-      console.log("[DownloadSync] Downloads completed - sending final sync and stopping");
-      await performSync(downloadsArray, true);
-      stopSyncInterval();
-      lastDownloadCount = 0;
-      return;
-    }
-
-    // If no downloads, don't sync
-    if (currentCount === 0) {
-      return;
-    }
-
-    // Update last known count
-    lastDownloadCount = currentCount;
-
-    // Perform sync
+    // Empty snapshots clear stale server state too. Retry failures on the next tick.
     await performSync(downloadsArray, force);
   } catch (error) {
     syncBackoff.failure();
     console.error("[DownloadSync] Error syncing downloads:", error);
+  } finally {
+    syncInFlight = false;
+    if (syncRequested) {
+      syncRequested = false;
+      void syncDownloads(true);
+    }
   }
 };
 
@@ -162,7 +147,9 @@ const performSync = async (downloadsArray, force = false) => {
   const downloadStates = downloadsArray.map(download => ({
     id: download.id || download.name,
     name: download.name,
-    progress: download.progress || 0,
+    progress: Number.isFinite(download.progress)
+      ? Math.max(0, Math.min(100, download.progress))
+      : 0,
     speed: download.speed || "0 B/s",
     eta: download.eta || "Calculating...",
     status: download.status || "downloading",
@@ -184,14 +171,20 @@ const performSync = async (downloadsArray, force = false) => {
   }
 
   const timestamp = new Date().toISOString();
-  const formattedDownloads = downloadStates.map(download => ({ ...download, timestamp }));
+  const formattedDownloads = downloadStates.map(download => ({
+    ...download,
+    timestamp,
+  }));
 
   // Get Firebase ID token
-  const firebaseToken = await currentUser.getIdToken();
+  const user = currentUser;
+  const firebaseToken = await user.getIdToken();
+  if (user !== currentUser) return;
 
   // Sync to monitor endpoint
   const response = await fetch("https://monitor.ascendara.app/downloads/sync", {
     method: "POST",
+    signal: AbortSignal.timeout(15000),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${firebaseToken}`,
@@ -201,6 +194,7 @@ const performSync = async (downloadsArray, force = false) => {
     }),
   });
 
+  if (user !== currentUser) return;
   if (!response.ok) {
     syncBackoff.failure();
     console.error(
@@ -373,5 +367,5 @@ export const notifyDownloadStart = async (downloadId, downloadName) => {
 export const forceSyncDownloads = () => {
   console.log("[DownloadSync] Force sync requested");
   startSyncInterval();
-  syncDownloads(true);
+  return syncDownloads(true);
 };

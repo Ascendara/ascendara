@@ -94,7 +94,10 @@ async function qbtRemoveTorrentsForDirectory(settings, gameDirectory, deleteFile
       `${baseUrl}/api/v2/torrents/delete`,
       `hashes=${matchingHashes.join("|")}&deleteFiles=${deleteFiles ? "true" : "false"}`,
       {
-        headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: cookie },
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: cookie,
+        },
         validateStatus: () => true,
         timeout: 5000,
       }
@@ -243,7 +246,7 @@ function registerDownloadHandlers() {
                   // Use extraction progress if extracting, otherwise use download progress
                   if (
                     downloadingData.extracting &&
-                    downloadingData.extractionProgress?.percentComplete
+                    downloadingData.extractionProgress?.percentComplete != null
                   ) {
                     const progressStr = String(
                       downloadingData.extractionProgress.percentComplete
@@ -254,9 +257,39 @@ function registerDownloadHandlers() {
                     progress = parseFloat(progressStr.replace("%", "")) || 0;
                   }
 
-                  // Calculate downloaded size from progress if available
+                  progress = Number.isFinite(progress)
+                    ? Math.max(0, Math.min(100, progress))
+                    : 0;
+                  const rawDownloadProgress = parseFloat(
+                    downloadingData.progressCompleted
+                  );
+                  const downloadProgress = Number.isFinite(rawDownloadProgress)
+                    ? Math.max(0, Math.min(100, rawDownloadProgress))
+                    : 0;
+                  const status =
+                    downloadingData.pendingManualInstall ||
+                    downloadingData.awaitingRecoveryAction
+                      ? "actionRequired"
+                      : downloadingData.error || downloadingData.verifyError?.length
+                        ? "error"
+                        : downloadingData.paused
+                          ? "paused"
+                          : downloadingData.stopped
+                            ? "stopped"
+                            : downloadingData.verifying
+                              ? "verifying"
+                              : downloadingData.extracting
+                                ? "extracting"
+                                : downloadingData.waiting
+                                  ? "queued"
+                                  : downloadingData.updating
+                                    ? "updating"
+                                    : "downloading";
+                  const transferring = status === "downloading" || status === "updating";
+
+                  // Downloaded size is an estimate from transfer progress, never extraction progress.
                   let downloadedSize = "0 MB";
-                  const totalSize = gameData.size || "Unknown";
+                  const totalSize = String(gameData.size || "Unknown");
 
                   // Calculate downloaded size if we have both progress and total size
                   // Use >= 0 instead of > 0 to handle edge cases
@@ -266,7 +299,10 @@ function registerDownloadHandlers() {
                     if (sizeMatch) {
                       const sizeValue = parseFloat(sizeMatch[1]);
                       const sizeUnit = sizeMatch[2].toUpperCase();
-                      const downloadedValue = ((sizeValue * progress) / 100).toFixed(2);
+                      const downloadedValue = (
+                        (sizeValue * downloadProgress) /
+                        100
+                      ).toFixed(2);
                       downloadedSize = `${downloadedValue} ${sizeUnit}`;
                     }
                   }
@@ -277,29 +313,29 @@ function registerDownloadHandlers() {
                     name: gameData.game || dir,
                     progress: progress,
                     speed:
-                      downloadingData.extracting &&
+                      status === "extracting" &&
                       downloadingData.extractionProgress?.extractionSpeed
                         ? downloadingData.extractionProgress.extractionSpeed
-                        : downloadingData.progressDownloadSpeeds || "0 B/s",
+                        : transferring
+                          ? downloadingData.progressDownloadSpeeds || "0 B/s"
+                          : "0 B/s",
                     eta:
-                      downloadingData.extracting &&
+                      status === "extracting" &&
                       downloadingData.extractionProgress?.currentFile
                         ? `Extracting: ${downloadingData.extractionProgress.filesExtracted}/${downloadingData.extractionProgress.totalFiles} files`
-                        : downloadingData.timeUntilComplete || "Calculating...",
-                    status: downloadingData.pendingManualInstall
-                      ? "actionRequired"
-                      : downloadingData.paused
-                        ? "paused"
-                        : downloadingData.extracting
-                          ? "extracting"
-                          : downloadingData.verifying
-                            ? "verifying"
-                            : downloadingData.stopped
-                              ? "stopped"
-                              : "downloading",
+                        : transferring
+                          ? downloadingData.timeUntilComplete || "Calculating..."
+                          : "-",
+                    status,
                     size: totalSize,
                     downloaded: downloadedSize,
-                    error: downloadingData.error || null,
+                    error:
+                      status === "error"
+                        ? downloadingData.message ||
+                          (typeof downloadingData.error === "string"
+                            ? downloadingData.error
+                            : "Download or verification failed")
+                        : null,
                     paused: downloadingData.paused || false,
                     stopped: downloadingData.stopped || false,
                     // Include all downloadingData fields for frontend
@@ -324,25 +360,6 @@ function registerDownloadHandlers() {
                       error: downloadingData.error || null,
                     },
                   };
-                  console.log("[get-downloads] Found active download:", download.name);
-                  console.log(
-                    "[get-downloads]   Progress:",
-                    progress,
-                    "Status:",
-                    download.status
-                  );
-                  console.log(
-                    "[get-downloads]   Total size:",
-                    totalSize,
-                    "Downloaded:",
-                    downloadedSize
-                  );
-                  console.log(
-                    "[get-downloads]   Speed:",
-                    download.speed,
-                    "Paused:",
-                    downloadingData.paused
-                  );
                   downloads.push(download);
                 }
               }
@@ -785,7 +802,10 @@ function registerDownloadHandlers() {
         if (!isWindows && !isDev && !fs.existsSync(executablePath)) {
           const errMsg = `Binary not found: ${executablePath}`;
           console.error(errMsg);
-          event.sender.send("download-error", { game: sanitizedGame, error: errMsg });
+          event.sender.send("download-error", {
+            game: sanitizedGame,
+            error: errMsg,
+          });
           return;
         }
 
@@ -1123,10 +1143,15 @@ function registerDownloadHandlers() {
                         continue;
                       }
                       const fullPath = path.join(gameDirectory, file.name);
-                      await fs.promises.rm(fullPath, { recursive: true, force: true });
+                      await fs.promises.rm(fullPath, {
+                        recursive: true,
+                        force: true,
+                      });
                     }
                     if (fs.existsSync(preexistingMarkerPath)) {
-                      await fs.promises.rm(preexistingMarkerPath, { force: true });
+                      await fs.promises.rm(preexistingMarkerPath, {
+                        force: true,
+                      });
                     }
                     // Only remove the directory itself if nothing pre-existing is left in it
                     const remaining = await fs.promises.readdir(gameDirectory);
@@ -1349,7 +1374,10 @@ function registerDownloadHandlers() {
       };
       await fs.writeJson(metadata, info, { spaces: 4 });
       try {
-        const child = spawn(executable, args, { stdio: "ignore", windowsHide: true });
+        const child = spawn(executable, args, {
+          stdio: "ignore",
+          windowsHide: true,
+        });
         downloadProcesses.set(game, child);
         child.once("close", async code => {
           if (downloadProcesses.get(game) === child) downloadProcesses.delete(game);
@@ -1537,7 +1565,10 @@ function registerDownloadHandlers() {
 
           if (!downloadLink) {
             console.error(`No download link found for: ${sanitizedGame}`);
-            return { success: false, error: "Download link not found. Cannot resume." };
+            return {
+              success: false,
+              error: "Download link not found. Cannot resume.",
+            };
           }
 
           const torrentDownload = /^(magnet:)|\.torrent(?:\?|$)/i.test(downloadLink);

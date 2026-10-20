@@ -191,6 +191,7 @@ const Downloads = () => {
   const processedCommandsRef = useRef(new Set());
   const commandTimestampsRef = useRef(new Map());
   const commandIntervalRef = useRef(null);
+  const commandInFlightRef = useRef(false);
   const hasLiveDownloadRef = useRef(false);
   const lastCommandCheckRef = useRef(0);
 
@@ -202,124 +203,136 @@ const Downloads = () => {
 
     console.log("[Downloads] Starting command check interval");
     commandIntervalRef.current = setInterval(async () => {
-      // Clean up old processed commands (older than 5 minutes) to prevent memory buildup
-      const now = Date.now();
-      const fiveMinutesAgo = now - 5 * 60 * 1000;
-      for (const [key, timestamp] of commandTimestampsRef.current.entries()) {
-        if (timestamp < fiveMinutesAgo) {
-          processedCommandsRef.current.delete(key);
-          commandTimestampsRef.current.delete(key);
-        }
-      }
-
-      // Stopped or failed downloads sit in the list indefinitely. They can still
-      // be resumed from the webapp, but don't need checking at full speed.
-      if (
-        !hasLiveDownloadRef.current &&
-        now - lastCommandCheckRef.current < IDLE_COMMAND_CHECK_INTERVAL
-      ) {
-        return;
-      }
-      lastCommandCheckRef.current = now;
-
-      const commands = await checkDownloadCommands();
-
-      if (commands.length > 0) {
-        console.log("[Downloads] Processing", commands.length, "commands");
-      }
-
-      for (const cmd of commands) {
-        const downloadId = cmd.downloadId;
-        const command = cmd.command;
-        const commandKey = `${downloadId}-${command}-${cmd.timestamp || Date.now()}`;
-
-        // Skip if we've already processed this command
-        if (processedCommandsRef.current.has(commandKey)) {
-          console.log("[Downloads] Skipping already processed command:", commandKey);
-          continue;
+      if (commandInFlightRef.current) return;
+      commandInFlightRef.current = true;
+      try {
+        // Clean up old processed commands (older than 5 minutes) to prevent memory buildup
+        const now = Date.now();
+        const fiveMinutesAgo = now - 5 * 60 * 1000;
+        for (const [key, timestamp] of commandTimestampsRef.current.entries()) {
+          if (timestamp < fiveMinutesAgo) {
+            processedCommandsRef.current.delete(key);
+            commandTimestampsRef.current.delete(key);
+          }
         }
 
-        // Mark as processed immediately with timestamp
-        processedCommandsRef.current.add(commandKey);
-        commandTimestampsRef.current.set(commandKey, Date.now());
+        // Stopped or failed downloads sit in the list indefinitely. They can still
+        // be resumed from the webapp, but don't need checking at full speed.
+        if (
+          !hasLiveDownloadRef.current &&
+          now - lastCommandCheckRef.current < IDLE_COMMAND_CHECK_INTERVAL
+        ) {
+          return;
+        }
+        lastCommandCheckRef.current = now;
 
-        console.log(
-          "[Downloads] Executing command:",
-          command,
-          "for download:",
-          downloadId
-        );
+        const commands = await checkDownloadCommands();
 
-        // Execute command
-        try {
-          let commandSuccess = false;
-          let commandError = null;
+        if (commands.length > 0) {
+          console.log("[Downloads] Processing", commands.length, "commands");
+        }
 
-          if (command === "pause") {
-            // Pause is done by calling stopDownload with deleteContents = false
-            const result = await window.electron.stopDownload(downloadId, false);
-            console.log("[Downloads] Pause result:", result);
-            if (result) {
-              commandSuccess = true;
-            } else {
-              commandError = "Failed to pause download";
-            }
-          } else if (command === "resume") {
-            const result = await window.electron.resumeDownload(downloadId);
-            console.log("[Downloads] Resume result:", result);
-            if (result?.success) {
-              commandSuccess = true;
-            } else {
-              commandError = result?.error || "Failed to resume download";
-            }
-          } else if (command === "stop" || command === "cancel" || command === "kill") {
-            // Stop/cancel/kill all mean delete the download
-            const result = await window.electron.stopDownload(downloadId, true, true);
-            console.log("[Downloads] Stop result:", result);
-            if (result) {
-              commandSuccess = true;
-              // Remove from UI
-              setDownloadingGames(prev => prev.filter(g => g.game !== downloadId));
-            } else {
-              commandError = "Failed to kill download";
-            }
+        for (const cmd of commands) {
+          const downloadId = cmd.downloadId;
+          const command = cmd.command;
+          const commandKey = `${downloadId}-${command}-${cmd.timestamp || Date.now()}`;
+
+          // Skip if we've already processed this command
+          if (processedCommandsRef.current.has(commandKey)) {
+            console.log("[Downloads] Skipping already processed command:", commandKey);
+            continue;
           }
 
-          // Acknowledge command BEFORE showing toast to prevent race condition
-          const status = commandSuccess ? "completed" : "failed";
+          // Mark as processed immediately with timestamp
+          processedCommandsRef.current.add(commandKey);
+          commandTimestampsRef.current.set(commandKey, Date.now());
+
           console.log(
-            "[Downloads] Acknowledging command for:",
-            downloadId,
-            "Status:",
-            status
+            "[Downloads] Executing command:",
+            command,
+            "for download:",
+            downloadId
           );
-          await acknowledgeCommand(downloadId, status, commandError);
 
-          // Now show toast after acknowledgment
-          if (commandSuccess) {
+          // Execute command
+          try {
+            let commandSuccess = false;
+            let commandError = null;
+
             if (command === "pause") {
-              toast.success(t("downloads.pauseSuccess"));
+              // Pause is done by calling stopDownload with deleteContents = false
+              const result = await window.electron.stopDownload(downloadId, false);
+              console.log("[Downloads] Pause result:", result);
+              if (result) {
+                commandSuccess = true;
+              } else {
+                commandError = "Failed to pause download";
+              }
             } else if (command === "resume") {
-              toast.success(t("downloads.resumeSuccess"));
+              const result = await window.electron.resumeDownload(downloadId);
+              console.log("[Downloads] Resume result:", result);
+              if (result?.success) {
+                commandSuccess = true;
+              } else {
+                commandError = result?.error || "Failed to resume download";
+              }
             } else if (command === "stop" || command === "cancel" || command === "kill") {
-              toast.success(t("downloads.killSuccess"));
-              // Wait for the download to be fully removed from filesystem
-              // before syncing, so the sync reflects the removal
-              console.log("[Downloads] Waiting 1s for filesystem cleanup...");
-              await new Promise(resolve => setTimeout(resolve, 1000));
+              // Stop/cancel/kill all mean delete the download
+              const result = await window.electron.stopDownload(downloadId, true, true);
+              console.log("[Downloads] Stop result:", result);
+              if (result) {
+                commandSuccess = true;
+                // Remove from UI
+                setDownloadingGames(prev => prev.filter(g => g.game !== downloadId));
+              } else {
+                commandError = "Failed to kill download";
+              }
             }
-          } else if (commandError) {
-            toast.error(commandError);
-          }
 
-          // Force sync to update webapp immediately
-          forceSyncDownloads();
-        } catch (error) {
-          console.error("[Downloads] Error executing command:", error);
-          // Acknowledge as failed
-          await acknowledgeCommand(downloadId, "failed", error.message);
-          toast.error(t("downloads.errors.commandFailed") || "Failed to execute command");
+            // Acknowledge command BEFORE showing toast to prevent race condition
+            const status = commandSuccess ? "completed" : "failed";
+            console.log(
+              "[Downloads] Acknowledging command for:",
+              downloadId,
+              "Status:",
+              status
+            );
+            await acknowledgeCommand(downloadId, status, commandError);
+
+            // Now show toast after acknowledgment
+            if (commandSuccess) {
+              if (command === "pause") {
+                toast.success(t("downloads.pauseSuccess"));
+              } else if (command === "resume") {
+                toast.success(t("downloads.resumeSuccess"));
+              } else if (
+                command === "stop" ||
+                command === "cancel" ||
+                command === "kill"
+              ) {
+                toast.success(t("downloads.killSuccess"));
+                // Wait for the download to be fully removed from filesystem
+                // before syncing, so the sync reflects the removal
+                console.log("[Downloads] Waiting 1s for filesystem cleanup...");
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+            } else if (commandError) {
+              toast.error(commandError);
+            }
+
+            // Force sync to update webapp immediately
+            forceSyncDownloads();
+          } catch (error) {
+            console.error("[Downloads] Error executing command:", error);
+            // Acknowledge as failed
+            await acknowledgeCommand(downloadId, "failed", error.message);
+            toast.error(
+              t("downloads.errors.commandFailed") || "Failed to execute command"
+            );
+          }
         }
+      } finally {
+        commandInFlightRef.current = false;
       }
     }, 3000); // Check every 3 seconds
   }, [isAuthenticated, user, t]);
@@ -396,28 +409,23 @@ const Downloads = () => {
   });
 
   const normalizeSpeed = speed => {
-    const [value, unit] = speed.split(" ");
-    const num = parseFloat(value);
-    if (isNaN(num)) return 0;
-
-    // Convert everything to MB/s
-    switch (unit) {
-      case "KB/s":
-        return num / 1024;
-      case "MB/s":
-        return num;
-      case "GB/s":
-        return num * 1024;
-      default:
-        return 0;
-    }
+    const match = String(speed || "").match(/([\d.]+)\s*(B|KB|MB|GB|TB)\/s/i);
+    if (!match) return 0;
+    const value = Number(match[1]);
+    const power = ["B", "KB", "MB", "GB", "TB"].indexOf(match[2].toUpperCase());
+    return Number.isFinite(value) ? Math.max(0, value) * 1024 ** (power - 2) : 0;
   };
 
   // Polling interval for downloading games (every 1 second)
   useEffect(() => {
+    let disposed = false;
+    let fetching = false;
     const fetchDownloadingGames = async () => {
+      if (disposed || fetching) return;
+      fetching = true;
       try {
         const games = await window.electron.getGames();
+        if (disposed) return;
         const downloading = games.filter(game => {
           const { downloadingData } = game;
           return (
@@ -455,7 +463,12 @@ const Downloads = () => {
             completedGamesRef.current.has(gameName) ||
             fadingGamesRef.current.has(gameName);
 
-          if ((wasVerifying || wasPendingManualInstall) && isGone && !isAlreadyTracked) {
+          if (
+            (wasVerifying || wasPendingManualInstall) &&
+            isGone &&
+            games.some(g => g.game === gameName) &&
+            !isAlreadyTracked
+          ) {
             console.log("Game completed:", gameName);
             newlyCompleted.push(game);
 
@@ -532,7 +545,9 @@ const Downloads = () => {
           processNextInQueue().then(nextItem => {
             if (nextItem) {
               toast.success(
-                t("downloads.queuedDownloadStarted", { name: nextItem.gameName })
+                t("downloads.queuedDownloadStarted", {
+                  name: nextItem.gameName,
+                })
               );
             }
           });
@@ -568,7 +583,15 @@ const Downloads = () => {
         let totalSpeedNum = 0;
         let activeCount = 0;
         downloading.forEach(game => {
-          if (game.downloadingData?.downloading) {
+          if (
+            game.downloadingData?.downloading &&
+            !game.downloadingData.stopped &&
+            !game.downloadingData.paused &&
+            !game.downloadingData.error &&
+            !game.downloadingData.waiting &&
+            !game.downloadingData.extracting &&
+            !game.downloadingData.verifying
+          ) {
             activeCount++;
             const speed = game.downloadingData.progressDownloadSpeeds;
             if (speed) {
@@ -663,7 +686,9 @@ const Downloads = () => {
             processNextInQueue().then(nextItem => {
               if (nextItem) {
                 toast.success(
-                  t("downloads.queuedDownloadStarted", { name: nextItem.gameName })
+                  t("downloads.queuedDownloadStarted", {
+                    name: nextItem.gameName,
+                  })
                 );
               }
             });
@@ -674,6 +699,8 @@ const Downloads = () => {
         targetSpeedRef.current = totalSpeedNum;
       } catch (error) {
         console.error("Error fetching downloading games:", error);
+      } finally {
+        fetching = false;
       }
     };
 
@@ -681,8 +708,12 @@ const Downloads = () => {
     // Poll every 1 second for more responsive progress updates
     const intervalId = setInterval(fetchDownloadingGames, 1000);
     // Only run this effect on mount/unmount (not on downloadingGames change)
-    return () => clearInterval(intervalId);
-  }, []);
+    return () => {
+      disposed = true;
+      clearInterval(intervalId);
+      stopCommandChecking();
+    };
+  }, [startCommandChecking, stopCommandChecking]);
 
   // Poll queued downloads
   useEffect(() => {
@@ -1651,7 +1682,10 @@ const DownloadCard = ({
     return msg;
   };
 
-  const progress = parseFloat(downloadingData?.progressCompleted || 0);
+  const rawProgress = parseFloat(downloadingData?.progressCompleted);
+  const progress = Number.isFinite(rawProgress)
+    ? Math.max(0, Math.min(100, rawProgress))
+    : 0;
 
   const status = isResumingState
     ? "resuming"
@@ -1828,7 +1862,9 @@ const DownloadCard = ({
         {confirmingKill && !isCompleted && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3">
             <p className="text-sm font-medium text-foreground">
-              {t("downloads.actions.killDownloadTitle", { gameName: game.game })}
+              {t("downloads.actions.killDownloadTitle", {
+                gameName: game.game,
+              })}
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -1955,7 +1991,9 @@ const DownloadCard = ({
             <p className="text-sm text-muted-foreground">
               {privateSourceMessage(t, downloadingData.message)}
             </p>
-            <p className="text-xs text-muted-foreground">{t("privateSources.package.note")}</p>
+            <p className="text-xs text-muted-foreground">
+              {t("privateSources.package.note")}
+            </p>
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
