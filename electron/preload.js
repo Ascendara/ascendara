@@ -324,6 +324,8 @@ contextBridge.exposeInMainWorld("electron", {
     openDirectory: (store, id) =>
       ipcRenderer.invoke("store-game-open-directory", store, id),
     artwork: (store, id) => ipcRenderer.invoke("store-game-artwork", store, id),
+    onGameLaunched: callback => preloadIpc.subscribe("store-game-launched", callback),
+    onGameClosed: callback => preloadIpc.subscribe("store-game-closed", callback),
   },
   startLauncherImport: launchers =>
     ipcRenderer.invoke("start-launcher-import", launchers),

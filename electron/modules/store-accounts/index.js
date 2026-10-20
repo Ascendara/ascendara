@@ -1,9 +1,10 @@
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { STORES, assertStore, createVault } = require("./vault");
+const { createStoreSessions, createPlaytimeStore } = require("./sessions");
 const { LOGIN, ROOTS, allowedNavigation, steamIdentity, request, epicToken, syncLibrary, gameUrl } = require("./providers");
 
-function createAccountManager({ vault, makeSession, authenticate, openExternal }) {
+function createAccountManager({ vault, makeSession, authenticate, openExternal, playtime }) {
   const jobs = new Map();
   const errors = new Map();
   function state() {
@@ -12,7 +13,11 @@ function createAccountManager({ vault, makeSession, authenticate, openExternal }
       try { record = vault.read(store); } catch { errors.set(store, "Saved account could not be unlocked. Unlock your system keyring or disconnect and reconnect."); }
       return { store, connected: Boolean(record), displayName: record?.displayName || "",
         lastSync: record?.lastSync || null, busy: jobs.has(store), error: errors.get(store) || null,
-        games: (record?.games || []).map(({ id, name }) => ({ id, name, store })) };
+        games: (record?.games || []).map(({ id, name }) => {
+          const played = playtime?.get(`${store}:${id}`);
+          return { id, name, store, ...(played && { playTime: played.playTime,
+            launchCount: played.launchCount, lastPlayed: played.lastPlayed }) };
+        }) };
     }) };
   }
   async function run(store, connect) {
@@ -134,13 +139,37 @@ function createAuthentication(BrowserWindow) {
 function registerStoreAccountHandlers() {
   const { app, ipcMain, session, safeStorage, BrowserWindow, shell } = require("electron");
   const vault = createVault(path.join(app.getPath("userData"), "store-accounts"), safeStorage);
+  const playtime = createPlaytimeStore(path.join(app.getPath("userData"), "store-accounts", "playtime.json"));
+  const { setPlayingActivity, updateDiscordRPCToLibrary } = require("../discord-rpc");
+  const { hideWindow, showWindow } = require("../window");
+  const { getSettingsManager } = require("../settings");
+  const broadcast = (channel, data) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send(channel, data);
+    }
+  };
+  // Same window and Discord behaviour as launching a library game
+  const sessions = createStoreSessions({
+    playtime,
+    onLaunch({ key, game }) {
+      setPlayingActivity(game, `store:${key}`);
+      broadcast("store-game-launched", { key, game });
+      if (getSettingsManager().getSettings().hideOnGameLaunch !== false) hideWindow();
+    },
+    onClose({ key, game, playTime, durationMs }) {
+      updateDiscordRPCToLibrary(`store:${key}`);
+      if (getSettingsManager().getSettings().hideOnGameLaunch !== false) showWindow();
+      broadcast("store-game-closed", { key, game, playTime, durationMs });
+    },
+  });
   const storeGames = require("./games").createStoreGames({
     vault, directory: path.join(app.getPath("userData"), "store-artwork", "games"),
     discover: require("../launcher-discovery").discoverLauncherGames,
     downloadAssets: require("../launcher-import").downloadImportedAssets,
     shell,
+    sessions,
   });
-  const manager = createAccountManager({ vault, authenticate: createAuthentication(BrowserWindow),
+  const manager = createAccountManager({ vault, playtime, authenticate: createAuthentication(BrowserWindow),
     openExternal: url => shell.openExternal(url),
     async makeSession(store, cookies) {
       const isolated = session.fromPartition(`store-${store}-${crypto.randomUUID()}`, { cache: false });
@@ -169,5 +198,6 @@ function registerStoreAccountHandlers() {
   handle("store-game-details", storeGames.details);
   handle("store-game-artwork", storeGames.artwork);
   app.on("before-quit", manager.shutdown);
+  app.on("before-quit", sessions.shutdown);
 }
 module.exports = { createAccountManager, createAuthentication, registerStoreAccountHandlers };

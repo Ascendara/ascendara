@@ -26,7 +26,12 @@ export function useStoreLibrary() {
     refresh();
     window.addEventListener("store-accounts-updated", refresh);
     window.addEventListener("focus", refresh);
+    // Playtime and launch counts come back with the account state
+    const unsubLaunched = window.electron.storeAccounts.onGameLaunched?.(refresh);
+    const unsubClosed = window.electron.storeAccounts.onGameClosed?.(refresh);
     return () => {
+      unsubLaunched?.();
+      unsubClosed?.();
       revisionRef.current++;
       window.removeEventListener("store-accounts-updated", refresh);
       window.removeEventListener("focus", refresh);

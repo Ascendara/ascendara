@@ -18,6 +18,7 @@ function createStoreGames({
   discover,
   downloadAssets,
   shell,
+  sessions,
 }) {
   const artworkJobs = new Map();
   const scans = new Map();
@@ -55,6 +56,7 @@ function createStoreGames({
       store,
       name: game.name,
       installed: Boolean(installation),
+      running: sessions.isRunning(`${store}:${id}`),
       installationSupported: process.platform === "win32" || store === "steam",
     };
   }
@@ -69,6 +71,21 @@ function createStoreGames({
     }
     const failure = await shell.openPath(directory);
     if (failure) throw new Error(failure);
+  }
+  async function launchExecutable(store, id, name, installation) {
+    const { installPath, executable } = installation;
+    if (process.platform !== "win32" || typeof executable !== "string" ||
+        typeof installPath !== "string" || !path.isAbsolute(executable)) return false;
+    const relative = path.relative(installPath, executable);
+    if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) return false;
+    if (!(await fs.stat(executable).catch(() => null))?.isFile()) return false;
+    try {
+      await sessions.launch(`${store}:${id}`, name, installation);
+      return true;
+    } catch {
+      // e.g. an exe that requires elevation; the store launcher can still start it
+      return false;
+    }
   }
   async function artwork(store, id) {
     const game = owned(store, id);
@@ -130,38 +147,32 @@ function createStoreGames({
     return result;
   }
   async function open(store, id, intent = "auto") {
-    owned(store, id);
+    const game = owned(store, id);
     if (!["auto", "store"].includes(intent))
       throw new Error("Invalid game action");
     const installation =
       intent === "auto" ? await installed(store, id, true) : null;
     if (installation) {
+      // Start the game's own executable, like any other library game. The store
+      // launcher is only used when discovery could not resolve an executable.
+      if (await launchExecutable(store, id, game.name, installation)) {
+        return { action: "launch", installed: true };
+      }
       const {
         buildLauncherUri,
         validateLauncherUri,
       } = require("../launcher-discovery");
       const uri = buildLauncherUri(store, installation.launcherId);
-      if (uri && validateLauncherUri(uri, store)) {
-        try {
-          await shell.openExternal(uri);
-        } catch {
-          throw new Error(
-            "Could not start the store launcher. Check that it is installed and signed in.",
-          );
-        }
-      } else if (
-        store === "gog" &&
-        process.platform === "win32" &&
-        installation.executable
-      ) {
-        const failure = await shell.openPath(installation.executable);
-        if (failure)
-          throw new Error(
-            "Could not launch this game. Check its installation in GOG Galaxy.",
-          );
-      } else {
+      if (!uri || !validateLauncherUri(uri, store)) {
         throw new Error(
           "This installation cannot be launched. Open its store launcher to repair it.",
+        );
+      }
+      try {
+        await shell.openExternal(uri);
+      } catch {
+        throw new Error(
+          "Could not start the store launcher. Check that it is installed and signed in.",
         );
       }
       return { action: "launch", installed: true };
