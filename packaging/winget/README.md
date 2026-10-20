@@ -49,7 +49,6 @@ changes rather than silently submitting incompatible metadata.
 ```powershell
 python scripts/winget_release.py --tag 11.3.3 --check-existing
 winget validate --manifest .cache/winget/manifests/t/tagoWorks/Ascendara/11.3.3
-python -m unittest discover -s tests -p test_winget_release.py
 ```
 
 Before the initial submission, test installation, detection, upgrade, and
