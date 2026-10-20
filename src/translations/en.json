@@ -443,6 +443,7 @@
       "yourCommunities": "Your Communities"
     },
     "companion": {
+      "activeNow": "Active now",
       "awaitingDevice": "Waiting for device",
       "cancel": "Cancel",
       "codeCopied": "Code copied to clipboard",
@@ -453,7 +454,9 @@
       "copied": "Copied",
       "copyCode": "Copy Code",
       "devicesDescription": "Manage the devices linked to your Ascendara app.",
+      "disconnectDescription": "This device will lose access to Companion until you pair it again.",
       "disconnectDevice": "Disconnect device",
+      "disconnectTitle": "Disconnect {{device}}?",
       "downloads": "Manage downloads",
       "emptyDescription": "Use Connect a device to link your phone, tablet, or browser.",
       "enterThisCode": "Enter this code in Companion",
