@@ -1,3 +1,4 @@
+import { setUserOnlineStatus as UpdateUserStatus } from "@/services/ascendStatusService";
 import { useEffect as UseEffect, useMemo as UseMemo, useRef as UseRef, useState as UseState } from "react";
 import { useLanguage as UseLanguage } from "@/context/LanguageContext";
 import { useAuth as UseAuth } from "@/context/AuthContext";
@@ -18,7 +19,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn as Cn } from "@/lib/utils";
 import {
   getUserStatus as GetUserStatus,
-  updateUserStatus as UpdateUserStatus,
   syncProfileToAscend as SyncProfileToAscend,
   getProfileStats as GetProfileStats,
   recomputeProfileStats as RecomputeProfileStats,

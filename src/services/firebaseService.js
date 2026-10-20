@@ -389,6 +389,7 @@ export const loginUser = async (email, password) => {
  */
 export const logoutUser = async () => {
   try {
+    await updateUserStatus("offline", "", true, false);
     await signOut(auth);
     return { success: true, error: null };
   } catch (error) {
@@ -782,69 +783,39 @@ export const reloadCurrentUser = async () => {
   }
 };
 
-// Debounce timer for status updates
-let statusUpdateTimer = null;
-let pendingStatusUpdate = null;
+// Serialize writes so lifecycle and manual changes reach Firestore in order.
+let statusWriteQueue = Promise.resolve();
 
-/**
- * Update user status (online, away, busy, offline)
- * Debounced to prevent excessive writes
- * @param {string} status - Status type
- * @param {string} customMessage - Optional custom status message
- * @param {boolean} immediate - Skip debouncing and update immediately
- * @returns {Promise<{success: boolean, error: string|null}>}
- */
-export const updateUserStatus = async (status, customMessage = "", immediate = false) => {
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      return { success: false, error: "No user logged in" };
+// Omitted fields are preserved. Only explicit user choices save a preference.
+export const updateUserStatus = (status, customMessage, immediate = false, savePreference = true) => {
+  const userId = auth.currentUser?.uid;
+  const write = async () => {
+    if (!userId || auth.currentUser?.uid !== userId) {
+      return { success: false, error: "Not authenticated" };
     }
-
-    const updateData = {
-      status,
-      customMessage,
-      updatedAt: serverTimestamp(),
-    };
-
-    // Store preferred status if user manually sets a non-offline status
-    // offline is set automatically by app close/API timeout, not user choice
-    if (status !== "offline") {
-      updateData.preferredStatus = status;
-    }
-
-    // Debounce status updates (except for immediate updates like offline on close)
-    if (!immediate) {
-      pendingStatusUpdate = { user, updateData };
-      
-      if (statusUpdateTimer) {
-        clearTimeout(statusUpdateTimer);
+    try {
+      const data = { updatedAt: serverTimestamp() };
+      if (status !== undefined) {
+        data.status = status;
+        if (savePreference && status !== "offline") data.preferredStatus = status;
       }
-
-      statusUpdateTimer = setTimeout(async () => {
-        if (pendingStatusUpdate) {
-          await setDoc(doc(db, "userStatus", pendingStatusUpdate.user.uid), pendingStatusUpdate.updateData, { merge: true });
-          // Clear cache for this user's status
-          clearUserCache(pendingStatusUpdate.user.uid);
-          pendingStatusUpdate = null;
-        }
-      }, 2000); // 2 second debounce
-
+      if (customMessage !== undefined) data.customMessage = customMessage;
+      await setDoc(doc(db, "userStatus", userId), data, { merge: true });
+      clearUserCache(userId);
       return { success: true, error: null };
+    } catch (error) {
+      console.error("Update status error:", error);
+      return { success: false, error: error.message };
     }
-
-    // Immediate update
-    await setDoc(doc(db, "userStatus", user.uid), updateData, { merge: true });
-    
-    // Clear cache for this user's status
-    clearUserCache(user.uid);
-
-    return { success: true, error: null };
-  } catch (error) {
-    console.error("Update status error:", error);
-    return { success: false, error: error.message };
-  }
+  };
+  statusWriteQueue = statusWriteQueue.then(write, write);
+  return statusWriteQueue;
 };
+
+export const subscribeToUserStatus = (userId, callback) =>
+  onSnapshot(doc(db, "userStatus", userId), snapshot => {
+    callback(snapshot.exists() ? snapshot.data() : null);
+  }, error => console.error("Status subscription error:", error));
 
 /**
  * Get user status

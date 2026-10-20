@@ -35,7 +35,7 @@ import {
   cleanupStatusService,
   setGamePlayingState,
 } from "@/services/ascendStatusService";
-import { setActivity, ActivityType, clearActivity } from "@/services/userStatusService";
+import { setActivity, ActivityType } from "@/services/userStatusService";
 import { initializeDownloadSync, stopDownloadSync } from "@/services/downloadSyncService";
 import {
   initializeFavoritesSync,
@@ -860,21 +860,6 @@ const UserActivityTracker = React.memo(() => {
     return () => {
       if (typeof unsubProgress === "function") unsubProgress();
       if (typeof unsubComplete === "function") unsubComplete();
-    };
-  }, [user?.uid]);
-
-  // Clear activity when app closes
-  useEffect(() => {
-    if (!user?.uid) return;
-
-    const handleAppClose = () => {
-      clearActivity();
-    };
-
-    window.electron?.onAppClose?.(handleAppClose);
-
-    return () => {
-      clearActivity();
     };
   }, [user?.uid]);
 

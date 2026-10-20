@@ -28,7 +28,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { updateUserStatus, getUserStatus } from "@/services/firebaseService";
+import { subscribeToUserStatus } from "@/services/firebaseService";
+import { setUserOnlineStatus } from "@/services/ascendStatusService";
 import { toast } from "sonner";
 
 // Friends, requests, people search and the leaderboard share one tabbed
@@ -62,33 +63,19 @@ const AscendNavBar = ({
     { id: "invisible", color: "bg-gray-500", label: t("ascend.status.invisible") },
   ];
 
-  // Load custom message on mount (status is managed by ascendStatusService)
-  // Don't override status here - ascendStatusService sets it to online on app open
   useEffect(() => {
-    if (user?.uid) {
-      const timeout = setTimeout(() => {
-        getUserStatus(user.uid).then(result => {
-          if (result.data) {
-            setCustomMessage(result.data.customMessage || "");
-
-            // Only use fetched status if it's a valid user-chosen status (not offline from API timeout)
-            const validStatuses = ["online", "away", "busy"];
-            const fetchedStatus = result.data.status;
-            const status =
-              fetchedStatus && validStatuses.includes(fetchedStatus)
-                ? fetchedStatus
-                : "online";
-            setCurrentStatus(status);
-            onStatusChange?.(status);
-          }
-        });
-      }, 800);
-      return () => clearTimeout(timeout);
-    }
-  }, [user?.uid]);
+    if (!user?.uid) return;
+    return subscribeToUserStatus(user.uid, data => {
+      if (!data) return;
+      setCustomMessage(data.customMessage || "");
+      const status = data.status === "offline" ? "invisible" : data.status;
+      setCurrentStatus(status || "online");
+      onStatusChange?.(status || "online");
+    });
+  }, [user?.uid, onStatusChange]);
 
   const handleStatusChange = async status => {
-    const result = await updateUserStatus(status, customMessage);
+    const result = await setUserOnlineStatus(status, customMessage);
     if (result.success) {
       setCurrentStatus(status);
       toast.success(t("ascend.status.updated"));

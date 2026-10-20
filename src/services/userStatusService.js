@@ -73,23 +73,8 @@ export const setActivity = async (activityType, context = null) => {
     currentActivity = { type: activityType, context };
     const customMessage = getActivityMessage(activityType, context);
 
-    // Get current status to preserve it
-    // Both offline and invisible mean the user is offline (just set differently)
-    const currentStatus = await getCurrentUserStatus(user.uid);
-    let status = currentStatus?.status || "online";
-
-    // Don't preserve offline status - user is now active
-    // Use preferredStatus if available, otherwise default to online
-    if (status === "offline") {
-      status = currentStatus?.preferredStatus || "online";
-      // If preferredStatus is also offline, default to online
-      if (status === "offline") {
-        status = "online";
-      }
-    }
-
-    // Update with the current status and new activity message
-    const result = await updateUserStatus(status, customMessage);
+    // Activity must never restore presence or overwrite a manual preference.
+    const result = await updateUserStatus(undefined, customMessage);
 
     if (result.success) {
       console.log("[UserStatusService] Activity updated:", activityType, context || "");
@@ -128,22 +113,7 @@ export const updateCustomMessage = async customMessage => {
       return { success: false, error: "Not authenticated" };
     }
 
-    // Get current status first to preserve it
-    const currentStatus = await getCurrentUserStatus(user.uid);
-    let status = currentStatus?.status || "online";
-
-    // Don't preserve offline status - user is now active
-    // Use preferredStatus if available, otherwise default to online
-    if (status === "offline") {
-      status = currentStatus?.preferredStatus || "online";
-      // If preferredStatus is also offline, default to online
-      if (status === "offline") {
-        status = "online";
-      }
-    }
-
-    // Update with the current status and new custom message
-    const result = await updateUserStatus(status, customMessage);
+    const result = await updateUserStatus(undefined, customMessage);
     return result;
   } catch (error) {
     console.error("[UserStatusService] Failed to update custom message:", error);

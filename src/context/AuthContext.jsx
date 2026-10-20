@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
-import { subscribeToAuthChanges, loginUser, logoutUser, registerUser, resetPassword, updateUserProfile, changePassword, deleteAccount, getUserData, subscribeToUserData, updateUserData, resendVerificationEmail, reloadCurrentUser, signInWithGoogle, updateUserStatus } from "@/services/firebaseService";
+import { subscribeToAuthChanges, loginUser, logoutUser, registerUser, resetPassword, updateUserProfile, changePassword, deleteAccount, getUserData, subscribeToUserData, updateUserData, resendVerificationEmail, reloadCurrentUser, signInWithGoogle } from "@/services/firebaseService";
 
 const AuthContext = createContext(null);
 
@@ -90,13 +90,6 @@ export const AuthProvider = ({ children }) => {
                     steam: null,
                   },
                   createdAt: serverTimestamp(),
-                  updatedAt: serverTimestamp(),
-                }, { merge: true });
-                
-                // Also create status document
-                await setDoc(doc(db, "userStatus", firebaseUser.uid), {
-                  status: "online",
-                  customMessage: "",
                   updatedAt: serverTimestamp(),
                 }, { merge: true });
                 
@@ -194,12 +187,6 @@ export const AuthProvider = ({ children }) => {
   // Logout user
   const logout = async () => {
     setError(null);
-    // Set status to invisible before logging out (don't block on errors)
-    try {
-      await updateUserStatus("invisible");
-    } catch (e) {
-      console.error("Failed to set status on logout:", e);
-    }
     const result = await logoutUser();
     if (result.error) {
       setError(result.error);

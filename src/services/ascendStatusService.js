@@ -1,189 +1,94 @@
-import { updateUserStatus, getUserStatus } from "./firebaseService";
+import { updateUserStatus, getUserStatus, auth } from "./firebaseService";
 
-let previousStatus = "online";
-let isInitialized = false;
-let statusChangeCallback = null;
-let currentUserId = null;
-let initializationTime = 0;
+const validStatuses = ["online", "away", "busy", "invisible"];
+let session = null;
 let isPlayingGame = false;
 
-/**
- * Initialize the status service - sets user to their preferred status
- * @param {Function} onStatusChange - Callback to update UI when status changes
- * @param {string} userId - User ID
- */
-export const initializeStatusService = async (onStatusChange, userId) => {
-  if (isInitialized) return;
-  if (!userId) {
-    console.log("[AscendStatus] No user ID provided");
-    return;
-  }
+const publish = async state => {
+  if (session !== state || state.closing || auth.currentUser?.uid !== state.userId) return;
+  const status = state.hidden && !isPlayingGame ? "offline" : state.preference;
+  const result = await updateUserStatus(status, undefined, true, false);
+  if (result.success && session === state) state.callback?.(status);
+  return result;
+};
 
-  statusChangeCallback = onStatusChange;
-  currentUserId = userId;
-
-  try {
-    // Get user's preferred status (what they manually set, not current status)
-    const result = await getUserStatus(userId);
-    console.log("[AscendStatus] Fetched status:", result.data);
-
-    // Only restore user-chosen statuses (online, away, busy)
-    // "offline" is set by app close or API inactivity timeout, not user choice - ignore it
-    const validStatuses = ["online", "away", "busy"];
-    if (
-      result.data?.preferredStatus &&
-      validStatuses.includes(result.data.preferredStatus)
-    ) {
-      previousStatus = result.data.preferredStatus;
-    } else if (result.data?.status && validStatuses.includes(result.data.status)) {
-      // Fallback to current status if no valid preferred status saved
-      previousStatus = result.data.status;
-    } else {
-      // Default to online if no valid status found
-      previousStatus = "online";
+export const initializeStatusService = (onStatusChange, userId) => {
+  if (!userId) return Promise.resolve();
+  if (session?.userId === userId) return session.ready;
+  cleanupStatusService();
+  const state = {
+    userId, callback: onStatusChange, preference: "online", hidden: false,
+    closing: false, loaded: false, disposers: [], timer: null,
+  };
+  session = state;
+  const refresh = async () => {
+    if (session !== state || state.closing) return;
+    if (!state.loaded) {
+      const result = await getUserStatus(userId);
+      if (session !== state || state.closing || result.error) return;
+      state.preference = validStatuses.includes(result.data?.preferredStatus)
+        ? result.data.preferredStatus
+        : validStatuses.includes(result.data?.status) ? result.data.status : "online";
+      state.loaded = true;
     }
-
-    console.log("[AscendStatus] Restoring status to:", previousStatus);
-
-    // Restore user's preferred status
-    await updateUserStatus(previousStatus);
-    if (statusChangeCallback) statusChangeCallback(previousStatus);
-    isInitialized = true;
-    initializationTime = Date.now();
-
-    // Set up close handlers
-    if (typeof window !== "undefined") {
-      // In Electron, use the app-closing IPC event (beforeunload fires during HMR reloads)
-      // Only use beforeunload for non-Electron environments (pure browser)
-      if (window.electron?.onAppClose) {
-        window.electron.onAppClose(() => {
-          handleAppClose();
-        });
-      } else {
-        // Fallback for non-Electron environments
-        window.addEventListener("beforeunload", handleAppClose);
-      }
-
-      // Listen for app hidden (minimized to tray)
-      if (window.electron?.onAppHidden) {
-        window.electron.onAppHidden(() => {
-          handleAppHidden();
-        });
-      }
-
-      // Listen for app shown (restored from tray)
-      if (window.electron?.onAppShown) {
-        window.electron.onAppShown(() => {
-          handleAppShown();
-        });
-      }
-    }
-
-    console.log("[AscendStatus] Initialized - status set to:", previousStatus);
-  } catch (error) {
-    console.error("[AscendStatus] Failed to initialize:", error);
-  }
-};
-
-/**
- * Handle app close - set status to offline
- */
-const handleAppClose = async () => {
-  if (!currentUserId) return;
-
-  try {
-    await updateUserStatus("offline");
-    if (statusChangeCallback) statusChangeCallback("offline");
-    console.log("[AscendStatus] App closing - status set to offline");
-  } catch (error) {
-    console.error("[AscendStatus] Failed to set offline status:", error);
-  }
-};
-
-/**
- * Handle app hidden (minimized to tray) - set status to offline
- */
-const handleAppHidden = async () => {
-  if (!currentUserId) return;
-
-  // Ignore hidden events that fire within 2 seconds of initialization
-  // This prevents race conditions during app startup
-  if (Date.now() - initializationTime < 2000) {
-    console.log("[AscendStatus] Ignoring early hidden event");
-    return;
-  }
-
-  // Don't set offline if user is playing a game
-  // The window hides during game launch, but user is still active
-  if (isPlayingGame) {
-    console.log("[AscendStatus] Ignoring hidden event - user is playing a game");
-    return;
-  }
-
-  try {
-    await updateUserStatus("offline");
-    if (statusChangeCallback) statusChangeCallback("offline");
-    console.log("[AscendStatus] App hidden - status set to offline");
-  } catch (error) {
-    console.error("[AscendStatus] Failed to set offline status:", error);
-  }
-};
-
-/**
- * Handle app shown (restored from tray) - restore previous status
- */
-const handleAppShown = async () => {
-  if (!currentUserId) return;
-
-  try {
-    await updateUserStatus(previousStatus);
-    if (statusChangeCallback) statusChangeCallback(previousStatus);
-    console.log("[AscendStatus] App shown - status restored to:", previousStatus);
-  } catch (error) {
-    console.error("[AscendStatus] Failed to restore status:", error);
-  }
-};
-
-/**
- * Cleanup the status service
- */
-export const cleanupStatusService = () => {
+    return publish(state);
+  };
+  const close = () => {
+    if (session !== state) return;
+    state.closing = true;
+    clearInterval(state.timer);
+    return updateUserStatus("offline", "", true, false);
+  };
+  const hidden = () => { state.hidden = true; if (state.loaded) void publish(state); };
+  const shown = () => { state.hidden = false; void refresh(); };
   if (typeof window !== "undefined") {
-    window.removeEventListener("beforeunload", handleAppClose);
-  }
-  isInitialized = false;
-  currentUserId = null;
-  statusChangeCallback = null;
-};
-
-/**
- * Manually set the user's status and update the stored preference
- */
-export const setUserOnlineStatus = async status => {
-  if (!currentUserId) return { error: "Not authenticated" };
-
-  try {
-    const result = await updateUserStatus(status);
-    if (result.success && status !== "offline") {
-      previousStatus = status;
+    if (window.electron?.onAppClose) {
+      state.disposers.push(window.electron.onAppClose(close));
+    } else {
+      window.addEventListener("beforeunload", close);
+      state.disposers.push(() => window.removeEventListener("beforeunload", close));
     }
-    return result;
-  } catch (error) {
-    return { error: error.message };
+    state.disposers.push(window.electron?.onAppHidden?.(hidden));
+    state.disposers.push(window.electron?.onAppShown?.(shown));
+    window.addEventListener("online", refresh);
+    state.disposers.push(() => window.removeEventListener("online", refresh));
   }
+  // The API expires presence after ten minutes. Refresh while idle/playing too.
+  state.timer = setInterval(refresh, 60_000);
+  state.ready = refresh();
+  return state.ready;
 };
 
-/**
- * Get the user's stored preferred status
- */
-export const getPreferredStatus = () => previousStatus;
+export const cleanupStatusService = () => {
+  if (!session) return;
+  clearInterval(session.timer);
+  session.disposers.forEach(dispose => dispose?.());
+  session = null;
+};
 
-/**
- * Set whether a game is currently being played
- * This prevents status from being set to offline when window hides during game launch
- * @param {boolean} playing - Whether a game is currently playing
- */
+export const setUserOnlineStatus = async (status, customMessage) => {
+  const state = session;
+  if (!state || state.closing || auth.currentUser?.uid !== state.userId) {
+    return { success: false, error: "Not authenticated" };
+  }
+  if (!validStatuses.includes(status)) return { success: false, error: "Invalid status" };
+  // Prevent a pending startup read from replacing this explicit choice.
+  await state.ready;
+  if (session !== state || state.closing) return { success: false, error: "Session ended" };
+  const previous = state.preference;
+  state.preference = status;
+  state.loaded = true;
+  const result = await updateUserStatus(status, customMessage, true, true);
+  if (session === state) {
+    if (!result.success && state.preference === status) state.preference = previous;
+    if (result.success) state.callback?.(status);
+  }
+  return result;
+};
+
+export const getPreferredStatus = () => session?.preference || "online";
+
 export const setGamePlayingState = playing => {
   isPlayingGame = playing;
-  console.log("[AscendStatus] Game playing state set to:", playing);
+  if (session?.loaded) void publish(session);
 };
