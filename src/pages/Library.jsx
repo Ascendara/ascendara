@@ -111,6 +111,7 @@ import {
 import { syncFavoritesNow } from "@/services/favoritesCloudSync";
 import { calculateLibraryValue } from "@/services/cheapsharkService";
 import { getDownloadQueue } from "@/services/downloadQueueService";
+import { normalizeDriveTotals } from "@/services/systemHealthService";
 
 import ImportGamesDialog from "@/components/ImportGamesDialog";
 import StoreAccountsDialog from "@/components/StoreAccountsDialog";
@@ -684,50 +685,40 @@ const Library = () => {
       try {
         const installPath = await window.electron.getDownloadDirectory();
         if (installPath) {
-          const [driveSpace, gamesSize] = await Promise.all([
+          // Drive space is a cheap statfs call, so show it right away instead of
+          // waiting on the games size, which can need a full directory walk.
+          setIsCalculatingSize(true);
+          const gamesSizePromise = window.electron.getInstalledGamesSize();
+          const [rawDriveSpace, isWindows] = await Promise.all([
             window.electron.getDriveSpace(installPath),
-            window.electron.getInstalledGamesSize(),
+            window.electron.isOnWindows(),
           ]);
+          // Count each volume once when several library folders share a drive
+          const driveSpace = normalizeDriveTotals(rawDriveSpace, Boolean(isWindows));
+          setStorageInfo(driveSpace);
 
-          // Use the actual directory-specific game sizes from the backend
-          if (
-            driveSpace &&
-            driveSpace.directories &&
-            driveSpace.directories.length > 0 &&
-            gamesSize.success &&
-            !gamesSize.calculating &&
-            gamesSize.directorySizes
-          ) {
-            // Map the drive space directories with their corresponding game sizes
-            const directoriesWithGameSizes = driveSpace.directories.map(dir => {
-              // Find the matching directory in the game sizes data
-              const matchingDir = gamesSize.directorySizes.find(
-                gameSizeDir => gameSizeDir.path === dir.path
-              );
+          const gamesSize = await gamesSizePromise;
+          setIsCalculatingSize(false);
+          if (!gamesSize.success) return;
+          setTotalGamesSize(gamesSize.totalSize);
 
-              return {
-                ...dir,
-                gamesSize: matchingDir ? matchingDir.size : 0,
-              };
-            });
-
+          // Map the drive space directories with their corresponding game sizes
+          if (driveSpace?.directories?.length > 0 && gamesSize.directorySizes) {
             setStorageInfo({
               ...driveSpace,
-              directories: directoriesWithGameSizes,
+              directories: driveSpace.directories.map(dir => ({
+                ...dir,
+                gamesSize:
+                  gamesSize.directorySizes.find(
+                    gameSizeDir => gameSizeDir.path === dir.path
+                  )?.size || 0,
+              })),
             });
-          } else {
-            setStorageInfo(driveSpace);
-          }
-
-          if (gamesSize.success) {
-            setIsCalculatingSize(gamesSize.calculating);
-            if (!gamesSize.calculating) {
-              setTotalGamesSize(gamesSize.totalSize);
-            }
           }
         }
       } catch (error) {
         console.error("Error fetching storage info:", error);
+        setIsCalculatingSize(false);
       }
     };
 
@@ -2136,7 +2127,7 @@ const Library = () => {
                       <div className="mt-2 space-y-2 border-t border-border/40 pt-2">
                         {storageInfo.directories.map((dir, idx) => {
                           const usedPct = Math.min(
-                            (dir.usedSpace / dir.totalSpace) * 100,
+                            ((dir.totalSpace - dir.freeSpace) / dir.totalSpace) * 100,
                             100
                           );
                           const gamesPct = Math.min(

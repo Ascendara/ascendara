@@ -33,7 +33,7 @@ function getWindowsVolumeKey(directory) {
   return null;
 }
 
-function normalizeDriveTotals(driveSpace, isWindows) {
+export function normalizeDriveTotals(driveSpace, isWindows) {
   const directories = Array.isArray(driveSpace?.directories) ? driveSpace.directories : [];
   if (!isWindows || directories.length < 2) return driveSpace;
 
