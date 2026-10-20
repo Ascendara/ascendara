@@ -58,6 +58,18 @@ function createStoreGames({
       installationSupported: process.platform === "win32" || store === "steam",
     };
   }
+  async function openDirectory(store, id) {
+    owned(store, id);
+    const installation = await installed(store, id, true);
+    if (!installation) throw new Error("This game is not installed on this device.");
+    const directory = installation.installPath;
+    if (typeof directory !== "string" || !path.isAbsolute(directory) ||
+        !(await fs.stat(directory).catch(() => null))?.isDirectory()) {
+      throw new Error("The game's installation folder could not be found.");
+    }
+    const failure = await shell.openPath(directory);
+    if (failure) throw new Error(failure);
+  }
   async function artwork(store, id) {
     const game = owned(store, id);
     const hash = crypto
@@ -195,6 +207,6 @@ function createStoreGames({
     }
     return { action: "store", installed: false };
   }
-  return { details, artwork, open };
+  return { details, artwork, open, openDirectory };
 }
 module.exports = { createStoreGames, matchesInstallation };

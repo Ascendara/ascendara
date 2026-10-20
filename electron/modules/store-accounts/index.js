@@ -165,6 +165,7 @@ function registerStoreAccountHandlers() {
   handle("store-accounts-disconnect", manager.disconnect);
   handle("store-accounts-cancel", manager.cancel);
   handle("store-accounts-open-game", storeGames.open);
+  handle("store-game-open-directory", storeGames.openDirectory);
   handle("store-game-details", storeGames.details);
   handle("store-game-artwork", storeGames.artwork);
   app.on("before-quit", manager.shutdown);

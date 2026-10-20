@@ -117,7 +117,7 @@ import StoreAccountsDialog from "@/components/StoreAccountsDialog";
 import ImportFromLaunchersDialog from "@/components/ImportFromLaunchersDialog";
 import StoreOwnedGameCard from "@/components/StoreOwnedGameCard";
 import { useStoreLibrary } from "@/hooks/useStoreLibrary";
-import { storeLibraryEntries, storeNames } from "@/lib/storeLibrary";
+import { storeGameKey, storeLibraryEntries, storeNames } from "@/lib/storeLibrary";
 import LibraryBackupsDialog from "@/components/LibraryBackupsDialog";
 import NewFolderDialog from "@/components/NewFolderDialog";
 import MoveToFolderDialog from "@/components/MoveToFolderDialog";
@@ -560,6 +560,14 @@ const Library = () => {
     }));
   const ownedStoreGames = storeLibraryEntries(storeLibrary.accounts, storeLibrary.preferences,
     [...libraryRecords, ...games.filter(game => !game.isFolder), ...getGamesInFolders(), ...queuedStubs]);
+  const hideStoreGame = game => {
+    const hiddenGames = [...new Set([
+      ...(storeLibrary.preferences.hiddenGames || []), storeGameKey(game.store, game.id),
+    ])];
+    if (!storeLibrary.updatePreferences({ ...storeLibrary.preferences, hiddenGames })) {
+      toast.error(t("storeAccounts.display.saveError", "Could not save this preference. Please try again."));
+    }
+  };
   const gamesWithQueued = [...games, ...queuedStubs, ...ownedStoreGames];
 
   // Filter games based on search query
@@ -2659,7 +2667,8 @@ const Library = () => {
                   {game._isStoreOwned ? (
                     <StoreOwnedGameCard game={game} viewMode={viewMode}
                       favorite={favorites.includes(game.game)}
-                      onToggleFavorite={() => toggleFavorite(game.game)} />
+                      onToggleFavorite={() => toggleFavorite(game.game)}
+                      onRemove={() => hideStoreGame(game)} />
                   ) : game.isFolder ? (
                     <DroppableFolderCard
                       folder={game}

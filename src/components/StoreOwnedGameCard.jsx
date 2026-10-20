@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Gamepad2, Heart } from "lucide-react";
+import { ExternalLink, FolderOpen, Gamepad2, Heart, MoreHorizontal, Play, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useStoreGame } from "@/hooks/useStoreGame";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
@@ -15,12 +17,14 @@ export default function StoreOwnedGameCard({
   viewMode,
   favorite,
   onToggleFavorite,
+  onRemove,
 }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const card = useRef(null);
   const [visible, setVisible] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -36,11 +40,12 @@ export default function StoreOwnedGameCard({
     return () => observer.disconnect();
   }, []);
 
-  const { artwork } = useStoreGame(game, visible);
+  const { artwork, details } = useStoreGame(game, visible);
   const store = storeNames[game.store];
   const showDetails = () =>
     navigate("/gamescreen", { state: { gameData: game, libraryPage: true } });
   const onKeyDown = event => {
+    if (event.target !== event.currentTarget) return;
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       showDetails();
@@ -53,6 +58,67 @@ export default function StoreOwnedGameCard({
     event.stopPropagation();
     onToggleFavorite();
   };
+  const runStoreAction = async intent => {
+    try {
+      const result = await window.electron.storeAccounts.openGame(game.store, game.id, intent);
+      if (!result.success) toast.error(result.error);
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+  const openDirectory = async () => {
+    try {
+      const result = await window.electron.storeAccounts.openDirectory(game.store, game.id);
+      if (!result.success) toast.error(result.error);
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+  const showContextMenu = event => {
+    event.preventDefault();
+    event.stopPropagation();
+    setMenuOpen(true);
+  };
+  const menu = (
+    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost" size="icon"
+          aria-label={t("common.contextMenu.menu", "Game options")}
+          className={cn("h-8 w-8 shrink-0", viewMode === "list" ? "text-foreground" : "text-white")}
+          onClick={event => event.stopPropagation()}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={event => event.stopPropagation()}>
+        <DropdownMenuItem onSelect={showDetails}>
+          <Gamepad2 className="mr-2 h-4 w-4" />
+          {t("storeAccounts.gameOptions.details", "View details")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void runStoreAction("auto")}>
+          <Play className="mr-2 h-4 w-4" />
+          {details?.installed
+            ? t("common.play", "Play")
+            : t("storeAccounts.installNamed", { defaultValue: "Install with {{store}}", store })}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void runStoreAction("store")}>
+          <ExternalLink className="mr-2 h-4 w-4" />
+          {t("storeAccounts.openNamed", { defaultValue: "Open in {{store}}", store })}
+        </DropdownMenuItem>
+        {details?.installed && (
+          <DropdownMenuItem onSelect={() => void openDirectory()}>
+            <FolderOpen className="mr-2 h-4 w-4" />
+            {t("common.contextMenu.openDirectory", "Open file location")}
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onSelect={onRemove} className="text-destructive focus:text-destructive">
+          <Trash2 className="mr-2 h-4 w-4" />
+          {t("storeAccounts.gameOptions.remove", "Remove from Library")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   if (viewMode === "list") {
     const banner = artwork.hero || artwork.grid;
@@ -63,6 +129,7 @@ export default function StoreOwnedGameCard({
         tabIndex={0}
         onClick={showDetails}
         onKeyDown={onKeyDown}
+        onContextMenu={showContextMenu}
         className="group relative flex cursor-pointer items-center gap-4 rounded-xl border border-border/60 bg-card p-2 pr-4 shadow-sm transition-all duration-200 hover:border-primary/30 hover:bg-accent/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <div className="relative h-[72px] w-56 shrink-0 overflow-hidden rounded-lg bg-zinc-900 shadow-sm md:w-64">
@@ -107,6 +174,7 @@ export default function StoreOwnedGameCard({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
+          {menu}
           <Button
             variant="ghost"
             size="icon"
@@ -134,6 +202,7 @@ export default function StoreOwnedGameCard({
       tabIndex={0}
       onClick={showDetails}
       onKeyDown={onKeyDown}
+      onContextMenu={showContextMenu}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className="press group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -155,6 +224,9 @@ export default function StoreOwnedGameCard({
             <span className="rounded-full border border-white/10 bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm backdrop-blur-md">
               {store}
             </span>
+          </div>
+          <div className="absolute right-2 top-2 z-20 rounded-md bg-black/70 text-white">
+            {menu}
           </div>
           {/* Hover overlay with title + favorite, same as installed games */}
           <div

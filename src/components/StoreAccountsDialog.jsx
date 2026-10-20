@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
-import { storeNames } from "@/lib/storeLibrary";
+import { storeGameKey, storeNames } from "@/lib/storeLibrary";
 
 // Each store gets a recognisable monogram instead of a generic icon
 const storeMarks = { steam: "S", epic: "E", gog: "G" };
@@ -98,9 +98,14 @@ export default function StoreAccountsDialog({
   const update = next => setSaveError(!onPreferencesChange(next));
   const accounts = snapshot?.accounts || [];
   const connected = accounts.filter(account => account.connected);
+  const hiddenGames = new Set(preferences.hiddenGames || []);
+  const hiddenEntries = connected.flatMap(account => account.games
+    .filter(game => hiddenGames.has(storeGameKey(account.store, game.id)))
+    .map(game => ({ ...game, store: account.store })));
   const visibleCount = connected
     .filter(account => preferences.stores.includes(account.store))
-    .reduce((sum, account) => sum + account.games.length, 0);
+    .reduce((sum, account) => sum + account.games.filter(game =>
+      !hiddenGames.has(storeGameKey(account.store, game.id))).length, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,6 +179,30 @@ export default function StoreAccountsDialog({
               onCheckedChange={enabled => update({ ...preferences, enabled })}
             />
           </div>
+
+          {hiddenEntries.length > 0 && (
+            <div className="rounded-xl border border-border/60 bg-card p-4">
+              <h3 className="text-sm font-semibold">
+                {t("storeAccounts.gameOptions.hidden", "Removed from Library")}
+              </h3>
+              <div className="mt-3 max-h-40 space-y-1 overflow-y-auto">
+                {hiddenEntries.map(game => (
+                  <div key={storeGameKey(game.store, game.id)} className="flex items-center gap-2 text-sm">
+                    <span className="min-w-0 flex-1 truncate" title={game.name}>
+                      {game.name} · {storeNames[game.store]}
+                    </span>
+                    <Button variant="ghost" size="sm" onClick={() => update({
+                      ...preferences,
+                      hiddenGames: (preferences.hiddenGames || []).filter(key =>
+                        key !== storeGameKey(game.store, game.id)),
+                    })}>
+                      {t("storeAccounts.gameOptions.restore", "Restore")}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* One row per store: connection and whether it shows in the library */}
           {!snapshot && !error ? (

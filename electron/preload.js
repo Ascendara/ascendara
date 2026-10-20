@@ -321,6 +321,8 @@ contextBridge.exposeInMainWorld("electron", {
     openGame: (store, id, intent) =>
       ipcRenderer.invoke("store-accounts-open-game", store, id, intent),
     gameDetails: (store, id) => ipcRenderer.invoke("store-game-details", store, id),
+    openDirectory: (store, id) =>
+      ipcRenderer.invoke("store-game-open-directory", store, id),
     artwork: (store, id) => ipcRenderer.invoke("store-game-artwork", store, id),
   },
   startLauncherImport: launchers =>

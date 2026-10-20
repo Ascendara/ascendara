@@ -8,6 +8,7 @@ import {
   HardDrive,
   Download,
   Gamepad2,
+  FolderOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -94,6 +95,14 @@ export default function StoreGameScreen({ game }) {
       setBusy(false);
     }
   };
+  const openDirectory = async () => {
+    try {
+      const result = await window.electron.storeAccounts.openDirectory(game.store, game.id);
+      if (!result.success) throw new Error(result.error);
+    } catch (failure) {
+      toast.error(failure.message);
+    }
+  };
 
   return (
     <div className="mx-auto w-full max-w-7xl pb-24 pt-4 fade-in">
@@ -152,6 +161,12 @@ export default function StoreGameScreen({ game }) {
                 store,
               })}
             </Button>
+            {installed && (
+              <Button variant="outline" className="gap-2 text-foreground" onClick={openDirectory}>
+                <FolderOpen className="h-4 w-4" />
+                {t("common.contextMenu.openDirectory", "Open file location")}
+              </Button>
+            )}
             <span className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
               {installed ? (
                 <HardDrive className="h-4 w-4 text-primary" />
