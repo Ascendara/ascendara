@@ -73,20 +73,10 @@ def read_size(size: int, decimal_places: int = 2) -> str:
 
 def get_free_disk_space(path: str) -> int:
     """Get free disk space in bytes for the drive containing the path."""
-    try:
-        if sys.platform == 'win32':
-            import ctypes
-            free_bytes = ctypes.c_ulonglong(0)
-            ctypes.windll.kernel32.GetDiskFreeSpaceExW(
-                ctypes.c_wchar_p(path), None, None, ctypes.pointer(free_bytes)
-            )
-            return free_bytes.value
-        else:
-            stat = os.statvfs(path)
-            return stat.f_bavail * stat.f_frsize
-    except Exception as e:
-        logging.error(f"Error getting free disk space: {e}")
-        return 0
+    # disk_usage checks Windows API errors and reports space available to this user.
+    # Let failures reach check_disk_space instead of treating them as a full disk.
+    return shutil.disk_usage(path).free
+
 
 def check_disk_space(path: str, required_bytes: int, operation: str = "operation") -> bool:
     """Check if there's enough disk space for an operation.
@@ -95,20 +85,19 @@ def check_disk_space(path: str, required_bytes: int, operation: str = "operation
     """
     try:
         free_space = get_free_disk_space(path)
-        # Add 10% buffer for safety
-        required_with_buffer = int(required_bytes * 1.1)
+        # Compare the same byte count that is reported in errors.
 
-        if free_space < required_with_buffer:
+        if free_space < required_bytes:
             logging.error(
                 f"Insufficient disk space for {operation}: "
-                f"Required: {read_size(required_with_buffer)}, "
+                f"Required: {read_size(required_bytes)}, "
                 f"Available: {read_size(free_space)}"
             )
             return False
 
         logging.info(
             f"Disk space check passed for {operation}: "
-            f"Required: {read_size(required_with_buffer)}, "
+            f"Required: {read_size(required_bytes)}, "
             f"Available: {read_size(free_space)}"
         )
         return True
@@ -366,8 +355,9 @@ class TorrentManager:
                         size_unit = size_parts[1].upper()
                         multipliers = {'B': 1, 'KB': 1024, 'MB': 1024**2, 'GB': 1024**3, 'TB': 1024**4}
                         estimated_download_size = int(size_value * multipliers.get(size_unit, 1024**3))
-                        total_needed = estimated_download_size * 4 if updateFlow else estimated_download_size * 3
-                        if not check_disk_space(download_dir, total_needed, "download and extraction"):
+                        # Extraction checks its own space requirement once archives exist.
+                        total_needed = estimated_download_size
+                        if not check_disk_space(download_dir, total_needed, "download"):
                             error_msg = f"Insufficient disk space. Need ~{read_size(total_needed)}"
                             logging.error(f"[TorrentHandler] {error_msg}")
                             handleerror(game_info, game_info_path, error_msg)
