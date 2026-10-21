@@ -50,8 +50,7 @@ import steamGridImageService from "@/services/steamGridImageService";
 import recentGamesService from "@/services/recentGamesService";
 import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { sanitizeText } from "@/lib/utils";
+import { cn, imageDataUrlFromBase64, sanitizeText } from "@/lib/utils";
 
 // Module-level caches that persist during runtime
 let gamesCache = null;
@@ -260,6 +259,19 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
   const [, setTick] = useState(0);
   const sanitizedGameName = sanitizeText(game.game || game.name);
   const imageLoadedRef = useRef(false);
+  const { cachedImage: fallbackImage, loading: fallbackLoading } = useImageLoader(
+    game.imgID,
+    {
+      quality: "high",
+      priority: "high",
+      enabled:
+        (!game.isCustom && !!game.imgID) ||
+        (!game.imgID && !!(game.game || game.name)),
+      fallbackGameName: game.imgID ? null : game.game || game.name,
+      fallbackSlot: "card",
+    }
+  );
+  const displayImage = imageData || fallbackImage;
 
   useEffect(() => {
     let isMounted = true;
@@ -272,7 +284,7 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
         const imageBase64 = await window.electron.getGameImage(gameId);
         if (imageBase64 && isMounted) {
           imageLoadedRef.current = true;
-          setImageData(`data:image/jpeg;base64,${imageBase64}`);
+          setImageData(imageDataUrlFromBase64(imageBase64));
         }
       } catch (error) {}
     };
@@ -333,13 +345,13 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
       className="group relative min-h-0 flex-1 cursor-pointer overflow-hidden rounded-lg"
       onClick={() => onPlay(game)}
     >
-      {imageData ? (
+      {displayImage ? (
         <img
-          src={imageData}
+          src={displayImage}
           alt={sanitizedGameName}
           className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
         />
-      ) : game?.imgID ? (
+      ) : fallbackLoading ? (
         <Skeleton className="absolute inset-0 h-full w-full" />
       ) : (
         <div className="absolute inset-0">

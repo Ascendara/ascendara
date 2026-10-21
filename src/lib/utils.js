@@ -27,6 +27,18 @@ export function sanitizeText(text) {
     .trim();
 }
 
+export function imageDataUrlFromBase64(base64) {
+  if (!base64) return null;
+
+  const mimeType = base64.startsWith("iVBORw0KGgo")
+    ? "image/png"
+    : base64.startsWith("UklGR")
+      ? "image/webp"
+      : "image/jpeg";
+
+  return `data:${mimeType};base64,${base64}`;
+}
+
 export function formatLatestUpdate(latest_update) {
   if (!latest_update) return null;
   const now = new Date();

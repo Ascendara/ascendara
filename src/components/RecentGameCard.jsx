@@ -1,31 +1,43 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "./ui/card";
-import { cn } from "@/lib/utils";
-import { sanitizeText } from "@/lib/utils";
+import { cn, imageDataUrlFromBase64, sanitizeText } from "@/lib/utils";
 import { Play } from "lucide-react";
 import { Button } from "./ui/button";
 import { AspectRatio } from "./ui/aspect-ratio";
 import { Skeleton } from "./ui/skeleton";
 import { useGameRunning } from "@/hooks/useGameRunning";
+import { useImageLoader } from "@/hooks/useImageLoader";
 
 const RecentGameCard = ({ game, onPlay }) => {
   const [isHovered, setIsHovered] = useState(false);
   const isRunning = useGameRunning(game.game || game.name);
   const [imageData, setImageData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const sanitizedGameName = sanitizeText(game.game || game.name);
+  const gameName = game.game || game.name;
+  const sanitizedGameName = sanitizeText(gameName);
+  const { cachedImage: fallbackImage, loading: fallbackLoading } = useImageLoader(
+    game.imgID,
+    {
+      quality: "high",
+      priority: "normal",
+      enabled: (!game.isCustom && !!game.imgID) || (!game.imgID && !!gameName),
+      fallbackGameName: game.imgID ? null : gameName,
+      fallbackSlot: "card",
+    }
+  );
+  const displayImage = imageData || fallbackImage;
 
   // Load game image via IPC (no localStorage caching - data URLs blow out
   // the per-origin localStorage quota; IPC reads from disk are fast)
   useEffect(() => {
     let isMounted = true;
-    const gameId = game.game || game.name;
+    const gameId = gameName;
 
     const loadGameImage = async () => {
       try {
         const imageBase64 = await window.electron.getGameImage(gameId);
         if (imageBase64 && isMounted) {
-          setImageData(`data:image/jpeg;base64,${imageBase64}`);
+          setImageData(imageDataUrlFromBase64(imageBase64));
         }
       } catch (error) {
         console.error("Error loading game image:", error);
@@ -68,7 +80,7 @@ const RecentGameCard = ({ game, onPlay }) => {
       window.removeEventListener("game-cover-updated", handleCoverUpdate);
       unsubscribeAssetsUpdated();
     };
-  }, [game]);
+  }, [gameName]);
 
   const handlePlay = e => {
     e.stopPropagation();
@@ -107,10 +119,12 @@ const RecentGameCard = ({ game, onPlay }) => {
       <CardContent className="p-0">
         <AspectRatio ratio={16 / 9}>
           <div className="relative h-full w-full">
-            {loading && <Skeleton className="absolute inset-0 h-full w-full" />}
-            {!loading && imageData && (
+            {(loading || fallbackLoading) && !displayImage && (
+              <Skeleton className="absolute inset-0 h-full w-full" />
+            )}
+            {displayImage && (
               <img
-                src={imageData}
+                src={displayImage}
                 alt={sanitizedGameName}
                 className={cn(
                   "h-full w-full object-cover transition-transform duration-300",
