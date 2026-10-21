@@ -1,5 +1,4 @@
 import ProfileSettingsCard from "./settings/ProfileSettingsCard";
-import DiscordVerificationCard from "./settings/DiscordVerificationCard";
 import PrivacySettingsCard from "./settings/PrivacySettingsCard";
 import SubscriptionSettingsCard from "./settings/SubscriptionSettingsCard";
 import SubscriptionSuccessDialog from "./settings/SubscriptionSuccessDialog";
@@ -174,7 +173,6 @@ export default function SettingsSection({
               deletedAccountWarning={deletedAccountWarning}
               handleSubscribe={handleSubscribe}
             />
-            <DiscordVerificationCard t={t} ascendAccess={ascendAccess} user={user} />
           </section>
 
           <section {...sectionProps("privacy")}>

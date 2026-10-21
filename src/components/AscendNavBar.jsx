@@ -6,7 +6,7 @@ import {
   Users,
   MessageCircle,
   Settings,
-   Smartphone,
+  Smartphone,
   Bell,
   Clock,
   BadgeCheck,
@@ -31,10 +31,19 @@ import {
 import { subscribeToUserStatus } from "@/services/firebaseService";
 import { setUserOnlineStatus } from "@/services/ascendStatusService";
 import { toast } from "sonner";
+import DiscordIcon from "@/pages/ascend/DiscordIcon";
+
+const DiscordOutlineIcon = props => <DiscordIcon {...props} outline />;
 
 // Friends, requests, people search and the leaderboard share one tabbed
 // Community page, so they count as a single destination here
-const COMMUNITY_SECTIONS = ["friends", "requests", "search", "leaderboard", "userProfile"];
+const COMMUNITY_SECTIONS = [
+  "friends",
+  "requests",
+  "search",
+  "leaderboard",
+  "userProfile",
+];
 
 const AscendNavBar = ({
   activeSection,
@@ -100,6 +109,7 @@ const AscendNavBar = ({
       badge: badges.requests,
       matches: COMMUNITY_SECTIONS,
     },
+    { id: "discord", icon: DiscordOutlineIcon, label: t("ascend.nav.discord") },
     {
       id: "messages",
       icon: MessageCircle,
@@ -149,7 +159,7 @@ const AscendNavBar = ({
     <header className="shrink-0 px-4 pt-[52px] sm:px-6 lg:px-10">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 rounded-2xl border border-border/50 bg-card/60 px-2 shadow-sm backdrop-blur-xl">
         {/* Primary destinations; inactive tabs collapse to icons on narrow windows */}
-        <nav className="flex min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex-1 items-center gap-0.5 overflow-x-auto">
+        <nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {navItems.map((item, index) => {
             const isActive = isItemActive(item);
             return (
@@ -161,7 +171,9 @@ const AscendNavBar = ({
                   aria-current={isActive ? "page" : undefined}
                   title={item.label}
                   className={`relative flex h-9 items-center gap-2 rounded-xl px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
-                    isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                    isActive
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {isActive && (
@@ -197,7 +209,9 @@ const AscendNavBar = ({
               className="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-secondary transition-colors hover:bg-primary/90"
             >
               <BadgeDollarSign className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{t("ascend.subscription.upgradeShort")}</span>
+              <span className="hidden sm:inline">
+                {t("ascend.subscription.upgradeShort")}
+              </span>
               <span className="opacity-80">· {planChip.label}</span>
             </button>
           ) : planChip ? (
@@ -253,7 +267,9 @@ const AscendNavBar = ({
               <DropdownMenuLabel className="font-normal">
                 <p className="flex items-center gap-1 truncate text-sm font-semibold">
                   {user?.displayName || "User"}
-                  {userData?.owner && <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />}
+                  {userData?.owner && (
+                    <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
+                  )}
                   {userData?.contributor && (
                     <Hammer className="h-3.5 w-3.5 shrink-0 text-orange-500" />
                   )}

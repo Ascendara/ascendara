@@ -487,6 +487,36 @@
       "webDevice": "Companion device",
       "workspaceDescription": "Connect devices and manage Companion access."
     },
+    "discord": {
+      "ascendAccount": "Ascend account",
+      "connected": "Discord connected",
+      "connectedDescription": "Your Ascend account is verified on the Discord server and your roles are active.",
+      "discordAccount": "Discord account",
+      "linkedAccounts": "Linked accounts",
+      "notConnected": "Discord not connected",
+      "notConnectedDescription": "Verify your account on the Discord server to unlock exclusive roles and channels.",
+      "openServer": "Open Discord Server",
+      "perks": {
+        "channels": {
+          "description": "Access channels only verified Ascend members can see.",
+          "title": "Subscriber channels"
+        },
+        "role": {
+          "description": "Get a verified role next to your name on the server.",
+          "title": "Verified role"
+        },
+        "support": {
+          "description": "Get help from the team and community when something goes wrong.",
+          "title": "Help and support"
+        }
+      },
+      "perksTitle": "What you get",
+      "plan": "Plan",
+      "subscribe": "Subscribe",
+      "subtitle": "Link your Ascend account to the Ascendara Discord server.",
+      "title": "Discord",
+      "verifyStep3": "Come back here. This page updates on its own once the bot verifies your account."
+    },
     "friends": {
       "addFriend": "Add Friend",
       "alreadyFriends": "Already friends",
@@ -549,6 +579,7 @@
       "cloudLibrary": "Game Library",
       "community": "Community",
       "companion": "Companion",
+      "discord": "Discord",
       "findPeople": "Find People",
       "friends": "Friends",
       "home": "Home",

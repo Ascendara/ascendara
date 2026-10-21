@@ -36,6 +36,7 @@ const UpcomingSection = lazy(() => import("./ascend/UpcomingSection"));
 const UserProfileSection = lazy(() => import("./ascend/UserProfileSection"));
 const CloudBackupsSection = lazy(() => import("./ascend/CloudBackupsSection"));
 const PremiumSection = lazy(() => import("./ascend/PremiumSection"));
+const DiscordSection = lazy(() => import("./ascend/DiscordSection"));
 const AuthSection = lazy(() => import("./ascend/AuthSection"));
 
 const Ascend = () => {
@@ -878,6 +879,17 @@ const Ascend = () => {
         case "premium":
           return <PremiumSection t={t} setActiveSection={setActiveSection} />;
 
+        case "discord":
+          return (
+            <DiscordSection
+              t={t}
+              user={user}
+              userData={userData}
+              ascendAccess={ascendAccess}
+              handleSubscribe={handleSubscribe}
+            />
+          );
+
         default:
           return null;
       }
@@ -928,7 +940,9 @@ const Ascend = () => {
 
         {/* Subscription Plan Selection Dialog */}
         <SubscriptionPlanDialog
-          isLifetimeUpgrade={ascendAccess.isSubscribed && !userData?.ascendSubscription?.lifetime}
+          isLifetimeUpgrade={
+            ascendAccess.isSubscribed && !userData?.ascendSubscription?.lifetime
+          }
           open={showPlanDialog}
           onOpenChange={setShowPlanDialog}
           availablePlans={availablePlans}
