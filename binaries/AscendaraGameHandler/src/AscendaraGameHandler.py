@@ -570,6 +570,16 @@ def get_running_processes_in_dir(game_dir, exclude_pids=None):
             continue
     return matches
 
+def is_abnormal_exit(return_code):
+    """True when the exit code means the game crashed rather than quit normally."""
+    if return_code is None:
+        return False
+    if os.name == 'nt':
+        # Unhandled exceptions surface as NTSTATUS error codes (0xC0000005 etc.)
+        return return_code < 0 or return_code >= 0xC0000000
+    # Killed by a signal; the user closing it (SIGTERM/SIGINT/SIGHUP) is not a crash
+    return return_code < 0 and -return_code not in (15, 2, 1)
+
 def update_play_time(file_path, is_custom_game, game_entry=None, seconds_to_add=180):
     """Update the playTime field in either the game's JSON file or games.json for custom games"""
     logging.info(f"[ENTRY] update_play_time(file_path={file_path}, is_custom_game={is_custom_game}, add={seconds_to_add})")
@@ -1223,6 +1233,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
 
         logging.info("Entering game process monitoring loop (180s intervals)")
         stub_exited_logged = False
+        tracked_related_process = False
         session_end_time = start_time
         while True:
             if process.poll() is None:
@@ -1240,6 +1251,8 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     stub_exited_logged = True
                 related_processes = get_running_processes_in_dir(game_root_dir, exclude_pids={handler_pid})
                 game_alive = len(related_processes) > 0
+                if game_alive:
+                    tracked_related_process = True
 
             if not game_alive:
                 session_end_time = time.time()
@@ -1285,6 +1298,15 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             logging.info(f"Related game process(es) under {game_root_dir} have exited; treating game as closed")
         logging.info(f"Game process exited with return code: {return_code}")
 
+        # The return code only describes the game when we didn't end up tracking
+        # a separate process spawned by a launcher/stub.
+        last_session = {
+            "seconds": max(0, int(session_end_time - start_time)),
+            "crashed": not tracked_related_process and is_abnormal_exit(return_code),
+            "endedAt": datetime.now().isoformat(),
+        }
+        logging.info(f"Session summary for {game_name}: {last_session}")
+
         # Close trainer if it was launched
         if trainer_process and trainer_process.poll() is None:
             try:
@@ -1321,6 +1343,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             for game in data["games"]:
                 if not game.get('_isDeleted') and game.get('executable') == exe_path:
                     game["isRunning"] = False
+                    game["lastSession"] = last_session
                     logging.info(f"Set isRunning=False for custom game {game_name}")
                     break
             atomic_write_json(games_json_path, data, indent=4)
@@ -1328,6 +1351,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             with open(json_file_path, "r", encoding='utf-8') as f:
                 data = json.load(f)
             data["isRunning"] = False
+            data["lastSession"] = last_session
             logging.info(f"Set isRunning=False for game {game_name}")
             atomic_write_json(json_file_path, data, indent=4)
 

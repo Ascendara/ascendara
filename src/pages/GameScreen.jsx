@@ -62,11 +62,7 @@ import GamesBackupDialog from "@/components/GamesBackupDialog";
 import imageCacheService from "@/services/imageCacheService";
 import "@/components/GameMetadata";
 import steamService from "@/services/gameInfoService";
-import {
-  gameImageCache,
-  heroImageCache,
-  logoImageCache,
-} from "@/lib/gameImageCache";
+import { gameImageCache, heroImageCache, logoImageCache } from "@/lib/gameImageCache";
 import GameRate from "@/components/GameRate";
 import { GameAssetSearchDialog } from "@/components/GameAssetSearchDialog";
 import nexusModsService from "@/services/nexusModsService";
@@ -568,6 +564,23 @@ const FIELD_META = {
   playTime: { type: "number", readonly: true, leaderboard: true },
   lastPlayed: { type: "text", readonly: true },
   executables: { type: "array" },
+};
+
+// Only ask for a rating once the user has actually played the game, and never
+// right after a session that crashed or closed almost immediately.
+const RATE_PROMPT_MIN_LAUNCHES = 2;
+const RATE_PROMPT_MIN_PLAYTIME = 30 * 60;
+const RATE_PROMPT_MIN_LAST_SESSION = 5 * 60;
+
+const shouldPromptRating = game => {
+  if (!game || game.hasRated || game.isRunning) return false;
+  if ((game.launchCount || 0) < RATE_PROMPT_MIN_LAUNCHES) return false;
+  if ((game.playTime || 0) < RATE_PROMPT_MIN_PLAYTIME) return false;
+  const last = game.lastSession;
+  if (last && (last.crashed || (last.seconds || 0) < RATE_PROMPT_MIN_LAST_SESSION)) {
+    return false;
+  }
+  return true;
 };
 
 const LEADERBOARD_KEYS = Object.entries(FIELD_META)
@@ -1209,7 +1222,8 @@ const steamAppDataCache = new Map();
 export default function GameScreen() {
   const location = useLocation();
   const game = location.state?.gameData;
-  if (game?._isStoreOwned) return <StoreGameScreen key={`${game.store}:${game.id}`} game={game} />;
+  if (game?._isStoreOwned)
+    return <StoreGameScreen key={`${game.store}:${game.id}`} game={game} />;
   return <InstalledGameScreen />;
 }
 
@@ -2020,8 +2034,17 @@ function InstalledGameScreen() {
 
   // Keep the prompt in sync with the game's persisted review status.
   useEffect(() => {
-    setHasRated(Boolean(game?.hasRated) || !(game?.launchCount > 1));
-  }, [game?.hasRated, game?.launchCount, game?.game, game?.name]);
+    setHasRated(!shouldPromptRating(game));
+  }, [
+    game?.hasRated,
+    game?.isRunning,
+    game?.launchCount,
+    game?.playTime,
+    game?.lastSession?.seconds,
+    game?.lastSession?.crashed,
+    game?.game,
+    game?.name,
+  ]);
 
   // Check Nexus Mods support for the game
   useEffect(() => {
