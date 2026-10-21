@@ -1,7 +1,17 @@
 import { motion } from "framer-motion";
-import { AlertTriangle, CircleCheck, Loader } from "lucide-react";
+import { AlertTriangle, CircleCheck, ExternalLink, Loader } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Progress } from "@/components/ui/progress";
+
+export const DOWNLOAD_FOLDER_CHECK_DOCS =
+  "https://ascendara.app/docs/features/downloading#download-folder-check";
+
+// Docs section explaining each kind of failed check
+const ISSUE_DOCS = {
+  basic: "https://ascendara.app/docs/features/downloading#folder-access-problems",
+  antivirus: "https://ascendara.app/docs/features/downloading#antivirus-interference",
+  download: "https://ascendara.app/docs/features/downloading#check-could-not-finish",
+};
 
 /**
  * Progress bar and friendly status line for a download folder check.
@@ -70,7 +80,15 @@ export function DownloadFolderCheckResult({ check, children }) {
               {t(`downloadFolderCheck.errors.${issue}Title`)}
             </p>
             <p className="text-muted-foreground">
-              {t(`downloadFolderCheck.errors.${issue}`)}
+              {t(`downloadFolderCheck.errors.${issue}`)}{" "}
+              <button
+                type="button"
+                className="inline-flex items-center text-primary hover:underline"
+                onClick={() => window.electron.openURL(ISSUE_DOCS[issue])}
+              >
+                {t("common.learnMore")}
+                <ExternalLink className="ml-1 h-3 w-3" />
+              </button>
             </p>
             {children}
             {check.errors && (

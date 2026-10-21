@@ -70,6 +70,7 @@ import { useDownloadFolderCheck } from "@/hooks/useDownloadFolderCheck";
 import {
   DownloadFolderCheckProgress,
   DownloadFolderCheckResult,
+  DOWNLOAD_FOLDER_CHECK_DOCS,
 } from "@/components/DownloadFolderCheck";
 
 const DEPENDENCIES = [
@@ -1922,7 +1923,21 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   key="verifyDirectory"
                   icon={FolderCheck}
                   title={t("welcome.setup.verify.title")}
-                  subtitle={t("welcome.setup.verify.subtitle")}
+                  subtitle={
+                    <>
+                      {t("welcome.setup.verify.subtitle")}{" "}
+                      <button
+                        type="button"
+                        className="inline-flex items-center text-primary hover:underline"
+                        onClick={() =>
+                          window.electron.openURL(DOWNLOAD_FOLDER_CHECK_DOCS)
+                        }
+                      >
+                        {t("common.learnMore")}
+                        <ExternalLink className="ml-1 h-3 w-3" />
+                      </button>
+                    </>
+                  }
                   footer={
                     folderCheck.state !== "done" ? (
                       <>
@@ -1971,7 +1986,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   <div className={`${cardClass} space-y-3 text-left`}>
                     <div className="flex items-center gap-2 rounded-lg border border-primary/15 bg-background/60 px-3 py-2">
                       <FolderDownIcon className="h-4 w-4 shrink-0 text-primary" />
-                      <span className="truncate font-mono text-sm" title={downloadDirectory}>
+                      <span
+                        className="truncate font-mono text-sm"
+                        title={downloadDirectory}
+                      >
                         {downloadDirectory}
                       </span>
                     </div>
