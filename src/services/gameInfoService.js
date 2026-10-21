@@ -103,7 +103,10 @@ const searchGameSteam = async (gameName, apiKey) => {
 
       const storeSearchUrl = `${STEAM_STORE_SEARCH_URL}?term=${encodedSearch}`;
       const response = await fetch(storeSearchUrl);
-      const storeResult = { success: response.ok, data: response.ok ? await response.json() : null };
+      const storeResult = {
+        success: response.ok,
+        data: response.ok ? await response.json() : null,
+      };
 
       if (storeResult.success) {
         const storeData = storeResult.data;
@@ -233,10 +236,9 @@ const getGameDetailByIdSteam = async (appId, apiKey) => {
     // The proxy can return a stale outer key. Trust the payload's identity,
     // never an unrelated game's data just because its envelope key matches.
     const entries = data && typeof data === "object" ? Object.values(data) : [];
-    const match = entries.find(entry =>
-      entry?.success &&
-      entry.data &&
-      String(entry.data.steam_appid) === String(appId)
+    const match = entries.find(
+      entry =>
+        entry?.success && entry.data && String(entry.data.steam_appid) === String(appId)
     );
     if (match) return match.data;
 
@@ -619,7 +621,7 @@ const formatSteamData = steamData => {
 
     // Store the full description separately
     full_description: fullCleanDescription,
-    
+
     // Store the raw HTML about_the_game for rich display
     about_the_game: steamData.about_the_game || null,
 
@@ -750,18 +752,24 @@ const getGameDetails = async (gameName, config = {}) => {
  * @param {string} size - Size parameter (not used for Steam, kept for compatibility)
  * @returns {string} Formatted image URL
  */
+// Busted URLs are remembered so the same image keeps the same URL: a fresh one
+// on every call made pages reload (and re-fade) their images on each render.
+const formattedImageUrls = new Map();
+
 const formatImageUrl = (url, size = "screenshot_big") => {
   if (!url) return null;
+  const cached = formattedImageUrls.get(url);
+  if (cached) return cached;
 
   // Fix protocol-relative URLs (starting with //)
-  if (url.startsWith("//")) {
-    url = `https:${url}`;
-  }
+  const absolute = url.startsWith("//") ? `https:${url}` : url;
 
   // Add cache-busting to fix NEBULA_CACHE_OPERATION_NOT_SUPPORTED error
   // This prevents Chrome/Electron caching issues with Steam's CDN
-  const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}_cb=${Date.now()}`;
+  const separator = absolute.includes("?") ? "&" : "?";
+  const formatted = `${absolute}${separator}_cb=${Date.now()}`;
+  formattedImageUrls.set(url, formatted);
+  return formatted;
 };
 
 // Export the service functions
