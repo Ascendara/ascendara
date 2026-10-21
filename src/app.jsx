@@ -37,7 +37,10 @@ import {
 } from "@/services/ascendStatusService";
 import { setActivity, ActivityType } from "@/services/userStatusService";
 import { initializeDownloadSync, stopDownloadSync } from "@/services/downloadSyncService";
-import { initializeDesktopLibrarySync, stopDesktopLibrarySync } from "@/services/desktopLibrarySyncService";
+import {
+  initializeDesktopLibrarySync,
+  stopDesktopLibrarySync,
+} from "@/services/desktopLibrarySyncService";
 import {
   initializeFavoritesSync,
   stopFavoritesSync,
@@ -1381,6 +1384,18 @@ const AppRoutes = () => {
     };
     checkVersion();
   }, []);
+
+  // Developer tools can replay the welcome flow from Settings
+  useEffect(() => {
+    const showWelcomeFlow = () => {
+      setIsNewInstall(true);
+      setWelcomeData({ isNew: true, isV7: true });
+      navigate("/welcome", { replace: true });
+      setShowWelcome(true);
+    };
+    window.addEventListener("ascendara:show-welcome", showWelcomeFlow);
+    return () => window.removeEventListener("ascendara:show-welcome", showWelcomeFlow);
+  }, [navigate]);
 
   // Check if user needs to set up game index for the first time
   useEffect(() => {

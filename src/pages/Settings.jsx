@@ -1172,6 +1172,11 @@ function Settings() {
           await window.electron.setTimestampValue("isUpdating", true);
           window.location.reload();
           break;
+
+        case "welcome":
+          // App swaps to the welcome flow as if this were a new install
+          window.dispatchEvent(new CustomEvent("ascendara:show-welcome"));
+          break;
       }
     } catch (error) {
       console.error("Error triggering screen:", error);
@@ -1458,7 +1463,10 @@ function Settings() {
 
           <div className="min-w-0">
             <SettingsCategory {...categoryProps("general")} layout="grid">
-              <Card id="appearance-settings" className="border border-border/60 shadow-none p-6">
+              <Card
+                id="appearance-settings"
+                className="border border-border/60 p-6 shadow-none"
+              >
                 {/* Appearance Section */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
@@ -1486,7 +1494,8 @@ function Settings() {
                             {t("settings.customColors") || "Custom Colors"}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {t("settings.customColorsSubtitle") || "Create your own theme"}
+                            {t("settings.customColorsSubtitle") ||
+                              "Create your own theme"}
                           </p>
                         </div>
                       </div>
@@ -1608,7 +1617,10 @@ function Settings() {
                 </div>
               </Card>
 
-              <Card id="application-settings" className="border border-border/60 shadow-none p-6">
+              <Card
+                id="application-settings"
+                className="border border-border/60 p-6 shadow-none"
+              >
                 {/* Application Section */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
@@ -1627,7 +1639,9 @@ function Settings() {
                     </div>
                     <Select
                       value={settings.defaultOpenPage || "home"}
-                      onValueChange={value => handleSettingChange("defaultOpenPage", value)}
+                      onValueChange={value =>
+                        handleSettingChange("defaultOpenPage", value)
+                      }
                     >
                       <SelectTrigger className="w-[180px] bg-background">
                         <SelectValue placeholder="Home" />
@@ -1798,7 +1812,10 @@ function Settings() {
             </SettingsCategory>
 
             <SettingsCategory {...categoryProps("downloads")} columns>
-              <Card id="download-manager" className="space-y-5 border border-border/60 p-6 shadow-none">
+              <Card
+                id="download-manager"
+                className="space-y-5 border border-border/60 p-6 shadow-none"
+              >
                 <h3 className="text-base font-semibold text-foreground">
                   {t("settings.downloaderSettings")}
                 </h3>
@@ -2142,7 +2159,10 @@ function Settings() {
                 </div>
               </Card>
 
-              <Card id="download-locations" className="space-y-5 border border-border/60 p-6 shadow-none">
+              <Card
+                id="download-locations"
+                className="space-y-5 border border-border/60 p-6 shadow-none"
+              >
                 <h3 className="text-base font-semibold text-foreground">
                   {t("settings.downloadLocationsTitle")}
                 </h3>
@@ -2256,7 +2276,10 @@ function Settings() {
                 </div>
               </Card>
 
-              <Card id="torbox-settings" className="space-y-5 border border-border/60 p-6 shadow-none">
+              <Card
+                id="torbox-settings"
+                className="space-y-5 border border-border/60 p-6 shadow-none"
+              >
                 <h3 className="text-base font-semibold text-foreground">
                   {t("settings.torboxTitle")}
                 </h3>
@@ -2393,7 +2416,10 @@ function Settings() {
               </Card>
 
               {/* Torrenting Card */}
-              <Card id="torrent-downloads" className="border border-border/60 shadow-none p-6">
+              <Card
+                id="torrent-downloads"
+                className="border border-border/60 p-6 shadow-none"
+              >
                 <div className="mb-6 flex items-center justify-between">
                   <div>
                     <h2 className="text-base font-semibold text-foreground">
@@ -2608,7 +2634,9 @@ function Settings() {
                           placeholder="admin"
                           disabled={!settings.torrentEnabled}
                           value={
-                            qbitConfigDraft?.username ?? settings.torrentUsername ?? "admin"
+                            qbitConfigDraft?.username ??
+                            settings.torrentUsername ??
+                            "admin"
                           }
                           onChange={e =>
                             setQbitConfigDraft(prev => ({
@@ -2706,9 +2734,11 @@ function Settings() {
             </SettingsCategory>
 
             <SettingsCategory {...categoryProps("gaming")} columns>
-              <Card id="gaming-settings" className="border border-border/60 shadow-none p-6">
+              <Card
+                id="gaming-settings"
+                className="border border-border/60 p-6 shadow-none"
+              >
                 <div className="space-y-4">
-
                   <div id="discord-rpc" className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label>{t("settings.discordRPC")}</Label>
@@ -2737,7 +2767,10 @@ function Settings() {
                     <Switch
                       checked={settings.hideOnGameLaunch}
                       onCheckedChange={() =>
-                        handleSettingChange("hideOnGameLaunch", !settings.hideOnGameLaunch)
+                        handleSettingChange(
+                          "hideOnGameLaunch",
+                          !settings.hideOnGameLaunch
+                        )
                       }
                     />
                   </div>
@@ -2817,7 +2850,10 @@ function Settings() {
                     <Switch
                       checked={settings.extraGameOptions}
                       onCheckedChange={() =>
-                        handleSettingChange("extraGameOptions", !settings.extraGameOptions)
+                        handleSettingChange(
+                          "extraGameOptions",
+                          !settings.extraGameOptions
+                        )
                       }
                     />
                   </div>
@@ -2912,7 +2948,7 @@ function Settings() {
               </Card>
 
               {/* Achievement Watcher Directories Card */}
-              <Card className="border border-border/60 shadow-none p-6">
+              <Card className="border border-border/60 p-6 shadow-none">
                 <h3 className="mb-2 text-base font-semibold text-foreground">
                   {t("settings.achievementWatcher.title") ||
                     "Achievement Watcher Directories"}
@@ -2964,7 +3000,10 @@ function Settings() {
                   {settings.watchingFolders && settings.watchingFolders.length > 0 ? (
                     <ul className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/50">
                       {settings.watchingFolders.map((dir, idx) => (
-                        <li key={dir} className="flex min-w-0 items-center gap-2 py-1 pl-3 pr-1">
+                        <li
+                          key={dir}
+                          className="flex min-w-0 items-center gap-2 py-1 pl-3 pr-1"
+                        >
                           <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
                           <span className="flex-1 truncate text-sm" title={dir}>
                             {dir}
@@ -3238,7 +3277,7 @@ function Settings() {
                 {/* ── Linux Compatibility Layer ── */}
                 {isOnLinux && (
                   <>
-                    <Card className="border border-border/60 shadow-none p-6">
+                    <Card className="border border-border/60 p-6 shadow-none">
                       <div className="space-y-6">
                         <h3 className="mb-2 text-base font-semibold text-foreground">
                           {t("welcome.compatibilityLayer")}
@@ -3379,7 +3418,9 @@ function Settings() {
                             ) : (
                               <>
                                 <Download className="h-4 w-4" />
-                                {runners.some(r => r.name.toLowerCase().includes("cachyos"))
+                                {runners.some(r =>
+                                  r.name.toLowerCase().includes("cachyos")
+                                )
                                   ? t("settings.linuxCompat.updateProtonCachy")
                                   : t("settings.linuxCompat.downloadProtonCachy")}
                               </>
@@ -3392,7 +3433,8 @@ function Settings() {
                             onClick={async () => {
                               setProtonCachyUpdateStatus("checking");
                               try {
-                                const info = await window.electron.checkProtonCachyOSUpdate();
+                                const info =
+                                  await window.electron.checkProtonCachyOSUpdate();
                                 if (!info.success) {
                                   setProtonCachyUpdateStatus(null);
                                   return;
@@ -3527,7 +3569,8 @@ function Settings() {
                               onClick={async () => {
                                 setProtonGEUpdateStatus("checking");
                                 try {
-                                  const info = await window.electron.checkProtonGEUpdate();
+                                  const info =
+                                    await window.electron.checkProtonGEUpdate();
                                   if (!info.success) {
                                     setProtonGEUpdateStatus(null);
                                     return;
@@ -3570,41 +3613,46 @@ function Settings() {
                               </div>
                             )}
 
-                            {protonGEUpdateStatus === "update-available" && protonGEInfo && (
-                              <div className="flex w-full items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
-                                <div className="flex items-center gap-2">
-                                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                                  <p className="text-sm text-yellow-500">
-                                    {t("settings.linuxCompat.updateAvailable", {
-                                      version: protonGEInfo.latestVersion,
-                                    })}
-                                    {protonGEInfo.installedVersions.length > 0 && (
-                                      <span className="text-yellow-500/70">
-                                        {" "}
-                                        {t("settings.linuxCompat.updateAvailableCurrent", {
-                                          version: protonGEInfo.installedVersions[0],
-                                        })}
-                                      </span>
-                                    )}
-                                  </p>
+                            {protonGEUpdateStatus === "update-available" &&
+                              protonGEInfo && (
+                                <div className="flex w-full items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+                                  <div className="flex items-center gap-2">
+                                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                                    <p className="text-sm text-yellow-500">
+                                      {t("settings.linuxCompat.updateAvailable", {
+                                        version: protonGEInfo.latestVersion,
+                                      })}
+                                      {protonGEInfo.installedVersions.length > 0 && (
+                                        <span className="text-yellow-500/70">
+                                          {" "}
+                                          {t(
+                                            "settings.linuxCompat.updateAvailableCurrent",
+                                            {
+                                              version: protonGEInfo.installedVersions[0],
+                                            }
+                                          )}
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setShowProtonGEConfirm(true)}
+                                    className="gap-1"
+                                  >
+                                    <Download className="h-3 w-3" />
+                                    {t("settings.linuxCompat.update")}
+                                  </Button>
                                 </div>
-                                <Button
-                                  size="sm"
-                                  onClick={() => setShowProtonGEConfirm(true)}
-                                  className="gap-1"
-                                >
-                                  <Download className="h-3 w-3" />
-                                  {t("settings.linuxCompat.update")}
-                                </Button>
-                              </div>
-                            )}
+                              )}
                           </div>
                         </details>
 
                         {/* Info Box */}
                         <div className="rounded-lg border border-border bg-muted/50 p-3">
                           <p className="text-xs text-muted-foreground">
-                            <strong>Proton</strong> {t("settings.linuxCompat.infoBoxProton")}{" "}
+                            <strong>Proton</strong>{" "}
+                            {t("settings.linuxCompat.infoBoxProton")}{" "}
                             <strong>Wine</strong> {t("settings.linuxCompat.infoBoxWine")}
                           </p>
                         </div>
@@ -3625,11 +3673,13 @@ function Settings() {
                               <span className="text-sm font-medium">UMU Launcher</span>
                               {umuInstalled ? (
                                 <span className="flex items-center gap-1 rounded bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-600">
-                                  <FileCheck2 className="h-3 w-3" /> {t("common.installed")}
+                                  <FileCheck2 className="h-3 w-3" />{" "}
+                                  {t("common.installed")}
                                 </span>
                               ) : (
                                 <span className="flex items-center gap-1 rounded bg-red-500/20 px-2 py-0.5 text-xs font-semibold text-red-500">
-                                  <AlertTriangle className="h-3 w-3" /> {t("common.missing")}
+                                  <AlertTriangle className="h-3 w-3" />{" "}
+                                  {t("common.missing")}
                                 </span>
                               )}
                             </div>
@@ -3649,11 +3699,15 @@ function Settings() {
                                     if (result.success) {
                                       setUmuInstalled(true);
                                       toast.success(
-                                        t("settings.linuxCompat.umu.launcher.installSuccess")
+                                        t(
+                                          "settings.linuxCompat.umu.launcher.installSuccess"
+                                        )
                                       );
                                     } else {
                                       toast.error(
-                                        t("settings.linuxCompat.umu.launcher.installFailed") +
+                                        t(
+                                          "settings.linuxCompat.umu.launcher.installFailed"
+                                        ) +
                                           ": " +
                                           (result.error || result.message)
                                       );
@@ -3728,22 +3782,30 @@ function Settings() {
                                   setIsDownloadingUmuProton(true);
                                   setUmuProtonUpdateStatus(null);
                                   try {
-                                    const result = await window.electron.downloadUmuProton();
+                                    const result =
+                                      await window.electron.downloadUmuProton();
                                     if (result.success) {
                                       toast.success(
-                                        t("settings.linuxCompat.umu.proton.installSuccess", {
-                                          name: result.name,
-                                        })
+                                        t(
+                                          "settings.linuxCompat.umu.proton.installSuccess",
+                                          {
+                                            name: result.name,
+                                          }
+                                        )
                                       );
                                       const updated = await window.electron.getRunners();
                                       setRunners(updated);
-                                      const info = await window.electron.getUmuProtonInfo();
+                                      const info =
+                                        await window.electron.getUmuProtonInfo();
                                       if (info?.success) setUmuProtonInfo(info);
                                     } else {
                                       toast.error(
-                                        t("settings.linuxCompat.umu.proton.installFailed", {
-                                          message: result.message || "Unknown error",
-                                        })
+                                        t(
+                                          "settings.linuxCompat.umu.proton.installFailed",
+                                          {
+                                            message: result.message || "Unknown error",
+                                          }
+                                        )
                                       );
                                     }
                                   } catch (e) {
@@ -3782,7 +3844,8 @@ function Settings() {
                                 disabled={umuProtonUpdateStatus === "checking"}
                                 onClick={async () => {
                                   setUmuProtonUpdateStatus("checking");
-                                  const info = await window.electron.checkUmuProtonUpdate();
+                                  const info =
+                                    await window.electron.checkUmuProtonUpdate();
                                   if (info?.success) {
                                     setUmuProtonInfo(info);
                                     setUmuProtonUpdateStatus(
@@ -3880,7 +3943,8 @@ function Settings() {
                                     <span>
                                       {" "}
                                       {t("settings.linuxCompat.protonConfirm.replacing", {
-                                        versions: protonGEInfo.installedVersions.join(", "),
+                                        versions:
+                                          protonGEInfo.installedVersions.join(", "),
                                       })}
                                     </span>
                                   )}
@@ -3910,7 +3974,9 @@ function Settings() {
                               </strong>{" "}
                               {protonGEInfo &&
                                 t("settings.linuxCompat.protonConfirm.sizeApprox", {
-                                  gb: (protonGEInfo.size / (1024 * 1024 * 1024)).toFixed(1),
+                                  gb: (protonGEInfo.size / (1024 * 1024 * 1024)).toFixed(
+                                    1
+                                  ),
                                 })}
                             </p>
                             <p>
@@ -3980,7 +4046,9 @@ function Settings() {
                           <AlertDialogTitle>
                             {protonCachyInfo?.updateAvailable
                               ? t("settings.linuxCompat.protonConfirm.titleUpdateCachy")
-                              : t("settings.linuxCompat.protonConfirm.titleDownloadCachy")}
+                              : t(
+                                  "settings.linuxCompat.protonConfirm.titleDownloadCachy"
+                                )}
                           </AlertDialogTitle>
                           <AlertDialogDescription className="space-y-3">
                             <p>
@@ -4027,9 +4095,10 @@ function Settings() {
                               </strong>{" "}
                               {protonCachyInfo &&
                                 t("settings.linuxCompat.protonConfirm.sizeApprox", {
-                                  gb: (protonCachyInfo.size / (1024 * 1024 * 1024)).toFixed(
-                                    1
-                                  ),
+                                  gb: (
+                                    protonCachyInfo.size /
+                                    (1024 * 1024 * 1024)
+                                  ).toFixed(1),
                                 })}
                             </p>
                             <p>
@@ -4055,7 +4124,8 @@ function Settings() {
                               setProtonCachyUpdateStatus(null);
                               setIsDownloadingProtonCachy(true);
                               try {
-                                const result = await window.electron.downloadProtonCachyOS();
+                                const result =
+                                  await window.electron.downloadProtonCachyOS();
                                 if (result.success) {
                                   const updated = await window.electron.getRunners();
                                   setRunners(updated);
@@ -4090,7 +4160,7 @@ function Settings() {
 
             <SettingsCategory {...categoryProps("tools")} columns>
               {/* Timemachine Card */}
-              <Card id="timemachine" className="border border-border/60 shadow-none p-6">
+              <Card id="timemachine" className="border border-border/60 p-6 shadow-none">
                 <div className="mb-2 flex items-center gap-2">
                   <History className="mb-2 h-5 w-5 text-primary" />
                   <h2 className="text-base font-semibold text-foreground">
@@ -4131,7 +4201,10 @@ function Settings() {
               </Card>
 
               {/* Workshop Downloader Card */}
-              <Card id="workshop-downloader" className="border border-border/60 shadow-none p-6">
+              <Card
+                id="workshop-downloader"
+                className="border border-border/60 p-6 shadow-none"
+              >
                 <div className="mb-2 flex items-center gap-2">
                   <Package className="mb-2 h-5 w-5 text-primary" />
                   <h2 className="text-base font-semibold text-foreground">
@@ -4189,7 +4262,7 @@ function Settings() {
 
               {/* Components Card */}
               {isOnWindows && (
-                <Card id="components" className="border border-border/60 shadow-none p-6">
+                <Card id="components" className="border border-border/60 p-6 shadow-none">
                   <div className="mb-2 flex items-center gap-2">
                     <CpuIcon className="mb-2 h-5 w-5 text-primary" />
                     <h2 className="text-base font-semibold text-foreground">
@@ -4211,7 +4284,7 @@ function Settings() {
 
             <SettingsCategory {...categoryProps("advanced")} columns>
               {/* App Branch Card */}
-              <Card className="overflow-hidden border border-border/60 shadow-none p-0">
+              <Card className="overflow-hidden border border-border/60 p-0 shadow-none">
                 <div className="border-b border-border px-6 py-4">
                   <div className="flex items-center gap-2">
                     <FlaskConical className="mb-2 h-5 w-5 text-primary" />
@@ -4258,7 +4331,8 @@ function Settings() {
                     },
                   ].map(branch => {
                     const isActive = currentBranch === branch.id;
-                    const isLocked = branch.requiresSubscription && !hasAscendSubscription;
+                    const isLocked =
+                      branch.requiresSubscription && !hasAscendSubscription;
                     return (
                       <button
                         key={branch.id}
@@ -4366,7 +4440,7 @@ function Settings() {
 
               {/* Developer Settings Card - Only shown in development mode */}
               {isDev && (
-                <Card className="border border-border/60 shadow-none p-6">
+                <Card className="border border-border/60 p-6 shadow-none">
                   <div className="space-y-6">
                     <div>
                       <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
@@ -4423,6 +4497,7 @@ function Settings() {
                               <SelectItem value="loading">Loading</SelectItem>
                               <SelectItem value="crashscreen">Crash Screen</SelectItem>
                               <SelectItem value="finishingup">Finishing Up</SelectItem>
+                              <SelectItem value="welcome">Welcome Flow</SelectItem>
                             </SelectContent>
                           </Select>
                           <Button
@@ -4446,7 +4521,7 @@ function Settings() {
                 </Card>
               )}
 
-              <Card className="border border-border/60 shadow-none p-6">
+              <Card className="border border-border/60 p-6 shadow-none">
                 <div className="mb-2 flex items-center gap-2">
                   <MessageCircleQuestion className="mb-2 h-5 w-5 text-primary" />
                   <h2 className="text-base font-semibold text-foreground">
@@ -4466,7 +4541,6 @@ function Settings() {
                   {t("settings.getHelp")}
                 </Button>
               </Card>
-
             </SettingsCategory>
           </div>
         </div>
@@ -5001,7 +5075,6 @@ function Settings() {
                   />
                 </div>
               </div>
-
             </div>
 
             {/* Live Preview */}
