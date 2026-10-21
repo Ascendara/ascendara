@@ -1,4 +1,6 @@
 /** Keep the companion's installed library current and execute its launch queue. */
+import recentGamesService from './recentGamesService';
+
 const MONITOR = 'https://monitor.ascendara.app';
 let timer = null;
 let user = null;
@@ -82,7 +84,19 @@ async function tick() {
         console.error('[DesktopLibrary] Library sync failed:', error);
       }
     }
-    const { commands } = await authorizedFetch(`/library/commands/${encodeURIComponent(user.uid)}`);
+    const sessions = await window.electron.getRunningGameSessions();
+    if (currentUser !== user) return;
+    if (!games) games = await localGames();
+    await authorizedFetch('/library/activity', { method: 'POST', body: JSON.stringify({
+      sessions: sessions.flatMap(session => {
+        const entry = games.find(({ game, isCustom }) => isCustom === session.isCustom &&
+          (game.game || game.name) === session.name &&
+          (!session.sourceDir || game._sourceDir === session.sourceDir) &&
+          (!isCustom || game.executable === session.executable));
+        return entry ? [{ gameId: entry.id, sessionId: session.sessionId, startedAt: session.startedAt, canStop: session.canStop }] : [];
+      }),
+    }) });
+    const { commands } = await authorizedFetch(`/library/commands/${encodeURIComponent(user.uid)}?actions=launch,stop`);
     if (currentUser !== user) return;
     if (commands.length && !games) games = await localGames();
     for (const command of commands) {
@@ -103,6 +117,9 @@ async function tick() {
         if (!entry) throw new Error('Game is no longer installed.');
         const { game, isCustom } = entry;
         const name = game.game || game.name;
+        if (command.action === 'stop') {
+          await window.electron.stopGame(name, command.sessionId);
+        } else if (command.action === 'launch' || !command.action) {
         if (await window.electron.isDev()) throw new Error('Game launching is unavailable in developer mode.');
         if (await window.electron.isGameRunning(name)) throw new Error('This game is already running.');
         if (game.online && !game.launchCount) throw new Error('Launch this game once in Ascendara before using remote play.');
@@ -115,6 +132,16 @@ async function tick() {
           game._sourceDir ? { _sourceDir: game._sourceDir, executable: game.executable } : null,
         );
         if (result === false || result?.success === false) throw new Error(result?.error || 'Game launch failed.');
+        recentGamesService.addRecentGame({
+          game: name,
+          name: game.name,
+          imgID: game.imgID,
+          version: game.version,
+          isCustom,
+          online: game.online,
+          dlc: game.dlc,
+        });
+        } else { throw new Error('Unknown game command.'); }
         } catch (cause) {
           status = 'failed';
           error = cause instanceof Error ? cause.message : 'Game launch failed.';

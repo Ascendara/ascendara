@@ -415,6 +415,8 @@ contextBridge.exposeInMainWorld("electron", {
     ),
   checkTrainerExists: (gameName, isCustom) =>
     ipcRenderer.invoke("check-trainer-exists", gameName, isCustom),
+  getRunningGameSessions: () => ipcRenderer.invoke("get-running-game-sessions"),
+  stopGame: (game, sessionId) => ipcRenderer.invoke("stop-game", game, sessionId),
   isGameRunning: game => ipcRenderer.invoke("is-game-running", game),
   startSteam: () => ipcRenderer.invoke("start-steam"),
   isSteamRunning: () => ipcRenderer.invoke("is-steam-running"),

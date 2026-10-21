@@ -30,6 +30,7 @@ import ctypes
 import atexit
 from pypresence import Presence
 import psutil
+import threading
 import shutil
 import re
 import tempfile
@@ -1232,10 +1233,43 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                 logging.warning(f"Trainer not found at: {trainer_path}")
 
         logging.info("Entering game process monitoring loop (180s intervals)")
+        print("ASCENDARA_STOP_READY", flush=True)
+        was_stopped = False
+        stop_requested = threading.Event()
+        def read_commands():
+            for command in sys.stdin:
+                if command.strip() == 'ASCENDARA_STOP':
+                    stop_requested.set()
+        threading.Thread(target=read_commands, daemon=True).start()
         stub_exited_logged = False
         tracked_related_process = False
         session_end_time = start_time
         while True:
+            if stop_requested.is_set():
+                stop_requested.clear()
+                was_stopped = True
+                targets = {p.pid: p for p in get_running_processes_in_dir(game_root_dir, exclude_pids={handler_pid})}
+                if process.poll() is None:
+                    try:
+                        parent = psutil.Process(process.pid)
+                        targets[parent.pid] = parent
+                        for child in parent.children(recursive=True):
+                            targets[child.pid] = child
+                    except psutil.NoSuchProcess:
+                        pass
+                for parent in list(targets.values()):
+                    try:
+                        for child in parent.children(recursive=True):
+                            targets[child.pid] = child
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+                for target in reversed(list(targets.values())):
+                    try:
+                        target.kill()
+                    except psutil.NoSuchProcess:
+                        pass
+                    except psutil.AccessDenied:
+                        logging.error("Permission denied stopping game process %s", target.pid)
             if process.poll() is None:
                 game_alive = True
             else:
@@ -1302,7 +1336,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         # a separate process spawned by a launcher/stub.
         last_session = {
             "seconds": max(0, int(session_end_time - start_time)),
-            "crashed": not tracked_related_process and is_abnormal_exit(return_code),
+            "crashed": not was_stopped and not tracked_related_process and is_abnormal_exit(return_code),
             "endedAt": datetime.now().isoformat(),
         }
         logging.info(f"Session summary for {game_name}: {last_session}")

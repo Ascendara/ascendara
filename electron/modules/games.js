@@ -751,12 +751,23 @@ function registerGameHandlers() {
         let launchFailed = false;
         const runGame = spawn(executablePath, spawnArgs, {
           detached: false,
-          stdio: ["ignore", "pipe", "pipe"],
+          stdio: ["pipe", "pipe", "pipe"],
           windowsHide: true,
         });
 
+        let activityOutput = "";
         runGame.stdout.on("data", data => {
           exitMonitor.write(data);
+          activityOutput += data.toString();
+          const activityLines = activityOutput.split(/\r?\n/);
+          activityOutput = activityLines.pop().slice(-4096);
+          for (const line of activityLines) {
+            if (line === "ASCENDARA_STOP_READY") runGame.stopSupported = true;
+            if (/^ASCENDARA_SESSION_DURATION_MS:\d+$/.test(line)) {
+              runGame.sessionEnded = true;
+              runGame.emit("session-ended");
+            }
+          }
           console.log(`Game handler output: ${data}`);
         });
 
@@ -764,6 +775,8 @@ function registerGameHandlers() {
           console.error(`Game handler error: ${data}`);
         });
 
+        runGame.playSession = { sessionId: require("crypto").randomUUID(), startedAt: Date.now(), name: game,
+          isCustom, sourceDir: installation?._sourceDir || (!isCustom ? path.dirname(gameDirectory) : ""), executable };
         runGameProcesses.set(game, runGame);
 
         runGame.once("spawn", () => {
@@ -795,7 +808,7 @@ function registerGameHandlers() {
               ...(!isCustom ? { _sourceDir: path.dirname(gameDirectory) } : {}),
               executable,
             },
-            ...exitMonitor.result({ stopped: runGame.killed, failed: launchFailed }),
+            ...exitMonitor.result({ stopped: runGame.killed || runGame.stopRequested, failed: launchFailed }),
           });
         });
 
@@ -839,11 +852,30 @@ function registerGameHandlers() {
   );
 
   // Stop game
-  ipcMain.handle("stop-game", (_, game) => {
-    const runGame = runGameProcesses.get(game);
-    if (runGame) {
-      runGame.kill();
+  ipcMain.handle("get-running-game-sessions", () =>
+    [...runGameProcesses.values()].filter(proc => !proc.sessionEnded).map(proc => ({ ...proc.playSession, canStop: !!proc.stopSupported })));
+  ipcMain.handle("stop-game", async (_, game, sessionId) => {
+    const proc = runGameProcesses.get(game);
+    if (!proc || (sessionId && proc.playSession.sessionId !== sessionId)) {
+      throw new Error("This play session has already ended.");
     }
+    if (!proc.stopSupported) throw new Error("Update the desktop game helper and relaunch this game to enable remote stop.");
+    proc.stopRequested = true;
+    // Let the helper stop the actual game and flush the final playtime.
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => finish(new Error("Game did not stop. Check the desktop for permission errors.")), 15000);
+      const closed = () => finish();
+      const finish = error => {
+        clearTimeout(timeout);
+        proc.removeListener("close", closed);
+        proc.removeListener("session-ended", closed);
+        error ? reject(error) : resolve();
+      };
+      proc.once("close", closed);
+      proc.once("session-ended", closed);
+      proc.stdin.write("ASCENDARA_STOP\n", error => { if (error) finish(error); });
+    });
+    return { success: true };
   });
 
   // Check if game is running
