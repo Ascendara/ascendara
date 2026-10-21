@@ -41,6 +41,7 @@ import {
   Download,
   MessageSquare,
   HelpCircle,
+  Share2,
 } from "lucide-react";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import gameService from "@/services/gameService";
@@ -1812,7 +1813,7 @@ const Home = memo(() => {
           <div className="mx-auto max-w-3xl text-center">
             <div className="mb-6 flex justify-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5">
-                <BanknoteIcon className="h-7 w-7 text-primary" />
+                <Share2 className="h-7 w-7 text-primary" />
               </div>
             </div>
 
