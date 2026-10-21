@@ -27,6 +27,7 @@ const { prepareDownloaderRuntime } = require("./downloaderRuntime");
 const { startDownloadWatchdog } = require("./downloadLiveness");
 
 const steamgrid = require("./steamgrid");
+const gameUpdateBackup = require("./gameUpdateBackup");
 
 const {
   listHelpers,
@@ -211,6 +212,7 @@ function registerDownloadHandlers() {
 
       for (const downloadDir of allDownloadDirectories) {
         try {
+          await gameUpdateBackup.recoverLibrary(downloadDir, withDownloadOperation);
           const subdirectories = await fs.promises.readdir(downloadDir, {
             withFileTypes: true,
           });
@@ -223,6 +225,11 @@ function registerDownloadHandlers() {
             try {
               const gameInfoData = await fs.promises.readFile(gameInfoPath, "utf8");
               const gameData = JSON.parse(gameInfoData);
+              if (!gameData.downloadingData) {
+                await withDownloadOperation(dir, () =>
+                  gameUpdateBackup.finish(path.join(downloadDir, dir))
+                );
+              }
 
               // Check if this game has active downloadingData
               if (gameData.downloadingData) {
@@ -410,284 +417,253 @@ function registerDownloadHandlers() {
       browserAssetGameId,
       browserAssetLogoId
     ) => {
-      if (typeof link === "string" && link.startsWith("private:")) {
-        const [, sourceId, entryId] = link.split(":");
-        return require("./privateSources").start(
-          sourceId,
-          entryId,
-          additionalDirIndex || 0
-        );
-      }
-      console.log(
-        `Downloading file: ${link}, game: ${game}, online: ${online}, dlc: ${dlc}, isVr: ${isVr}, updateFlow: ${updateFlow}, version: ${version}, size: ${size}, additionalDirIndex: ${additionalDirIndex}, gameID: ${gameID}`
-      );
-
-      if (
-        browserAssetGameId !== undefined &&
-        browserAssetGameId !== null &&
-        (!Number.isSafeInteger(browserAssetGameId) || browserAssetGameId <= 0)
-      ) {
-        throw new Error("Invalid artwork game selection");
-      }
-      if (
-        browserAssetLogoId != null &&
-        (!Number.isSafeInteger(browserAssetLogoId) ||
-          browserAssetLogoId <= 0 ||
-          !Number.isSafeInteger(browserAssetGameId) ||
-          browserAssetGameId <= 0)
-      ) {
-        throw new Error("Invalid artwork logo selection");
-      }
-      if (browserDirect === true) {
-        const parsed = new URL(link);
-        if (
-          !["http:", "https:"].includes(parsed.protocol) ||
-          parsed.username ||
-          parsed.password
-        ) {
-          throw new Error("Invalid browser download URL");
-        }
-      }
-      const settings = settingsManager.getSettings();
-      let targetDirectory;
-      let gameDirectory;
-      const sanitizedGame = sanitizeGameName(sanitizeText(game));
-      console.log(`Sanitized game name: ${sanitizedGame}`);
-
-      // If it's an update flow, search for existing game directory
-      if (updateFlow) {
-        console.log(`Update flow detected - searching for existing game directory`);
-        const allDirectories = [
-          settings.downloadDirectory,
-          ...(settings.additionalDirectories || []),
-        ];
-
-        for (let i = 0; i < allDirectories.length; i++) {
-          const testPath = path.join(allDirectories[i], sanitizedGame);
-          try {
-            await fs.promises.access(testPath);
-            targetDirectory = allDirectories[i];
-            gameDirectory = testPath;
-            console.log(`Found existing game directory at: ${gameDirectory}`);
-
-            // Delete all contents except .ascendara.json and header.ascendara files
-            const files = await fs.promises.readdir(gameDirectory);
-            for (const file of files) {
-              // Preserve the game's ascendara.json file and header image
-              if (
-                file.endsWith(".ascendara.json") ||
-                file.startsWith("header.ascendara")
-              ) {
-                console.log(`Update flow: preserving file: ${file}`);
-                continue;
-              }
-              const filePath = path.join(gameDirectory, file);
-              const stat = await fs.promises.stat(filePath);
-              if (stat.isDirectory()) {
-                await fs.promises.rm(filePath, { recursive: true });
-              } else {
-                await fs.promises.unlink(filePath);
-              }
-            }
-            break;
-          } catch (err) {
-            continue;
-          }
-        }
-
-        if (!targetDirectory) {
-          throw new Error(
-            `Could not find existing game directory for update: ${sanitizedGame}`
+      return withDownloadOperation(sanitizeGameName(sanitizeText(game)), async () => {
+        if (typeof link === "string" && link.startsWith("private:")) {
+          const [, sourceId, entryId] = link.split(":");
+          return require("./privateSources").start(
+            sourceId,
+            entryId,
+            additionalDirIndex || 0
           );
         }
-      } else {
-        if (additionalDirIndex === 0) {
-          targetDirectory = settings.downloadDirectory;
-        } else {
-          const additionalDirectories = settings.additionalDirectories || [];
-          targetDirectory = additionalDirectories[additionalDirIndex - 1];
-          if (!targetDirectory) {
-            throw new Error(`Invalid additional directory index: ${additionalDirIndex}`);
-          }
-        }
-        gameDirectory = path.join(targetDirectory, sanitizedGame);
-
-        // If the destination folder already exists and wasn't created by a
-        // previous Ascendara download (no tracking JSON present), it likely
-        // contains files unrelated to this download (e.g. a manual install
-        // with save data). Snapshot its current top-level contents so they
-        // are never touched if the user later kills/deletes the download.
-        const existingJsonPath = path.join(
-          gameDirectory,
-          `${sanitizedGame}.ascendara.json`
-        );
-        if (fs.existsSync(gameDirectory) && !fs.existsSync(existingJsonPath)) {
-          try {
-            const preexistingEntries = await fs.promises.readdir(gameDirectory);
-            if (preexistingEntries.length > 0) {
-              console.log(
-                `Destination folder already exists with ${preexistingEntries.length} pre-existing item(s), preserving them: ${gameDirectory}`
-              );
-              await fs.promises.writeFile(
-                path.join(gameDirectory, "preexisting.ascendara.json"),
-                JSON.stringify(preexistingEntries, null, 2)
-              );
-            }
-          } catch (snapshotError) {
-            console.error(
-              `Failed to snapshot pre-existing directory contents: ${snapshotError}`
-            );
-          }
-        }
-
-        await fs.promises.mkdir(gameDirectory, { recursive: true });
-      }
-
-      try {
-        // Download game header image (skip if updateFlow and header already exists, or if imgID is undefined)
-        let headerImagePath;
-        let imageBuffer;
-
-        // Check if header image already exists (for update flow)
-        const existingHeaders = await fs.promises.readdir(gameDirectory).catch(() => []);
-        const existingHeader = existingHeaders.find(f =>
-          f.startsWith("header.ascendara")
-        );
-
-        if (updateFlow && existingHeader) {
-          console.log(`Update flow: keeping existing header image: ${existingHeader}`);
-          headerImagePath = path.join(gameDirectory, existingHeader);
-        } else if (imgID) {
-          // Only try to download image if imgID is defined
-          if (settings.localIndex) {
-            const localImagePath = path.join(settings.localIndex, "imgs", `${imgID}.jpg`);
-            if (fs.existsSync(localImagePath)) {
-              imageBuffer = await fs.promises.readFile(localImagePath);
-              headerImagePath = path.join(gameDirectory, `header.ascendara.jpg`);
-              await fs.promises.writeFile(headerImagePath, imageBuffer);
-            }
-          }
-
-          // Try SteamGridDB fallback if no local image found
-          if (!headerImagePath) {
-            try {
-              console.log(
-                `No local header image found, trying SteamGridDB fallback for: ${game}`
-              );
-              const steamGridHeader = await steamgrid.fetchGameHeader(game);
-              if (steamGridHeader && steamGridHeader.url) {
-                const response = await axios({
-                  url: steamGridHeader.url,
-                  method: "GET",
-                  responseType: "arraybuffer",
-                  timeout: 10000,
-                });
-
-                imageBuffer = Buffer.from(response.data);
-                const mimeType = response.headers["content-type"];
-                const extension = getExtensionFromMimeType(mimeType);
-                headerImagePath = path.join(
-                  gameDirectory,
-                  `header.ascendara${extension}`
-                );
-                await fs.promises.writeFile(headerImagePath, imageBuffer);
-                console.log(
-                  `SteamGridDB header image downloaded and saved: ${headerImagePath}`
-                );
-              } else {
-                console.log(`No SteamGridDB header image found for: ${game}`);
-              }
-            } catch (steamGridError) {
-              console.warn(
-                `SteamGridDB fallback failed for ${game}:`,
-                steamGridError.message
-              );
-            }
-          }
-        } else {
-          console.log(`No imgID provided, skipping header image download`);
-        }
-
-        // Download Steamgriddb assets
         console.log(
-          `[Download] Starting background asset fetch for ${game} (Name Search)`
+          `Downloading file: ${link}, game: ${game}, online: ${online}, dlc: ${dlc}, isVr: ${isVr}, updateFlow: ${updateFlow}, version: ${version}, size: ${size}, additionalDirIndex: ${additionalDirIndex}, gameID: ${gameID}`
         );
-        // Launch in background to not interfer with game downloading
-        if (browserAssetGameId !== null) {
-          steamgrid
-            .fetchGameAssets(game, gameDirectory, browserAssetGameId, browserAssetLogoId)
-            .catch(err => console.error(`[Download] Assets download failed:`, err));
+
+        if (
+          browserAssetGameId !== undefined &&
+          browserAssetGameId !== null &&
+          (!Number.isSafeInteger(browserAssetGameId) || browserAssetGameId <= 0)
+        ) {
+          throw new Error("Invalid artwork game selection");
         }
-        let executablePath;
-        let spawnCommand;
-        const linkStr = typeof link === "string" ? link.trim().toLowerCase() : "";
-        const isMagnetLink = linkStr.startsWith("magnet:");
-        const isDotTorrentFile = linkStr.split("?")[0].endsWith(".torrent");
-        const isTorrentLink = isMagnetLink || isDotTorrentFile;
+        if (
+          browserAssetLogoId != null &&
+          (!Number.isSafeInteger(browserAssetLogoId) ||
+            browserAssetLogoId <= 0 ||
+            !Number.isSafeInteger(browserAssetGameId) ||
+            browserAssetGameId <= 0)
+        ) {
+          throw new Error("Invalid artwork logo selection");
+        }
+        if (browserDirect === true) {
+          const parsed = new URL(link);
+          if (
+            !["http:", "https:"].includes(parsed.protocol) ||
+            parsed.username ||
+            parsed.password
+          ) {
+            throw new Error("Invalid browser download URL");
+          }
+        }
+        const settings = settingsManager.getSettings();
+        let targetDirectory;
+        let gameDirectory;
+        const sanitizedGame = sanitizeGameName(sanitizeText(game));
+        if (!sanitizedGame || sanitizedGame === "." || sanitizedGame === "..") {
+          throw new Error("Invalid game name.");
+        }
+        console.log(`Sanitized game name: ${sanitizedGame}`);
 
-        if (isWindows) {
-          executablePath = isDev
-            ? path.join(
-                isTorrentLink
-                  ? "./binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler.exe"
-                  : "./binaries/AscendaraDownloader/dist/AscendaraDownloader.exe"
-              )
-            : path.join(
-                appDirectory,
-                isTorrentLink
-                  ? "/resources/AscendaraTorrentHandler.exe"
-                  : "/resources/AscendaraDownloader.exe"
-              );
+        // If it's an update flow, search for existing game directory
+        if (updateFlow) {
+          console.log(`Update flow detected - searching for existing game directory`);
+          const allDirectories = [
+            settings.downloadDirectory,
+            ...(settings.additionalDirectories || []),
+          ].filter(Boolean);
 
-          spawnCommand = isTorrentLink
-            ? [
-                link,
-                sanitizedGame,
-                online,
-                dlc,
-                isVr,
-                updateFlow,
-                version || -1,
-                size,
-                settings.downloadDirectory,
-              ]
-            : [
-                link,
-                sanitizedGame,
-                online,
-                dlc,
-                isVr,
-                updateFlow,
-                version || -1,
-                size,
-                targetDirectory,
-                gameID || "",
-              ];
-        } else {
-          if (isDev) {
-            executablePath = getPythonPath();
-            const scriptPath = path.join(
-              isTorrentLink
-                ? "./binaries/AscendaraTorrentHandler/src/AscendaraTorrentHandler.py"
-                : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
+          for (let i = 0; i < allDirectories.length; i++) {
+            const testPath = path.join(allDirectories[i], sanitizedGame);
+            try {
+              await fs.promises.access(testPath);
+              targetDirectory = allDirectories[i];
+              gameDirectory = testPath;
+              console.log(`Found existing game directory at: ${gameDirectory}`);
+
+              break;
+            } catch (err) {
+              continue;
+            }
+          }
+
+          if (!targetDirectory) {
+            throw new Error(
+              `Could not find existing game directory for update: ${sanitizedGame}`
             );
+          }
+        } else {
+          if (additionalDirIndex === 0) {
+            targetDirectory = settings.downloadDirectory;
+          } else {
+            const additionalDirectories = settings.additionalDirectories || [];
+            targetDirectory = additionalDirectories[additionalDirIndex - 1];
+            if (!targetDirectory) {
+              throw new Error(
+                `Invalid additional directory index: ${additionalDirIndex}`
+              );
+            }
+          }
+          gameDirectory = path.join(targetDirectory, sanitizedGame);
+
+          // If the destination folder already exists and wasn't created by a
+          // previous Ascendara download (no tracking JSON present), it likely
+          // contains files unrelated to this download (e.g. a manual install
+          // with save data). Snapshot its current top-level contents so they
+          // are never touched if the user later kills/deletes the download.
+          const existingJsonPath = path.join(
+            gameDirectory,
+            `${sanitizedGame}.ascendara.json`
+          );
+          if (fs.existsSync(gameDirectory) && !fs.existsSync(existingJsonPath)) {
+            try {
+              const preexistingEntries = await fs.promises.readdir(gameDirectory);
+              if (preexistingEntries.length > 0) {
+                console.log(
+                  `Destination folder already exists with ${preexistingEntries.length} pre-existing item(s), preserving them: ${gameDirectory}`
+                );
+                await fs.promises.writeFile(
+                  path.join(gameDirectory, "preexisting.ascendara.json"),
+                  JSON.stringify(preexistingEntries, null, 2)
+                );
+              }
+            } catch (snapshotError) {
+              console.error(
+                `Failed to snapshot pre-existing directory contents: ${snapshotError}`
+              );
+            }
+          }
+
+          await fs.promises.mkdir(gameDirectory, { recursive: true });
+        }
+
+        let updatePrepared = false;
+        try {
+          if (updateFlow) {
+            await gameUpdateBackup.prepare(gameDirectory);
+            updatePrepared = true;
+          }
+          // Download game header image (skip if updateFlow and header already exists, or if imgID is undefined)
+          let headerImagePath;
+          let imageBuffer;
+
+          // Check if header image already exists (for update flow)
+          const existingHeaders = await fs.promises
+            .readdir(gameDirectory)
+            .catch(() => []);
+          const existingHeader = existingHeaders.find(f =>
+            f.startsWith("header.ascendara")
+          );
+
+          if (updateFlow && existingHeader) {
+            console.log(`Update flow: keeping existing header image: ${existingHeader}`);
+            headerImagePath = path.join(gameDirectory, existingHeader);
+          } else if (imgID) {
+            // Only try to download image if imgID is defined
+            if (settings.localIndex) {
+              const localImagePath = path.join(
+                settings.localIndex,
+                "imgs",
+                `${imgID}.jpg`
+              );
+              if (fs.existsSync(localImagePath)) {
+                imageBuffer = await fs.promises.readFile(localImagePath);
+                headerImagePath = path.join(gameDirectory, `header.ascendara.jpg`);
+                await fs.promises.writeFile(headerImagePath, imageBuffer);
+              }
+            }
+
+            // Try SteamGridDB fallback if no local image found
+            if (!headerImagePath) {
+              try {
+                console.log(
+                  `No local header image found, trying SteamGridDB fallback for: ${game}`
+                );
+                const steamGridHeader = await steamgrid.fetchGameHeader(game);
+                if (steamGridHeader && steamGridHeader.url) {
+                  const response = await axios({
+                    url: steamGridHeader.url,
+                    method: "GET",
+                    responseType: "arraybuffer",
+                    timeout: 10000,
+                  });
+
+                  imageBuffer = Buffer.from(response.data);
+                  const mimeType = response.headers["content-type"];
+                  const extension = getExtensionFromMimeType(mimeType);
+                  headerImagePath = path.join(
+                    gameDirectory,
+                    `header.ascendara${extension}`
+                  );
+                  await fs.promises.writeFile(headerImagePath, imageBuffer);
+                  console.log(
+                    `SteamGridDB header image downloaded and saved: ${headerImagePath}`
+                  );
+                } else {
+                  console.log(`No SteamGridDB header image found for: ${game}`);
+                }
+              } catch (steamGridError) {
+                console.warn(
+                  `SteamGridDB fallback failed for ${game}:`,
+                  steamGridError.message
+                );
+              }
+            }
+          } else {
+            console.log(`No imgID provided, skipping header image download`);
+          }
+
+          // Download Steamgriddb assets
+          console.log(
+            `[Download] Starting background asset fetch for ${game} (Name Search)`
+          );
+          // Launch in background to not interfer with game downloading
+          if (browserAssetGameId !== null) {
+            steamgrid
+              .fetchGameAssets(
+                game,
+                gameDirectory,
+                browserAssetGameId,
+                browserAssetLogoId
+              )
+              .catch(err => console.error(`[Download] Assets download failed:`, err));
+          }
+          let executablePath;
+          let spawnCommand;
+          const linkStr = typeof link === "string" ? link.trim().toLowerCase() : "";
+          const isMagnetLink = linkStr.startsWith("magnet:");
+          const isDotTorrentFile = linkStr.split("?")[0].endsWith(".torrent");
+          const isTorrentLink = isMagnetLink || isDotTorrentFile;
+
+          if (isWindows) {
+            executablePath = isDev
+              ? path.join(
+                  isTorrentLink
+                    ? "./binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler.exe"
+                    : "./binaries/AscendaraDownloader/dist/AscendaraDownloader.exe"
+                )
+              : path.join(
+                  appDirectory,
+                  isTorrentLink
+                    ? "/resources/AscendaraTorrentHandler.exe"
+                    : "/resources/AscendaraDownloader.exe"
+                );
+
             spawnCommand = isTorrentLink
               ? [
-                  scriptPath,
                   link,
-                  game,
+                  sanitizedGame,
                   online,
                   dlc,
                   isVr,
                   updateFlow,
                   version || -1,
                   size,
-                  settings.downloadDirectory,
+                  targetDirectory,
                 ]
               : [
-                  scriptPath,
                   link,
-                  game,
+                  sanitizedGame,
                   online,
                   dlc,
                   isVr,
@@ -698,142 +674,195 @@ function registerDownloadHandlers() {
                   gameID || "",
                 ];
           } else {
-            executablePath = path.join(
-              process.resourcesPath,
-              isTorrentLink ? "AscendaraTorrentHandler" : "AscendaraDownloader"
-            );
-            spawnCommand = isTorrentLink
-              ? [
-                  link,
-                  game,
-                  online,
-                  dlc,
-                  isVr,
-                  updateFlow,
-                  version || -1,
-                  size,
-                  settings.downloadDirectory,
-                ]
-              : [
-                  link,
-                  game,
-                  online,
-                  dlc,
-                  isVr,
-                  updateFlow,
-                  version || -1,
-                  size,
-                  targetDirectory,
-                  gameID || "",
-                ];
+            if (isDev) {
+              executablePath = getPythonPath();
+              const scriptPath = path.join(
+                isTorrentLink
+                  ? "./binaries/AscendaraTorrentHandler/src/AscendaraTorrentHandler.py"
+                  : "./binaries/AscendaraDownloader/src/AscendaraDownloader.py"
+              );
+              spawnCommand = isTorrentLink
+                ? [
+                    scriptPath,
+                    link,
+                    game,
+                    online,
+                    dlc,
+                    isVr,
+                    updateFlow,
+                    version || -1,
+                    size,
+                    targetDirectory,
+                  ]
+                : [
+                    scriptPath,
+                    link,
+                    game,
+                    online,
+                    dlc,
+                    isVr,
+                    updateFlow,
+                    version || -1,
+                    size,
+                    targetDirectory,
+                    gameID || "",
+                  ];
+            } else {
+              executablePath = path.join(
+                process.resourcesPath,
+                isTorrentLink ? "AscendaraTorrentHandler" : "AscendaraDownloader"
+              );
+              spawnCommand = isTorrentLink
+                ? [
+                    link,
+                    game,
+                    online,
+                    dlc,
+                    isVr,
+                    updateFlow,
+                    version || -1,
+                    size,
+                    targetDirectory,
+                  ]
+                : [
+                    link,
+                    game,
+                    online,
+                    dlc,
+                    isVr,
+                    updateFlow,
+                    version || -1,
+                    size,
+                    targetDirectory,
+                    gameID || "",
+                  ];
+            }
           }
-        }
 
-        if (browserDirect === true && !isTorrentLink)
-          spawnCommand.push("--provider", "direct");
+          if (browserDirect === true && !isTorrentLink)
+            spawnCommand.push("--provider", "direct");
 
-        // Add notification flags if enabled
-        if (settings.notifications) {
-          spawnCommand = spawnCommand.concat(["--withNotification", settings.theme]);
-        }
+          // Add notification flags if enabled
+          if (settings.notifications) {
+            spawnCommand = spawnCommand.concat(["--withNotification", settings.theme]);
+          }
 
-        // For torrent downloads, pass the user's qBittorrent WebUI config
-        if (isTorrentLink) {
-          const qbHost = settings.torrentHost || "localhost";
-          const qbPort = settings.torrentPort || 8080;
-          const qbUser = settings.torrentUsername || "admin";
-          const qbPass = settings.torrentPassword || "adminadmin";
-          spawnCommand = spawnCommand.concat([
-            "--qbitHost",
-            String(qbHost),
-            "--qbitPort",
-            String(qbPort),
-            "--qbitUsername",
-            String(qbUser),
-            "--qbitPassword",
-            String(qbPass),
-          ]);
-        }
+          // For torrent downloads, pass the user's qBittorrent WebUI config
+          if (isTorrentLink) {
+            const qbHost = settings.torrentHost || "localhost";
+            const qbPort = settings.torrentPort || 8080;
+            const qbUser = settings.torrentUsername || "admin";
+            const qbPass = settings.torrentPassword || "adminadmin";
+            spawnCommand = spawnCommand.concat([
+              "--qbitHost",
+              String(qbHost),
+              "--qbitPort",
+              String(qbPort),
+              "--qbitUsername",
+              String(qbUser),
+              "--qbitPassword",
+              String(qbPass),
+            ]);
+          }
 
-        // Cache download data for resume functionality
-        const cacheDir = path.join(app.getPath("userData"), "downloadCache");
-        await fs.promises.mkdir(cacheDir, { recursive: true });
-        const cachedDataPath = path.join(cacheDir, `${sanitizedGame}.json`);
-        const cacheData = {
-          link: link,
-          browserDirect: browserDirect === true,
-          browserAssetGameId,
-          game: game,
-          online: online,
-          dlc: dlc,
-          isVr: isVr,
-          version: version,
-          size: size,
-          gameID: gameID,
-          timestamp: new Date().toISOString(),
-        };
-        await fs.promises.writeFile(cachedDataPath, JSON.stringify(cacheData, null, 2));
-        console.log(`Cached download data for resume: ${cachedDataPath}`);
+          // Cache download data for resume functionality
+          const cacheDir = path.join(app.getPath("userData"), "downloadCache");
+          await fs.promises.mkdir(cacheDir, { recursive: true });
+          const cachedDataPath = path.join(cacheDir, `${sanitizedGame}.json`);
+          const cacheData = {
+            link: link,
+            browserDirect: browserDirect === true,
+            browserAssetGameId,
+            game: game,
+            online: online,
+            dlc: dlc,
+            isVr: isVr,
+            version: version,
+            size: size,
+            gameID: gameID,
+            timestamp: new Date().toISOString(),
+          };
+          await fs.promises.writeFile(cachedDataPath, JSON.stringify(cacheData, null, 2));
+          console.log(`Cached download data for resume: ${cachedDataPath}`);
 
-        // Update download history
-        let timestampData = {};
-        try {
-          const data = await fs.promises.readFile(TIMESTAMP_FILE, "utf8");
-          timestampData = JSON.parse(data);
+          // Update download history
+          let timestampData = {};
+          try {
+            const data = await fs.promises.readFile(TIMESTAMP_FILE, "utf8");
+            timestampData = JSON.parse(data);
+          } catch (error) {
+            console.error("Error reading timestamp file:", error);
+          }
+          if (!timestampData.downloadedHistory) {
+            timestampData.downloadedHistory = [];
+          }
+          timestampData.downloadedHistory.push({
+            game: sanitizedGame,
+            timestamp: new Date().toISOString(),
+          });
+          await updateTimestampFile(timestampData);
+
+          console.log(`Spawning executable: ${executablePath}`);
+          if (process.platform === "linux" && !isDev && !isTorrentLink) {
+            executablePath = await prepareDownloaderRuntime(
+              executablePath,
+              path.join(app.getPath("userData"), "downloader-runtime")
+            );
+          }
+          if (!isWindows && !isDev && !fs.existsSync(executablePath)) {
+            const errMsg = `Binary not found: ${executablePath}`;
+            console.error(errMsg);
+            event.sender.send("download-error", {
+              game: sanitizedGame,
+              error: errMsg,
+            });
+            throw new Error(errMsg);
+          }
+
+          const downloadProcess = spawn(executablePath, spawnCommand, {
+            detached: true,
+            stdio: "ignore",
+            windowsHide: false,
+          });
+
+          downloadProcess.on("error", err => {
+            console.error(`Failed to start download process: ${err}`);
+            event.sender.send("download-error", {
+              game: sanitizedGame,
+              error: err.message,
+            });
+          });
+
+          await waitForSpawn(downloadProcess);
+          downloadProcess.once("exit", code => {
+            if (code === 0 && updateFlow) {
+              withDownloadOperation(sanitizedGame, () =>
+                gameUpdateBackup.finish(gameDirectory)
+              ).catch(error => console.error("Update backup retained:", error));
+            }
+          });
+          downloadProcesses.set(sanitizedGame, downloadProcess);
+          downloadProcess.unref();
+          return { success: true };
         } catch (error) {
-          console.error("Error reading timestamp file:", error);
-        }
-        if (!timestampData.downloadedHistory) {
-          timestampData.downloadedHistory = [];
-        }
-        timestampData.downloadedHistory.push({
-          game: sanitizedGame,
-          timestamp: new Date().toISOString(),
-        });
-        await updateTimestampFile(timestampData);
-
-        console.log(`Spawning executable: ${executablePath}`);
-        if (process.platform === "linux" && !isDev && !isTorrentLink) {
-          executablePath = await prepareDownloaderRuntime(
-            executablePath,
-            path.join(app.getPath("userData"), "downloader-runtime")
-          );
-        }
-        if (!isWindows && !isDev && !fs.existsSync(executablePath)) {
-          const errMsg = `Binary not found: ${executablePath}`;
-          console.error(errMsg);
+          if (updatePrepared) {
+            await gameUpdateBackup
+              .restore(gameDirectory)
+              .catch(restoreError =>
+                console.error(
+                  "Update backup retained after startup failure:",
+                  restoreError
+                )
+              );
+          }
+          console.error("Error in download-file handler:", error);
           event.sender.send("download-error", {
             game: sanitizedGame,
-            error: errMsg,
+            error: error.message,
           });
-          return;
+          return { success: false, error: error.message };
         }
-
-        const downloadProcess = spawn(executablePath, spawnCommand, {
-          detached: true,
-          stdio: "ignore",
-          windowsHide: false,
-        });
-
-        downloadProcess.on("error", err => {
-          console.error(`Failed to start download process: ${err}`);
-          event.sender.send("download-error", {
-            game: sanitizedGame,
-            error: err.message,
-          });
-        });
-
-        downloadProcesses.set(sanitizedGame, downloadProcess);
-        downloadProcess.unref();
-        return { success: true };
-      } catch (error) {
-        console.error("Error in download-file handler:", error);
-        event.sender.send("download-error", {
-          game: sanitizedGame,
-          error: error.message,
-        });
-        return { success: false, error: error.message };
-      }
+      });
     }
   );
 
@@ -1003,6 +1032,12 @@ function registerDownloadHandlers() {
               `${sanitizedGame}.ascendara.json`
             );
             const before = await fs.readJson(jsonFilePath);
+            const protectedUpdate = await gameUpdateBackup.hasBackup(gameDirectory);
+            if (deleteContents && before.downloadingData?.updating && !protectedUpdate) {
+              throw new Error(
+                "This update has no recovery backup. Keep its files to protect the installed game."
+              );
+            }
             if (
               !isKill &&
               (!before.downloadingData ||
@@ -1038,7 +1073,7 @@ function registerDownloadHandlers() {
               if (fs.existsSync(jsonFile)) {
                 try {
                   const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-                  if (isKill) {
+                  if (isKill && !protectedUpdate) {
                     // Killing (even with files kept) means the user is abandoning the
                     // download, not pausing it - clear downloadingData entirely so it
                     // no longer shows up as an active/resumable download.
@@ -1073,15 +1108,21 @@ function registerDownloadHandlers() {
                 await qbtRemoveTorrentsForDirectory(
                   settings,
                   gameDirectory,
-                  deleteContents
+                  deleteContents && !protectedUpdate
                 );
+              }
+
+              if (protectedUpdate && (isKill || deleteContents)) {
+                await gameUpdateBackup.restore(gameDirectory);
+                await fs.remove(cacheFile);
+                return true;
               }
 
               // Step 4: Ensure JSON is in the expected state (in case downloader overwrote it)
               if (fs.existsSync(jsonFile)) {
                 try {
                   const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-                  if (isKill) {
+                  if (isKill && !protectedUpdate) {
                     delete gameInfo.downloadingData;
                   } else {
                     gameInfo.downloadingData = {

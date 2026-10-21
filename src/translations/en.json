@@ -1772,7 +1772,7 @@
     "trainer": "Trainer Menu",
     "understand": "I Understand, Continue",
     "update": {
-      "description": "This will reinstall the game in the same directory. While most games save data in separate locations, it is recommended to back up any important save files or custom content before proceeding with the update.",
+      "description": "Ascendara will copy your current installation before updating. This needs extra disk space equal to the installed game, plus space for the update. Cancelling restores the previous game and its saved files. Files from a cancelled update are kept in .ascendara-updates inside your library folder.",
       "title": "Ready to update {{game}}?"
     },
     "viewCriticReviews": "View Critic Reviews",
@@ -1888,7 +1888,7 @@
     "installingDescription": "Follow the installer's steps. Once it finishes, click below to mark this game as installed.",
     "installingTitle": "Installing...",
     "kill": "Kill Download",
-    "killSuccess": "Download killed and files deleted",
+    "killSuccess": "Download cancelled",
     "killSuccessKeepFiles": "Download killed, files kept on disk",
     "largeFileNotice": "Writing a large file to disk... this may take a moment.",
     "lastExtracted": "Last extracted",
