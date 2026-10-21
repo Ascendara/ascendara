@@ -3068,7 +3068,7 @@ function Settings() {
             <SettingsCategory {...categoryProps("backups")}>
               <Card id="ludusavi" className="border border-border/60 shadow-none">
                 <div className="p-6">
-                  <div className="flex items-center justify-between">
+                  <div>
                     <div>
                       <h3 className="text-base font-semibold text-foreground">
                         {t("settings.gameBackup.title")}
@@ -3107,7 +3107,7 @@ function Settings() {
                           className={`space-y-2 ${!settings.ludusavi.backupLocation ? "pointer-events-none opacity-50" : ""}`}
                         >
                           <Label>{t("settings.gameBackup.title")}</Label>
-                          <p className="max-w-[70%] text-sm text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             {t("settings.gameBackup.description")}&nbsp;
                             <a
                               onClick={() =>
@@ -3135,10 +3135,10 @@ function Settings() {
                   <div
                     className={`mt-6 space-y-6 ${!settings.ludusavi.enabled ? "pointer-events-none opacity-50" : ""}`}
                   >
-                    <div className="mt-4 flex items-center justify-between">
+                    <div className="flex items-center justify-between">
                       <div className="space-y-2">
                         <Label>{t("settings.gameBackup.skipManifestCheck")}</Label>
-                        <p className="max-w-[70%] text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">
                           {t("settings.gameBackup.skipManifestCheckDesc")}&nbsp;
                         </p>
                       </div>
