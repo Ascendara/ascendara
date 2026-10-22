@@ -177,7 +177,6 @@ export const signInWithGoogle = async () => {
       console.log("[signInWithGoogle] Creating new user document...");
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
-        email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
         provider: "google",
@@ -226,7 +225,6 @@ export const checkGoogleRedirectResult = async () => {
       if (!userDoc.exists()) {
         await setDoc(doc(db, "users", user.uid), {
           uid: user.uid,
-          email: user.email,
           displayName: user.displayName,
           photoURL: user.photoURL,
           provider: "google",
@@ -289,7 +287,6 @@ export const registerUser = async (email, password, displayName, hardwareId = nu
 
         await setDoc(doc(db, "users", user.uid), {
           uid: user.uid,
-          email: user.email,
           displayName,
           photoURL: null,
           bio: null,
@@ -299,7 +296,6 @@ export const registerUser = async (email, password, displayName, hardwareId = nu
             github: null,
             steam: null,
           },
-          hardwareId: hardwareId || null,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
@@ -368,6 +364,7 @@ export const registerUser = async (email, password, displayName, hardwareId = nu
           createdAt: serverTimestamp(),
           trialEndDate: Timestamp.fromDate(trialEndDate),
         });
+        await savePrivateHardwareId(user.uid, hardwareId);
       } catch (hwError) {
         console.warn("Hardware ID registration failed:", hwError);
         // Don't fail the registration - hardware ID will be registered on next access check
@@ -599,6 +596,12 @@ export const deleteNewAccount = async () => {
     const uid = user.uid;
 
     // Delete Firestore documents
+    try {
+      await deleteDoc(privateAccountRef(uid));
+    } catch (e) {
+      console.warn("Failed to delete private account doc:", e);
+    }
+
     try {
       await deleteDoc(doc(db, "users", uid));
     } catch (e) {
@@ -1448,6 +1451,25 @@ export const deleteCloudGame = async gameName => {
 // ==================== ASCEND SUBSCRIPTION ====================
 
 /**
+ * Masked email ("it***@gmail.com") of the account linked to a device. Emails
+ * aren't readable from Firestore, so the API looks it up. Null on failure.
+ */
+const getMaskedHardwareEmail = async hardwareId => {
+  try {
+    const response = await userAuthenticatedFetch(
+      auth.currentUser,
+      `https://api.ascendara.app/v3/account/hardware-email?hardwareId=${encodeURIComponent(hardwareId)}`
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    return typeof data.email === "string" ? data.email : null;
+  } catch (error) {
+    console.warn("Could not fetch linked account email:", error);
+    return null;
+  }
+};
+
+/**
  * Check if hardware ID already has an account (for preventing multiple accounts)
  * @param {string} hardwareId - The hardware ID to check
  * @returns {Promise<{hasAccount: boolean, email: string|null, userId: string|null, error: string|null}>}
@@ -1467,28 +1489,9 @@ export const checkHardwareIdAccount = async hardwareId => {
     const linkedUserId = data.userId || null;
 
     // Get the linked user's email (partially masked for privacy)
-    // Only try to fetch user doc if we're authenticated (users collection requires auth)
     if (linkedUserId && auth.currentUser) {
-      try {
-        const userDoc = await getDoc(doc(db, "users", linkedUserId));
-        if (userDoc.exists()) {
-          const email = userDoc.data().email || "";
-          // Mask email for privacy: show first 2 chars and domain
-          const maskedEmail =
-            email.length > 0
-              ? email.substring(0, 2) + "***@" + email.split("@")[1]
-              : null;
-          return {
-            hasAccount: true,
-            email: maskedEmail,
-            userId: linkedUserId,
-            error: null,
-          };
-        }
-      } catch (userError) {
-        // Can't read user doc - just return that account exists without email
-        console.warn("Could not fetch user email:", userError);
-      }
+      const maskedEmail = await getMaskedHardwareEmail(hardwareId);
+      return { hasAccount: true, email: maskedEmail, userId: linkedUserId, error: null };
     }
 
     return { hasAccount: true, email: null, userId: linkedUserId, error: null };
@@ -1520,19 +1523,7 @@ export const checkDeletedAccount = async hardwareId => {
     // Get the linked user's email if account is deleted
     let email = null;
     if (isDeleted && data.userId && auth.currentUser) {
-      try {
-        const userDoc = await getDoc(doc(db, "users", data.userId));
-        if (userDoc.exists()) {
-          const userEmail = userDoc.data().email || "";
-          // Mask email for privacy: show first 2 chars and domain
-          email =
-            userEmail.length > 0
-              ? userEmail.substring(0, 2) + "***@" + userEmail.split("@")[1]
-              : null;
-        }
-      } catch (userError) {
-        console.warn("Could not fetch user email:", userError);
-      }
+      email = await getMaskedHardwareEmail(hardwareId);
     }
 
     return { isDeleted, email, error: null };
@@ -1573,6 +1564,26 @@ export const checkHardwareIdTrial = async hardwareId => {
   }
 };
 
+// The device hardwareId is private: it lives in users/{uid}/private/account,
+// which only the owner can read, not on the public users doc.
+const privateAccountRef = uid => doc(db, "users", uid, "private", "account");
+
+const savePrivateHardwareId = (uid, hardwareId) =>
+  setDoc(
+    privateAccountRef(uid),
+    { hardwareId, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+
+const getPrivateHardwareId = async uid => {
+  try {
+    const snap = await getDoc(privateAccountRef(uid));
+    return snap.exists() ? snap.data().hardwareId || null : null;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Register hardware ID for trial tracking
  * @param {string} hardwareId - The hardware ID to register
@@ -1594,10 +1605,7 @@ export const registerHardwareId = async (hardwareId, userId) => {
     const hwDoc = await getDoc(doc(db, "hardwareIds", hardwareId));
     if (hwDoc.exists()) {
       // Already registered, just update user doc
-      await updateDoc(doc(db, "users", userId), {
-        hardwareId,
-        updatedAt: serverTimestamp(),
-      });
+      await savePrivateHardwareId(userId, hardwareId);
       return { success: true, error: null };
     }
 
@@ -1617,10 +1625,7 @@ export const registerHardwareId = async (hardwareId, userId) => {
     });
 
     // Also store hardware ID in user document
-    await updateDoc(doc(db, "users", userId), {
-      hardwareId,
-      updatedAt: serverTimestamp(),
-    });
+    await savePrivateHardwareId(userId, hardwareId);
 
     return { success: true, error: null };
   } catch (error) {
@@ -1798,7 +1803,8 @@ export const verifyAscendAccess = async (hardwareId = null) => {
       try {
         // If user doesn't have a hardware ID stored, check for trial abuse but DON'T register yet
         // Registration happens in handleGoogleSignIn after duplicate account check
-        if (!userData.hardwareId) {
+        const storedHardwareId = await getPrivateHardwareId(user.uid);
+        if (!storedHardwareId) {
           // Check if this hardware ID was used by another account with expired trial
           const hwCheck = await checkHardwareIdTrial(hardwareId);
           if (hwCheck.used && hwCheck.trialExpired && hwCheck.linkedUserId !== user.uid) {
@@ -1816,7 +1822,7 @@ export const verifyAscendAccess = async (hardwareId = null) => {
           }
           // NOTE: Hardware ID registration is handled by handleGoogleSignIn for new users
           // to avoid race condition with duplicate account check
-        } else if (userData.hardwareId !== hardwareId) {
+        } else if (storedHardwareId !== hardwareId) {
           // User has a different hardware ID stored - could be using multiple devices
           // Check if the new hardware ID has an expired trial
           const hwCheck = await checkHardwareIdTrial(hardwareId);

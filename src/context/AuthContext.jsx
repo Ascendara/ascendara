@@ -1,5 +1,20 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
-import { subscribeToAuthChanges, loginUser, logoutUser, registerUser, resetPassword, updateUserProfile, changePassword, deleteAccount, getUserData, subscribeToUserData, updateUserData, resendVerificationEmail, reloadCurrentUser, signInWithGoogle } from "@/services/firebaseService";
+import {
+  subscribeToAuthChanges,
+  loginUser,
+  logoutUser,
+  registerUser,
+  resetPassword,
+  updateUserProfile,
+  changePassword,
+  deleteAccount,
+  getUserData,
+  subscribeToUserData,
+  updateUserData,
+  resendVerificationEmail,
+  reloadCurrentUser,
+  signInWithGoogle,
+} from "@/services/firebaseService";
 
 const AuthContext = createContext(null);
 
@@ -70,31 +85,39 @@ export const AuthProvider = ({ children }) => {
                 "[AuthContext] Failed to fetch user data (might be new account):",
                 fetchError
               );
-              
+
               // Attempt to create missing Firestore document
               try {
-                console.log("[AuthContext] Attempting to create missing Firestore document...");
-                const { setDoc, doc, serverTimestamp } = await import("firebase/firestore");
+                console.log(
+                  "[AuthContext] Attempting to create missing Firestore document..."
+                );
+                const { setDoc, doc, serverTimestamp } =
+                  await import("firebase/firestore");
                 const { db } = await import("@/services/firebaseService");
-                
-                await setDoc(doc(db, "users", firebaseUser.uid), {
-                  uid: firebaseUser.uid,
-                  email: firebaseUser.email,
-                  displayName: firebaseUser.displayName || "User",
-                  photoURL: firebaseUser.photoURL || null,
-                  bio: null,
-                  country: null,
-                  socials: {
-                    discord: null,
-                    github: null,
-                    steam: null,
+
+                await setDoc(
+                  doc(db, "users", firebaseUser.uid),
+                  {
+                    uid: firebaseUser.uid,
+                    displayName: firebaseUser.displayName || "User",
+                    photoURL: firebaseUser.photoURL || null,
+                    bio: null,
+                    country: null,
+                    socials: {
+                      discord: null,
+                      github: null,
+                      steam: null,
+                    },
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
                   },
-                  createdAt: serverTimestamp(),
-                  updatedAt: serverTimestamp(),
-                }, { merge: true });
-                
-                console.log("[AuthContext] Successfully created missing Firestore document");
-                
+                  { merge: true }
+                );
+
+                console.log(
+                  "[AuthContext] Successfully created missing Firestore document"
+                );
+
                 // Fetch the newly created data
                 const { data: newData } = await getUserData(firebaseUser.uid);
                 setUser(firebaseUser);
@@ -106,7 +129,10 @@ export const AuthProvider = ({ children }) => {
                 setLoading(false);
                 return;
               } catch (createError) {
-                console.error("[AuthContext] Failed to create missing Firestore document:", createError);
+                console.error(
+                  "[AuthContext] Failed to create missing Firestore document:",
+                  createError
+                );
                 // Still set the user but with no data
                 setUser(firebaseUser);
                 setUserData(null);
