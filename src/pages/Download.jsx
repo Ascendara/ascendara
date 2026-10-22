@@ -46,7 +46,19 @@ import { forceSyncDownloads, notifyDownloadStart } from "@/services/downloadSync
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
-import { Loader } from "lucide-react";
+import { Loader, Wine } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import HighballCompatibility, {
+  useHighballCompat,
+} from "@/components/HighballCompatibility";
 import { toast } from "sonner";
 import TimemachineDialog from "@/components/TimemachineDialog";
 import steamService from "@/services/gameInfoService";
@@ -169,9 +181,11 @@ const clearDownloadLock = () => {
 
 export default function DownloadPage() {
   const { state } = useLocation();
-  return state?.gameData?.privateSource
-    ? <PrivateGameDetails initialGame={state.gameData} />
-    : <PublicDownloadPage />;
+  return state?.gameData?.privateSource ? (
+    <PrivateGameDetails initialGame={state.gameData} />
+  ) : (
+    <PublicDownloadPage />
+  );
 }
 
 function PublicDownloadPage() {
@@ -356,7 +370,9 @@ function PublicDownloadPage() {
   const [cachedImage, setCachedImage] = useState(initialPrepared?.cachedImage ?? null);
   const [coverGridUrl, setCoverGridUrl] = useState(initialPrepared?.coverGridUrl ?? null);
   // Approved community artwork correction; wins over name-matched artwork
-  const [artworkOverride, setArtworkOverride] = useState(initialPrepared?.override ?? null);
+  const [artworkOverride, setArtworkOverride] = useState(
+    initialPrepared?.override ?? null
+  );
   // False until we know whether an override exists, so the wrong art never flashes
   const [artworkReady, setArtworkReady] = useState(true);
   const [showArtworkDialog, setShowArtworkDialog] = useState(false);
@@ -375,6 +391,13 @@ function PublicDownloadPage() {
   const [showQueuePrompt, setShowQueuePrompt] = useState(false);
   const [pendingDownloadData, setPendingDownloadData] = useState(null);
   const [steamData, setSteamData] = useState(initialPrepared?.steamData ?? null);
+  // Apple Silicon: how this game runs through Highball, and whether to warn first
+  const macCompat = useHighballCompat({
+    steamAppId: steamData?.appid,
+    title: gameData?.game,
+  });
+  const [pendingCompatDownload, setPendingCompatDownload] = useState(null);
+  const compatAcknowledgedRef = useRef(false);
   const [steamError, setSteamError] = useState(null);
   const [steamLoading, setSteamLoading] = useState(false);
   const [hltbData, setHltbData] = useState(null);
@@ -823,6 +846,12 @@ function PublicDownloadPage() {
     if (!gameData) {
       console.error("No game data available");
       toast.error(t("download.toast.noGameData"));
+      return;
+    }
+
+    // A game that cannot run on this Mac gets one confirmation before downloading
+    if (macCompat?.downloadWarning && !compatAcknowledgedRef.current) {
+      setPendingCompatDownload([directUrl, dir, forceStart, skipConflictCheck]);
       return;
     }
 
@@ -2078,6 +2107,19 @@ function PublicDownloadPage() {
           </div>
 
           <aside className="min-w-0 space-y-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+            {macCompat && (
+              <section
+                className={`space-y-2 rounded-xl border bg-card p-5 ${macCompat.downloadWarning ? "border-red-500/40" : "border-border/40"}`}
+              >
+                <div className="flex items-center gap-2">
+                  <Wine className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">
+                    {t("settings.macCompat.gameTitle")}
+                  </span>
+                </div>
+                <HighballCompatibility compat={macCompat} />
+              </section>
+            )}
             <DownloadPanel
               mode={downloadMode}
               gameData={gameData}
@@ -2174,6 +2216,38 @@ function PublicDownloadPage() {
           gameData={gameData}
         />
       )}
+
+      <Dialog
+        open={!!pendingCompatDownload}
+        onOpenChange={open => !open && setPendingCompatDownload(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("settings.macCompat.db.confirmTitle")}</DialogTitle>
+            <DialogDescription>
+              {macCompat?.downloadWarning &&
+                t(`settings.macCompat.db.warning.${macCompat.downloadWarning}`)}
+            </DialogDescription>
+          </DialogHeader>
+          <HighballCompatibility compat={macCompat} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingCompatDownload(null)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                const args = pendingCompatDownload;
+                compatAcknowledgedRef.current = true;
+                setPendingCompatDownload(null);
+                handleDownload(...args);
+              }}
+            >
+              {t("settings.macCompat.db.downloadAnyway")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <TimemachineDialog
         gameData={gameData}

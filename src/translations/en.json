@@ -4384,6 +4384,36 @@
       "d3dmetalLicenseDescription": "D3DMetal is part of Apple's Game Porting Toolkit. Read Apple's license below; it permits personal, non-commercial use.",
       "d3dmetalLicenseTitle": "Enable D3DMetal",
       "d3dmetalReview": "Enable D3DMetal",
+      "db": {
+        "confirmTitle": "This game may not run on your Mac",
+        "downloadAnyway": "Download anyway",
+        "knownIssues_one": "{{count}} known issue",
+        "knownIssues_other": "{{count}} known issues",
+        "prediction": {
+          "bad": "Unlikely to run (prediction)",
+          "good": "Likely playable (prediction)",
+          "warn": "Might run (prediction)"
+        },
+        "recommended": "Recommended graphics translator: {{renderer}}. Automatic uses it.",
+        "short": {
+          "bad": "Mac: Won't run",
+          "good": "Mac: Works",
+          "info": "Mac: Likely",
+          "warn": "Mac: Maybe"
+        },
+        "status": {
+          "blocked-anticheat": "Won't run on Mac: kernel anti-cheat",
+          "blocked-publisher": "Won't run on Mac: blocked by the publisher",
+          "community": "Runs on Mac (community reports)",
+          "reported-upstream": "Reported to run on Mac",
+          "verified-local": "Verified on Apple Silicon"
+        },
+        "viewDetails": "Details on Highball",
+        "warning": {
+          "blocked": "This game can't run on a Mac under any compatibility layer.",
+          "unlikely": "Reports suggest this game is unlikely to run on a Mac."
+        }
+      },
       "description": "Ascendara runs Windows games on your Mac with Highball, which translates Windows and DirectX into macOS and Metal. Compatibility varies by game.",
       "gameTitle": "Mac compatibility",
       "highballTitle": "Game compatibility files",

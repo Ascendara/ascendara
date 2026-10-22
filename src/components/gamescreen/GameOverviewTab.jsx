@@ -189,7 +189,10 @@ export default function GameOverviewTab({
         </section>
 
         {isOnMac && /\.(exe|msi|bat)$/i.test(game?.executable || "") && (
-          <HighballGameOptions game={game} />
+          <HighballGameOptions
+            game={game}
+            steamAppId={game?.steamAppId || steamData?.appid}
+          />
         )}
 
         {isOnLinux && (

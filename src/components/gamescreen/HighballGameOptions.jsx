@@ -4,11 +4,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/LanguageContext";
 import { OptionSelect, rendererOptions } from "@/components/HighballSettings";
+import HighballCompatibility, {
+  useHighballCompat,
+} from "@/components/HighballCompatibility";
 
 /** Per-game macOS compatibility overrides for a Windows game. */
-export default function HighballGameOptions({ game }) {
+export default function HighballGameOptions({ game, steamAppId }) {
   const { t } = useLanguage();
   const gameName = game?.game || game?.name;
+  const compat = useHighballCompat({ steamAppId, title: gameName, detail: true });
   const isCustom = !!game?.isCustom;
   const [status, setStatus] = useState(null);
   const [overrides, setOverrides] = useState(null);
@@ -51,6 +55,8 @@ export default function HighballGameOptions({ game }) {
         <Wine className="h-4 w-4 text-primary" />
         <span className="text-sm font-medium">{t("settings.macCompat.gameTitle")}</span>
       </div>
+
+      <HighballCompatibility compat={compat} />
 
       <label className="block space-y-1">
         <span className="text-xs text-muted-foreground">

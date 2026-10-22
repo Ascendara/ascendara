@@ -1,6 +1,10 @@
 import { useState, memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  HighballCompatBadge,
+  useHighballCompat,
+} from "@/components/HighballCompatibility";
 import { Button } from "@/components/ui/button";
 import {
   Gift,
@@ -91,6 +95,8 @@ function GameCardContent({ game, compact, viewCount }) {
   const [isFavorite, setIsFavorite] = useState(false);
   const cardRef = useRef(null);
   const privateImage = usePrivateArtwork(isVisible ? game?.privateSource : null);
+  // Apple Silicon: how this game runs through Highball, looked up once visible
+  const macCompat = useHighballCompat({ title: game?.game, enabled: isVisible });
   const {
     cachedImage: publicImage,
     loading,
@@ -450,7 +456,10 @@ function GameCardContent({ game, compact, viewCount }) {
             // Only once the pointer rests here, so sweeping across a grid
             // doesn't queue lookups ahead of the game actually opened
             clearTimeout(prefetchTimer.current);
-            prefetchTimer.current = setTimeout(() => gamePagePreparer.prefetch(game), 200);
+            prefetchTimer.current = setTimeout(
+              () => gamePagePreparer.prefetch(game),
+              200
+            );
           }}
           onPointerLeave={() => clearTimeout(prefetchTimer.current)}
           aria-busy={isLoading}
@@ -495,7 +504,8 @@ function GameCardContent({ game, compact, viewCount }) {
                   </TooltipTrigger>
                   <TooltipContent>
                     <p className="text-secondary">
-                      {t("gameCard.verified.badge")} · {t("gameCard.verified.clickForInfo")}
+                      {t("gameCard.verified.badge")} ·{" "}
+                      {t("gameCard.verified.clickForInfo")}
                     </p>
                   </TooltipContent>
                 </Tooltip>
@@ -524,6 +534,27 @@ function GameCardContent({ game, compact, viewCount }) {
                 <Loader className="h-6 w-6 animate-spin" />
                 <span className="text-xs font-medium">{t("gameCard.loading")}</span>
               </div>
+            )}
+
+            {/* Bottom-right: Mac compatibility from highball-db */}
+            {macCompat && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="absolute bottom-2.5 right-2.5 rounded-full bg-black/65 backdrop-blur-sm">
+                    <HighballCompatBadge
+                      compat={macCompat}
+                      short
+                      className="px-2 py-0.5 text-[11px]"
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <HighballCompatBadge
+                    compat={macCompat}
+                    className="bg-transparent px-0 py-0 ring-0"
+                  />
+                </TooltipContent>
+              </Tooltip>
             )}
 
             {/* Bottom-left: fresh update ribbon */}
@@ -613,7 +644,9 @@ function GameCardContent({ game, compact, viewCount }) {
                           </span>
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs">
-                          <p className="text-secondary">{t("download.storyOnlyTooltip")}</p>
+                          <p className="text-secondary">
+                            {t("download.storyOnlyTooltip")}
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     )}
