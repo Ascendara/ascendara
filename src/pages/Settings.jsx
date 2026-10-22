@@ -3309,32 +3309,33 @@ function Settings() {
                           <label className="text-sm font-medium">
                             {t("settings.linuxCompat.defaultRunner")}
                           </label>
-                          <select
+                          <Select
                             value={selectedRunner}
-                            onChange={async e => {
-                              setSelectedRunner(e.target.value);
-                              await window.electron.updateSetting(
-                                "linuxRunner",
-                                e.target.value
-                              );
+                            onValueChange={async value => {
+                              setSelectedRunner(value);
+                              await window.electron.updateSetting("linuxRunner", value);
                             }}
-                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           >
-                            <option value="auto">
-                              {t("settings.linuxCompat.autoDetect")}
-                            </option>
-                            {runners.map(r => (
-                              <option key={r.path} value={r.path}>
-                                {r.name} (
-                                {r.source === "steam"
-                                  ? t("settings.linuxCompat.sourceSteam")
-                                  : r.source === "custom"
-                                    ? t("settings.linuxCompat.sourceCustom")
-                                    : t("settings.linuxCompat.sourceSystem")}
-                                ){r.version ? ` — v${r.version}` : ""}
-                              </option>
-                            ))}
-                          </select>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="auto">
+                                {t("settings.linuxCompat.autoDetect")}
+                              </SelectItem>
+                              {runners.map(r => (
+                                <SelectItem key={r.path} value={r.path}>
+                                  {r.name} (
+                                  {r.source === "steam"
+                                    ? t("settings.linuxCompat.sourceSteam")
+                                    : r.source === "custom"
+                                      ? t("settings.linuxCompat.sourceCustom")
+                                      : t("settings.linuxCompat.sourceSystem")}
+                                  ){r.version ? ` — v${r.version}` : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
 
                           {(() => {
                             let activeRunnerName = "";

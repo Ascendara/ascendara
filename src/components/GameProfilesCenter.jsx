@@ -18,6 +18,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/context/LanguageContext";
@@ -249,22 +256,30 @@ const GameProfilesCenter = () => {
           <div className="space-y-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 items-center gap-2">
-                <select
+                <Select
                   value={selectedKey}
-                  onChange={event => selectGame(event.target.value)}
-                  disabled={loadingGames || loadingProfile || saving || games.length === 0}
-                  aria-label={t("featureCenters.profiles.title")}
-                  className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onValueChange={selectGame}
+                  disabled={
+                    loadingGames || loadingProfile || saving || games.length === 0
+                  }
                 >
-                  {games.map(game => (
-                    <option key={game.__profileKey} value={game.__profileKey}>
-                      {getGameName(game)}
-                      {game.isCustom
-                        ? ` (${t("featureCenters.profiles.customSuffix")})`
-                        : ""}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger
+                    aria-label={t("featureCenters.profiles.title")}
+                    className="h-10 min-w-0 flex-1"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {games.map(game => (
+                      <SelectItem key={game.__profileKey} value={game.__profileKey}>
+                        {getGameName(game)}
+                        {game.isCustom
+                          ? ` (${t("featureCenters.profiles.customSuffix")})`
+                          : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {isDirty && (
                   <Badge variant="outline" className="hidden shrink-0 sm:inline-flex">
                     {t("featureCenters.profiles.unsaved")}
@@ -308,10 +323,7 @@ const GameProfilesCenter = () => {
                 }}
               />
             ) : loadingGames && games.length === 0 ? (
-              <FeatureState
-                icon={RefreshCw}
-                title={t("featureCenters.common.loading")}
-              />
+              <FeatureState icon={RefreshCw} title={t("featureCenters.common.loading")} />
             ) : !selectedGame ? (
               <FeatureState
                 icon={Gamepad2}

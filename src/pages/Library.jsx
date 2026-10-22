@@ -20,6 +20,13 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import "@/components/ui/switch";
 import "@/components/ui/label";
 import { useLanguage } from "@/context/LanguageContext";
@@ -2384,7 +2391,7 @@ const Library = () => {
                       key={item.label}
                       onClick={item.onClick}
                       className={cn(
-                        "cursor-pointer rounded-md px-2 py-1.5",
+                        "cursor-pointer",
                         item.active
                           ? "bg-primary/10 font-medium text-primary"
                           : "text-foreground"
@@ -2417,7 +2424,7 @@ const Library = () => {
                       key={placement}
                       onClick={() => setFolderPlacement(placement)}
                       className={cn(
-                        "cursor-pointer rounded-md px-2 py-1.5",
+                        "cursor-pointer",
                         folderPlacement === placement &&
                           "bg-primary/10 font-medium text-primary"
                       )}
@@ -2457,7 +2464,7 @@ const Library = () => {
                       key={item.label}
                       onClick={item.onClick}
                       className={cn(
-                        "cursor-pointer rounded-md px-2 py-1.5",
+                        "cursor-pointer",
                         item.active
                           ? "bg-primary/10 font-medium text-primary"
                           : "text-foreground"
@@ -2491,7 +2498,7 @@ const Library = () => {
                       setFilters(prev => ({ ...prev, vrOnly: !prev.vrOnly }))
                     }
                     className={cn(
-                      "cursor-pointer rounded-md px-2 py-1.5",
+                      "cursor-pointer",
                       filters.vrOnly
                         ? "bg-primary/10 font-medium text-primary"
                         : "text-foreground"
@@ -2537,7 +2544,7 @@ const Library = () => {
                       setFilters(prev => ({ ...prev, onlineGames: !prev.onlineGames }))
                     }
                     className={cn(
-                      "cursor-pointer rounded-md px-2 py-1.5",
+                      "cursor-pointer",
                       filters.onlineGames
                         ? "bg-primary/10 font-medium text-primary"
                         : "text-foreground"
@@ -3184,7 +3191,7 @@ const Library = () => {
                               className={cn(
                                 "cursor-pointer",
                                 favGallerySortMode === opt.id &&
-                                  "bg-accent/50 font-semibold text-primary"
+                                  "bg-primary/10 font-medium text-primary"
                               )}
                               onClick={() => setFavGallerySortMode(opt.id)}
                             >
@@ -6458,24 +6465,29 @@ const FolderScanGameForm = ({ onSuccess, onLibraryChanged, onBusyChange }) => {
                 </p>
               )}
 
-              <select
+              <Select
                 value={game.executable}
                 disabled={!game.included || isSubmitting}
-                onChange={e =>
-                  updateRow(game.id, { executable: e.target.value, error: "" })
+                onValueChange={value =>
+                  updateRow(game.id, { executable: value, error: "" })
                 }
-                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
-                aria-label={t("library.addGame.folderScan.executable")}
               >
-                <option value="">
-                  {t("library.addGame.folderScan.selectExecutable")}
-                </option>
-                {game.executables.map(exe => (
-                  <option key={exe.path} value={exe.path}>
-                    {exe.relativePath}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  className="h-8 px-2"
+                  aria-label={t("library.addGame.folderScan.executable")}
+                >
+                  <SelectValue
+                    placeholder={t("library.addGame.folderScan.selectExecutable")}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {game.executables.map(exe => (
+                    <SelectItem key={exe.path} value={exe.path}>
+                      {exe.relativePath}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               {game.truncated && (
                 <p className="flex items-center gap-1.5 text-xs font-medium text-amber-500">

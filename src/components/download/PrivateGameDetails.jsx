@@ -4,6 +4,13 @@ import { ArrowLeft, Download, Search, ImagePlus, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -15,10 +22,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import usePrivateArtwork from "@/hooks/usePrivateArtwork";
-import {
-  addToQueue,
-  hasActiveDownloads,
-} from "@/services/downloadQueueService";
+import { addToQueue, hasActiveDownloads } from "@/services/downloadQueueService";
 import gameService from "@/services/gameService";
 import { privateSourceMessage } from "@/lib/privateSourceMessages";
 import { toast } from "sonner";
@@ -28,9 +32,7 @@ export default function PrivateGameDetails({ initialGame }) {
   const [revision, setRevision] = useState(0);
   const [matching, setMatching] = useState(false);
   const [query, setQuery] = useState(game.game);
-  const [description, setDescription] = useState(
-    game.privateMetadata?.description || "",
-  );
+  const [description, setDescription] = useState(game.privateMetadata?.description || "");
   const [candidates, setCandidates] = useState([]);
   const [busy, setBusy] = useState(false);
   const [directory, setDirectory] = useState(0);
@@ -39,7 +41,7 @@ export default function PrivateGameDetails({ initialGame }) {
   const navigate = useNavigate();
   const source = game.privateSource;
   const image = usePrivateArtwork(source, revision);
-  const run = async (fn) => {
+  const run = async fn => {
     setBusy(true);
     try {
       await fn();
@@ -49,23 +51,21 @@ export default function PrivateGameDetails({ initialGame }) {
       setBusy(false);
     }
   };
-  const update = async (override) => {
+  const update = async override => {
     const catalog = await window.electron.privateSources.match(
       source.sourceId,
       source.entryId,
-      override,
+      override
     );
-    const next = catalog.games.find(
-      (g) => g.privateSource.entryId === source.entryId,
-    );
+    const next = catalog.games.find(g => g.privateSource.entryId === source.entryId);
     setGame(next);
     setQuery(next.game);
     setDescription(next.privateMetadata?.description || "");
-    setRevision((v) => v + 1);
+    setRevision(v => v + 1);
     gameService.notifySourceChanged();
     setMatching(false);
   };
-  const download = async (queued) => {
+  const download = async queued => {
     if (queued && (await hasActiveDownloads())) {
       addToQueue({
         url: `private:${source.sourceId}:${source.entryId}`,
@@ -79,7 +79,7 @@ export default function PrivateGameDetails({ initialGame }) {
       await window.electron.privateSources.download(
         source.sourceId,
         source.entryId,
-        directory,
+        directory
       );
     }
     navigate("/downloads");
@@ -129,7 +129,7 @@ export default function PrivateGameDetails({ initialGame }) {
               {metadata.description || t("privateSources.details.noDescription")}
             </p>
             <div className="flex flex-wrap gap-2">
-              {metadata.genres?.map((g) => (
+              {metadata.genres?.map(g => (
                 <Badge key={g} variant="outline">
                   {g}
                 </Badge>
@@ -150,11 +150,7 @@ export default function PrivateGameDetails({ initialGame }) {
                 ))}
             </dl>
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => setMatching(true)}
-              >
+              <Button variant="outline" disabled={busy} onClick={() => setMatching(true)}>
                 <Search className="mr-2 h-4 w-4" />
                 {t("privateSources.details.matchGame")}
               </Button>
@@ -165,9 +161,9 @@ export default function PrivateGameDetails({ initialGame }) {
                   run(async () => {
                     await window.electron.privateSources.uploadArt(
                       source.sourceId,
-                      source.entryId,
+                      source.entryId
                     );
-                    setRevision((v) => v + 1);
+                    setRevision(v => v + 1);
                   })
                 }
               >
@@ -182,7 +178,7 @@ export default function PrivateGameDetails({ initialGame }) {
             )}
             {metadata.screenshots?.length > 0 && (
               <div className="grid grid-cols-2 gap-3">
-                {metadata.screenshots.map((url) => (
+                {metadata.screenshots.map(url => (
                   <img
                     key={url}
                     src={url}
@@ -195,27 +191,28 @@ export default function PrivateGameDetails({ initialGame }) {
             )}
           </div>
           <aside className="space-y-4 rounded-xl border bg-background/50 p-5">
-            <h2 className="font-semibold">
-              {t("privateSources.details.downloadTitle")}
-            </h2>
+            <h2 className="font-semibold">{t("privateSources.details.downloadTitle")}</h2>
             <Label htmlFor="private-destination">
               {t("privateSources.details.destination")}
             </Label>
-            <select
-              id="private-destination"
-              className="w-full rounded-md border bg-background p-2 text-sm"
-              value={directory}
-              onChange={(e) => setDirectory(Number(e.target.value))}
+            <Select
+              value={String(directory)}
+              onValueChange={value => setDirectory(Number(value))}
             >
-              {[
-                settings.downloadDirectory,
-                ...(settings.additionalDirectories || []),
-              ].map((dir, i) => (
-                <option key={i} value={i}>
-                  {dir || t("privateSources.details.noDownloadFolder")}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="private-destination">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[
+                  settings.downloadDirectory,
+                  ...(settings.additionalDirectories || []),
+                ].map((dir, i) => (
+                  <SelectItem key={i} value={String(i)}>
+                    {dir || t("privateSources.details.noDownloadFolder")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               className="w-full gap-2 text-secondary"
               disabled={busy || !settings.downloadDirectory}
@@ -248,25 +245,21 @@ export default function PrivateGameDetails({ initialGame }) {
               {t("privateSources.details.matchDescription")}
             </DialogDescription>
           </DialogHeader>
-          <Label htmlFor="private-title">
-            {t("privateSources.details.searchLabel")}
-          </Label>
+          <Label htmlFor="private-title">{t("privateSources.details.searchLabel")}</Label>
           <div className="flex gap-2">
             <Input
               id="private-title"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={e => setQuery(e.target.value)}
             />
             <Button
               className="text-secondary"
               disabled={busy || !query.trim()}
               onClick={() =>
                 run(async () => {
-                  const items =
-                    await window.electron.privateSources.search(query);
+                  const items = await window.electron.privateSources.search(query);
                   setCandidates(items);
-                  if (!items.length)
-                    toast.info(t("privateSources.details.noMatches"));
+                  if (!items.length) toast.info(t("privateSources.details.noMatches"));
                 })
               }
             >
@@ -280,7 +273,7 @@ export default function PrivateGameDetails({ initialGame }) {
             id="private-description"
             className="min-h-24 rounded-md border bg-background p-3 text-sm"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={e => setDescription(e.target.value)}
           />
           <Button
             variant="secondary"
@@ -290,18 +283,14 @@ export default function PrivateGameDetails({ initialGame }) {
             {t("privateSources.details.saveDetails")}
           </Button>
           <div className="space-y-2">
-            {candidates.map((c) => (
+            {candidates.map(c => (
               <button
                 key={c.id}
                 disabled={busy}
                 className="flex w-full items-center gap-4 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
                 onClick={() => run(() => update({ steamId: c.id }))}
               >
-                <img
-                  src={c.image}
-                  alt=""
-                  className="h-16 w-32 rounded object-cover"
-                />
+                <img src={c.image} alt="" className="h-16 w-32 rounded object-cover" />
                 <span className="flex-1 font-medium">{c.name}</span>
                 <span className="text-xs text-muted-foreground">
                   {t("privateSources.details.similarity", {
