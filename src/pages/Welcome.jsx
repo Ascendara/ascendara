@@ -470,8 +470,11 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [depsOutcome, setDepsOutcome] = useState(null);
   const [failedDependencies, setFailedDependencies] = useState([]);
   const [warningMessage, setWarningMessage] = useState("");
-  // Linux/macOS: whether the Python step is done and the runner step is showing
+  // Linux/macOS: whether the Python step is done and the runner step is showing.
+  // Packaged builds bundle every helper, so only developer mode asks for Python.
   const [dependenciesInstalled, setDependenciesInstalled] = useState(false);
+  // Apple Silicon: Highball is bundled and sets itself up, so no runner is needed
+  const [highballStatus, setHighballStatus] = useState(null);
   const [progress, setProgress] = useState(0);
   // Set once the game index exists; pendingExit holds an exit waiting on the offline warning
   const indexReadyRef = useRef(false);
@@ -518,6 +521,19 @@ const Welcome = ({ welcomeData, onComplete }) => {
     [isOnWindows]
   );
   const setupIndex = setupSteps.indexOf(step);
+  const compatibilityReady =
+    !!highballStatus?.supported || runnersList.length > 0 || umuInstalled;
+
+  // Refresh Highball's state for the summary, since setup may have run since
+  useEffect(() => {
+    if (step === "finish" && highballStatus?.supported) {
+      window.electron
+        .highballGetStatus()
+        .then(setHighballStatus)
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const protectReasonKey = ["cancelled", "defenderUnavailable", "blocked"].includes(
     protectResult?.reason
@@ -914,7 +930,12 @@ const Welcome = ({ welcomeData, onComplete }) => {
       setIsOnLinux(isLinux);
 
       if (!isWindows) {
+        if (!(await window.electron.isDev())) setDependenciesInstalled(true);
         setRunnersList(await window.electron.getRunners());
+      }
+
+      if (window.electron.getPlatform() === "darwin") {
+        setHighballStatus(await window.electron.highballGetStatus());
       }
 
       if (isLinux) {
@@ -2723,37 +2744,37 @@ const Welcome = ({ welcomeData, onComplete }) => {
 
                         {/* Navigation Buttons */}
                         <div className="flex justify-center gap-3 pt-4">
-                          <Button
-                            variant="outline"
-                            size="lg"
-                            onClick={async () => {
-                              try {
-                                const runners = await window.electron.getRunners();
-                                setRunnersList(runners);
-                                const hasUmu =
-                                  isOnLinux && (await window.electron.isUmuInstalled());
-                                setUmuInstalled(hasUmu);
-                                setSetupError(
-                                  runners.length || hasUmu
-                                    ? ""
-                                    : t("welcome.noCompatibilityToolsFound")
-                                );
-                              } catch (error) {
-                                setSetupError(error.message);
-                              }
-                            }}
-                          >
-                            {t("welcome.checkAgain")}
-                          </Button>
+                          {!highballStatus?.supported && (
+                            <Button
+                              variant="outline"
+                              size="lg"
+                              onClick={async () => {
+                                try {
+                                  const runners = await window.electron.getRunners();
+                                  setRunnersList(runners);
+                                  const hasUmu =
+                                    isOnLinux && (await window.electron.isUmuInstalled());
+                                  setUmuInstalled(hasUmu);
+                                  setSetupError(
+                                    runners.length || hasUmu
+                                      ? ""
+                                      : t("welcome.noCompatibilityToolsFound")
+                                  );
+                                } catch (error) {
+                                  setSetupError(error.message);
+                                }
+                              }}
+                            >
+                              {t("welcome.checkAgain")}
+                            </Button>
+                          )}
                           <Button
                             onClick={() => handleNext()}
                             size="lg"
-                            className={`px-12 py-6 text-lg ${runnersList.length > 0 || umuInstalled ? "text-secondary" : "text-foreground"}`}
-                            variant={
-                              runnersList.length > 0 || umuInstalled ? "default" : "ghost"
-                            }
+                            className={`px-12 py-6 text-lg ${compatibilityReady ? "text-secondary" : "text-foreground"}`}
+                            variant={compatibilityReady ? "default" : "ghost"}
                           >
-                            {runnersList.length > 0 || umuInstalled
+                            {compatibilityReady
                               ? t("welcome.continue")
                               : t("welcome.skip")}
                             <ArrowRight className="ml-2 h-5 w-5" />
@@ -2985,6 +3006,18 @@ const Welcome = ({ welcomeData, onComplete }) => {
                               ? t("welcome.setup.finish.componentsPartial")
                               : t("welcome.setup.finish.componentsSkipped"),
                         ok: depsOutcome === "installed",
+                      },
+                      !isOnWindows && {
+                        icon: Wine,
+                        label: t("welcome.setup.finish.windowsGames"),
+                        value: highballStatus?.supported
+                          ? highballStatus.ready
+                            ? t("welcome.setup.finish.windowsGamesReady")
+                            : t("welcome.setup.finish.windowsGamesFirstPlay")
+                          : runnersList.length > 0 || umuInstalled
+                            ? t("welcome.setup.finish.windowsGamesReady")
+                            : t("welcome.setup.finish.windowsGamesNotSetUp"),
+                        ok: compatibilityReady,
                       },
                       {
                         icon: RefreshCw,

@@ -5051,7 +5051,11 @@
         "protection": "Download protection",
         "subtitle": "Here's how Ascendara is set up. You can change any of this in Settings.",
         "title": "You're all set",
-        "updates": "Updates"
+        "updates": "Updates",
+        "windowsGames": "Windows games",
+        "windowsGamesFirstPlay": "Sets up on first play",
+        "windowsGamesNotSetUp": "Not set up",
+        "windowsGamesReady": "Ready"
       },
       "personalize": {
         "autoUpdateDesc": "Recommended. Updates bring bug fixes, security patches and new features.",
