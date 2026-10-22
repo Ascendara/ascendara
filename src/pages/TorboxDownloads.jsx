@@ -45,7 +45,7 @@ import {
   controlDownload,
   getApiKey,
   getDirectDownloadLink,
-} from "@/services/torboxService";
+} from "@/services/downloads/torboxService";
 
 // Helper function to check if there are active downloads
 const checkActiveDownloads = async () => {

@@ -47,14 +47,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
-import torboxService from "@/services/torboxService";
+import torboxService from "@/services/downloads/torboxService";
 import { sanitizeText, formatLatestUpdate, formatCompactNumber } from "@/lib/utils";
-import ratingQueueService from "@/services/ratingQueueService";
-import installedGamesService from "@/services/installedGamesService";
+import ratingQueueService from "@/services/games/ratingQueueService";
+import installedGamesService from "@/services/library/installedGamesService";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import usePrivateArtwork from "@/hooks/usePrivateArtwork";
-import verifiedGamesService from "@/services/verifiedGamesService";
-import gamePagePreparer from "@/services/gamePagePreparer";
+import verifiedGamesService from "@/services/games/verifiedGamesService";
+import gamePagePreparer from "@/services/games/gamePagePreparer";
 import {
   SEAMLESS_PROVIDERS,
   TORBOX_PROVIDERS,

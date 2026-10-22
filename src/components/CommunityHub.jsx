@@ -6,8 +6,35 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { requestCommunityCreation, getUserCommunityRequests, getApprovedCommunities, requestJoinCommunity, getCommunityJoinRequests, getCommunityMembers, sendCommunityMessage, getCommunityMessages, subscribeToCommunityMessages, checkCommunityMembership, getUserCommunities } from "@/services/firebaseService";
-import { Users, MessageCircle, Plus, Search, Send, Crown, Shield, UserPlus, Loader2, ArrowLeft, CheckCircle, XCircle, Clock, Gamepad2 } from "lucide-react";
+import {
+  requestCommunityCreation,
+  getUserCommunityRequests,
+  getApprovedCommunities,
+  requestJoinCommunity,
+  getCommunityJoinRequests,
+  getCommunityMembers,
+  sendCommunityMessage,
+  getCommunityMessages,
+  subscribeToCommunityMessages,
+  checkCommunityMembership,
+  getUserCommunities,
+} from "@/services/firebase/firebaseService";
+import {
+  Users,
+  MessageCircle,
+  Plus,
+  Search,
+  Send,
+  Crown,
+  Shield,
+  UserPlus,
+  Loader2,
+  ArrowLeft,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Gamepad2,
+} from "lucide-react";
 import "@/lib/utils";
 
 const CommunityHub = ({ user, userData }) => {

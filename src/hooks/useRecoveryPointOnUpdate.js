@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { createSettingsRecoveryPoint } from "@/services/recoveryService";
+import { createSettingsRecoveryPoint } from "@/services/app/recoveryService";
 
 export function useRecoveryPointOnUpdate() {
   useEffect(() => {

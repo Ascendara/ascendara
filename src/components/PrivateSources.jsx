@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
-import gameService from "@/services/gameService";
+import gameService from "@/services/games/gameService";
 import { toast } from "sonner";
 
 const empty = {

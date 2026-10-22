@@ -1,5 +1,5 @@
-import { getBackupDownloadUrl } from "./firebaseService";
-import { retroBackupPlatform, restoreRetroCloudBackup } from "./retroService";
+import { getBackupDownloadUrl } from "../firebase/firebaseService";
+import { retroBackupPlatform, restoreRetroCloudBackup } from "../library/retroService";
 import {
   MAX_CLOUD_BACKUP_BYTES,
   validateBackupFolderName,
@@ -34,8 +34,7 @@ export async function restoreCloudSave(backup, settings) {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > MAX_CLOUD_BACKUP_BYTES)
-        throw new Error("Cloud backup is too large");
+      if (size > MAX_CLOUD_BACKUP_BYTES) throw new Error("Cloud backup is too large");
       chunks.push(value);
     }
   } finally {
@@ -47,16 +46,12 @@ export async function restoreCloudSave(backup, settings) {
   const archives = entries.filter(
     entry => entry.name.endsWith(".zip") && !entry.name.endsWith("_cloud.zip")
   );
-  if (
-    archives.length !== 1 ||
-    !entries.some(entry => entry.name === "mapping.yaml")
-  ) {
+  if (archives.length !== 1 || !entries.some(entry => entry.name === "mapping.yaml")) {
     throw new Error("Backup must contain one save archive and mapping.yaml");
   }
   // Resolve canonical Ludusavi titles just as the upload service does.
   const local = await window.electron.ludusavi("list-backups", backup.gameName);
-  if (!local?.success)
-    throw new Error(local?.error || "Unable to locate local backups");
+  if (!local?.success) throw new Error(local?.error || "Unable to locate local backups");
   const existing = Object.values(local.data?.games || {})[0];
   const folder = existing?.backupPath || `${location}/${folderName}`;
   for (const entry of entries) {
@@ -72,7 +67,6 @@ export async function restoreCloudSave(backup, settings) {
     backup.gameName,
     archives[0].name
   );
-  if (!restored?.success)
-    throw new Error(restored?.error || "Failed to restore saves");
+  if (!restored?.success) throw new Error(restored?.error || "Failed to restore saves");
   return restored;
 }

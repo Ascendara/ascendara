@@ -5,9 +5,9 @@ import {
   getBackupDownloadUrl,
   verifyAscendAccess,
   auth,
-} from "./firebaseService";
+} from "../firebase/firebaseService";
 
-import expanded from "../../electron/modules/retro/expanded-catalogue.json";
+import expanded from "../../../electron/modules/retro/expanded-catalogue.json";
 
 const RETRO_BACKUP_PREFIX = "Ascendara Retro - ";
 const RETRO_PLATFORMS = new Set([
@@ -42,7 +42,8 @@ export async function getRetroCloudAccess() {
 async function requireRetroCloudAccess(platform) {
   const uid = auth?.currentUser?.uid;
   if (!uid) throw new Error(i18n.t("retro.errors.signIn"));
-  if (!RETRO_PLATFORMS.has(platform)) throw new Error(i18n.t("retro.errors.unknownConsole"));
+  if (!RETRO_PLATFORMS.has(platform))
+    throw new Error(i18n.t("retro.errors.unknownConsole"));
   if (!(await getRetroCloudAccess()))
     throw new Error(i18n.t("retro.errors.cloudSubscription"));
   assertAccount(uid);
@@ -61,7 +62,8 @@ export async function retroCall(method, ...args) {
   let premiumLaunch = false;
   if (method === "launch") {
     const snapshot = await api.getState();
-    if (!snapshot?.success) throw new Error(snapshot?.error || i18n.t("retro.errors.requestFailed"));
+    if (!snapshot?.success)
+      throw new Error(snapshot?.error || i18n.t("retro.errors.requestFailed"));
     const game = snapshot.data.games.find(game => game.id === args[0]);
     premiumLaunch =
       game &&
@@ -80,13 +82,12 @@ export async function retroCall(method, ...args) {
   ) {
     const uid = auth?.currentUser?.uid;
     if (!uid || !(await getRetroCloudAccess()))
-      throw new Error(
-        i18n.t("retro.errors.expandedSubscription")
-      );
+      throw new Error(i18n.t("retro.errors.expandedSubscription"));
     assertAccount(uid);
   }
   const result = await api[method](...args);
-  if (!result?.success) throw new Error(result?.error || i18n.t("retro.errors.requestFailed"));
+  if (!result?.success)
+    throw new Error(result?.error || i18n.t("retro.errors.requestFailed"));
   return result.data;
 }
 
@@ -99,7 +100,8 @@ export async function uploadRetroBackup(platform) {
     `Ascendara Retro - ${platform}`,
     backup.name
   );
-  if (!result.success) throw new Error(result.error || i18n.t("retro.errors.uploadFailed"));
+  if (!result.success)
+    throw new Error(result.error || i18n.t("retro.errors.uploadFailed"));
   return result;
 }
 
@@ -124,7 +126,8 @@ export async function restoreRetroCloudBackup(platform, backupId) {
   const response = await fetch(result.downloadUrl, {
     signal: AbortSignal.timeout(120000),
   });
-  if (!response.ok) throw new Error(i18n.t("retro.errors.downloadFailed", { status: response.status }));
+  if (!response.ok)
+    throw new Error(i18n.t("retro.errors.downloadFailed", { status: response.status }));
   const limit = 256 * 1024 * 1024;
   if (Number(response.headers.get("content-length")) > limit)
     throw new Error(i18n.t("retro.errors.backupTooLarge"));

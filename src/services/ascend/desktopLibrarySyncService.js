@@ -1,5 +1,5 @@
 /** Keep the companion's installed library current and execute its launch queue. */
-import recentGamesService from "./recentGamesService";
+import recentGamesService from "../library/recentGamesService";
 
 const MONITOR = "https://monitor.ascendara.app";
 let timer = null;

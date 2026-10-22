@@ -60,14 +60,14 @@ class InstalledGamesService {
    */
   async checkGameStatus(gameName, newVersion) {
     const games = await this.getInstalledGames();
-    
+
     // Sanitize game name to match backend directory naming
-    const sanitizeName = (name) => {
+    const sanitizeName = name => {
       if (!name) return "";
       // Match backend's sanitize_folder_name: remove special chars including colons
       return name.replace(/[<>:"/\\|?*]/g, "").trim();
     };
-    
+
     const sanitizedGameName = sanitizeName(gameName);
     const installedGame = games.find(ig => sanitizeName(ig.game) === sanitizedGameName);
 

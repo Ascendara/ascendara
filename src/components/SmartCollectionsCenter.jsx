@@ -24,7 +24,7 @@ import {
   formatPlayTime,
   getLibraryGameName,
   loadSmartCollectionLibrary,
-} from "@/services/smartCollectionsService";
+} from "@/services/library/smartCollectionsService";
 
 const COLLECTION_ALIASES = {
   "never-played": "neverPlayed",
@@ -78,7 +78,8 @@ const SmartCollectionsCenter = () => {
   );
 
   const activeCollection =
-    collections.find(collection => collection.id === selectedCollection) || collections[0];
+    collections.find(collection => collection.id === selectedCollection) ||
+    collections[0];
 
   const filteredGames = useMemo(() => {
     const query = filter.trim().toLocaleLowerCase();
@@ -206,7 +207,9 @@ const SmartCollectionsCenter = () => {
                         <div className="flex items-start gap-3">
                           <Gamepad2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-foreground">{gameName}</p>
+                            <p className="truncate font-medium text-foreground">
+                              {gameName}
+                            </p>
                             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                               {game.isCustom && (
                                 <Badge variant="outline">
@@ -223,7 +226,9 @@ const SmartCollectionsCenter = () => {
                               {recent?.lastPlayed && (
                                 <span className="flex items-center gap-1">
                                   <Clock3 className="h-3 w-3" />
-                                  {new Date(recent.lastPlayed).toLocaleDateString(language)}
+                                  {new Date(recent.lastPlayed).toLocaleDateString(
+                                    language
+                                  )}
                                 </span>
                               )}
                             </div>

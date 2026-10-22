@@ -7,7 +7,7 @@ import {
   useMemo,
 } from "react";
 import i18n, { languages, addLanguage, getClosestSupportedLanguage } from "@/i18n";
-import { changeLanguage, getAvailableLanguages } from "@/services/languageService";
+import { changeLanguage, getAvailableLanguages } from "@/services/app/languageService";
 
 const LanguageContext = createContext();
 

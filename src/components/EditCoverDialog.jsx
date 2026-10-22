@@ -14,10 +14,10 @@ import { Search as SearchIcon, Upload as UploadIcon } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { cn } from "@/lib/utils";
-import gameService from "@/services/gameService";
+import gameService from "@/services/games/gameService";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import imageCacheService from "@/services/imageCacheService";
+import imageCacheService from "@/services/images/imageCacheService";
 
 const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
   const { t } = useLanguage();

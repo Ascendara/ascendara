@@ -28,7 +28,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import SafeHtml from "@/components/SafeHtml";
-import soundService from "@/services/soundService";
+import soundService from "@/services/app/soundService";
 
 const MUTE_KEY = "ascendara:tourMuted";
 const SPOTLIGHT_PADDING = 12;

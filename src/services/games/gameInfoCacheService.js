@@ -256,7 +256,10 @@ const clearExpiredCache = () => {
  * @returns {boolean} True if it's a game API cache key
  */
 const isGameApiCacheKey = key => {
-  return typeof key === "string" && Object.values(CACHE_PREFIXES).some(prefix => key.startsWith(prefix));
+  return (
+    typeof key === "string" &&
+    Object.values(CACHE_PREFIXES).some(prefix => key.startsWith(prefix))
+  );
 };
 
 /**
@@ -437,9 +440,7 @@ const purgeLegacyImageCache = () => {
     toRemove.forEach(k => localStorage.removeItem(k));
     localStorage.setItem(SENTINEL, "done");
     if (toRemove.length > 0) {
-      console.log(
-        `[gameInfoCache] Purged ${toRemove.length} legacy image cache entries`
-      );
+      console.log(`[gameInfoCache] Purged ${toRemove.length} legacy image cache entries`);
     }
   } catch (error) {
     console.warn("Error purging legacy image cache:", error);
@@ -471,16 +472,12 @@ const safeSetItem = (key, value) => {
       512 * 1024
     );
     const evicted = evictForSpace(target);
-    console.warn(
-      `[safeSetItem] Quota exceeded for ${key}; evicted ${evicted} entries`
-    );
+    console.warn(`[safeSetItem] Quota exceeded for ${key}; evicted ${evicted} entries`);
     try {
       localStorage.setItem(key, value);
       return true;
     } catch (retryError) {
-      console.warn(
-        `[safeSetItem] Still over quota after eviction; skipping ${key}`
-      );
+      console.warn(`[safeSetItem] Still over quota after eviction; skipping ${key}`);
       return false;
     }
   }
@@ -499,5 +496,4 @@ export default {
   evictForSpace,
   safeSetItem,
   isQuotaExceededError,
-
 };

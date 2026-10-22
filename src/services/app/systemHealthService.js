@@ -1,4 +1,4 @@
-import { checkServerStatus } from "@/services/serverStatus";
+import { checkServerStatus } from "@/services/app/serverStatus";
 
 const LOW_SPACE_BYTES = 5 * 1024 * 1024 * 1024;
 
@@ -14,8 +14,8 @@ function toolIsInstalled(value) {
   if (value === true) return true;
   return Boolean(
     value &&
-      typeof value === "object" &&
-      (value.installed === true || value.success === true || value.status === "installed")
+    typeof value === "object" &&
+    (value.installed === true || value.success === true || value.status === "installed")
   );
 }
 
@@ -34,7 +34,9 @@ function getWindowsVolumeKey(directory) {
 }
 
 export function normalizeDriveTotals(driveSpace, isWindows) {
-  const directories = Array.isArray(driveSpace?.directories) ? driveSpace.directories : [];
+  const directories = Array.isArray(driveSpace?.directories)
+    ? driveSpace.directories
+    : [];
   if (!isWindows || directories.length < 2) return driveSpace;
 
   const volumes = new Map();
@@ -206,7 +208,8 @@ export async function inspectSystemHealth(t) {
     const failedServices = serviceNames.filter(name => !serverStatus?.[name]?.ok);
     items.push({
       id: "services",
-      status: serverStatus?.noInternet || failedServices.length > 0 ? "warning" : "healthy",
+      status:
+        serverStatus?.noInternet || failedServices.length > 0 ? "warning" : "healthy",
       title: t("featureCenters.system.health.services"),
       description: serverStatus?.noInternet
         ? t("featureCenters.system.health.servicesOffline")

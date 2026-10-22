@@ -24,28 +24,34 @@ import ArtworkCorrectionDialog, {
   hasCorrectedArtwork,
 } from "@/components/download/ArtworkCorrectionDialog";
 import SystemRequirements from "@/components/download/SystemRequirements";
-import { canRetryExtraction, retryExtraction } from "@/services/extractionRetryService";
+import {
+  canRetryExtraction,
+  retryExtraction,
+} from "@/services/downloads/extractionRetryService";
 import { AlertDialog, AlertDialogDescription } from "@/components/ui/alert-dialog";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { sanitizeText } from "@/lib/utils";
 import { useGameViews } from "@/hooks/useGameViews";
-import imageCacheService from "@/services/imageCacheService";
-import steamGridImageService from "@/services/steamGridImageService";
-import artworkOverrideService from "@/services/artworkOverrideService";
-import gamePagePreparer from "@/services/gamePagePreparer";
-import { cacheDownloadData } from "@/services/retryGameDownloadService";
+import imageCacheService from "@/services/images/imageCacheService";
+import steamGridImageService from "@/services/images/steamGridImageService";
+import artworkOverrideService from "@/services/images/artworkOverrideService";
+import gamePagePreparer from "@/services/games/gamePagePreparer";
+import { cacheDownloadData } from "@/services/downloads/retryGameDownloadService";
 import {
   addToQueue,
   hasActiveDownloads,
   getDownloadQueue,
-} from "@/services/downloadQueueService";
-import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
-import { forceSyncDownloads, notifyDownloadStart } from "@/services/downloadSyncService";
+} from "@/services/downloads/downloadQueueService";
+import pendingLibrarySwapService from "@/services/downloads/pendingLibrarySwapService";
+import {
+  forceSyncDownloads,
+  notifyDownloadStart,
+} from "@/services/ascend/downloadSyncService";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
+import checkQbittorrentStatus from "@/services/downloads/qbittorrentCheckService";
 import { Loader, Wine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,18 +67,18 @@ import HighballCompatibility, {
 } from "@/components/HighballCompatibility";
 import { toast } from "sonner";
 import TimemachineDialog from "@/components/TimemachineDialog";
-import steamService from "@/services/gameInfoService";
-import hltbService from "@/services/hltbService";
-import torboxService from "@/services/torboxService";
+import steamService from "@/services/games/gameInfoService";
+import hltbService from "@/services/integrations/hltbService";
+import torboxService from "@/services/downloads/torboxService";
 import {
   fetchProviderPatterns,
   getProviderPattern,
-} from "@/services/providerPatternService";
-import nexusModsService from "@/services/nexusModsService";
-import flingTrainerService from "@/services/flingTrainerService";
-import verifiedGamesService from "@/services/verifiedGamesService";
-import gameService from "@/services/gameService";
-import installedGamesService from "@/services/installedGamesService";
+} from "@/services/downloads/providerPatternService";
+import nexusModsService from "@/services/integrations/nexusModsService";
+import flingTrainerService from "@/services/integrations/flingTrainerService";
+import verifiedGamesService from "@/services/games/verifiedGamesService";
+import gameService from "@/services/games/gameService";
+import installedGamesService from "@/services/library/installedGamesService";
 import {
   SEAMLESS_PROVIDERS,
   VERIFIED_PROVIDERS as CENTRAL_VERIFIED_PROVIDERS,

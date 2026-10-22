@@ -17,7 +17,7 @@ import {
   getAvailableLanguages,
   cancelTranslation,
   onLanguageListChange,
-} from "@/services/languageService";
+} from "@/services/app/languageService";
 import {
   AlertDialog,
   AlertDialogAction,

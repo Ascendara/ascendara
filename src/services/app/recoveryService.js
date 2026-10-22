@@ -2,7 +2,8 @@ const SAFE_MODE_KEY = "ascendara:safe-ui-mode";
 const SAFE_MODE_STYLE_ID = "ascendara-safe-ui-mode-style";
 
 function ensureSafeModeStyle() {
-  if (typeof document === "undefined" || document.getElementById(SAFE_MODE_STYLE_ID)) return;
+  if (typeof document === "undefined" || document.getElementById(SAFE_MODE_STYLE_ID))
+    return;
 
   const style = document.createElement("style");
   style.id = SAFE_MODE_STYLE_ID;

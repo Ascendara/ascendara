@@ -14,7 +14,7 @@ import {
   resendVerificationEmail,
   reloadCurrentUser,
   signInWithGoogle,
-} from "@/services/firebaseService";
+} from "@/services/firebase/firebaseService";
 
 const AuthContext = createContext(null);
 
@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }) => {
                 );
                 const { setDoc, doc, serverTimestamp } =
                   await import("firebase/firestore");
-                const { db } = await import("@/services/firebaseService");
+                const { db } = await import("@/services/firebase/firebaseService");
 
                 await setDoc(
                   doc(db, "users", firebaseUser.uid),

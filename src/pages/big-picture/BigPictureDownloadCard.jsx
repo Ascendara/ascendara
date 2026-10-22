@@ -1,6 +1,6 @@
 import React from "react";
 import { FolderOpen, Trash2, Play, Pause, Loader, RefreshCcw } from "lucide-react";
-import { canRetryExtraction } from "@/services/extractionRetryService";
+import { canRetryExtraction } from "@/services/downloads/extractionRetryService";
 
 // --- BIG PICTURE DOWNLOAD CARD ---
 const BigPictureDownloadCard = ({

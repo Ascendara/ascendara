@@ -29,8 +29,7 @@ export const calculateLevelFromXP = totalXP => {
     console.log("[LevelCalc] Input XP:", totalXP, "Normalized:", normalizedXP);
   }
 
-  const rawLevel =
-    1 + Math.pow(normalizedXP / LEVEL_XP_BASE, 1 / LEVEL_XP_EXPONENT);
+  const rawLevel = 1 + Math.pow(normalizedXP / LEVEL_XP_BASE, 1 / LEVEL_XP_EXPONENT);
   let level = Math.max(1, Math.floor(rawLevel));
   level = Math.min(level, MAX_PROFILE_LEVEL);
 

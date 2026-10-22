@@ -1,4 +1,4 @@
-import { useLibraryBackupStore } from "@/services/libraryBackupStore";
+import { useLibraryBackupStore } from "@/services/library/libraryBackupStore";
 import LocalLibraryBackupsDialog from "@/components/LocalLibraryBackupsDialog";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
@@ -28,8 +28,8 @@ import {
   getBackupDownloadUrl,
   listBackups,
   verifyAscendAccess,
-} from "@/services/firebaseService";
-import { uploadBackupToCloud } from "@/services/cloudBackupService";
+} from "@/services/firebase/firebaseService";
+import { uploadBackupToCloud } from "@/services/cloud/cloudBackupService";
 import {
   MAX_CLOUD_BACKUP_BYTES,
   validateBackupFolderName,

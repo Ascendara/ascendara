@@ -10,7 +10,10 @@ import {
 import { Button } from "./ui/button";
 import { Skeleton } from "./ui/skeleton";
 import { useState, useEffect, useCallback } from "react";
-import { fetchGameReleases, TimemachineBusyError } from "../services/timemachineService";
+import {
+  fetchGameReleases,
+  TimemachineBusyError,
+} from "../services/games/timemachineService";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
 import {
@@ -104,7 +107,9 @@ export default function TimemachineDialog({
   const isShowing = entry => !!entry.version && entry.version === showingVersion;
 
   const releaseDate = entry =>
-    formatDate(entry.firstSeen) || entry.legacyDate || t("download.timemachine.unknownDate");
+    formatDate(entry.firstSeen) ||
+    entry.legacyDate ||
+    t("download.timemachine.unknownDate");
 
   const liveRelease = releases.find(entry => entry.live);
   const viewingOlder = !!liveRelease && !isShowing(liveRelease);
@@ -234,10 +239,16 @@ export default function TimemachineDialog({
                     <div
                       className={cn(
                         "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
-                        active ? "bg-primary text-secondary" : "bg-accent/30 text-foreground"
+                        active
+                          ? "bg-primary text-secondary"
+                          : "bg-accent/30 text-foreground"
                       )}
                     >
-                      {active ? <Check className="h-4 w-4" /> : <History className="h-4 w-4" />}
+                      {active ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <History className="h-4 w-4" />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">

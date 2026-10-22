@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearch } from "@/context/SearchContext";
-import gameService from "@/services/gameService";
+import gameService from "@/services/games/gameService";
 
 export const useGameIndexSearch = () => {
   const { registerSearchable, unregisterSearchable } = useSearch();

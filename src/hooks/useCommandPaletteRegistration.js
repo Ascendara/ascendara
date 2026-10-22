@@ -4,7 +4,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useSearch } from "@/context/SearchContext";
 import { FEATURE_CENTER_EVENTS, openFeatureCenter } from "@/lib/featureCenterEvents";
 import { startPreviousVersionRollback } from "@/lib/recoveryActions";
-import { createSettingsRecoveryPoint } from "@/services/recoveryService";
+import { createSettingsRecoveryPoint } from "@/services/app/recoveryService";
 
 const keywords = {
   system: [
@@ -39,14 +39,7 @@ const keywords = {
     "espaço",
     "pastas",
   ],
-  recovery: [
-    "recovery",
-    "safe mode",
-    "rollback",
-    "cache",
-    "recuperação",
-    "modo seguro",
-  ],
+  recovery: ["recovery", "safe mode", "rollback", "cache", "recuperação", "modo seguro"],
   profiles: [
     "profiles",
     "launch commands",
@@ -121,7 +114,9 @@ export function useCommandPaletteRegistration() {
         id: "create-recovery-point",
         type: "commands",
         label: t("featureCenters.commandPalette.commands.createRecovery.label"),
-        description: t("featureCenters.commandPalette.commands.createRecovery.description"),
+        description: t(
+          "featureCenters.commandPalette.commands.createRecovery.description"
+        ),
         keywords: [
           "snapshot",
           "settings",
@@ -198,7 +193,8 @@ export function useCommandPaletteRegistration() {
         label: t("featureCenters.commandPalette.commands.localRefresh.label"),
         description: t("featureCenters.commandPalette.commands.localRefresh.description"),
         keywords: ["index", "refresh", "local", "índice", "atualizar"],
-        onSelect: navigate => navigate("/settings", { state: { scrollTo: "game-index" } }),
+        onSelect: navigate =>
+          navigate("/settings", { state: { scrollTo: "game-index" } }),
       },
       {
         id: "open-settings",

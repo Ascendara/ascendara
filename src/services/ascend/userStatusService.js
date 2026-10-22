@@ -1,4 +1,4 @@
-import { updateUserStatus, getUserStatus, auth } from "./firebaseService";
+import { updateUserStatus, getUserStatus, auth } from "../firebase/firebaseService";
 
 let isInitialized = false;
 let currentActivity = null;

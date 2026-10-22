@@ -1,6 +1,6 @@
 import { useState, useEffect, useSyncExternalStore } from "react";
-import imageCacheService from "@/services/imageCacheService";
-import steamGridImageService from "@/services/steamGridImageService";
+import imageCacheService from "@/services/images/imageCacheService";
+import steamGridImageService from "@/services/images/steamGridImageService";
 
 // Track which images are currently being loaded to prevent duplicate requests
 const loadingImages = new Map();
@@ -15,13 +15,15 @@ function processImageQueue() {
       const task = imageQueue.shift();
       if (task && task.mounted) {
         activeLoads++;
-        task.execute().catch(() => {}).finally(() => {
-          activeLoads--;
-          processNext();
-        });
+        task
+          .execute()
+          .catch(() => {})
+          .finally(() => {
+            activeLoads--;
+            processNext();
+          });
       }
     }
-
   };
 
   processNext();
@@ -81,7 +83,9 @@ export function useImageLoader(
             error: err?.message || "SteamGrid lookup failed",
           });
         });
-      return () => { active = false; };
+      return () => {
+        active = false;
+      };
     }
 
     if (!imgID || !options.enabled) {
@@ -128,7 +132,9 @@ export function useImageLoader(
             });
           }
         });
-      return () => { active = false; };
+      return () => {
+        active = false;
+      };
     }
 
     // Set loading state immediately (non-blocking)
@@ -141,7 +147,8 @@ export function useImageLoader(
         if (!active) return null;
 
         try {
-          const loadPromise = loadingImages.get(loadingKey) || imageCacheService.getImage(imgID, options);
+          const loadPromise =
+            loadingImages.get(loadingKey) || imageCacheService.getImage(imgID, options);
           loadingImages.set(loadingKey, loadPromise);
 
           const cached = await loadPromise;

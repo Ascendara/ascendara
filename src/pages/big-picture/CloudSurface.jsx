@@ -11,9 +11,9 @@ import {
 import { toast } from "sonner";
 import { useSettings } from "@/context/SettingsContext";
 import useAscendPage from "../ascend/useAscendPage";
-import { listBackups, deleteBackup } from "@/services/firebaseService";
-import { uploadBackupToCloud } from "@/services/cloudBackupService";
-import { restoreCloudSave } from "@/services/restoreCloudSave";
+import { listBackups, deleteBackup } from "@/services/firebase/firebaseService";
+import { uploadBackupToCloud } from "@/services/cloud/cloudBackupService";
+import { restoreCloudSave } from "@/services/cloud/restoreCloudSave";
 import { SurfaceButton, useSurface } from "./Surface";
 import {
   BigPictureShell,
@@ -30,8 +30,7 @@ const tabs = [
   ["local", "Local Saves"],
 ];
 const sortModes = ["name", "playtime", "recent", "achievements"];
-const dateLabel = value =>
-  value ? new Date(value).toLocaleString() : "Unknown date";
+const dateLabel = value => (value ? new Date(value).toLocaleString() : "Unknown date");
 
 export function CloudSurface({
   navigation,
@@ -79,10 +78,8 @@ export function CloudSurface({
     cloud.ascendAccess.verified &&
     cloud.ascendAccess.hasAccess;
   const savesAllowed =
-    libraryAllowed &&
-    (cloud.ascendAccess.isSubscribed || cloud.ascendAccess.isVerified);
-  const localReady =
-    !!settings.ludusavi?.enabled && !!settings.ludusavi?.backupLocation;
+    libraryAllowed && (cloud.ascendAccess.isSubscribed || cloud.ascendAccess.isVerified);
+  const localReady = !!settings.ludusavi?.enabled && !!settings.ludusavi?.backupLocation;
   const locked = keyboard || !!confirmation || busy;
 
   useEffect(() => {
@@ -129,9 +126,7 @@ export function CloudSurface({
         window.electron.getCustomSavePaths(name, !!game.isCustom),
       ]);
       if (customPaths?.success === false)
-        throw new Error(
-          customPaths.error || "Unable to load custom save paths"
-        );
+        throw new Error(customPaths.error || "Unable to load custom save paths");
       if (request !== localRequest.current) return;
       const data = Object.values(result?.data?.games || {})[0];
       setLocalBackups(data?.backups || []);
@@ -195,8 +190,7 @@ export function CloudSurface({
     cloud.setLibrarySearchQuery(value);
     setPage(0);
   };
-  const matches = name =>
-    name.toLocaleLowerCase().includes(query.toLocaleLowerCase());
+  const matches = name => name.toLocaleLowerCase().includes(query.toLocaleLowerCase());
   const items =
     tab === "library"
       ? cloud.getFilteredLibraryGames()
@@ -218,8 +212,7 @@ export function CloudSurface({
   const pages = Math.max(1, Math.ceil(items.length / 12));
   const currentPage = Math.min(page, pages - 1);
   const displayed = items.slice(currentPage * 12, (currentPage + 1) * 12);
-  const allowed =
-    tab === "local" || (tab === "library" ? libraryAllowed : savesAllowed);
+  const allowed = tab === "local" || (tab === "library" ? libraryAllowed : savesAllowed);
   const loading =
     tab === "library"
       ? cloud.loadingCloudLibrary
@@ -231,11 +224,7 @@ export function CloudSurface({
   else if (selectedGame) {
     rows.push(
       ["local-back", "local-refresh"],
-      [
-        "backup",
-        ...(savesAllowed ? ["upload", "auto-cloud"] : []),
-        "auto-local",
-      ],
+      ["backup", ...(savesAllowed ? ["upload", "auto-cloud"] : []), "auto-local"],
       ["add-path"],
       ...paths.map((_, i) => [`path-${i}`]),
       ...localBackups.map((_, i) => [`local-restore-${i}`])
@@ -303,18 +292,12 @@ export function CloudSurface({
       !!selectedGame.isCustom,
       next
     );
-    if (!result?.success)
-      throw new Error(result?.error || "Unable to save paths");
+    if (!result?.success) throw new Error(result?.error || "Unable to save paths");
     setPaths(result.paths || next);
   };
 
   return (
-    <BigPictureShell
-      ref={root}
-      className="bp-cloud"
-      title="Cloud"
-      focus={focus}
-    >
+    <BigPictureShell ref={root} className="bp-cloud" title="Cloud" focus={focus}>
       <header className="bp-cloud-heading">
         <Cloud />
         <div>
@@ -356,8 +339,8 @@ export function CloudSurface({
           }
         >
           <p>
-            Manage your account in desktop Ascend. Local Saves are available
-            without a subscription.
+            Manage your account in desktop Ascend. Local Saves are available without a
+            subscription.
           </p>
           <div className="bp-actions">
             {button("account", "Open Ascend account", onAccount)}
@@ -373,9 +356,7 @@ export function CloudSurface({
         <>
           <h2>{gameName(selectedGame)}</h2>
           <BigPictureToolbar>
-            {button("local-back", "All local games", () =>
-              setSelectedGame(null)
-            )}
+            {button("local-back", "All local games", () => setSelectedGame(null))}
             {button(
               "local-refresh",
               "Refresh",
@@ -464,9 +445,7 @@ export function CloudSurface({
                               !!selectedGame.isCustom
                             ))
                           )
-                            throw new Error(
-                              "Unable to enable automatic local backups"
-                            );
+                            throw new Error("Unable to enable automatic local backups");
                           setAutoLocal(true);
                         }
                         localStorage.setItem(
@@ -481,8 +460,7 @@ export function CloudSurface({
               <section className="bp-panel">
                 <h3>Custom save folders</h3>
                 <p className="bp-muted">
-                  Automatic game detection is used when no custom folders are
-                  set.
+                  Automatic game detection is used when no custom folders are set.
                 </p>
                 {button("add-path", "Add save folder", () =>
                   perform(async () => {
@@ -495,9 +473,7 @@ export function CloudSurface({
                   <div className="bp-cloud-row" key={path}>
                     <span>{path}</span>
                     {button(`path-${index}`, "Remove folder", () =>
-                      perform(() =>
-                        savePaths(paths.filter((_, i) => i !== index))
-                      )
+                      perform(() => savePaths(paths.filter((_, i) => i !== index)))
                     )}
                   </div>
                 ))}
@@ -546,20 +522,13 @@ export function CloudSurface({
               <Search />
             )}
             {button("clear", "Clear filter", () => setFilter(""), !query)}
-            {button(
-              "refresh",
-              "Refresh",
-              () => perform(refresh),
-              loading,
-              <RefreshCw />
-            )}
+            {button("refresh", "Refresh", () => perform(refresh), loading, <RefreshCw />)}
             {tab === "library" && (
               <>
                 {button("sort", `Sort: ${cloud.librarySortBy}`, () => {
                   cloud.setLibrarySortBy(
                     sortModes[
-                      (sortModes.indexOf(cloud.librarySortBy) + 1) %
-                        sortModes.length
+                      (sortModes.indexOf(cloud.librarySortBy) + 1) % sortModes.length
                     ]
                   );
                   setPage(0);
@@ -619,28 +588,22 @@ export function CloudSurface({
                   "Choose a backup location to get started."}
               </p>
               {!localReady && (
-                <p>
-                  Enable save backups and choose a location before selecting a
-                  game.
-                </p>
+                <p>Enable save backups and choose a location before selecting a game.</p>
               )}
             </section>
           )}
           {tab === "library" && cloud.cloudLibrary && (
             <p className="bp-muted">
               {cloud.cloudLibrary.games?.length || 0} games ·{" "}
-              {cloud.formatPlaytime(cloud.cloudLibrary.totalPlaytime || 0)}{" "}
-              played · {cloud.cloudLibrary.unlockedAchievements || 0}{" "}
-              achievements unlocked
+              {cloud.formatPlaytime(cloud.cloudLibrary.totalPlaytime || 0)} played ·{" "}
+              {cloud.cloudLibrary.unlockedAchievements || 0} achievements unlocked
             </p>
           )}
           {tab === "backups" && backupError && (
             <p role="alert">{backupError} Use Refresh to try again.</p>
           )}
           {tab === "library" && cloud.cloudLibraryError && (
-            <p role="alert">
-              {cloud.cloudLibraryError} Use Refresh to try again.
-            </p>
+            <p role="alert">{cloud.cloudLibraryError} Use Refresh to try again.</p>
           )}
           {loading ? (
             <p role="status">Loading…</p>
@@ -681,9 +644,7 @@ export function CloudSurface({
                       `restore-${index}`,
                       "Restore saves",
                       () =>
-                        restore(item.gameName, () =>
-                          restoreCloudSave(item, settings)
-                        ),
+                        restore(item.gameName, () => restoreCloudSave(item, settings)),
                       false,
                       <RotateCcw />
                     )}
@@ -698,9 +659,7 @@ export function CloudSurface({
                             perform(async () => {
                               const result = await deleteBackup(item.backupId);
                               if (!result.success)
-                                throw new Error(
-                                  result.error || "Delete failed"
-                                );
+                                throw new Error(result.error || "Delete failed");
                               setBackups(previous =>
                                 previous.filter(
                                   backup => backup.backupId !== item.backupId
@@ -718,9 +677,7 @@ export function CloudSurface({
                 <article className="bp-cloud-row" key={item.key}>
                   <div>
                     <h3>{gameName(item.game)}</h3>
-                    <p>
-                      {item.game.isCustom ? "Custom game" : "Installed game"}
-                    </p>
+                    <p>{item.game.isCustom ? "Custom game" : "Installed game"}</p>
                   </div>
                   {button(
                     `local-${index}`,
@@ -755,10 +712,7 @@ export function CloudSurface({
                         confirm(
                           "Remove game from cloud?",
                           `Remove ${item.name} and its synced game data from your cloud library. Your installed game and save backups are kept.`,
-                          () =>
-                            perform(() =>
-                              cloud.handleDeleteCloudGame(item.name)
-                            ),
+                          () => perform(() => cloud.handleDeleteCloudGame(item.name)),
                           "Remove"
                         )
                       )}
@@ -769,23 +723,19 @@ export function CloudSurface({
                       {cloud.loadingGameAchievements ? (
                         <p role="status">Loading achievements…</p>
                       ) : cloud.gameAchievements?.achievements?.length ? (
-                        cloud.gameAchievements.achievements.map(
-                          (achievement, i) => (
-                            <p
-                              {...focus(`achievement-${index}-${i}`)}
-                              key={achievement.achID || i}
-                            >
-                              <strong>{achievement.name}</strong>
-                              <span>
-                                {achievement.achieved ? "Unlocked" : "Locked"}
-                              </span>
-                            </p>
-                          )
-                        )
+                        cloud.gameAchievements.achievements.map((achievement, i) => (
+                          <p
+                            {...focus(`achievement-${index}-${i}`)}
+                            key={achievement.achID || i}
+                          >
+                            <strong>{achievement.name}</strong>
+                            <span>{achievement.achieved ? "Unlocked" : "Locked"}</span>
+                          </p>
+                        ))
                       ) : (
                         <p>
-                          No achievement details synced. Sync the library from
-                          the PC where you played.
+                          No achievement details synced. Sync the library from the PC
+                          where you played.
                         </p>
                       )}
                     </div>

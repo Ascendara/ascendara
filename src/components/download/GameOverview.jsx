@@ -1,7 +1,7 @@
 import GameScreenshots from "@/components/GameScreenshots";
 import SafeHtml from "@/components/SafeHtml";
 import { useLanguage } from "@/context/LanguageContext";
-import steamService from "@/services/gameInfoService";
+import steamService from "@/services/games/gameInfoService";
 import { ExternalLink, Loader } from "lucide-react";
 
 function DetailGroup({ title, children }) {

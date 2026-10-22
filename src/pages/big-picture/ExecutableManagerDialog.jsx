@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import gameUpdateService from "@/services/gameUpdateService";
+import gameUpdateService from "@/services/library/gameUpdateService";
 import { toast } from "sonner";
 import GamepadFileBrowser from "@/components/GamepadFileBrowser";
 

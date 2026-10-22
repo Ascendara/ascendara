@@ -6,7 +6,7 @@ import {
 import {
   uploadBackupToCloud,
   hasActiveSubscription,
-} from "@/services/cloudBackupService";
+} from "@/services/cloud/cloudBackupService";
 import { useState, useEffect } from "react";
 import {
   AlertDialog,
@@ -45,7 +45,7 @@ import { Card, CardContent } from "./ui/card";
 import {
   listBackups as listCloudBackups,
   getBackupDownloadUrl,
-} from "@/services/firebaseService";
+} from "@/services/firebase/firebaseService";
 
 const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false }) => {
   const [activeScreen, setActiveScreen] = useState("options"); // options, backup, restore, restoreConfirm, backupsList

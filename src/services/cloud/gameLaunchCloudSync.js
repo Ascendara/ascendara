@@ -24,7 +24,7 @@
  *   - Hard cap on total time spent waiting before launch (`PULL_TIMEOUT_MS`).
  */
 
-import { auth, getCloudLibrary } from "./firebaseService";
+import { auth, getCloudLibrary } from "../firebase/firebaseService";
 
 // Max time we're willing to delay a game launch for the cloud pull.
 // Network is best-effort — if Firestore is slow we launch anyway and rely on
@@ -106,9 +106,7 @@ export const pullCloudGameDataBeforeLaunch = async gameName => {
   try {
     const result = await withTimeout(getCloudLibrary(), PULL_TIMEOUT_MS);
     const cloudGames = result?.data?.games || [];
-    const target = cloudGames.find(
-      g => normalizeName(g?.name) === normalizeName(name)
-    );
+    const target = cloudGames.find(g => normalizeName(g?.name) === normalizeName(name));
 
     if (!target) {
       // Nothing to merge, but still mark as pulled so we don't retry every
@@ -121,8 +119,7 @@ export const pullCloudGameDataBeforeLaunch = async gameName => {
     // performs Math.max so sending zero/null values cannot regress locals.
     const payload = {
       playTime: typeof target.playTime === "number" ? target.playTime : 0,
-      launchCount:
-        typeof target.launchCount === "number" ? target.launchCount : 0,
+      launchCount: typeof target.launchCount === "number" ? target.launchCount : 0,
       lastPlayed: target.lastPlayed || null,
       favorite: !!target.favorite,
     };

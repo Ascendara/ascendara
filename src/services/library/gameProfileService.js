@@ -51,7 +51,9 @@ export async function loadGameProfileCatalog() {
   // Hiding custom entries from additional folders is safer than presenting controls that
   // only update part of their state. Regular installed games remain fully supported.
   const merged = [
-    ...(Array.isArray(installed) ? installed.map(game => normalizeGame(game, false)) : []),
+    ...(Array.isArray(installed)
+      ? installed.map(game => normalizeGame(game, false))
+      : []),
     ...supportedCustomGames.map(game => normalizeGame(game, true)),
   ];
 
@@ -74,11 +76,15 @@ export async function loadGameProfile(game, isLinux) {
     window.electron.getLaunchCommands(gameName, game.isCustom).catch(() => ""),
     window.electron.isGameAutoBackupsEnabled(gameName, game.isCustom).catch(() => false),
     window.electron.getCustomSavePaths(gameName, game.isCustom),
-    isLinux ? window.electron.umuGetGameId(gameName).catch(() => "") : Promise.resolve(""),
+    isLinux
+      ? window.electron.umuGetGameId(gameName).catch(() => "")
+      : Promise.resolve(""),
   ]);
 
   if (!savePathsResult?.success) {
-    throw new Error(savePathsResult?.error || "Ascendara could not read custom save paths");
+    throw new Error(
+      savePathsResult?.error || "Ascendara could not read custom save paths"
+    );
   }
 
   return {
@@ -122,7 +128,9 @@ export async function saveGameProfile(game, profile, isLinux) {
     savePaths
   );
   if (!savePathsResult?.success) {
-    throw new Error(savePathsResult?.error || "Ascendara could not save custom save paths");
+    throw new Error(
+      savePathsResult?.error || "Ascendara could not save custom save paths"
+    );
   }
 
   if (isLinux) {

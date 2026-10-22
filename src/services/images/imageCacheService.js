@@ -1,7 +1,7 @@
 /**
  * ImageCacheService - A simplified and robust image caching service
  */
-import gameService from "./gameService";
+import gameService from "../games/gameService";
 
 class ImageCacheService {
   constructor() {

@@ -9,20 +9,16 @@ import {
   Users,
 } from "lucide-react";
 import { useImageLoader } from "@/hooks/useImageLoader";
-import ratingQueueService from "@/services/ratingQueueService";
+import ratingQueueService from "@/services/games/ratingQueueService";
 import { gameName } from "./surfaceNavigation";
 import "./browse-game-card.css";
 
-const validRating = (value) => {
+const validRating = value => {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : null;
 };
 
-export const BrowseGameCard = memo(function BrowseGameCard({
-  game,
-  focus,
-  onOpen,
-}) {
+export const BrowseGameCard = memo(function BrowseGameCard({ game, focus, onOpen }) {
   const ref = useRef(null);
   const id = useId();
   const name = gameName(game);
@@ -30,7 +26,7 @@ export const BrowseGameCard = memo(function BrowseGameCard({
   const [failedImages, setFailedImages] = useState(() => new Set());
   const [queuedRating, setQueuedRating] = useState(null);
   const suppliedArtwork = [game.cover, game.image].find(
-    (url) => typeof url === "string" && url.trim() && !failedImages.has(url),
+    url => typeof url === "string" && url.trim() && !failedImages.has(url)
   );
   const { cachedImage } = useImageLoader(game.imgID, {
     enabled: visible && !suppliedArtwork,
@@ -46,9 +42,7 @@ export const BrowseGameCard = memo(function BrowseGameCard({
   const rating =
     suppliedRating ||
     (queuedRating?.id === game.gameID ? queuedRating.value : null) ||
-    (game.gameID
-      ? validRating(ratingQueueService.getCachedRating(game.gameID))
-      : null);
+    (game.gameID ? validRating(ratingQueueService.getCachedRating(game.gameID)) : null);
   const rawGenres = game.category || game.genre || game.genres || [];
   const genres = [
     ...new Set(
@@ -58,21 +52,19 @@ export const BrowseGameCard = memo(function BrowseGameCard({
           ? rawGenres.split(",")
           : []
       )
-        .map((genre) =>
-          typeof genre === "string" ? genre.trim() : genre?.name,
-        )
-        .filter((genre) => typeof genre === "string" && genre),
+        .map(genre => (typeof genre === "string" ? genre.trim() : genre?.name))
+        .filter(genre => typeof genre === "string" && genre)
     ),
   ].slice(0, 2);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
+      entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
         setVisible(true);
         observer.disconnect();
       },
-      { rootMargin: "250px" },
+      { rootMargin: "250px" }
     );
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
@@ -81,7 +73,7 @@ export const BrowseGameCard = memo(function BrowseGameCard({
   useEffect(() => {
     if (!visible || suppliedRating || !game.gameID) return;
     let active = true;
-    const unsubscribe = ratingQueueService.subscribe(game.gameID, (value) => {
+    const unsubscribe = ratingQueueService.subscribe(game.gameID, value => {
       const next = validRating(value);
       if (active && next) setQueuedRating({ id: game.gameID, value: next });
     });
@@ -108,9 +100,7 @@ export const BrowseGameCard = memo(function BrowseGameCard({
             alt=""
             loading="lazy"
             decoding="async"
-            onError={() =>
-              setFailedImages((previous) => new Set([...previous, artwork]))
-            }
+            onError={() => setFailedImages(previous => new Set([...previous, artwork]))}
           />
         ) : (
           <div className="bp-browse-artwork-placeholder">

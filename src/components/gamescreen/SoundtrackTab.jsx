@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/LanguageContext";
-import { trackDownload } from "@/services/khinsiderService";
+import { trackDownload } from "@/services/integrations/khinsiderService";
 import { Copy, Download, HeadphoneOff, Music2, Play } from "lucide-react";
 import { toast } from "sonner";
 

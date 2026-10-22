@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getRetroCloudAccess } from "@/services/retroService";
+import { getRetroCloudAccess } from "@/services/library/retroService";
 
 export default function useRetroAccess() {
   const { user, userData } = useAuth();

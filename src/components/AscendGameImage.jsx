@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Gamepad2 } from "lucide-react";
-import { getAscendArtworkCandidates } from "@/services/ascendArtworkService";
+import { getAscendArtworkCandidates } from "@/services/images/ascendArtworkService";
 
-export default function AscendGameImage({ name, slot = "header", fallback: Fallback = Gamepad2 }) {
+export default function AscendGameImage({
+  name,
+  slot = "header",
+  fallback: Fallback = Gamepad2,
+}) {
   const host = useRef(null);
   const advance = useRef(null);
   const [artwork, setArtwork] = useState(null);
@@ -22,13 +26,18 @@ export default function AscendGameImage({ name, slot = "header", fallback: Fallb
       started = true;
       void next();
     };
-    const observer = typeof IntersectionObserver === "undefined" ? null :
-      new IntersectionObserver(entries => {
-        if (entries.some(entry => entry.isIntersecting)) {
-          observer.disconnect();
-          start();
-        }
-      }, { rootMargin: "200px" });
+    const observer =
+      typeof IntersectionObserver === "undefined"
+        ? null
+        : new IntersectionObserver(
+            entries => {
+              if (entries.some(entry => entry.isIntersecting)) {
+                observer.disconnect();
+                start();
+              }
+            },
+            { rootMargin: "200px" }
+          );
     if (observer && host.current) observer.observe(host.current);
     else start();
     return () => {
@@ -48,9 +57,14 @@ export default function AscendGameImage({ name, slot = "header", fallback: Fallb
           alt={name || ""}
           decoding="async"
           className={`h-full w-full ${artwork.type === "logo" ? "object-contain p-2" : "object-cover"}`}
-          onError={() => { setArtwork(null); void advance.current?.(); }}
+          onError={() => {
+            setArtwork(null);
+            void advance.current?.();
+          }}
         />
-      ) : <Fallback className="h-6 w-6 text-muted-foreground/50" />}
+      ) : (
+        <Fallback className="h-6 w-6 text-muted-foreground/50" />
+      )}
     </div>
   );
 }

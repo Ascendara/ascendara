@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSettings } from "@/context/SettingsContext";
-import gameService from "@/services/gameService";
+import gameService from "@/services/games/gameService";
 
 // Keep recovery available across pages, including when background sync is off.
 export default function IndexRecoveryNotice() {

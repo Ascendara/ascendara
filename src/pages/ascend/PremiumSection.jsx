@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import SectionHeader from "./SectionHeader";
-import { useLibraryBackupStore } from "@/services/libraryBackupStore";
+import { useLibraryBackupStore } from "@/services/library/libraryBackupStore";
 import {
   User,
   Users,
@@ -182,7 +182,9 @@ export default function PremiumSection({ t, setActiveSection }) {
               className={`h-5 w-5 ${group.featured ? "text-primary" : "text-muted-foreground"}`}
             />
             <div>
-              <h2 className={group.featured ? "text-xl font-bold" : "text-lg font-semibold"}>
+              <h2
+                className={group.featured ? "text-xl font-bold" : "text-lg font-semibold"}
+              >
                 {t(`ascend.premium.groups.${group.id}.title`)}
               </h2>
               <p className="text-sm text-muted-foreground">
@@ -199,7 +201,8 @@ export default function PremiumSection({ t, setActiveSection }) {
               <div
                 key={feature.key}
                 className={
-                  group.featured && index === group.features.length - 1 &&
+                  group.featured &&
+                  index === group.features.length - 1 &&
                   group.features.length % 2 === 1
                     ? "md:col-span-2"
                     : ""

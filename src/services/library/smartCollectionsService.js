@@ -1,4 +1,4 @@
-import recentGamesService from "@/services/recentGamesService";
+import recentGamesService from "@/services/library/recentGamesService";
 
 export function getLibraryGameName(game) {
   return game?.game || game?.name || "";
@@ -60,7 +60,9 @@ export function buildSmartCollections(games, recentGames) {
   }
 
   const continuePlaying = recentGames
-    .map(recent => games.find(game => getLibraryGameName(game) === getLibraryGameName(recent)))
+    .map(recent =>
+      games.find(game => getLibraryGameName(game) === getLibraryGameName(recent))
+    )
     .filter(Boolean);
 
   return {

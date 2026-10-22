@@ -62,7 +62,7 @@ import { languages } from "@/i18n";
 import { useTheme } from "@/context/ThemeContext";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
-import { validateInput } from "@/services/profanityFilterService";
+import { validateInput } from "@/services/ascend/profanityFilterService";
 import ImportGamesDialog from "@/components/ImportGamesDialog";
 import ImportFromLaunchersDialog from "@/components/ImportFromLaunchersDialog";
 import StoreAccountsDialog from "@/components/StoreAccountsDialog";
@@ -1041,8 +1041,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
         console.error("[Welcome] Failed to persist index flags:", e);
       }
       try {
-        const imageCacheService = (await import("@/services/imageCacheService")).default;
-        const gameService = (await import("@/services/gameService")).default;
+        const imageCacheService = (await import("@/services/images/imageCacheService"))
+          .default;
+        const gameService = (await import("@/services/games/gameService")).default;
         imageCacheService.invalidateSettingsCache?.();
         await imageCacheService.clearCache?.(true);
         gameService.clearMemoryCache?.();

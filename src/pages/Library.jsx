@@ -6,7 +6,7 @@ import {
   getGameDisplayName,
   getLibraryIdentityKey,
 } from "@/lib/libraryGames";
-import { useLibraryBackupStore } from "@/services/libraryBackupStore";
+import { useLibraryBackupStore } from "@/services/library/libraryBackupStore";
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -101,12 +101,12 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
-import gameService from "@/services/gameService";
-import imageCacheService from "@/services/imageCacheService";
-import { safeSetItem } from "@/services/gameInfoCacheService";
+import gameService from "@/services/games/gameService";
+import imageCacheService from "@/services/images/imageCacheService";
+import { safeSetItem } from "@/services/games/gameInfoCacheService";
 import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
-import steamService from "@/services/gameInfoService";
+import steamService from "@/services/games/gameInfoService";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -117,11 +117,11 @@ import {
   verifyAscendAccess,
   getFriendsList,
   deleteCloudGame,
-} from "@/services/firebaseService";
-import { syncFavoritesNow } from "@/services/favoritesCloudSync";
-import { calculateLibraryValue } from "@/services/cheapsharkService";
-import { getDownloadQueue } from "@/services/downloadQueueService";
-import { normalizeDriveTotals } from "@/services/systemHealthService";
+} from "@/services/firebase/firebaseService";
+import { syncFavoritesNow } from "@/services/cloud/favoritesCloudSync";
+import { calculateLibraryValue } from "@/services/integrations/cheapsharkService";
+import { getDownloadQueue } from "@/services/downloads/downloadQueueService";
+import { normalizeDriveTotals } from "@/services/app/systemHealthService";
 
 import ImportGamesDialog from "@/components/ImportGamesDialog";
 import StoreAccountsDialog from "@/components/StoreAccountsDialog";
@@ -3792,7 +3792,7 @@ const FavoritesGalleryCard = memo(
           if (game.imgID) {
             try {
               const { default: imageCacheSvc } =
-                await import("@/services/imageCacheService");
+                await import("@/services/images/imageCacheService");
               const url = await imageCacheSvc.getImage(game.imgID, {
                 priority: "normal",
                 quality: "high",
@@ -3808,7 +3808,8 @@ const FavoritesGalleryCard = memo(
           }
           if (gameId) {
             try {
-              const { default: sgSvc } = await import("@/services/steamGridImageService");
+              const { default: sgSvc } =
+                await import("@/services/images/steamGridImageService");
               const assets = await sgSvc.getAssets(gameId);
               const url = sgSvc.pickUrl(assets, "card");
               if (url && !cancelled) {
@@ -4438,7 +4439,8 @@ const InstalledGameCard = memo(
 
         if (game.isCustom && isMounted) {
           try {
-            const { default: sgSvc } = await import("@/services/steamGridImageService");
+            const { default: sgSvc } =
+              await import("@/services/images/steamGridImageService");
             const assets = await sgSvc.getAssets(gameId);
             const url = sgSvc.pickUrl(assets, "card");
             if (url && isMounted) {
@@ -5860,7 +5862,7 @@ const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
       // 1. Load via imgID when available (games from Search/Download always have one)
       if (game.imgID) {
         try {
-          const imageCacheService = await import("@/services/imageCacheService");
+          const imageCacheService = await import("@/services/images/imageCacheService");
           const url = await imageCacheService.default.getImage(game.imgID, {
             priority: "normal",
             quality: "high",
@@ -5878,7 +5880,8 @@ const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
       // 2. Try SteamGridDB fallback when no imgID is available
       if (game.game && !game.imgID) {
         try {
-          const steamGridImageService = await import("@/services/steamGridImageService");
+          const steamGridImageService =
+            await import("@/services/images/steamGridImageService");
           const assets = await steamGridImageService.default.getAssets(game.game);
           const imageUrl = steamGridImageService.default.pickUrl(assets, "card");
           if (imageUrl && isMounted) {
@@ -5999,7 +6002,8 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
     (async () => {
       if (game.imgID) {
         try {
-          const { default: imageCacheSvc } = await import("@/services/imageCacheService");
+          const { default: imageCacheSvc } =
+            await import("@/services/images/imageCacheService");
           const url = await imageCacheSvc.getImage(game.imgID, {
             priority: "low",
             quality: "high",
@@ -6015,7 +6019,8 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
       }
       if (gameName) {
         try {
-          const { default: sgSvc } = await import("@/services/steamGridImageService");
+          const { default: sgSvc } =
+            await import("@/services/images/steamGridImageService");
           const assets = await sgSvc.getAssets(gameName);
           const url = sgSvc.pickUrl(assets, "card");
           if (url && !cancelled) {

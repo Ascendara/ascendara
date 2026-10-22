@@ -1,7 +1,7 @@
 // Download Queue Service for Ascend users
 // Manages a queue of downloads that start automatically when the previous one finishes
 
-import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
+import pendingLibrarySwapService from "@/services/downloads/pendingLibrarySwapService";
 
 const QUEUE_STORAGE_KEY = "ascendDownloadQueue";
 

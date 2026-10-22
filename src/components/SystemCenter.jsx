@@ -37,12 +37,12 @@ import {
   restoreSettingsRecoveryPoint,
   rollbackAscendaraVersion,
   setSafeUiMode,
-} from "@/services/recoveryService";
+} from "@/services/app/recoveryService";
 import {
   formatBytes,
   inspectSystemHealth,
   loadStorageSnapshot,
-} from "@/services/systemHealthService";
+} from "@/services/app/systemHealthService";
 
 const STATUS_META = {
   healthy: {
@@ -203,7 +203,8 @@ const SystemCenter = () => {
   const handleHealthAction = useCallback(
     async action => {
       if (action.type === "settings") return closeAndNavigate("/settings");
-      if (action.type === "local-refresh") return closeAndNavigate("/settings", { scrollTo: "game-index" });
+      if (action.type === "local-refresh")
+        return closeAndNavigate("/settings", { scrollTo: "game-index" });
       if (action.type !== "install-dependencies") return;
 
       try {
@@ -251,7 +252,8 @@ const SystemCenter = () => {
 
   const restoreRecoveryPoint = async point => {
     const date = point.createdAt ? new Date(point.createdAt).toLocaleString() : point.id;
-    if (!window.confirm(t("featureCenters.system.recovery.restoreConfirm", { date }))) return;
+    if (!window.confirm(t("featureCenters.system.recovery.restoreConfirm", { date })))
+      return;
 
     try {
       await restoreSettingsRecoveryPoint(point.id);
@@ -264,7 +266,8 @@ const SystemCenter = () => {
   };
 
   const clearBrowserData = async () => {
-    if (!window.confirm(t("featureCenters.system.recovery.clearBrowserDataConfirm"))) return;
+    if (!window.confirm(t("featureCenters.system.recovery.clearBrowserDataConfirm")))
+      return;
     try {
       const cleared = await window.electron.clearCache();
       if (cleared !== true) {
@@ -379,7 +382,12 @@ const SystemCenter = () => {
             ) : (
               <div className="space-y-3">
                 {healthItems.map(item => (
-                  <HealthRow key={item.id} item={item} onAction={handleHealthAction} t={t} />
+                  <HealthRow
+                    key={item.id}
+                    item={item}
+                    onAction={handleHealthAction}
+                    t={t}
+                  />
                 ))}
               </div>
             )}
@@ -397,7 +405,11 @@ const SystemCenter = () => {
                   {t("featureCenters.system.storage.description")}
                 </p>
               </div>
-              <Button variant="outline" onClick={refreshStorage} disabled={storageLoading}>
+              <Button
+                variant="outline"
+                onClick={refreshStorage}
+                disabled={storageLoading}
+              >
                 <RefreshCw
                   className={`mr-2 h-4 w-4 ${storageLoading ? "animate-spin" : ""}`}
                 />
@@ -437,7 +449,11 @@ const SystemCenter = () => {
                 <FeatureSection
                   title={t("featureCenters.system.storage.configuredLocations")}
                   actions={
-                    <Button size="sm" variant="outline" onClick={() => closeAndNavigate("/settings")}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => closeAndNavigate("/settings")}
+                    >
                       {t("featureCenters.system.storage.manageFolders")}
                     </Button>
                   }
@@ -445,7 +461,8 @@ const SystemCenter = () => {
                   <div className="space-y-3">
                     {driveDirectories.map(directory => {
                       const gameSize =
-                        gameDirectories.find(item => item.path === directory.path)?.size || 0;
+                        gameDirectories.find(item => item.path === directory.path)
+                          ?.size || 0;
                       const usedPercent =
                         directory.totalSpace > 0
                           ? Math.max(
@@ -460,7 +477,10 @@ const SystemCenter = () => {
                           : 0;
 
                       return (
-                        <div key={directory.path} className="rounded-lg border border-border p-4">
+                        <div
+                          key={directory.path}
+                          className="rounded-lg border border-border p-4"
+                        >
                           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                             <p className="min-w-0 break-all font-mono text-xs text-foreground">
                               {directory.path}
@@ -553,7 +573,9 @@ const SystemCenter = () => {
 
               <FeatureSection
                 title={t("featureCenters.system.recovery.clearBrowserData")}
-                description={t("featureCenters.system.recovery.clearBrowserDataDescription")}
+                description={t(
+                  "featureCenters.system.recovery.clearBrowserDataDescription"
+                )}
               >
                 <Button variant="outline" onClick={clearBrowserData}>
                   <Database className="mr-2 h-4 w-4" />
@@ -566,7 +588,11 @@ const SystemCenter = () => {
               title={t("featureCenters.system.recovery.recoveryPoints")}
               description={t("featureCenters.system.recovery.recoveryPointsDescription")}
               actions={
-                <Button variant="outline" onClick={createRecoveryPoint} disabled={recoveryLoading}>
+                <Button
+                  variant="outline"
+                  onClick={createRecoveryPoint}
+                  disabled={recoveryLoading}
+                >
                   {t("featureCenters.system.recovery.createPoint")}
                 </Button>
               }
@@ -594,7 +620,11 @@ const SystemCenter = () => {
                           )}
                         </div>
                       </div>
-                      <Button size="sm" variant="outline" onClick={() => restoreRecoveryPoint(point)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => restoreRecoveryPoint(point)}
+                      >
                         {t("featureCenters.system.recovery.restore")}
                       </Button>
                     </div>
@@ -643,7 +673,9 @@ const SystemCenter = () => {
 
             <FeatureSection
               title={t("featureCenters.system.recovery.developerDiagnostics")}
-              description={t("featureCenters.system.recovery.developerDiagnosticsDescription")}
+              description={t(
+                "featureCenters.system.recovery.developerDiagnosticsDescription"
+              )}
             >
               <Button
                 variant="outline"

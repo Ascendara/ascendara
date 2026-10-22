@@ -19,7 +19,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { retroCall } from "@/services/retroService";
+import { retroCall } from "@/services/library/retroService";
 import expanded from "../../electron/modules/retro/expanded-catalogue.json";
 
 export default function RetroEmulators({ access, platforms, onChoose, onClose, busy }) {

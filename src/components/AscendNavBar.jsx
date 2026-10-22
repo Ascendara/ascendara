@@ -28,8 +28,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { subscribeToUserStatus } from "@/services/firebaseService";
-import { setUserOnlineStatus } from "@/services/ascendStatusService";
+import { subscribeToUserStatus } from "@/services/firebase/firebaseService";
+import { setUserOnlineStatus } from "@/services/ascend/ascendStatusService";
 import { toast } from "sonner";
 import DiscordIcon from "@/pages/ascend/DiscordIcon";
 

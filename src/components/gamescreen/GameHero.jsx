@@ -8,7 +8,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
-import gameService from "@/services/gameService";
+import gameService from "@/services/games/gameService";
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,

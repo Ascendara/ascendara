@@ -3,7 +3,7 @@
  * Fetches game completion times through the main process
  */
 
-import gameApiCache from "./gameInfoCacheService";
+import gameApiCache from "../games/gameInfoCacheService";
 
 /**
  * Get completion times for a game

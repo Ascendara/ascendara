@@ -44,11 +44,11 @@ import {
   Share2,
 } from "lucide-react";
 import { useImageLoader } from "@/hooks/useImageLoader";
-import gameService from "@/services/gameService";
-import imageCacheService from "@/services/imageCacheService";
-import steamGridImageService from "@/services/steamGridImageService";
-import recentGamesService from "@/services/recentGamesService";
-import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
+import gameService from "@/services/games/gameService";
+import imageCacheService from "@/services/images/imageCacheService";
+import steamGridImageService from "@/services/images/steamGridImageService";
+import recentGamesService from "@/services/library/recentGamesService";
+import { pullCloudGameDataBeforeLaunch } from "@/services/cloud/gameLaunchCloudSync";
 import { toast } from "sonner";
 import { cn, imageDataUrlFromBase64, sanitizeText } from "@/lib/utils";
 
@@ -265,8 +265,7 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
       quality: "high",
       priority: "high",
       enabled:
-        (!game.isCustom && !!game.imgID) ||
-        (!game.imgID && !!(game.game || game.name)),
+        (!game.isCustom && !!game.imgID) || (!game.imgID && !!(game.game || game.name)),
       fallbackGameName: game.imgID ? null : game.game || game.name,
       fallbackSlot: "card",
     }

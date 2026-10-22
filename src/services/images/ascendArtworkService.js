@@ -10,8 +10,13 @@ export async function* getAscendArtworkCandidates(name, slot = "header") {
     try {
       const image = await window.electron?.getGameImage?.(name, type);
       if (!image) continue;
-      const url = image.startsWith("data:") ? image : `data:image/${image.startsWith("iVBOR") ? "png" : "jpeg"};base64,${image}`;
-      if (!seen.has(url)) { seen.add(url); yield { url, type }; }
+      const url = image.startsWith("data:")
+        ? image
+        : `data:image/${image.startsWith("iVBOR") ? "png" : "jpeg"};base64,${image}`;
+      if (!seen.has(url)) {
+        seen.add(url);
+        yield { url, type };
+      }
     } catch {
       // Missing/inaccessible local artwork must not prevent the proxy fallback.
     }
@@ -23,7 +28,10 @@ export async function* getAscendArtworkCandidates(name, slot = "header") {
         : await steamGridImageService.getAssets(name);
       for (const type of types) {
         const url = assets?.[type];
-        if (url && !seen.has(url)) { seen.add(url); yield { url, type }; }
+        if (url && !seen.has(url)) {
+          seen.add(url);
+          yield { url, type };
+        }
       }
     } catch {
       // Keep the placeholder when all sources are unavailable.

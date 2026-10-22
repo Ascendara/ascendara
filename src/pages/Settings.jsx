@@ -18,7 +18,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
+import checkQbittorrentStatus from "@/services/downloads/qbittorrentCheckService";
 import {
   Select,
   SelectContent,
@@ -71,9 +71,12 @@ import {
   Settings2,
   Gamepad2,
 } from "lucide-react";
-import gameService from "@/services/gameService";
+import gameService from "@/services/games/gameService";
 import { useNavigate } from "react-router-dom";
-import { getAvailableLanguages, handleLanguageChange } from "@/services/languageService";
+import {
+  getAvailableLanguages,
+  handleLanguageChange,
+} from "@/services/app/languageService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -91,7 +94,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useSettings } from "@/context/SettingsContext";
-import { verifyAscendAccess } from "@/services/firebaseService";
+import { verifyAscendAccess } from "@/services/firebase/firebaseService";
 import ProtonOptionsDialog from "@/components/ProtonOptionsDialog";
 import HighballSettings from "@/components/HighballSettings";
 import { useDownloadFolderCheck } from "@/hooks/useDownloadFolderCheck";

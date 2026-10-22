@@ -23,7 +23,8 @@ export async function openAscendCheckout(user, priceId) {
     if (!response.ok || !result.url) {
       throw new Error(result.error || "Unable to open checkout. Please try again.");
     }
-    if (!window.electron?.openURL) throw new Error("Unable to open the checkout browser.");
+    if (!window.electron?.openURL)
+      throw new Error("Unable to open the checkout browser.");
     await window.electron.openURL(result.url);
     return true;
   } finally {

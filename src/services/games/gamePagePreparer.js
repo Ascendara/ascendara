@@ -3,9 +3,9 @@
  * overrides, SteamGridDB art, the index cover) and preloads the chosen images
  * before the page opens, so its artwork appears once instead of swapping in.
  */
-import artworkOverrideService from "./artworkOverrideService";
-import steamGridImageService from "./steamGridImageService";
-import imageCacheService from "./imageCacheService";
+import artworkOverrideService from "../images/artworkOverrideService";
+import steamGridImageService from "../images/steamGridImageService";
+import imageCacheService from "../images/imageCacheService";
 import steamService from "./gameInfoService";
 
 // Longest a click waits before opening the page with whatever is ready

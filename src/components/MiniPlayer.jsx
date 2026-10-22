@@ -5,7 +5,7 @@ import {
   formatTime,
   wasMiniplayerKilled,
   resetMiniplayerKilled,
-} from "@/services/audioPlayerService";
+} from "@/services/app/audioPlayerService";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,8 +25,6 @@ import {
   Maximize2,
   Minimize2,
 } from "lucide-react";
-
-
 
 import { useState } from "react";
 

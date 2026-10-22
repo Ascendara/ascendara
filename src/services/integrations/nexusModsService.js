@@ -501,7 +501,7 @@ const formatFileSize = bytes => {
   const numericBytes = parseFloat(bytes);
 
   if (isNaN(numericBytes) || numericBytes <= 0) return "Unknown";
-  
+
   const units = ["B", "KB", "MB", "GB"];
   let size = numericBytes;
   let unitIndex = 0;

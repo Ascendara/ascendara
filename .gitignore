@@ -56,7 +56,7 @@ yarn.lock
 /src/pages/concept
 binaries/AscendaraDownloader/src/AscendaraDownloaderV1.py
 electron/appOrginal.js
-src/services/firestore.rules
+src/services/firebase/firestore.rules
 src/translations/en.json.20251230_222339.backup
 src/pages/webview-api.py
 scripts/upload.py

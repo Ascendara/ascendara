@@ -35,7 +35,7 @@ import {
   loadGameProfile,
   loadGameProfileCatalog,
   saveGameProfile,
-} from "@/services/gameProfileService";
+} from "@/services/library/gameProfileService";
 
 const EMPTY_PROFILE = {
   launchCommands: "",

@@ -16,8 +16,8 @@ import {
 } from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatLatestUpdate, formatCompactNumber } from "@/lib/utils";
-import hltbService from "@/services/hltbService";
-import { isImageReady, markImageReady } from "@/services/gamePagePreparer";
+import hltbService from "@/services/integrations/hltbService";
+import { isImageReady, markImageReady } from "@/services/games/gamePagePreparer";
 import { useState } from "react";
 import {
   Apple,
@@ -191,7 +191,7 @@ export default function DownloadHero({
                   <Star className="h-3 w-3 fill-current" />
                   {gameRating}
                   {hasWrittenReviews && (
-                    <span className="ml-1 border-l border-current/30 pl-2">
+                    <span className="border-current/30 ml-1 border-l pl-2">
                       {t("download.readReviews")}
                     </span>
                   )}

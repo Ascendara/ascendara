@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import {
   listOfficialRollbackVersions,
   rollbackAscendaraVersion,
-} from "@/services/recoveryService";
+} from "@/services/app/recoveryService";
 
 export async function startPreviousVersionRollback(t, requestedVersion = null) {
   const toastId = requestedVersion
@@ -28,10 +28,9 @@ export async function startPreviousVersionRollback(t, requestedVersion = null) {
     );
     if (!confirmed) return false;
 
-    toast.loading(
-      t("featureCenters.system.toasts.rollbackDownloading", { version }),
-      { id: "ascendara-rollback" }
-    );
+    toast.loading(t("featureCenters.system.toasts.rollbackDownloading", { version }), {
+      id: "ascendara-rollback",
+    });
     await rollbackAscendaraVersion(version);
     return true;
   } catch (error) {

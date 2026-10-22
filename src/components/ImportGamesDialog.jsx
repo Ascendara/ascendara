@@ -29,8 +29,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn, sanitizeText } from "@/lib/utils";
-import gameService from "@/services/gameService";
-import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
+import gameService from "@/services/games/gameService";
+import pendingLibrarySwapService from "@/services/downloads/pendingLibrarySwapService";
 
 const LAUNCHERS = ["steam", "epic", "gog", "ubisoft", "battlenet"];
 const ACTIVE_PHASES = ["scanning", "importing", "assets"];

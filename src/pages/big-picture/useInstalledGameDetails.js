@@ -2,11 +2,11 @@ import { useNavigate } from "react-router-dom";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useRef, useEffect, useCallback } from "react";
-import steamService from "@/services/gameInfoService";
+import steamService from "@/services/games/gameInfoService";
 import { toast } from "sonner";
-import gameUpdateService from "@/services/gameUpdateService";
-import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
-import recentGamesService from "@/services/recentGamesService";
+import gameUpdateService from "@/services/library/gameUpdateService";
+import { pullCloudGameDataBeforeLaunch } from "@/services/cloud/gameLaunchCloudSync";
+import recentGamesService from "@/services/library/recentGamesService";
 import {
   loadFolders,
   saveFolders,
@@ -19,9 +19,9 @@ import { useControllerInput } from "./useControllerInput";
 import {
   hasActiveSubscription,
   uploadBackupToCloud,
-} from "@/services/cloudBackupService";
-import { listBackups as listCloudBackups } from "@/services/firebaseService";
-import { restoreCloudSave } from "@/services/restoreCloudSave";
+} from "@/services/cloud/cloudBackupService";
+import { listBackups as listCloudBackups } from "@/services/firebase/firebaseService";
+import { restoreCloudSave } from "@/services/cloud/restoreCloudSave";
 
 function useInstalledGameDetails({
   game,

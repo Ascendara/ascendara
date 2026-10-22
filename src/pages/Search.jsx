@@ -41,8 +41,8 @@ import {
   Star,
   Tag,
 } from "lucide-react";
-import gameService from "@/services/gameService";
-import { subscribeToStatus, getCurrentStatus } from "@/services/serverStatus";
+import gameService from "@/services/games/gameService";
+import { subscribeToStatus, getCurrentStatus } from "@/services/app/serverStatus";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   AlertDialog,
@@ -53,11 +53,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useNavigate, useLocation } from "react-router-dom";
-import imageCacheService from "@/services/imageCacheService";
+import imageCacheService from "@/services/images/imageCacheService";
 import { formatLatestUpdate, sanitizeText, formatCompactNumber } from "@/lib/utils";
-import verifiedGamesService from "@/services/verifiedGamesService";
-import ratingQueueService from "@/services/ratingQueueService";
-import installedGamesService from "@/services/installedGamesService";
+import verifiedGamesService from "@/services/games/verifiedGamesService";
+import ratingQueueService from "@/services/games/ratingQueueService";
+import installedGamesService from "@/services/library/installedGamesService";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { useGameViews } from "@/hooks/useGameViews";
 
@@ -998,7 +998,11 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                             <div className="pt-2">
                               <Button
                                 className="flex w-full items-center justify-center gap-2 text-secondary"
-                                onClick={() => navigate("/settings", { state: { scrollTo: "game-index" } })}
+                                onClick={() =>
+                                  navigate("/settings", {
+                                    state: { scrollTo: "game-index" },
+                                  })
+                                }
                               >
                                 <RefreshCw className="h-4 w-4" />
                                 {t("search.refreshLocalIndex")}
@@ -1095,7 +1099,11 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                             <div className="pt-2">
                               <Button
                                 className="flex w-full items-center justify-center gap-2 text-secondary"
-                                onClick={() => navigate("/settings", { state: { scrollTo: "game-index" } })}
+                                onClick={() =>
+                                  navigate("/settings", {
+                                    state: { scrollTo: "game-index" },
+                                  })
+                                }
                               >
                                 <RefreshCw className="h-4 w-4" />
                                 {t("search.switchToLocalIndex")}
@@ -1671,7 +1679,10 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) 
               </span>
             )}
             {viewCount > 0 && (
-              <span className="flex items-center gap-1" title={t("gameCard.viewsTooltip")}>
+              <span
+                className="flex items-center gap-1"
+                title={t("gameCard.viewsTooltip")}
+              >
                 <Eye className="h-3.5 w-3.5" />
                 <span className="tabular-nums">
                   {t("gameCard.views", { views: formatCompactNumber(viewCount) })}

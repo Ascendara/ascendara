@@ -35,16 +35,19 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import gameUpdateService from "@/services/gameUpdateService";
+import gameUpdateService from "@/services/library/gameUpdateService";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { loadFolders, saveFolders } from "@/lib/folderManager";
 import { cn, sanitizeText } from "@/lib/utils";
 import { useSettings } from "@/context/SettingsContext";
-import { useAudioPlayer, killAudioAndMiniplayer } from "@/services/audioPlayerService";
+import {
+  useAudioPlayer,
+  killAudioAndMiniplayer,
+} from "@/services/app/audioPlayerService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { getGameSoundtrack } from "@/services/khinsiderService";
+import { getGameSoundtrack } from "@/services/integrations/khinsiderService";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -57,21 +60,21 @@ import {
 
 import VerifyingGameDialog from "@/components/VerifyingGameDialog";
 import SteamNotRunningDialog from "@/components/SteamNotRunningDialog";
-import recentGamesService from "@/services/recentGamesService";
+import recentGamesService from "@/services/library/recentGamesService";
 import GamesBackupDialog from "@/components/GamesBackupDialog";
-import imageCacheService from "@/services/imageCacheService";
+import imageCacheService from "@/services/images/imageCacheService";
 import "@/components/GameMetadata";
-import steamService from "@/services/gameInfoService";
+import steamService from "@/services/games/gameInfoService";
 import { gameImageCache, heroImageCache, logoImageCache } from "@/lib/gameImageCache";
 import GameRate from "@/components/GameRate";
 import { GameAssetSearchDialog } from "@/components/GameAssetSearchDialog";
-import nexusModsService from "@/services/nexusModsService";
-import flingTrainerService from "@/services/flingTrainerService";
+import nexusModsService from "@/services/integrations/nexusModsService";
+import flingTrainerService from "@/services/integrations/flingTrainerService";
 import { useAuth } from "@/context/AuthContext";
-import { getCloudLibrary, verifyAscendAccess } from "@/services/firebaseService";
-import gameService from "@/services/gameService";
-import { pullCloudGameDataBeforeLaunch } from "@/services/gameLaunchCloudSync";
-import pendingLibrarySwapService from "@/services/pendingLibrarySwapService";
+import { getCloudLibrary, verifyAscendAccess } from "@/services/firebase/firebaseService";
+import gameService from "@/services/games/gameService";
+import { pullCloudGameDataBeforeLaunch } from "@/services/cloud/gameLaunchCloudSync";
+import pendingLibrarySwapService from "@/services/downloads/pendingLibrarySwapService";
 import GameHero from "@/components/gamescreen/GameHero";
 import StoreGameScreen from "@/components/gamescreen/StoreGameScreen";
 import GameActions from "@/components/gamescreen/GameActions";

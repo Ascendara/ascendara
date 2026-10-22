@@ -21,7 +21,9 @@ export function getActiveDownloadCount() {
 // Update download count and notify listeners
 function updateDownloadCount(delta) {
   activeDownloads = Math.max(0, activeDownloads + delta);
-  console.log(`[KhinsiderService] Audio download count updated: ${activeDownloads} (delta: ${delta})`);
+  console.log(
+    `[KhinsiderService] Audio download count updated: ${activeDownloads} (delta: ${delta})`
+  );
   downloadListeners.forEach(listener => listener(activeDownloads));
 }
 
@@ -108,7 +110,7 @@ export async function getAlbumTracks(albumId, onConfirmFetch) {
 
   // Track the metadata fetching operation
   updateDownloadCount(1);
-  
+
   try {
     // For each track, fetch the download URL (mp3)
     for (let track of tracks) {
@@ -117,7 +119,8 @@ export async function getAlbumTracks(albumId, onConfirmFetch) {
         const $track = cheerio.load(pageRes.data);
         // The download link is in <a href="...mp3"> in the center tag
         const mp3Link = $track('a[href$=".mp3"]').attr("href");
-        if (mp3Link) track.url = mp3Link.startsWith("http") ? mp3Link : BASE_URL + mp3Link;
+        if (mp3Link)
+          track.url = mp3Link.startsWith("http") ? mp3Link : BASE_URL + mp3Link;
       } catch (e) {
         track.url = null;
       }

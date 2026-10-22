@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import gameViewService from "@/services/gameViewService";
+import gameViewService from "@/services/games/gameViewService";
 
 /**
  * Tracks a game card as viewed while it is on screen and returns its view count.

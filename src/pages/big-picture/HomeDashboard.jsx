@@ -2,15 +2,10 @@ import { BigPictureShell } from "./BigPictureShell";
 import { pageFocusIds } from "./PageHeader";
 import { useMemo } from "react";
 import { Play, ChevronRight, Download, Pause, Gamepad2 } from "lucide-react";
-import recentGamesService from "@/services/recentGamesService";
+import recentGamesService from "@/services/library/recentGamesService";
 import { loadFolders } from "@/lib/folderManager";
 import { SurfaceButton, SurfaceGame, useSurface } from "./Surface";
-import {
-  gameName,
-  gameEntries,
-  libraryGames,
-  readStoredList,
-} from "./surfaceNavigation";
+import { gameName, gameEntries, libraryGames, readStoredList } from "./surfaceNavigation";
 import { useHomeArtwork } from "./useHomeArtwork";
 
 export function HomeDashboard({
@@ -34,18 +29,18 @@ export function HomeDashboard({
   const visible = useMemo(
     () =>
       libraryGames(games, {
-        hiddenFolders: loadFolders().filter((folder) => folder.hidden),
+        hiddenFolders: loadFolders().filter(folder => folder.hidden),
       }).filter(
-        (game) =>
+        game =>
           !game.downloadingData?.downloading &&
           !game.downloadingData?.extracting &&
-          !game.downloadingData?.verifying,
+          !game.downloadingData?.verifying
       ),
-    [games],
+    [games]
   );
   const history = recentGamesService.getRecentGames();
   const recent = history
-    .map((item) => visible.find((game) => gameName(game) === item.game))
+    .map(item => visible.find(game => gameName(game) === item.game))
     .filter(Boolean);
   const saved = readStoredList("play-later-games").slice(0, 12);
   const hero = recent[0] || visible[0] || discover[0];
@@ -55,10 +50,7 @@ export function HomeDashboard({
     {
       id: "library",
       title: "Your Library",
-      games: [
-        ...recent,
-        ...visible.filter((game) => !recent.includes(game)),
-      ].slice(0, 12),
+      games: [...recent, ...visible.filter(game => !recent.includes(game))].slice(0, 12),
       open: openGame,
       destination: "library",
     },
@@ -77,8 +69,8 @@ export function HomeDashboard({
       destination: "store",
     },
   ]
-    .filter((section) => section.games.length)
-    .map((section) => ({ ...section, entries: gameEntries(section.games) }));
+    .filter(section => section.games.length)
+    .map(section => ({ ...section, entries: gameEntries(section.games) }));
   const download = downloads[0];
   const data = download?.downloadingData || {};
   const canPause =
@@ -89,23 +81,15 @@ export function HomeDashboard({
   const rows = [
     pageFocusIds,
     ["hero", ...(hero ? ["details"] : [])],
-    ...(download || queue.length
-      ? [["downloads", ...(canPause ? ["pause"] : [])]]
-      : []),
-    ...sections.flatMap((section) => [
+    ...(download || queue.length ? [["downloads", ...(canPause ? ["pause"] : [])]] : []),
+    ...sections.flatMap(section => [
       [`all-${section.id}`],
       section.entries.map(({ key }) => `${section.id}-${key}`),
     ]),
   ];
-  const { root, focus } = useSurface(
-    navigation,
-    rows,
-    openMenu,
-    active,
-    "hero",
-  );
+  const { root, focus } = useSurface(navigation, rows, openMenu, active, "hero");
   const lastPlayed = history.find(
-    (item) => item.game === (hero && gameName(hero)),
+    item => item.game === (hero && gameName(hero))
   )?.lastPlayed;
   const hours = Number(hero?.playTime) / 3600;
   const lastDate =
@@ -115,10 +99,7 @@ export function HomeDashboard({
           day: "numeric",
         })
       : null;
-  const progress = Math.min(
-    100,
-    Math.max(0, parseFloat(data.progressCompleted) || 0),
-  );
+  const progress = Math.min(100, Math.max(0, parseFloat(data.progressCompleted) || 0));
   const status = data.error
     ? "Needs attention"
     : data.stopped
@@ -128,8 +109,7 @@ export function HomeDashboard({
         : data.verifying
           ? "Verifying"
           : "Downloading";
-  const busy =
-    download && (stopping.has(download.game) || resuming.has(download.game));
+  const busy = download && (stopping.has(download.game) || resuming.has(download.game));
   return (
     <BigPictureShell
       ref={root}
@@ -150,7 +130,7 @@ export function HomeDashboard({
             className="bp-home-art"
             src={image}
             alt=""
-            onError={(event) => {
+            onError={event => {
               event.currentTarget.style.visibility = "hidden";
             }}
           />
@@ -184,11 +164,7 @@ export function HomeDashboard({
               className="bp-home-play"
               {...focus("hero")}
               onClick={() =>
-                installed
-                  ? playGame(hero)
-                  : hero
-                    ? openStore(hero)
-                    : changeView("store")
+                installed ? playGame(hero) : hero ? openStore(hero) : changeView("store")
               }
             >
               <Play size={20} fill="currentColor" />
@@ -198,9 +174,7 @@ export function HomeDashboard({
               <SurfaceButton
                 className="bp-home-secondary"
                 {...focus("details")}
-                onClick={() =>
-                  installed ? openGame(hero) : changeView("store")
-                }
+                onClick={() => (installed ? openGame(hero) : changeView("store"))}
               >
                 {installed ? "View game" : "Browse"}
                 <ChevronRight size={18} />
@@ -226,9 +200,7 @@ export function HomeDashboard({
               {download && (
                 <span className="bp-home-meta">
                   {progress.toFixed(0)}%
-                  {data.progressDownloadSpeeds
-                    ? ` ? ${data.progressDownloadSpeeds}`
-                    : ""}
+                  {data.progressDownloadSpeeds ? ` ? ${data.progressDownloadSpeeds}` : ""}
                   {queue.length ? ` ? ${queue.length} queued` : ""}
                 </span>
               )}
@@ -261,7 +233,7 @@ export function HomeDashboard({
           )}
         </div>
       )}
-      {sections.map((section) => (
+      {sections.map(section => (
         <section key={section.id} className="bp-home-section">
           <header>
             <h2>{section.title}</h2>

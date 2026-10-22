@@ -14,7 +14,11 @@
  * caps at real time.
  */
 
-import { applyGameSessionDelta, auth, recomputeProfileStats } from "./firebaseService";
+import {
+  applyGameSessionDelta,
+  auth,
+  recomputeProfileStats,
+} from "../firebase/firebaseService";
 import { userAuthenticatedFetch } from "@/utils/authHelper";
 
 const SESSION_API = "https://api.ascendara.app/v3/playtime/session";

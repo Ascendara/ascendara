@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import LevelingCard from "@/components/LevelingCard";
-import { useLibraryBackupStore } from "@/services/libraryBackupStore";
+import { useLibraryBackupStore } from "@/services/library/libraryBackupStore";
 import { StatStrip } from "./primitives";
 import {
   Users,
@@ -71,7 +71,9 @@ function ToolCard({ icon: Icon, title, description, meta, onClick, delay, large 
       </div>
       <h3 className={`mt-3 font-semibold ${large ? "text-base" : "text-sm"}`}>{title}</h3>
       <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
-      {meta && <div className="mt-auto pt-3 text-xs font-medium text-primary">{meta}</div>}
+      {meta && (
+        <div className="mt-auto pt-3 text-xs font-medium text-primary">{meta}</div>
+      )}
     </motion.button>
   );
 }
@@ -134,7 +136,9 @@ export default function HomeSection({
     {
       icon: Trophy,
       value: `${cloudLibrary?.unlockedAchievements ?? 0}`,
-      suffix: cloudLibrary?.totalAchievements ? `/ ${cloudLibrary.totalAchievements}` : null,
+      suffix: cloudLibrary?.totalAchievements
+        ? `/ ${cloudLibrary.totalAchievements}`
+        : null,
       label: t("ascend.overview.stats.achievements"),
     },
     {
@@ -357,10 +361,10 @@ export default function HomeSection({
         </div>
         <div className="rounded-xl border border-border/50 bg-card/60 p-4 lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">{t("ascend.overview.communityTitle")}</h2>
-            <span className="text-xs text-muted-foreground">
-              {user.displayName}
-            </span>
+            <h2 className="text-sm font-semibold">
+              {t("ascend.overview.communityTitle")}
+            </h2>
+            <span className="text-xs text-muted-foreground">{user.displayName}</span>
           </div>
           <div className="space-y-1">
             {[

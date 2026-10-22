@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { useLibraryBackupStore } from "@/services/libraryBackupStore";
+import { useLibraryBackupStore } from "@/services/library/libraryBackupStore";
 import { useNavigate, useLocation } from "react-router-dom";
-import { subscribeToStatus, getCurrentStatus } from "@/services/serverStatus";
+import { subscribeToStatus, getCurrentStatus } from "@/services/app/serverStatus";
 import {
   subscribeToDownloads,
   getActiveDownloadCount,
-} from "@/services/khinsiderService";
+} from "@/services/integrations/khinsiderService";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -31,7 +31,7 @@ import {
   Loader,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
-import { checkForUpdates } from "@/services/updateCheckingService";
+import { checkForUpdates } from "@/services/app/updateCheckingService";
 import { exportToSvg } from "@/lib/exportToSvg";
 
 const MenuBar = () => {

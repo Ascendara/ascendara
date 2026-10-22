@@ -1,4 +1,4 @@
-import { openAscendCheckout } from "@/services/ascendCheckoutService";
+import { openAscendCheckout } from "@/services/ascend/ascendCheckoutService";
 import { toast } from "sonner";
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -97,11 +97,15 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
       // Determine which price ID to use
       let priceId = "price_1QnMnNCfu5zjwIKZFbCRwBHd"; // Monthly $1.50
       if (isLifetime) {
-        const productResponse = await fetch("https://api.ascendara.app/stripe/products/prod_TZdRiUAwPpMEjW");
+        const productResponse = await fetch(
+          "https://api.ascendara.app/stripe/products/prod_TZdRiUAwPpMEjW"
+        );
         if (!productResponse.ok) throw new Error("Unable to load lifetime price");
         const product = await productResponse.json();
         priceId = product.lifetimePriceId;
-        if (!product.prices?.some(price => price.id === priceId && price.interval === null)) {
+        if (
+          !product.prices?.some(price => price.id === priceId && price.interval === null)
+        ) {
           throw new Error("Lifetime price is unavailable");
         }
       }

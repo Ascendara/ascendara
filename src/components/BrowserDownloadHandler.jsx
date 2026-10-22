@@ -4,7 +4,10 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { parseBrowserDownload, parseBrowserDownloadTitle } from "@/lib/browserDownload";
 import { sanitizeText } from "@/lib/utils";
-import { addToQueue, processNextInQueue } from "@/services/downloadQueueService";
+import {
+  addToQueue,
+  processNextInQueue,
+} from "@/services/downloads/downloadQueueService";
 import BrowserDownloadArtwork from "@/components/BrowserDownloadArtwork";
 import { SelectPathDialog } from "@/components/download/DownloadDialogs";
 import { Switch } from "@/components/ui/switch";

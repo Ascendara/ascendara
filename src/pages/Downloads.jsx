@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef, memo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { canRetryExtraction, retryExtraction } from "@/services/extractionRetryService";
+import {
+  canRetryExtraction,
+  retryExtraction,
+} from "@/services/downloads/extractionRetryService";
 import {
   getCachedDownloadData,
   clearCachedDownloadData,
-} from "@/services/retryGameDownloadService";
+} from "@/services/downloads/retryGameDownloadService";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
@@ -53,12 +56,12 @@ import {
   getDownloadQueue,
   removeFromQueue,
   reorderQueue,
-} from "@/services/downloadQueueService";
+} from "@/services/downloads/downloadQueueService";
 import {
   checkDownloadCommands,
   acknowledgeCommand,
   forceSyncDownloads,
-} from "@/services/downloadSyncService";
+} from "@/services/ascend/downloadSyncService";
 import { cn } from "@/lib/utils";
 import { privateSourceMessage } from "@/lib/privateSourceMessages";
 import SpeedGraph, { formatSpeed, markDownloadStart } from "@/components/SpeedGraph";

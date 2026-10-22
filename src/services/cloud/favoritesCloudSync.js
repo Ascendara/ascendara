@@ -23,7 +23,7 @@
  *     but an explicit change made on another device always beats them.
  */
 
-import { auth, updateCloudFavorites } from "./firebaseService";
+import { auth, updateCloudFavorites } from "../firebase/firebaseService";
 
 const FAVORITES_KEY = "game-favorites";
 const META_KEY = "game-favorites-meta";
@@ -72,8 +72,15 @@ const writeJson = (key, value) => {
 const readFavorites = () => {
   const list = readJson(FAVORITES_KEY, []);
   const meta = readJson(META_KEY, {});
-  return Array.isArray(list) ? list.filter(name => typeof name === "string" && name &&
-    !meta[name]?.privateSource && !String(meta[name]?.gameID || "").startsWith("private-")) : [];
+  return Array.isArray(list)
+    ? list.filter(
+        name =>
+          typeof name === "string" &&
+          name &&
+          !meta[name]?.privateSource &&
+          !String(meta[name]?.gameID || "").startsWith("private-")
+      )
+    : [];
 };
 
 // Firestore rejects undefined, so build the stored meta field by field.
@@ -186,9 +193,14 @@ const mergeEntries = (cloudList, localList) => {
     const wins =
       !current ||
       candidate.updatedAt > current.updatedAt ||
-      (candidate.updatedAt === current.updatedAt && candidate.favorite && !current.favorite);
+      (candidate.updatedAt === current.updatedAt &&
+        candidate.favorite &&
+        !current.favorite);
     if (wins) {
-      merged[entry.name] = { ...candidate, meta: candidate.meta || current?.meta || null };
+      merged[entry.name] = {
+        ...candidate,
+        meta: candidate.meta || current?.meta || null,
+      };
     } else if (!current.meta && candidate.meta) {
       current.meta = candidate.meta;
     }
@@ -234,8 +246,11 @@ const applyToLocal = (uid, entries) => {
   const listChanged =
     next.length !== current.length || next.some((name, i) => name !== current[i]);
   if (listChanged) {
-    const privateFavorites = readJson(FAVORITES_KEY, []).filter(name =>
-      localMeta[name]?.privateSource || String(localMeta[name]?.gameID || "").startsWith("private-"));
+    const privateFavorites = readJson(FAVORITES_KEY, []).filter(
+      name =>
+        localMeta[name]?.privateSource ||
+        String(localMeta[name]?.gameID || "").startsWith("private-")
+    );
     writeJson(FAVORITES_KEY, [...new Set([...next, ...privateFavorites])]);
     window.dispatchEvent(new CustomEvent("favorites-updated"));
   }

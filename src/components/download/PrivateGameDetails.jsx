@@ -22,8 +22,11 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import usePrivateArtwork from "@/hooks/usePrivateArtwork";
-import { addToQueue, hasActiveDownloads } from "@/services/downloadQueueService";
-import gameService from "@/services/gameService";
+import {
+  addToQueue,
+  hasActiveDownloads,
+} from "@/services/downloads/downloadQueueService";
+import gameService from "@/services/games/gameService";
 import { privateSourceMessage } from "@/lib/privateSourceMessages";
 import { toast } from "sonner";
 

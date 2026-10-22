@@ -2,7 +2,7 @@ import AscendGameImage from "@/components/AscendGameImage";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "framer-motion";
-import { retroBackupPlatform } from "@/services/retroService";
+import { retroBackupPlatform } from "@/services/library/retroService";
 import SectionHeader from "./SectionHeader";
 import { EmptyState, Panel, StatStrip } from "./primitives";
 import { Button } from "@/components/ui/button";
@@ -129,11 +129,16 @@ function BackupActions({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("ascend.cloudBackups.deleteTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("ascend.cloudBackups.deleteDesc")}</AlertDialogDescription>
+            <AlertDialogDescription>
+              {t("ascend.cloudBackups.deleteDesc")}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <Button variant="destructive" onClick={() => handleDeleteBackup(backup.backupId)}>
+            <Button
+              variant="destructive"
+              onClick={() => handleDeleteBackup(backup.backupId)}
+            >
               {t("common.delete")}
             </Button>
           </AlertDialogFooter>
@@ -325,7 +330,10 @@ export default function CloudBackupsSection({
           title={t("ascend.cloudBackups.subscriptionRequired")}
           description={t("ascend.cloudBackups.subscriptionRequiredDesc")}
           action={
-            <Button onClick={() => setActiveSection("premium")} className="gap-2 text-secondary">
+            <Button
+              onClick={() => setActiveSection("premium")}
+              className="gap-2 text-secondary"
+            >
               <Crown className="h-4 w-4" />
               {t("ascend.cloudBackups.viewPlans")}
             </Button>
@@ -345,8 +353,16 @@ export default function CloudBackupsSection({
         <>
           <StatStrip
             stats={[
-              { icon: Gamepad2, label: t("ascend.cloudBackups.stats.games"), value: groups.length },
-              { icon: Cloud, label: t("ascend.cloudBackups.stats.backups"), value: backups.length },
+              {
+                icon: Gamepad2,
+                label: t("ascend.cloudBackups.stats.games"),
+                value: groups.length,
+              },
+              {
+                icon: Cloud,
+                label: t("ascend.cloudBackups.stats.backups"),
+                value: backups.length,
+              },
               {
                 icon: HardDrive,
                 label: t("ascend.cloudBackups.stats.storage"),

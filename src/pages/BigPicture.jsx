@@ -1,9 +1,9 @@
 import { LibraryConflictSurface } from "./big-picture/LibraryConflictSurface";
 import { PageNavigationContext } from "./big-picture/PageHeader";
-import { retryExtraction } from "@/services/extractionRetryService";
+import { retryExtraction } from "@/services/downloads/extractionRetryService";
 import { Toaster, toast } from "sonner";
 import { Search, Coffee, ListEnd, X, Gamepad2 } from "lucide-react";
-import { removeFromQueue, addToQueue } from "@/services/downloadQueueService";
+import { removeFromQueue, addToQueue } from "@/services/downloads/downloadQueueService";
 import { GameAssetSearchDialog } from "@/components/GameAssetSearchDialog";
 import { useBigPicturePage } from "./big-picture/useBigPicturePage";
 import { VirtualKeyboard } from "./big-picture/VirtualKeyboard";
@@ -140,7 +140,8 @@ function BigPicture() {
     assetSearchGame,
     showWelcomeAnimation,
   } = useBigPicturePage();
-  const HomeStyle = settings.bigPictureHomeStyle === "classic" ? ClassicHome : HomeDashboard;
+  const HomeStyle =
+    settings.bigPictureHomeStyle === "classic" ? ClassicHome : HomeDashboard;
   return (
     <div
       className={`fixed inset-0 z-[9999] flex h-screen w-screen flex-col overflow-hidden bg-background text-primary ${showKillDialog || showProviderDialog ? "pointer-events-none" : ""}`}

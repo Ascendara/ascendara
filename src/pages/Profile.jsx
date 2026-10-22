@@ -1,11 +1,16 @@
-import { setUserOnlineStatus as UpdateUserStatus } from "@/services/ascendStatusService";
-import { useEffect as UseEffect, useMemo as UseMemo, useRef as UseRef, useState as UseState } from "react";
+import { setUserOnlineStatus as UpdateUserStatus } from "@/services/ascend/ascendStatusService";
+import {
+  useEffect as UseEffect,
+  useMemo as UseMemo,
+  useRef as UseRef,
+  useState as UseState,
+} from "react";
 import { useLanguage as UseLanguage } from "@/context/LanguageContext";
 import { useAuth as UseAuth } from "@/context/AuthContext";
 import {
   calculateLevelFromXP,
   getLevelConstants,
-} from "@/services/levelCalculationService";
+} from "@/services/ascend/levelCalculationService";
 
 import UsernameDialog from "@/components/UsernameDialog";
 import { Button } from "@/components/ui/button";
@@ -22,7 +27,7 @@ import {
   syncProfileToAscend as SyncProfileToAscend,
   getProfileStats as GetProfileStats,
   recomputeProfileStats as RecomputeProfileStats,
-} from "@/services/firebaseService";
+} from "@/services/firebase/firebaseService";
 import {
   Archive,
   Clock,
@@ -1307,7 +1312,7 @@ const Profile = () => {
     });
   };
 
-  const HandleRemoveDownloadHistoryItem = async (HistoryIndex) => {
+  const HandleRemoveDownloadHistoryItem = async HistoryIndex => {
     if (RemovingDownloadHistoryIndex !== null) {
       return;
     }
@@ -1345,10 +1350,8 @@ const Profile = () => {
     }
   };
 
-
   return (
     <div className="container mx-auto space-y-6 p-4">
-
       {/* Profile Header */}
       <div
         className={Cn(
@@ -1917,7 +1920,7 @@ const Profile = () => {
                           }}
                           disabled={RemovingDownloadHistoryIndex === Item.historyIndex}
                           className={Cn(
-                            "absolute right-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center mt-8 justify-center rounded-full p-0 text-muted-foreground transition-colors hover:text-red-700",
+                            "absolute right-3 top-1/2 z-20 mt-8 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full p-0 text-muted-foreground transition-colors hover:text-red-700",
                             RemovingDownloadHistoryIndex === Item.historyIndex &&
                               "cursor-wait opacity-60"
                           )}

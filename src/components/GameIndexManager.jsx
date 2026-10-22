@@ -60,8 +60,8 @@ import {
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
-import imageCacheService from "@/services/imageCacheService";
-import gameService from "@/services/gameService";
+import imageCacheService from "@/services/images/imageCacheService";
+import gameService from "@/services/games/gameService";
 import PrivateSources from "@/components/PrivateSources";
 import { cn } from "@/lib/utils";
 

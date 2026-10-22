@@ -8,13 +8,13 @@ import {
   getDownloadQueue,
   processNextInQueue,
   hasActiveDownloads,
-} from "@/services/downloadQueueService";
+} from "@/services/downloads/downloadQueueService";
 import { toast } from "sonner";
-import * as torboxService from "@/services/torboxService";
+import * as torboxService from "@/services/downloads/torboxService";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { sanitizeText } from "@/lib/utils";
-import recentGamesService from "@/services/recentGamesService";
-import gameService from "@/services/gameService";
+import recentGamesService from "@/services/library/recentGamesService";
+import gameService from "@/services/games/gameService";
 import { useHideCursorOnGamepad } from "./useHideCursorOnGamepad";
 import { getControllerButtons } from "./controller";
 import { createFuzzyMatcher } from "./utils";

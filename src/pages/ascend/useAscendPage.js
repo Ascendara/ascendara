@@ -1,4 +1,4 @@
-import { openAscendCheckout } from "@/services/ascendCheckoutService";
+import { openAscendCheckout } from "@/services/ascend/ascendCheckoutService";
 import React, { useState, useEffect, useRef } from "react";
 import { applyAscendEntitlements } from "@/utils/ascendAccess";
 import { useTranslation } from "react-i18next";
@@ -6,14 +6,14 @@ import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useNavigate } from "react-router-dom";
 import { getUserAuthHeaders, userAuthenticatedFetch } from "@/utils/authHelper";
-import { retroBackupPlatform } from "@/services/retroService";
-import { restoreCloudSave } from "@/services/restoreCloudSave";
-import { checkForUpdates } from "@/services/updateCheckingService";
+import { retroBackupPlatform } from "@/services/library/retroService";
+import { restoreCloudSave } from "@/services/cloud/restoreCloudSave";
+import { checkForUpdates } from "@/services/app/updateCheckingService";
 import {
   calculateLevelFromXP,
   getLevelConstants,
-} from "@/services/levelCalculationService";
-import { validateInput } from "@/services/profanityFilterService";
+} from "@/services/ascend/levelCalculationService";
+import { validateInput } from "@/services/ascend/profanityFilterService";
 import { toast } from "sonner";
 import {
   searchUsers,
@@ -54,8 +54,8 @@ import {
   subscribeToIncomingRequests,
   subscribeToOutgoingRequests,
   cleanupMessageListeners,
-} from "@/services/firebaseService";
-import { syncFavoritesNow } from "@/services/favoritesCloudSync";
+} from "@/services/firebase/firebaseService";
+import { syncFavoritesNow } from "@/services/cloud/favoritesCloudSync";
 
 export default function useAscendPage({ cloudOnly = false } = {}) {
   const navigate = useNavigate();
@@ -315,9 +315,16 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     return () => {
       accessRequestRef.current += 1;
     };
-  }, [user?.uid, showDisplayNamePrompt, userData?.ascendSubscription?.active,
-    userData?.ascendSubscription?.lifetime, userData?.verified, userData?.owner,
-    userData?.contributor, userData?.noTrial]);
+  }, [
+    user?.uid,
+    showDisplayNamePrompt,
+    userData?.ascendSubscription?.active,
+    userData?.ascendSubscription?.lifetime,
+    userData?.verified,
+    userData?.owner,
+    userData?.contributor,
+    userData?.noTrial,
+  ]);
 
   // Re-run cloud-first stats merge once Ascend access is verified. The first
   // loadLocalStats call (above) runs before verifyAccess resolves and would
@@ -697,8 +704,6 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         .sort((a, b) => (b.playTime || 0) - (a.playTime || 0))
         .slice(0, 4);
       setRecentGames(sortedGames);
-
-
     } catch (e) {
       console.error("Failed to load local stats:", e);
     }
@@ -918,8 +923,6 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       ].filter(g => !g.downloadingData?.downloading && !g.downloadingData?.extracting);
 
       setLocalGames(allLocalGames);
-
-
     } catch (e) {
       console.error("Failed to load cloud library:", e);
       setCloudLibraryError(e.message || "Failed to load cloud library");
@@ -1177,7 +1180,8 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       // 3. Favorites (including ones for games not installed here)
       const favoritesBefore = localStorage.getItem("game-favorites");
       await syncFavoritesNow();
-      const favoritesRestored = localStorage.getItem("game-favorites") !== favoritesBefore;
+      const favoritesRestored =
+        localStorage.getItem("game-favorites") !== favoritesBefore;
 
       if (!profileRestored && gamesRestored === 0 && !favoritesRestored) {
         toast.error(
@@ -1977,7 +1981,9 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
           }))
           .sort((a, b) => a.intervalCount - b.intervalCount) || [];
 
-      const lifetimePrice = product.prices?.find(price => price.id === product.lifetimePriceId && price.interval === null);
+      const lifetimePrice = product.prices?.find(
+        price => price.id === product.lifetimePriceId && price.interval === null
+      );
       if (lifetimePrice) {
         plans.push({
           id: lifetimePrice.id,

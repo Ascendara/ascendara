@@ -387,7 +387,9 @@ export const getAllDownloads = async apiKey => {
     }
     results
       .filter(result => result.status === "rejected")
-      .forEach(result => console.warn("[Torbox] Partial download list failure:", result.reason));
+      .forEach(result =>
+        console.warn("[Torbox] Partial download list failure:", result.reason)
+      );
     return downloads;
   } catch (error) {
     console.error("[Torbox] Error fetching downloads:", error);

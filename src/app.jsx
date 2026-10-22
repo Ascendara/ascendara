@@ -1,11 +1,11 @@
 import {
   autoUploadBackupToCloud,
   hasActiveSubscription,
-} from "@/services/cloudBackupService";
+} from "@/services/cloud/cloudBackupService";
 import {
   recordSessionStart as recordCloudSessionStart,
   recordSessionEnd as recordCloudSessionEnd,
-} from "@/services/gameSessionTracker";
+} from "@/services/cloud/gameSessionTracker";
 import ContextMenu from "@/components/ContextMenu";
 import Layout from "@/components/Layout";
 import MenuBar from "@/components/MenuBar";
@@ -34,22 +34,28 @@ import {
   initializeStatusService,
   cleanupStatusService,
   setGamePlayingState,
-} from "@/services/ascendStatusService";
-import { setActivity, ActivityType } from "@/services/userStatusService";
-import { initializeDownloadSync, stopDownloadSync } from "@/services/downloadSyncService";
+} from "@/services/ascend/ascendStatusService";
+import { setActivity, ActivityType } from "@/services/ascend/userStatusService";
+import {
+  initializeDownloadSync,
+  stopDownloadSync,
+} from "@/services/ascend/downloadSyncService";
 import {
   initializeDesktopLibrarySync,
   stopDesktopLibrarySync,
-} from "@/services/desktopLibrarySyncService";
+} from "@/services/ascend/desktopLibrarySyncService";
 import {
   initializeFavoritesSync,
   stopFavoritesSync,
-} from "@/services/favoritesCloudSync";
-import { getUnreadMessageCount, verifyAscendAccess } from "@/services/firebaseService";
-import gameService from "@/services/gameService";
-import { checkForUpdates } from "@/services/updateCheckingService";
-import checkQbittorrentStatus from "@/services/qbittorrentCheckService";
-import { startStatusCheck } from "@/services/serverStatus";
+} from "@/services/cloud/favoritesCloudSync";
+import {
+  getUnreadMessageCount,
+  verifyAscendAccess,
+} from "@/services/firebase/firebaseService";
+import gameService from "@/services/games/gameService";
+import { checkForUpdates } from "@/services/app/updateCheckingService";
+import checkQbittorrentStatus from "@/services/downloads/qbittorrentCheckService";
+import { startStatusCheck } from "@/services/app/serverStatus";
 import { motion } from "framer-motion";
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";

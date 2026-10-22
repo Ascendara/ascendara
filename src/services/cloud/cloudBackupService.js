@@ -1,4 +1,7 @@
-import { uploadBackup, listBackups as listCloudBackups } from "./firebaseService";
+import {
+  uploadBackup,
+  listBackups as listCloudBackups,
+} from "../firebase/firebaseService";
 /**
  * Upload the latest local backup to cloud
  * Centralized logic for cloud backup uploads
@@ -18,7 +21,6 @@ export const uploadBackupToCloud = async (gameName, settings, user, userData) =>
     return { success: false, error: "Backup location not configured" };
   }
   try {
-
     // 1. Get latest LOCAL backup
     const listResult = await window.electron.ludusavi("list-backups", gameName);
     const gamesData = listResult?.data?.games;
@@ -44,13 +46,13 @@ export const uploadBackupToCloud = async (gameName, settings, user, userData) =>
 
     const latestBackupName = zipBackups.sort().reverse()[0];
     const backupZipPath = `${gameBackupFolder}/${latestBackupName}`;
-    
+
     // 2. Read the backup .zip file
     const backupZipFile = await window.electron.readBackupFile(backupZipPath);
     if (!backupZipFile) {
       return { success: false, error: "Failed to read backup zip file" };
     }
-    
+
     // 3. Read the mapping.yaml file (CRITICAL for Ludusavi restoration)
     const mappingPath = `${gameBackupFolder}/mapping.yaml`;
     let mappingFile = null;
@@ -62,7 +64,7 @@ export const uploadBackupToCloud = async (gameName, settings, user, userData) =>
     } catch (mappingErr) {
       console.warn("Failed to read mapping.yaml:", mappingErr);
     }
-    
+
     const localSize = backupZipFile.length + (mappingFile ? mappingFile.length : 0);
 
     // 3. Check CLOUD backups to avoid duplicate upload
@@ -70,50 +72,50 @@ export const uploadBackupToCloud = async (gameName, settings, user, userData) =>
       const cloudResult = await listCloudBackups(gameName);
       if (cloudResult.success && cloudResult.backups && cloudResult.backups.length > 0) {
         // Find if this exact backup already exists on cloud
-        const existsOnCloud = cloudResult.backups.some(b => 
-          b.backupName === latestBackupName && b.size === localSize
+        const existsOnCloud = cloudResult.backups.some(
+          b => b.backupName === latestBackupName && b.size === localSize
         );
 
         if (existsOnCloud) {
-          console.log(`Backup ${latestBackupName} already exists on cloud with same size. Skipping.`);
+          console.log(
+            `Backup ${latestBackupName} already exists on cloud with same size. Skipping.`
+          );
           return { success: true, skipped: true, reason: "already_exists" };
         }
       }
     } catch (checkErr) {
-      console.warn("Failed to check existing cloud backups, proceeding with upload:", checkErr);
+      console.warn(
+        "Failed to check existing cloud backups, proceeding with upload:",
+        checkErr
+      );
     }
 
     // 4. Create a combined archive with both .zip and mapping.yaml
     // This ensures Ludusavi can properly restore the backup
-    const JSZip = (await import('jszip')).default;
+    const JSZip = (await import("jszip")).default;
     const combinedZip = new JSZip();
-    
+
     // Add the backup .zip file
     combinedZip.file(latestBackupName, backupZipFile);
-    
+
     // Add mapping.yaml if it exists
     if (mappingFile) {
       combinedZip.file("mapping.yaml", mappingFile);
     }
-    
+
     // Generate the combined archive
-    const combinedBlob = await combinedZip.generateAsync({ 
+    const combinedBlob = await combinedZip.generateAsync({
       type: "blob",
       compression: "DEFLATE",
-      compressionOptions: { level: 6 }
+      compressionOptions: { level: 6 },
     });
-    
-    // Create filename for combined archive
-    const combinedFileName = latestBackupName.replace('.zip', '_cloud.zip');
-    const file = new File([combinedBlob], combinedFileName, { type: "application/zip" });
-      
-    const uploadResult = await uploadBackup(
-      file,
-      gameName,
-      combinedFileName
-    );
-    return uploadResult;
 
+    // Create filename for combined archive
+    const combinedFileName = latestBackupName.replace(".zip", "_cloud.zip");
+    const file = new File([combinedBlob], combinedFileName, { type: "application/zip" });
+
+    const uploadResult = await uploadBackup(file, gameName, combinedFileName);
+    return uploadResult;
   } catch (error) {
     console.error("Upload backup to cloud error:", error);
     return { success: false, error: error.message };

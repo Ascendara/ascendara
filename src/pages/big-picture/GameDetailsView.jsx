@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { useGameImage } from "@/hooks/useGameImage";
-import steamService from "@/services/gameInfoService";
-import nexusModsService from "@/services/nexusModsService";
-import flingTrainerService from "@/services/flingTrainerService";
-import installedGamesService from "@/services/installedGamesService";
+import steamService from "@/services/games/gameInfoService";
+import nexusModsService from "@/services/integrations/nexusModsService";
+import flingTrainerService from "@/services/integrations/flingTrainerService";
+import installedGamesService from "@/services/library/installedGamesService";
 import {
   Download,
   Info,
@@ -22,9 +22,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { checkSeamlessAvailable } from "./utils";
-import {
-  getControllerButtons,
-} from "./controller";
+import { getControllerButtons } from "./controller";
 import { useControllerInput } from "./useControllerInput";
 import { DetailBackButton } from "./DetailBackButton";
 
@@ -81,8 +79,6 @@ const GameDetailsView = ({
   }, [game.game, game.name]);
 
   const bgImage = playLaterImage || cachedImage || game.cover || game.image;
-
-
 
   // Fetch Data
   useEffect(() => {
@@ -358,16 +354,23 @@ const GameDetailsView = ({
   }, [handleInput]);
 
   // Gamepad Polling
-  useControllerInput(action => {
-    if (action === "MENU") onBack();
-    else handleInput(action);
-  }, { priority: 5, blocked: dialogOpen });
+  useControllerInput(
+    action => {
+      if (action === "MENU") onBack();
+      else handleInput(action);
+    },
+    { priority: 5, blocked: dialogOpen }
+  );
 
   const hasScreenshots = steamData?.screenshots && steamData.screenshots.length > 0;
 
   return (
     <div className="fixed inset-0 z-[10000] flex flex-col overflow-hidden bg-background text-primary">
-      <DetailBackButton onBack={() => handleInput("BACK")} controllerType={controllerType} t={t} />
+      <DetailBackButton
+        onBack={() => handleInput("BACK")}
+        controllerType={controllerType}
+        t={t}
+      />
       <div
         className="absolute inset-0 z-0 opacity-30 transition-opacity duration-1000"
         style={{
@@ -732,7 +735,6 @@ const GameDetailsView = ({
           </div>
         </div>
       </div>
-
     </div>
   );
 };

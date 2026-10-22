@@ -53,7 +53,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { retroCall } from "@/services/retroService";
+import { retroCall } from "@/services/library/retroService";
 
 const emptyProfile = {
   executable: "",

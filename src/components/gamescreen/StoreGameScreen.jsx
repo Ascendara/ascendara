@@ -36,7 +36,7 @@ import { useStoreLibrary } from "@/hooks/useStoreLibrary";
 import { useGameRunning } from "@/hooks/useGameRunning";
 import { storeGameKey, storeNames } from "@/lib/storeLibrary";
 import { cn } from "@/lib/utils";
-import steamService from "@/services/gameInfoService";
+import steamService from "@/services/games/gameInfoService";
 import GameHero from "./GameHero";
 import GameOverviewTab from "./GameOverviewTab";
 

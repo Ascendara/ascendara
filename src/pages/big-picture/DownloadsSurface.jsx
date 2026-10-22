@@ -4,13 +4,13 @@ import {
   BigPictureEmptyState,
 } from "./BigPictureShell";
 import { useState } from "react";
-import { canRetryExtraction } from "@/services/extractionRetryService";
+import { canRetryExtraction } from "@/services/downloads/extractionRetryService";
 import { toast } from "sonner";
 import {
   removeFromQueue,
   reorderQueue,
   processNextInQueue,
-} from "@/services/downloadQueueService";
+} from "@/services/downloads/downloadQueueService";
 import { BigPictureDownloadCard } from "./BigPictureDownloadCard";
 import { SurfaceButton, useSurface } from "./Surface";
 
