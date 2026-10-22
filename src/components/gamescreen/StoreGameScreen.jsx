@@ -166,7 +166,10 @@ export default function StoreGameScreen({ game }) {
   };
   const openDirectory = async () => {
     try {
-      const result = await window.electron.storeAccounts.openDirectory(game.store, game.id);
+      const result = await window.electron.storeAccounts.openDirectory(
+        game.store,
+        game.id
+      );
       if (!result.success) throw new Error(result.error);
     } catch (failure) {
       toast.error(failure.message);
@@ -187,7 +190,10 @@ export default function StoreGameScreen({ game }) {
     ];
     if (!updatePreferences({ ...preferences, hiddenGames })) {
       toast.error(
-        t("storeAccounts.display.saveError", "Could not save this preference. Please try again.")
+        t(
+          "storeAccounts.display.saveError",
+          "Could not save this preference. Please try again."
+        )
       );
       return;
     }
@@ -240,11 +246,11 @@ export default function StoreGameScreen({ game }) {
               {isRunning
                 ? t("library.running")
                 : installed || !details
-                ? t("library.play")
-                : t("storeAccounts.installNamed", {
-                    defaultValue: "Install with {{store}}",
-                    store,
-                  })}
+                  ? t("library.play")
+                  : t("storeAccounts.installNamed", {
+                      defaultValue: "Install with {{store}}",
+                      store,
+                    })}
             </Button>
 
             <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -302,7 +308,7 @@ export default function StoreGameScreen({ game }) {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    className="gap-2 text-red-500 focus:text-red-500"
+                    className="gap-2 text-red-500 focus:bg-red-500/10 focus:text-red-500"
                     onSelect={removeFromLibrary}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -317,7 +323,7 @@ export default function StoreGameScreen({ game }) {
         {error && (
           <p
             role="alert"
-            className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+            className="border-destructive/30 bg-destructive/5 text-destructive rounded-xl border p-4 text-sm"
           >
             {error}
           </p>

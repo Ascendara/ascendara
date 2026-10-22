@@ -241,7 +241,7 @@ export default function GameActions({
             <DropdownMenuSeparator />
 
             <DropdownMenuItem
-              className="gap-2 text-red-500 focus:text-red-500"
+              className="gap-2 text-red-500 focus:bg-red-500/10 focus:text-red-500"
               disabled={isUninstalling}
               onSelect={onDelete}
             >

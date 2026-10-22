@@ -24,7 +24,20 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Download, Server, HardDrive, CircleCheck, AlertCircle, Loader2, MoreVertical, Trash, StopCircle, RefreshCw, Coffee, Loader } from "lucide-react";
+import {
+  Download,
+  Server,
+  HardDrive,
+  CircleCheck,
+  AlertCircle,
+  Loader2,
+  MoreVertical,
+  Trash,
+  StopCircle,
+  RefreshCw,
+  Coffee,
+  Loader,
+} from "lucide-react";
 import "@/lib/utils";
 import {
   getUserInfo,
@@ -807,11 +820,7 @@ const TorboxDownloads = () => {
             <AlertDialogAction
               onClick={async () => {
                 try {
-                  await controlDownload(
-                    settings.torboxApiKey,
-                    confirmStop,
-                    "stop"
-                  );
+                  await controlDownload(settings.torboxApiKey, confirmStop, "stop");
 
                   toast.success(
                     t("torbox.download_stopped_desc", {
@@ -963,9 +972,7 @@ const TorboxDownloadCard = ({
     download?.id &&
     window.localStorage.getItem("torboxDownloadedToPc") &&
     (() => {
-      const downloaded = JSON.parse(
-        window.localStorage.getItem("torboxDownloadedToPc")
-      );
+      const downloaded = JSON.parse(window.localStorage.getItem("torboxDownloadedToPc"));
       return downloaded[getDownloadKey(download)] || downloaded[download.id];
     })();
 
@@ -1043,7 +1050,7 @@ const TorboxDownloadCard = ({
               {onDelete && (
                 <DropdownMenuItem
                   onClick={onDelete}
-                  className="text-destructive focus:text-destructive"
+                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                 >
                   <Trash className="mr-2 h-4 w-4" />
                   {t("common.delete")}

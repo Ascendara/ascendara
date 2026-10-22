@@ -54,7 +54,7 @@ const empty = {
 };
 const learnMore = () =>
   window.electron.openURL(
-    "https://www.ascendara.app/docs/features/external-sources#self-hosted-sources",
+    "https://www.ascendara.app/docs/features/external-sources#self-hosted-sources"
   );
 const connections = [
   {
@@ -85,9 +85,7 @@ export default function PrivateSources() {
   const [checking, setChecking] = useState(false);
   const { settings, updateSetting } = useSettings();
   const { t } = useLanguage();
-  const typeLabels = Object.fromEntries(
-    connections.map((c) => [c.type, t(c.title)]),
-  );
+  const typeLabels = Object.fromEntries(connections.map(c => [c.type, t(c.title)]));
   const navigate = useNavigate();
   const load = () => window.electron.privateSources.list().then(setSources);
   const check = async () => {
@@ -103,11 +101,11 @@ export default function PrivateSources() {
   useEffect(() => {
     load()
       .then(check)
-      .catch((e) => toast.error(privateSourceMessage(t, e)));
+      .catch(e => toast.error(privateSourceMessage(t, e)));
     const interval = setInterval(check, CHECK_INTERVAL_MS);
     return () => clearInterval(interval);
   }, []);
-  const run = async (fn) => {
+  const run = async fn => {
     setBusy(true);
     try {
       await fn();
@@ -118,7 +116,7 @@ export default function PrivateSources() {
       setBusy(false);
     }
   };
-  const activate = async (source) => {
+  const activate = async source => {
     await updateSetting("customSourcesMode", true);
     await updateSetting("activeCustomList", null);
     await updateSetting("customSource", {
@@ -132,13 +130,13 @@ export default function PrivateSources() {
     gameService.notifySourceChanged();
     navigate("/search");
   };
-  const refresh = (s) =>
+  const refresh = s =>
     run(async () => {
       const result = await window.electron.privateSources.refresh(s.id);
       gameService.notifySourceChanged();
       if (result.error) toast.error(privateSourceMessage(t, result.error));
     });
-  const remove = (s) =>
+  const remove = s =>
     run(async () => {
       await window.electron.privateSources.remove(s.id);
       if (settings.customSource?.privateSourceId === s.id) {
@@ -178,11 +176,9 @@ export default function PrivateSources() {
       </div>
       <div className="divide-y divide-border/50">
         {!sources.length && (
-          <p className="p-5 text-sm text-muted-foreground">
-            {t("privateSources.empty")}
-          </p>
+          <p className="p-5 text-sm text-muted-foreground">{t("privateSources.empty")}</p>
         )}
-        {sources.map((s) => {
+        {sources.map(s => {
           const inUse =
             !!settings.customSourcesMode &&
             settings.customSource?.privateSourceId === s.id;
@@ -195,7 +191,7 @@ export default function PrivateSources() {
               key={s.id}
               className={cn(
                 "flex items-center gap-4 px-5 py-3.5",
-                inUse && "bg-primary/5",
+                inUse && "bg-primary/5"
               )}
             >
               <span
@@ -205,7 +201,7 @@ export default function PrivateSources() {
                 className={cn(
                   "h-2 w-2 shrink-0 rounded-full",
                   online ? "bg-green-500" : "bg-red-500",
-                  checking && "animate-pulse",
+                  checking && "animate-pulse"
                 )}
               />
               <div className="min-w-0 flex-1">
@@ -218,10 +214,7 @@ export default function PrivateSources() {
                     </Badge>
                   )}
                 </div>
-                <p
-                  className="truncate text-xs text-muted-foreground"
-                  title={s.location}
-                >
+                <p className="truncate text-xs text-muted-foreground" title={s.location}>
                   {[
                     typeLabels[s.type],
                     t("privateSources.gameCount", {
@@ -231,7 +224,7 @@ export default function PrivateSources() {
                   ].join(" · ")}
                 </p>
                 {!online && s.error && (
-                  <p role="status" className="mt-0.5 text-xs text-destructive">
+                  <p role="status" className="text-destructive mt-0.5 text-xs">
                     {t("privateSources.offlineError", {
                       error: privateSourceMessage(t, s.error),
                     })}
@@ -245,9 +238,7 @@ export default function PrivateSources() {
                   disabled={busy || !s.count}
                   onClick={() => run(() => activate(s))}
                 >
-                  {inUse
-                    ? t("privateSources.browseGames")
-                    : t("externalSources.use")}
+                  {inUse ? t("privateSources.browseGames") : t("externalSources.use")}
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -266,10 +257,7 @@ export default function PrivateSources() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-52">
-                    <DropdownMenuItem
-                      className="gap-2"
-                      onSelect={() => refresh(s)}
-                    >
+                    <DropdownMenuItem className="gap-2" onSelect={() => refresh(s)}>
                       <RefreshCw className="h-4 w-4" />
                       {t("privateSources.rescan")}
                     </DropdownMenuItem>
@@ -284,9 +272,11 @@ export default function PrivateSources() {
                       className="gap-2"
                       disabled={!s.count}
                       onSelect={() =>
-                        run(() => window.electron.privateSources.export(s.id, {
+                        run(() =>
+                          window.electron.privateSources.export(s.id, {
                             fileType: t("privateSources.exportFileType"),
-                          }))
+                          })
+                        )
                       }
                     >
                       <Download className="h-4 w-4" />
@@ -294,7 +284,7 @@ export default function PrivateSources() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      className="gap-2 text-destructive focus:text-destructive"
+                      className="text-destructive focus:bg-destructive/10 focus:text-destructive gap-2"
                       onSelect={() => remove(s)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -309,7 +299,7 @@ export default function PrivateSources() {
       </div>
       <Dialog
         open={!!draft}
-        onOpenChange={(open) => {
+        onOpenChange={open => {
           if (!open && !busy) setDraft(null);
         }}
       >
@@ -319,81 +309,64 @@ export default function PrivateSources() {
               <Server className="h-5 w-5" />
             </div>
             <DialogTitle>
-              {draft?.id
-                ? t("privateSources.editTitle")
-                : t("privateSources.addTitle")}
+              {draft?.id ? t("privateSources.editTitle") : t("privateSources.addTitle")}
             </DialogTitle>
-            <DialogDescription>
-              {t("privateSources.dialogDescription")}
-            </DialogDescription>
+            <DialogDescription>{t("privateSources.dialogDescription")}</DialogDescription>
           </DialogHeader>
           {draft && (
-            <div
-              className="min-h-0 space-y-6 overflow-y-auto px-6 py-5"
-              aria-busy={busy}
-            >
+            <div className="min-h-0 space-y-6 overflow-y-auto px-6 py-5" aria-busy={busy}>
               <fieldset disabled={busy} className="space-y-3">
                 <legend className="mb-3 text-sm font-medium">
                   {t("privateSources.whereStored")}
                 </legend>
                 <div className="grid gap-2 sm:grid-cols-3">
-                  {connections.map(
-                    ({ type, title, description, icon: Icon }) => (
-                      <button
-                        key={type}
-                        type="button"
-                        aria-pressed={draft.type === type}
-                        onClick={() =>
-                          setDraft({
-                            ...draft,
-                            type,
-                            location: draft.type === type ? draft.location : "",
-                            token: "",
-                            clearToken: false,
-                          })
-                        }
+                  {connections.map(({ type, title, description, icon: Icon }) => (
+                    <button
+                      key={type}
+                      type="button"
+                      aria-pressed={draft.type === type}
+                      onClick={() =>
+                        setDraft({
+                          ...draft,
+                          type,
+                          location: draft.type === type ? draft.location : "",
+                          token: "",
+                          clearToken: false,
+                        })
+                      }
+                      className={cn(
+                        "relative rounded-xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        draft.type === type
+                          ? "border-primary bg-primary/5"
+                          : "border-border/60 hover:border-primary/40 hover:bg-muted/30"
+                      )}
+                    >
+                      <Icon
                         className={cn(
-                          "relative rounded-xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          draft.type === type
-                            ? "border-primary bg-primary/5"
-                            : "border-border/60 hover:border-primary/40 hover:bg-muted/30",
+                          "mb-3 h-5 w-5",
+                          draft.type === type ? "text-primary" : "text-muted-foreground"
                         )}
-                      >
-                        <Icon
-                          className={cn(
-                            "mb-3 h-5 w-5",
-                            draft.type === type
-                              ? "text-primary"
-                              : "text-muted-foreground",
-                          )}
-                        />
-                        {draft.type === type && (
-                          <Check className="absolute right-3 top-3 h-4 w-4 text-primary" />
-                        )}
-                        <span className="block text-sm font-medium">
-                          {t(title)}
-                        </span>
-                        <span className="mt-1 block text-xs text-muted-foreground">
-                          {t(description)}
-                        </span>
-                      </button>
-                    ),
-                  )}
+                      />
+                      {draft.type === type && (
+                        <Check className="absolute right-3 top-3 h-4 w-4 text-primary" />
+                      )}
+                      <span className="block text-sm font-medium">{t(title)}</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {t(description)}
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </fieldset>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="private-name">
-                    {t("privateSources.nameLabel")}
-                  </Label>
+                  <Label htmlFor="private-name">{t("privateSources.nameLabel")}</Label>
                   <Input
                     id="private-name"
                     disabled={busy}
                     placeholder={t("privateSources.namePlaceholder")}
                     value={draft.name}
-                    onChange={(e) =>
-                      setDraft({ ...draft, name: e.target.value })
-                    }
+                    onChange={e => setDraft({ ...draft, name: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -415,9 +388,7 @@ export default function PrivateSources() {
                             ? t("privateSources.smbPlaceholder")
                             : t("privateSources.pathPlaceholder")
                       }
-                      onChange={(e) =>
-                        setDraft({ ...draft, location: e.target.value })
-                      }
+                      onChange={e => setDraft({ ...draft, location: e.target.value })}
                     />
                     {draft.type !== "http" && (
                       <Button
@@ -448,12 +419,11 @@ export default function PrivateSources() {
                         : t("privateSources.pathHelp")}
                   </p>
                 </div>
-                {draft.type === "http" &&
-                  draft.location.startsWith("http:") && (
-                    <p className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-600 dark:text-amber-400">
-                      {t("privateSources.insecureWarning")}
-                    </p>
-                  )}
+                {draft.type === "http" && draft.location.startsWith("http:") && (
+                  <p className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-600 dark:text-amber-400">
+                    {t("privateSources.insecureWarning")}
+                  </p>
+                )}
               </div>
               <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 p-4">
                 <Checkbox
@@ -463,7 +433,7 @@ export default function PrivateSources() {
                   disabled={busy}
                   className="mt-0.5 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   checked={draft.metadataEnabled}
-                  onCheckedChange={(checked) =>
+                  onCheckedChange={checked =>
                     setDraft({ ...draft, metadataEnabled: checked })
                   }
                 />
@@ -525,9 +495,7 @@ export default function PrivateSources() {
                             : t("privateSources.tokenPlaceholder")
                         }
                         value={draft.token}
-                        onChange={(e) =>
-                          setDraft({ ...draft, token: e.target.value })
-                        }
+                        onChange={e => setDraft({ ...draft, token: e.target.value })}
                       />
                       <p className="text-xs text-muted-foreground">
                         {t("privateSources.tokenStorage")}
@@ -539,7 +507,7 @@ export default function PrivateSources() {
                             aria-labelledby="private-clear-token-label"
                             disabled={busy}
                             checked={!!draft.clearToken}
-                            onCheckedChange={(checked) =>
+                            onCheckedChange={checked =>
                               setDraft({ ...draft, clearToken: checked })
                             }
                           />
@@ -574,7 +542,7 @@ export default function PrivateSources() {
                         disabled={busy}
                         placeholder={t("privateSources.skipFoldersPlaceholder")}
                         value={draft.exclude.join("\n")}
-                        onChange={(e) =>
+                        onChange={e =>
                           setDraft({
                             ...draft,
                             exclude: e.target.value.split("\n"),
@@ -591,7 +559,7 @@ export default function PrivateSources() {
                         disabled={busy}
                         placeholder={t("privateSources.skipFilesPlaceholder")}
                         value={draft.ignore.join("\n")}
-                        onChange={(e) =>
+                        onChange={e =>
                           setDraft({
                             ...draft,
                             ignore: e.target.value.split("\n"),
@@ -617,11 +585,7 @@ export default function PrivateSources() {
               {t("common.learnMore")}
               <ExternalLink className="h-3.5 w-3.5" />
             </Button>
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => setDraft(null)}
-            >
+            <Button variant="outline" disabled={busy} onClick={() => setDraft(null)}>
               {t("common.cancel")}
             </Button>
             <Button

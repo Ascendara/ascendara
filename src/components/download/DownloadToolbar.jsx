@@ -56,7 +56,7 @@ function IssueItem({ icon: Icon, title, description, done, disabled, onSelect })
     <DropdownMenuItem
       disabled={disabled}
       onSelect={onSelect}
-      className="cursor-pointer items-start gap-3 rounded-md px-2 py-2 data-[disabled]:opacity-100"
+      className="items-start gap-3 data-[disabled]:opacity-100"
     >
       <div
         className={cn(
@@ -130,7 +130,9 @@ export default function DownloadToolbar({
           {/* Both of these save the game to the user's library */}
           <div className="flex items-center rounded-lg bg-card/60 p-0.5">
             <ToggleButton active={isFavorite} icon={Heart} onClick={onToggleFavorite}>
-              {isFavorite ? t("download.toolbar.favorited") : t("download.toolbar.favorite")}
+              {isFavorite
+                ? t("download.toolbar.favorited")
+                : t("download.toolbar.favorite")}
             </ToggleButton>
             <div className="mx-0.5 h-5 w-px bg-border/60" />
             <ToggleButton
@@ -146,13 +148,20 @@ export default function DownloadToolbar({
           {canShare && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" className={toolbarButton} onClick={onShare}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={toolbarButton}
+                  onClick={onShare}
+                >
                   {shareCopied ? (
                     <Check className="h-4 w-4 text-green-500" />
                   ) : (
                     <Link2 className="h-4 w-4" />
                   )}
-                  {shareCopied ? t("download.toolbar.copied") : t("download.toolbar.share")}
+                  {shareCopied
+                    ? t("download.toolbar.copied")
+                    : t("download.toolbar.share")}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -181,7 +190,9 @@ export default function DownloadToolbar({
                 </DropdownMenuLabel>
                 {artwork && (
                   <IssueItem
-                    icon={artwork.verified ? BadgeCheck : artwork.submitted ? Check : ImageUp}
+                    icon={
+                      artwork.verified ? BadgeCheck : artwork.submitted ? Check : ImageUp
+                    }
                     title={artworkTitle}
                     description={artworkDescription}
                     done={artwork.verified || artwork.submitted}

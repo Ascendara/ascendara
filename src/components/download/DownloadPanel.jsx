@@ -279,13 +279,9 @@ export default function DownloadPanel({
                       placeholder={t("download.downloadOptions.selectProvider")}
                     />
                   </SelectTrigger>
-                  <SelectContent className="border-border bg-background">
+                  <SelectContent>
                     {providers.map(provider => (
-                      <SelectItem
-                        key={provider}
-                        value={provider}
-                        className="hover:bg-muted focus:bg-muted"
-                      >
+                      <SelectItem key={provider} value={provider}>
                         <div className="flex items-center gap-2">
                           {getProviderLabel(
                             provider,
