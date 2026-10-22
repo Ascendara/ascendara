@@ -283,8 +283,10 @@ export const registerUser = async (email, password, displayName, hardwareId = nu
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`[registerUser] Creating Firestore document (attempt ${attempt}/${maxRetries})...`);
-        
+        console.log(
+          `[registerUser] Creating Firestore document (attempt ${attempt}/${maxRetries})...`
+        );
+
         await setDoc(doc(db, "users", user.uid), {
           uid: user.uid,
           email: user.email,
@@ -305,18 +307,25 @@ export const registerUser = async (email, password, displayName, hardwareId = nu
         // Verify document was created
         const verifyDoc = await getDoc(doc(db, "users", user.uid));
         if (verifyDoc.exists()) {
-          console.log("[registerUser] Firestore document created and verified successfully");
+          console.log(
+            "[registerUser] Firestore document created and verified successfully"
+          );
           firestoreSuccess = true;
           break;
         } else {
-          console.warn(`[registerUser] Document creation returned success but verification failed (attempt ${attempt})`);
+          console.warn(
+            `[registerUser] Document creation returned success but verification failed (attempt ${attempt})`
+          );
           lastError = new Error("Document verification failed");
           if (attempt < maxRetries) {
             await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
           }
         }
       } catch (firestoreError) {
-        console.error(`[registerUser] Firestore error on attempt ${attempt}:`, firestoreError);
+        console.error(
+          `[registerUser] Firestore error on attempt ${attempt}:`,
+          firestoreError
+        );
         lastError = firestoreError;
         if (attempt < maxRetries) {
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
@@ -325,10 +334,15 @@ export const registerUser = async (email, password, displayName, hardwareId = nu
     }
 
     if (!firestoreSuccess) {
-      console.error("[registerUser] Failed to create Firestore document after all retries");
+      console.error(
+        "[registerUser] Failed to create Firestore document after all retries"
+      );
       // Don't fail the entire registration - user can still log in and we'll create the doc later
       // But log this as a critical issue
-      console.error("[registerUser] CRITICAL: User created in Auth but not in Firestore:", user.uid);
+      console.error(
+        "[registerUser] CRITICAL: User created in Auth but not in Firestore:",
+        user.uid
+      );
     }
 
     // Set initial online status (non-blocking)
@@ -787,7 +801,12 @@ export const reloadCurrentUser = async () => {
 let statusWriteQueue = Promise.resolve();
 
 // Omitted fields are preserved. Only explicit user choices save a preference.
-export const updateUserStatus = (status, customMessage, immediate = false, savePreference = true) => {
+export const updateUserStatus = (
+  status,
+  customMessage,
+  immediate = false,
+  savePreference = true
+) => {
   const userId = auth.currentUser?.uid;
   const write = async () => {
     if (!userId || auth.currentUser?.uid !== userId) {
@@ -813,9 +832,13 @@ export const updateUserStatus = (status, customMessage, immediate = false, saveP
 };
 
 export const subscribeToUserStatus = (userId, callback) =>
-  onSnapshot(doc(db, "userStatus", userId), snapshot => {
-    callback(snapshot.exists() ? snapshot.data() : null);
-  }, error => console.error("Status subscription error:", error));
+  onSnapshot(
+    doc(db, "userStatus", userId),
+    snapshot => {
+      callback(snapshot.exists() ? snapshot.data() : null);
+    },
+    error => console.error("Status subscription error:", error)
+  );
 
 /**
  * Get user status
@@ -887,35 +910,39 @@ export const syncCloudLibrary = async games => {
     // Favorites live in localStorage, not in the game JSON files
     let localFavorites = new Set();
     try {
-      localFavorites = new Set(JSON.parse(localStorage.getItem("game-favorites") || "[]"));
+      localFavorites = new Set(
+        JSON.parse(localStorage.getItem("game-favorites") || "[]")
+      );
     } catch (_) {
       // Non-fatal — games simply sync as not favorited
     }
 
     // Transform games to a storable format
-    const localGamesData = games.filter(game => !game.privateSource).map(game => ({
-      name: game.game || game.name,
-      // Store gameID for non-custom games (used for fetching game images/info)
-      gameID: !game.isCustom && !game.custom && game.gameID ? game.gameID : null,
-      version: game.version || null,
-      online: game.online || false,
-      dlc: game.dlc || false,
-      isVr: game.isVr || false,
-      isCustom: game.isCustom || game.custom || false,
-      playTime: game.playTime || 0,
-      launchCount: game.launchCount || 0,
-      lastPlayed: game.lastPlayed || null,
-      completed: game.completed || false,
-      favorite: localFavorites.has(game.game || game.name),
-      // Store achievement summary for quick display
-      achievementStats: game.achievementStats
-        ? {
-            total: game.achievementStats.total || 0,
-            unlocked: game.achievementStats.unlocked || 0,
-            percentage: game.achievementStats.percentage || 0,
-          }
-        : null,
-    }));
+    const localGamesData = games
+      .filter(game => !game.privateSource)
+      .map(game => ({
+        name: game.game || game.name,
+        // Store gameID for non-custom games (used for fetching game images/info)
+        gameID: !game.isCustom && !game.custom && game.gameID ? game.gameID : null,
+        version: game.version || null,
+        online: game.online || false,
+        dlc: game.dlc || false,
+        isVr: game.isVr || false,
+        isCustom: game.isCustom || game.custom || false,
+        playTime: game.playTime || 0,
+        launchCount: game.launchCount || 0,
+        lastPlayed: game.lastPlayed || null,
+        completed: game.completed || false,
+        favorite: localFavorites.has(game.game || game.name),
+        // Store achievement summary for quick display
+        achievementStats: game.achievementStats
+          ? {
+              total: game.achievementStats.total || 0,
+              unlocked: game.achievementStats.unlocked || 0,
+              percentage: game.achievementStats.percentage || 0,
+            }
+          : null,
+      }));
 
     // Get existing cloud library to merge (don't delete games that were removed locally)
     const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -1722,7 +1749,7 @@ export const verifyAscendAccess = async (hardwareId = null) => {
           error: null,
         };
       }
-      
+
       const expiresAt = userData.ascendSubscription.expiresAt?.toDate();
       // If active flag is true, trust it regardless of expiration date
       // This prevents subscribed users from being treated as trial users
@@ -1877,7 +1904,7 @@ export const searchUsers = async searchQuery => {
 
     const usersRef = collection(db, "users");
     const queryLower = searchQuery.toLowerCase().trim();
-    
+
     const q = query(
       usersRef,
       where("displayName", ">=", queryLower[0]), // First character prefix
@@ -1898,9 +1925,10 @@ export const searchUsers = async searchQuery => {
       const nameMatches = displayName.includes(queryLower);
       const ascendSub = data.ascendSubscription;
       const hasActiveAscend = ascendSub?.active === true;
-      const isVerified = data.verified === true || data.owner === true || data.contributor === true;
+      const isVerified =
+        data.verified === true || data.owner === true || data.contributor === true;
       const hasAccess = hasActiveAscend || isVerified;
-      
+
       if (doc.id !== currentUser.uid && nameMatches && hasAccess) {
         matchingUsers.push({ uid: doc.id, data });
       }
@@ -1912,12 +1940,14 @@ export const searchUsers = async searchQuery => {
 
     // Build user results
     for (const { uid, data } of matchingUsers) {
-      // Calculate stats from cloudLibrary games
+      // Prefer the server-credited total; cloudLibrary playTime is client-written
       const games = data.cloudLibrary?.games || [];
-      let totalPlaytime = 0;
-      games.forEach(game => {
-        totalPlaytime += game.playTime || 0;
-      });
+      let totalPlaytime = data.profileStats?.totalPlaytime || 0;
+      if (!totalPlaytime) {
+        games.forEach(game => {
+          totalPlaytime += game.playTime || 0;
+        });
+      }
 
       // If user is private, don't include their stats
       const isPrivate = data.private || false;
@@ -1970,10 +2000,19 @@ export const getUserPublicProfile = async userId => {
 
     // Cloud library is stored inside the users document
     const cloudLibrary = userData.cloudLibrary || null;
-    const games = cloudLibrary?.games || [];
 
     // Get profile stats (level, xp, etc.)
     const profileStats = userData.profileStats || {};
+
+    // cloudLibrary playTime is client-written; show the playtime the server
+    // actually credited (see the API's playtime ledger) wherever it has one.
+    const ledgerGames = profileStats.playtimeLedger?.games || {};
+    const games = (cloudLibrary?.games || []).map(game => {
+      const entry = ledgerGames[(game?.name || "").trim().toLowerCase()];
+      return entry && typeof entry.credited === "number"
+        ? { ...game, playTime: entry.credited }
+        : game;
+    });
 
     // Calculate stats from cloud library games
     let totalPlaytime = profileStats.totalPlaytime || 0;
@@ -2337,12 +2376,12 @@ const batchGetUserData = async userIds => {
       const userData = userDoc.exists()
         ? userDoc.data()
         : { displayName: "Unknown User", photoURL: null };
-      
+
       userDataCache.set(userId, {
         data: userData,
         timestamp: Date.now(),
       });
-      
+
       return [userId, userData];
     });
 
@@ -2379,12 +2418,12 @@ const batchGetUserStatus = async userIds => {
     const fetchPromises = uncachedIds.map(async userId => {
       const statusDoc = await getDoc(doc(db, "userStatus", userId));
       const status = statusDoc.exists() ? statusDoc.data().status : "offline";
-      
+
       userStatusCache.set(userId, {
         status,
         timestamp: Date.now(),
       });
-      
+
       return [userId, status];
     });
 
@@ -2772,11 +2811,7 @@ export const getMessages = async (conversationId, limitCount = 100) => {
     }
 
     const messagesRef = collection(db, "conversations", conversationId, "messages");
-    const q = query(
-      messagesRef,
-      orderBy("createdAt", "desc"),
-      limit(limitCount)
-    );
+    const q = query(messagesRef, orderBy("createdAt", "desc"), limit(limitCount));
     const snapshot = await getDocs(q);
 
     const messages = snapshot.docs
@@ -3141,11 +3176,7 @@ export const subscribeToMessages = (conversationId, onUpdate, limitCount = 50) =
   if (!currentUser) return () => {};
 
   const messagesRef = collection(db, "conversations", conversationId, "messages");
-  const q = query(
-    messagesRef,
-    orderBy("createdAt", "desc"),
-    limit(limitCount)
-  );
+  const q = query(messagesRef, orderBy("createdAt", "desc"), limit(limitCount));
 
   return onSnapshot(
     q,
@@ -3204,7 +3235,10 @@ export const subscribeToConversations = onUpdate => {
 
       // Build conversations array
       const conversations = conversationData.map(({ docSnap, data, otherUserId }) => {
-        const userData = userDataMap.get(otherUserId) || { displayName: "Unknown User", photoURL: null };
+        const userData = userDataMap.get(otherUserId) || {
+          displayName: "Unknown User",
+          photoURL: null,
+        };
         const status = statusMap.get(otherUserId) || "offline";
         const unreadCount = data.unreadCount?.[currentUser.uid] || 0;
 
