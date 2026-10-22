@@ -2,6 +2,7 @@ import { useState, memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  compatLabel,
   HighballCompatBadge,
   useHighballCompat,
 } from "@/components/HighballCompatibility";
@@ -549,10 +550,7 @@ function GameCardContent({ game, compact, viewCount }) {
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <HighballCompatBadge
-                    compat={macCompat}
-                    className="bg-transparent px-0 py-0 ring-0"
-                  />
+                  <p className="text-secondary">{compatLabel(macCompat, t)}</p>
                 </TooltipContent>
               </Tooltip>
             )}

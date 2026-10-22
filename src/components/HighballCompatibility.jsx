@@ -70,6 +70,11 @@ export function useHighballCompat({ steamAppId, title, detail = false, enabled =
   return result;
 }
 
+/** Plain-text status, for places like tooltips that bring their own colors. */
+export function compatLabel(compat, t) {
+  return compat ? describe(compat, t).label : "";
+}
+
 function describe(compat, t) {
   if (compat.kind === "curated") {
     return {
