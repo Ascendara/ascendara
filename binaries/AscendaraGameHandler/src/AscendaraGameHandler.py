@@ -71,6 +71,9 @@ def parse_linux_runner_args(args):
         "steam_path": None,
         "umu_id": None,
         "proton_path": None,
+        "highball_bottle": None,
+        "highball_home": None,
+        "highball_renderer": None,
     }
 
     i = 0
@@ -92,6 +95,15 @@ def parse_linux_runner_args(args):
             i += 2
         elif args[i] == "--linux-proton-path" and i + 1 < len(args):
             config["proton_path"] = args[i + 1]
+            i += 2
+        elif args[i] == "--highball-bottle" and i + 1 < len(args):
+            config["highball_bottle"] = args[i + 1]
+            i += 2
+        elif args[i] == "--highball-home" and i + 1 < len(args):
+            config["highball_home"] = args[i + 1]
+            i += 2
+        elif args[i] == "--highball-renderer" and i + 1 < len(args):
+            config["highball_renderer"] = args[i + 1]
             i += 2
         else:
             i += 1
@@ -292,6 +304,68 @@ def launch_with_wine_isolated(exe_path, linux_config, game_launch_cmd=None):
     except Exception as e:
         logging.error(f"[Wine] Failed to launch: {e}", exc_info=True)
         return None
+
+def _highball_env(highball_config):
+    env = _clean_pyinstaller_env(os.environ.copy())
+    if highball_config.get("highball_home"):
+        env["HIGHBALL_HOME"] = highball_config["highball_home"]
+    return env
+
+
+def launch_with_highball(exe_path, highball_config, game_launch_cmd=None):
+    """
+    Launch a Windows executable on Apple Silicon through the bundled Highball CLI:
+    highball run [--renderer R] <bottle> <exe> -- <args>
+    The CLI stays running until the game exits and returns the game's exit code.
+    """
+    highball_bin = highball_config["runner_path"]
+    if not highball_bin or not os.path.isfile(highball_bin):
+        logging.error(f"[Highball] CLI not found at: {highball_bin}")
+        return None
+
+    env = _highball_env(highball_config)
+    extra_env, extra_args = _split_env_and_args(game_launch_cmd)
+    env.update(extra_env)
+
+    cmd = [highball_bin, "run"]
+    if highball_config.get("highball_renderer"):
+        cmd += ["--renderer", highball_config["highball_renderer"]]
+    cmd += [highball_config["highball_bottle"], exe_path]
+    if extra_args:
+        cmd += ["--", *extra_args]
+
+    logging.info(f"[Highball] Command: {' '.join(cmd)}")
+    logging.info(f"[Highball] HIGHBALL_HOME={env.get('HIGHBALL_HOME')}")
+
+    try:
+        process = subprocess.Popen(
+            cmd,
+            env=env,
+            cwd=os.path.dirname(exe_path),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        logging.info(f"[Highball] Process started, PID: {process.pid}")
+        _pipe_process_logs(process, "HIGHBALL")
+        return process
+    except Exception as e:
+        logging.error(f"[Highball] Failed to launch: {e}", exc_info=True)
+        return None
+
+
+def stop_highball_bottle(highball_config):
+    """Stop every Wine process in the game's bottle."""
+    try:
+        subprocess.run(
+            [highball_config["runner_path"], "bottle", "kill", highball_config["highball_bottle"]],
+            env=_highball_env(highball_config),
+            capture_output=True,
+            timeout=30,
+        )
+        logging.info(f"[Highball] Stopped bottle {highball_config['highball_bottle']}")
+    except Exception as e:
+        logging.error(f"[Highball] Failed to stop bottle: {e}", exc_info=True)
+
 
 def _clean_pyinstaller_env(env):
     for var in ('LD_LIBRARY_PATH', 'LD_PRELOAD', 'PYTHONPATH', 'PYTHONHOME'):
@@ -653,7 +727,7 @@ def get_ludusavi_settings():
         logging.info("[EXIT] get_ludusavi_settings() - Exception")
         return None
 
-def run_ludusavi_backup(game_name):
+def run_ludusavi_backup(game_name, wine_prefix=None):
     """
     Run Ludusavi backup for a specific game
     """
@@ -793,6 +867,11 @@ def run_ludusavi_backup(game_name):
                     logging.info(f"[Ludusavi] Linux: using wine prefix at {pfx_path}")
                 else:
                     logging.warning(f"[Ludusavi] Linux: wine prefix not found at {pfx_path}")
+
+        # macOS: games run in a Highball bottle, which is a Wine prefix
+        if sys.platform == 'darwin' and wine_prefix and os.path.isdir(wine_prefix):
+            cmd.extend(["--wine-prefix", wine_prefix])
+            logging.info(f"[Ludusavi] macOS: using Highball bottle at {wine_prefix}")
 
         creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
         result = subprocess.run(cmd, capture_output=True, text=True, creationflags=creationflags)
@@ -993,6 +1072,20 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     atomic_write_json(json_file_path, data, indent=4)
                 return
 
+        elif (current_platform == 'darwin' and is_windows_exe and linux_runner_config
+              and linux_runner_config["runner_type"] == "highball"):
+            logging.info(f"[Launch] Using Highball bottle: {linux_runner_config['highball_bottle']}")
+            process = launch_with_highball(exe_path, linux_runner_config, game_launch_cmd)
+            if process is None:
+                error_msg = "Failed to launch with Highball"
+                logging.error(error_msg)
+                if not is_custom_game and json_file_path:
+                    with open(json_file_path, "r", encoding='utf-8') as f:
+                        data = json.load(f)
+                    data["runError"] = error_msg
+                    atomic_write_json(json_file_path, data, indent=4)
+                return
+
         elif current_platform in ('linux', 'darwin') and is_windows_exe and not linux_runner_config:
             # Fallback: basic Wine (no Proton config from Electron)
             logging.warning("[Launch] No runner config from Electron, falling back to system Wine")
@@ -1169,6 +1262,9 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                             if linux_runner_config and linux_runner_config.get("runner_type") == "umu":
                                 logging.info("Launching trainer with UMU")
                                 trainer_process = launch_with_umu(trainer_path, linux_runner_config, None)
+                            elif linux_runner_config and linux_runner_config.get("runner_type") == "highball":
+                                logging.info("Launching trainer with Highball")
+                                trainer_process = launch_with_highball(trainer_path, linux_runner_config, None)
                             elif use_proton and current_platform == 'linux' and proton_config:
                                 logging.info("Launching trainer with Proton")
                                 try:
@@ -1270,6 +1366,8 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                         pass
                     except psutil.AccessDenied:
                         logging.error("Permission denied stopping game process %s", target.pid)
+                if linux_runner_config and linux_runner_config.get("runner_type") == "highball":
+                    stop_highball_bottle(linux_runner_config)
             if process.poll() is None:
                 game_alive = True
             else:
@@ -1365,7 +1463,8 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         # Run Ludusavi backup after game closes if enabled
         if use_ludusavi and game_name:
             logging.info(f"Game closed, running Ludusavi backup for {game_name}")
-            backup_success = run_ludusavi_backup(game_name)
+            highball_prefix = (linux_runner_config or {}).get("compat_data") if current_platform == 'darwin' else None
+            backup_success = run_ludusavi_backup(game_name, highball_prefix)
             if backup_success:
                 logging.info(f"Ludusavi backup succeeded for {game_name}")
             else:

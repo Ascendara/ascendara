@@ -24,7 +24,11 @@ const {
   shouldLogError,
 } = require("./utils");
 const { getSettingsManager } = require("./settings");
-const { getGameDirectories, getSelectedGameDirectories, getManagedGameDirectory } = require("./gameDirectories");
+const {
+  getGameDirectories,
+  getSelectedGameDirectories,
+  getManagedGameDirectory,
+} = require("./gameDirectories");
 const { setPlayingActivity, updateDiscordRPCToLibrary } = require("./discord-rpc");
 const { hideWindow, showWindow } = require("./window");
 
@@ -35,8 +39,11 @@ const { resetOnboarding } = require("./onboarding");
 
 // Load proton module only on linux
 const proton = isLinux ? require("./proton") : null;
+const highball = require("./highball");
 
 const runGameProcesses = new Map();
+// Games whose compatibility layer is still being prepared before launch
+const preparingGames = new Set();
 
 function findCustomGame(game, settings, selectedExecutable = null) {
   for (const directory of [
@@ -48,7 +55,9 @@ function findCustomGame(game, settings, selectedExecutable = null) {
         fs.readFileSync(path.join(directory, "games.json"), "utf8")
       );
       const gameInfo = (data.games || []).find(
-        entry => entry.game === game && !entry._isDeleted &&
+        entry =>
+          entry.game === game &&
+          !entry._isDeleted &&
           (!selectedExecutable || entry.executable === selectedExecutable)
       );
       if (gameInfo) return gameInfo;
@@ -291,7 +300,13 @@ function registerGameHandlers() {
               try {
                 const gameInfoData = await fs.promises.readFile(gameInfoPath, "utf8");
                 const parsed = JSON.parse(gameInfoData);
-                return { ...parsed, isCustom: false, custom: false, _sourceDir: downloadDir, _folderName: dir };
+                return {
+                  ...parsed,
+                  isCustom: false,
+                  custom: false,
+                  _sourceDir: downloadDir,
+                  _folderName: dir,
+                };
               } catch (error) {
                 const errorKey = `${dir}_${error.code}`;
                 if (shouldLogError(errorKey)) {
@@ -371,13 +386,21 @@ function registerGameHandlers() {
             return (gamesData.games || []).map(game => {
               let imagePath = null;
               for (const ext of [".jpg", ".jpeg", ".png"]) {
-                const match = coverFiles.get(`${game.game}.ascendara${ext}`.toLowerCase());
+                const match = coverFiles.get(
+                  `${game.game}.ascendara${ext}`.toLowerCase()
+                );
                 if (match) {
                   imagePath = path.join(gamesDirectory, match);
                   break;
                 }
               }
-              return { ...game, isCustom: true, custom: true, imagePath, _sourceDir: dir };
+              return {
+                ...game,
+                isCustom: true,
+                custom: true,
+                imagePath,
+                _sourceDir: dir,
+              };
             });
           } catch (error) {
             if (error.code !== "ENOENT") {
@@ -480,9 +503,12 @@ function registerGameHandlers() {
               ? configured.toLowerCase() === requested.toLowerCase()
               : configured === requested;
           });
-          if (!allDirectories.length) throw new Error("Selected game directory is no longer configured");
+          if (!allDirectories.length)
+            throw new Error("Selected game directory is no longer configured");
         }
         let launchCommands = null;
+        // Per-game macOS compatibility overrides (runner and Highball renderer)
+        let macCompat = {};
 
         if (!isCustom) {
           const sanitizedGame = sanitizeGameName(game);
@@ -517,6 +543,7 @@ function registerGameHandlers() {
           if (gameInfo.launchCommands) {
             launchCommands = gameInfo.launchCommands;
           }
+          macCompat = { runner: gameInfo.macRunner, renderer: gameInfo.highballRenderer };
 
           const executableToUse = specificExecutable || gameInfo.executable;
 
@@ -584,11 +611,15 @@ function registerGameHandlers() {
             }
           }
         } else {
-          const gameInfo = findCustomGame(game, {
-            ...settings,
-            downloadDirectory: allDirectories[0],
-            additionalDirectories: allDirectories.slice(1),
-          }, installation?.executable);
+          const gameInfo = findCustomGame(
+            game,
+            {
+              ...settings,
+              downloadDirectory: allDirectories[0],
+              additionalDirectories: allDirectories.slice(1),
+            },
+            installation?.executable
+          );
 
           if (!gameInfo) {
             throw new Error(`Game not found in games.json: ${game}`);
@@ -599,6 +630,7 @@ function registerGameHandlers() {
           if (gameInfo.launchCommands) {
             launchCommands = gameInfo.launchCommands;
           }
+          macCompat = { runner: gameInfo.macRunner, renderer: gameInfo.highballRenderer };
 
           executable = specificExecutable || gameInfo.executable;
           if (!executable) {
@@ -629,7 +661,7 @@ function registerGameHandlers() {
 
         await validateGameExecutable({ executable });
 
-        if (runGameProcesses.has(game)) {
+        if (runGameProcesses.has(game) || preparingGames.has(game)) {
           throw new Error("Game is already running");
         }
 
@@ -659,6 +691,45 @@ function registerGameHandlers() {
           ...(launchWithTrainer ? ["--trainer"] : []),
           ...(launchCommands ? ["--gameLaunchCmd", launchCommands] : []),
         ];
+
+        // macOS Highball: inject runner args, setting it up on first use
+        const isMacWindowsGame =
+          process.platform === "darwin" && /\.(exe|msi|bat)$/i.test(executable);
+        if (isMacWindowsGame && highball.shouldUseHighball(macCompat.runner)) {
+          preparingGames.add(game);
+          const launchConfig = await highball
+            .buildLaunchConfig(
+              game,
+              macCompat.renderer,
+              progress =>
+                !event.sender.isDestroyed() &&
+                event.sender.send("highball-setup-progress", { ...progress, game })
+            )
+            .finally(() => preparingGames.delete(game));
+          if (launchConfig.error) {
+            console.error("[Games] Highball unavailable:", launchConfig.error);
+            event.sender.send("game-launch-error", { game, error: launchConfig.error });
+            return false;
+          }
+          gameHandlerArgs.push(
+            "--linux-runner-type",
+            "highball",
+            "--linux-runner-path",
+            launchConfig.binary,
+            "--linux-compat-data",
+            launchConfig.prefix,
+            "--highball-bottle",
+            launchConfig.bottle,
+            "--highball-home",
+            launchConfig.home,
+            ...(launchConfig.renderer
+              ? ["--highball-renderer", launchConfig.renderer]
+              : [])
+          );
+          console.log(
+            `[Games] macOS launch via Highball (bottle ${launchConfig.bottle}, renderer ${launchConfig.renderer || "default"})`
+          );
+        }
 
         // Linux Proton/Wine: inject runner args
         if (isLinux && proton && proton.isWindowsExecutable(executable)) {
@@ -775,8 +846,15 @@ function registerGameHandlers() {
           console.error(`Game handler error: ${data}`);
         });
 
-        runGame.playSession = { sessionId: require("crypto").randomUUID(), startedAt: Date.now(), name: game,
-          isCustom, sourceDir: installation?._sourceDir || (!isCustom ? path.dirname(gameDirectory) : ""), executable };
+        runGame.playSession = {
+          sessionId: require("crypto").randomUUID(),
+          startedAt: Date.now(),
+          name: game,
+          isCustom,
+          sourceDir:
+            installation?._sourceDir || (!isCustom ? path.dirname(gameDirectory) : ""),
+          executable,
+        };
         runGameProcesses.set(game, runGame);
 
         runGame.once("spawn", () => {
@@ -808,7 +886,10 @@ function registerGameHandlers() {
               ...(!isCustom ? { _sourceDir: path.dirname(gameDirectory) } : {}),
               executable,
             },
-            ...exitMonitor.result({ stopped: runGame.killed || runGame.stopRequested, failed: launchFailed }),
+            ...exitMonitor.result({
+              stopped: runGame.killed || runGame.stopRequested,
+              failed: launchFailed,
+            }),
           });
         });
 
@@ -853,17 +934,29 @@ function registerGameHandlers() {
 
   // Stop game
   ipcMain.handle("get-running-game-sessions", () =>
-    [...runGameProcesses.values()].filter(proc => !proc.sessionEnded).map(proc => ({ ...proc.playSession, canStop: !!proc.stopSupported })));
+    [...runGameProcesses.values()]
+      .filter(proc => !proc.sessionEnded)
+      .map(proc => ({ ...proc.playSession, canStop: !!proc.stopSupported }))
+  );
   ipcMain.handle("stop-game", async (_, game, sessionId) => {
     const proc = runGameProcesses.get(game);
     if (!proc || (sessionId && proc.playSession.sessionId !== sessionId)) {
       throw new Error("This play session has already ended.");
     }
-    if (!proc.stopSupported) throw new Error("Update the desktop game helper and relaunch this game to enable remote stop.");
+    if (!proc.stopSupported)
+      throw new Error(
+        "Update the desktop game helper and relaunch this game to enable remote stop."
+      );
     proc.stopRequested = true;
     // Let the helper stop the actual game and flush the final playtime.
     await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => finish(new Error("Game did not stop. Check the desktop for permission errors.")), 15000);
+      const timeout = setTimeout(
+        () =>
+          finish(
+            new Error("Game did not stop. Check the desktop for permission errors.")
+          ),
+        15000
+      );
       const closed = () => finish();
       const finish = error => {
         clearTimeout(timeout);
@@ -873,7 +966,9 @@ function registerGameHandlers() {
       };
       proc.once("close", closed);
       proc.once("session-ended", closed);
-      proc.stdin.write("ASCENDARA_STOP\n", error => { if (error) finish(error); });
+      proc.stdin.write("ASCENDARA_STOP\n", error => {
+        if (error) finish(error);
+      });
     });
     return { success: true };
   });
@@ -895,7 +990,10 @@ function registerGameHandlers() {
       // Find the game's .ascendara.json to extract stats
       let gameInfo = null;
       for (const dir of allDirectories) {
-        const testPath = path.join(getManagedGameDirectory(dir, gameName, installation), `${installation?._folderName || sanitizedGame}.ascendara.json`);
+        const testPath = path.join(
+          getManagedGameDirectory(dir, gameName, installation),
+          `${installation?._folderName || sanitizedGame}.ascendara.json`
+        );
         if (fs.existsSync(testPath)) {
           try {
             gameInfo = JSON.parse(fs.readFileSync(testPath, "utf8"));
@@ -1135,7 +1233,10 @@ function registerGameHandlers() {
       const settings = settingsManager.getSettings();
       for (const directory of getSelectedGameDirectories(settings, installation)) {
         const gameDirectory = getManagedGameDirectory(directory, game, installation);
-        const metadata = path.join(gameDirectory, `${path.basename(gameDirectory)}.ascendara.json`);
+        const metadata = path.join(
+          gameDirectory,
+          `${path.basename(gameDirectory)}.ascendara.json`
+        );
         if (!fs.existsSync(metadata)) continue;
         fs.rmSync(gameDirectory, { recursive: true, force: true });
         if (isWindows) {
@@ -1143,6 +1244,7 @@ function registerGameHandlers() {
           deleteStartMenuShortcut(game);
         }
         if (isLinux && proton) await proton.deleteGamePrefix(game);
+        if (highball.isSupported()) await highball.resetBottle(game);
         return true;
       }
       throw new Error(`Game directory not found for ${game}`);
@@ -1158,7 +1260,9 @@ function registerGameHandlers() {
       const gamesFilePath = path.join(directory, "games.json");
       if (!fs.existsSync(gamesFilePath)) continue;
       const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
-      const matches = entry => entry.game === game && !entry._isDeleted &&
+      const matches = entry =>
+        entry.game === game &&
+        !entry._isDeleted &&
         (!installation || entry.executable === installation.executable);
       if (!gamesData.games.some(matches)) continue;
       gamesData.games = gamesData.games.filter(entry => !matches(entry));
@@ -1227,7 +1331,14 @@ function registerGameHandlers() {
       }
     } else {
       try {
-        const gameInfo = findCustomGame(game, { downloadDirectory: allDirectories[0], additionalDirectories: allDirectories.slice(1) }, installation?.executable);
+        const gameInfo = findCustomGame(
+          game,
+          {
+            downloadDirectory: allDirectories[0],
+            additionalDirectories: allDirectories.slice(1),
+          },
+          installation?.executable
+        );
         const directory = gameInfo?.launcher
           ? gameInfo.installPath
           : gameInfo?.executable
@@ -1713,6 +1824,65 @@ function registerGameHandlers() {
       return false;
     } catch (error) {
       console.error("Error saving launch commands:", error);
+      return false;
+    }
+  });
+
+  // Per-game macOS compatibility overrides (macRunner, highballRenderer)
+  const MAC_COMPAT_KEYS = ["macRunner", "highballRenderer"];
+  const findGameInfoFile = (game, isCustom) => {
+    const settings = settingsManager.getSettings();
+    const directories = [
+      settings.downloadDirectory,
+      ...(settings.additionalDirectories || []),
+    ].filter(Boolean);
+    for (const directory of directories) {
+      if (isCustom) {
+        const gamesPath = path.join(directory, "games.json");
+        if (!fs.existsSync(gamesPath)) continue;
+        const data = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
+        const entry = (data.games || []).find(g => g.game === game && !g._isDeleted);
+        if (entry) return { file: gamesPath, data, entry };
+      } else {
+        const sanitizedGame = sanitizeGameName(game);
+        const file = path.join(
+          directory,
+          sanitizedGame,
+          `${sanitizedGame}.ascendara.json`
+        );
+        if (fs.existsSync(file)) {
+          const data = JSON.parse(fs.readFileSync(file, "utf8"));
+          return { file, data, entry: data };
+        }
+      }
+    }
+    return null;
+  };
+
+  ipcMain.handle("get-mac-compat-overrides", (_, game, isCustom = false) => {
+    try {
+      const found = findGameInfoFile(game, isCustom);
+      return {
+        macRunner: found?.entry.macRunner || "auto",
+        highballRenderer: found?.entry.highballRenderer || "auto",
+      };
+    } catch (error) {
+      console.error("Error reading compatibility overrides:", error);
+      return { macRunner: "auto", highballRenderer: "auto" };
+    }
+  });
+
+  ipcMain.handle("set-mac-compat-override", (_, game, key, value, isCustom = false) => {
+    if (!MAC_COMPAT_KEYS.includes(key)) return false;
+    try {
+      const found = findGameInfoFile(game, isCustom);
+      if (!found) return false;
+      if (!value || value === "auto") delete found.entry[key];
+      else found.entry[key] = value;
+      fs.writeFileSync(found.file, JSON.stringify(found.data, null, 2));
+      return true;
+    } catch (error) {
+      console.error("Error saving compatibility override:", error);
       return false;
     }
   });

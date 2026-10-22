@@ -13,7 +13,10 @@
 const path = require("path");
 try {
   const projectRoot = path.resolve(__dirname, "..");
-  if (process.cwd() !== projectRoot && require("fs").existsSync(path.join(projectRoot, "package.json"))) {
+  if (
+    process.cwd() !== projectRoot &&
+    require("fs").existsSync(path.join(projectRoot, "package.json"))
+  ) {
     process.chdir(projectRoot);
   }
 } catch (e) {
@@ -375,6 +378,9 @@ function registerCriticalHandlers() {
   require("./modules/retro").registerRetroHandlers();
   system.registerSystemHandlers();
   require("./modules/proton").registerRunnerHandlers();
+  if (process.platform === "darwin") {
+    require("./modules/highball").registerHighballHandlers();
+  }
   if (isLinux) {
     const { registerProtonHandlers } = require("./modules/proton");
     registerProtonHandlers();

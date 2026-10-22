@@ -82,6 +82,23 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   // SETTINGS & CONFIGURATION
   //===========================================================================
+  // macOS/Highball
+  highballGetStatus: () => ipcRenderer.invoke("highball-get-status"),
+  highballSetup: options => ipcRenderer.invoke("highball-setup", options),
+  highballAcceptD3DMetal: () => ipcRenderer.invoke("highball-accept-d3dmetal"),
+  highballGetD3DMetalLicense: () => ipcRenderer.invoke("highball-get-d3dmetal-license"),
+  highballResetBottle: (gameName, options) =>
+    ipcRenderer.invoke("highball-reset-bottle", gameName, options),
+  highballOpenBottle: gameName => ipcRenderer.invoke("highball-open-bottle", gameName),
+  onHighballSetupProgress: callback =>
+    preloadIpc.subscribe("highball-setup-progress", callback, {
+      selectArgs: args => [args[0]],
+    }),
+  getMacCompatOverrides: (game, isCustom) =>
+    ipcRenderer.invoke("get-mac-compat-overrides", game, isCustom),
+  setMacCompatOverride: (game, key, value, isCustom) =>
+    ipcRenderer.invoke("set-mac-compat-override", game, key, value, isCustom),
+
   // Linux/Proton
   getRunners: () => ipcRenderer.invoke("get-runners"),
   detectProton: () => ipcRenderer.invoke("detect-proton"),

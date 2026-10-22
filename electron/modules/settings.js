@@ -85,6 +85,11 @@ class SettingsManager {
         protonBin: "",
         steamCompatDataPath: "",
       },
+      // macOS: "auto" | "highball" | "wine"
+      macRunner: "auto",
+      highballRenderer: "auto",
+      highballBottleMode: "shared",
+      highballD3DMetalAccepted: false,
       promptPurchaseAfter3Hours: true,
       openOnStartup: false,
       startMinimized: false,
