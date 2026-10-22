@@ -47,6 +47,7 @@
     "lint-staged": "lint-staged",
     "dist-mac": "python3 ./scripts/build_ascendara_mac.py",
     "setup-mac": "python3 ./scripts/setup_macos_tools.py",
+    "setup-highball": "python3 ./scripts/build_highball.py",
     "test-mac-extraction": "python3 -m unittest discover -s tests -p 'test_macos*.py'",
     "dist-mac-arm64": "python3 ./scripts/build_ascendara_mac.py --arch arm64",
     "dist-mac-intel": "python3 ./scripts/build_ascendara_mac.py --arch x64",

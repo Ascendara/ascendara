@@ -10,6 +10,7 @@ import subprocess
 import sys
 from build_support import register_after_build, validate_resources
 from setup_macos_tools import TOOL_DIR, validate_tool
+import build_highball
 
 ROOT = Path(__file__).resolve().parents[1]
 HELPERS = (
@@ -90,6 +91,8 @@ def preflight(arch):
             raise RuntimeError('Missing Rust standard library')
     except (OSError, RuntimeError, subprocess.CalledProcessError):
         errors.append(f'{arch}: install Rust with rustup, then run: rustup target add --toolchain stable {RUST_TARGET[arch]}')
+    if arch == 'arm64':
+        errors += build_highball.preflight()
     return errors
 
 
@@ -184,14 +187,20 @@ def build_arch(arch, args, identity):
         binary = staging / name
         run(['lipo', binary, '-verify_arch', MACH_ARCH[arch]])
         binary.chmod(0o755)
+    # Highball supports Apple Silicon only; Intel builds keep the system Wine fallback.
+    highball = build_highball.build(staging / 'Highball') if arch == 'arm64' else None
     config = json.loads((ROOT / 'package.json').read_text())['build']
     config['mac']['extraResources'] = [
         {'from': 'readme/logo/png/ascendara_512x.png', 'to': 'icon.png'},
         {'from': str(TOOL_DIR / 'License.txt'), 'to': 'licenses/7zip/License.txt'},
         {'from': str(TOOL_DIR / 'readme.txt'), 'to': 'licenses/7zip/readme.txt'},
         *({'from': str(staging / name), 'to': name} for name in names),
+        *({'from': str(highball / name), 'to': f'Highball/{name}'}
+          for name in (build_highball.STAGED_FILES if highball else ())),
     ]
     config['mac']['binaries'] = [f'Contents/Resources/{name}' for name in names]
+    if highball:
+        config['mac']['binaries'].append('Contents/Resources/Highball/highball')
     if identity:
         config['mac']['identity'] = identity
     config['mac']['notarize'] = args.release

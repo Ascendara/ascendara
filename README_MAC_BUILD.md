@@ -4,7 +4,7 @@ Use `yarn dist-mac` on a Mac. The script builds native Python helpers, the Rust 
 
 ## Prerequisites
 
-- Xcode command line tools, Node, Yarn, Python 3 with venv, and Rust/Cargo.
+- Xcode command line tools (including Swift and Git), Node, Yarn, Python 3 with venv, and Rust/Cargo.
 - Run `yarn setup-mac` to download the official macOS 7-Zip distribution into `.build-tools/macos/7zip`. Setup verifies a pinned SHA-256 checksum, the CPU architecture, and RAR decoder availability. The binary and license notices are bundled into both download helpers. Standalone UnRAR and `ASCENDARA_UNRAR_LICENSE` are no longer required for Mac builds. End users do not need Homebrew, Cargo, Python, or an archive utility installed.
 - Installed JavaScript dependencies (`yarn install --frozen-lockfile`).
 - The existing build-signature secret in `build.config.json` or `BUILD_SECRET`. Register the resulting `electron/build-signature.json` with the release backend using the project's release process. The repository does not include the private registration script.
@@ -12,6 +12,7 @@ Use `yarn dist-mac` on a Mac. The script builds native Python helpers, the Rust 
 ```sh
 brew install rust   # developer build dependency; includes Cargo
 yarn setup-mac      # official 7zz with RAR support and notices
+yarn setup-highball # Highball CLI for running Windows games in development
 yarn dist-mac --check
 yarn dist-mac --dir  # local unpacked .app
 yarn dist-mac        # DMG and ZIP
@@ -57,7 +58,16 @@ Release mode requires signing and notarization credentials and enables forced co
 ## Runtime support and remaining limits
 
 - Packaged downloads, translations, local refresh, notifications, and the game handler use native helpers in `Contents/Resources`. Finder launches include Homebrew and Wine paths. The achievement watcher reads macOS settings and monitors Ascendara Wine prefixes.
-- Native executable files and `.app` bundles can be selected for games. Windows `.exe` games require a working Wine installation; compatibility remains game-dependent. Proton/UMU features remain Linux-only. The catalogue is not converted into native Mac games.
+- Native executable files and `.app` bundles can be selected for games. Compatibility of Windows `.exe` games remains game-dependent. Proton/UMU features remain Linux-only. The catalogue is not converted into native Mac games.
+
+## Windows games on Apple Silicon (Highball)
+
+Apple Silicon builds bundle the CLI of [Highball](https://github.com/gauthierpiarrette/highball) (GPL-3.0) in `Contents/Resources/Highball/`, with its license, a source pointer, the default engine manifest and Apple's D3DMetal license text. `scripts/build_highball.py` pins the release (`VERSION`, `COMMIT`), verifies the checkout's commit, builds the arm64 CLI with Swift and stages these files; `yarn dist-mac` runs it for arm64 targets and `yarn setup-highball` stages it into `binaries/Highball/dist` for development.
+
+No Wine engine is bundled. The first Windows game launch, or **Settings › Compatibility**, installs Rosetta 2 if needed, downloads the engine named by the bundled manifest (about 280 MB, SHA-256 verified by Highball) and creates a bottle, all under `~/Library/Application Support/ascendara/highball` (`HIGHBALL_HOME`), separate from a standalone Highball app. Games then run with `highball run <bottle> <exe>`, which blocks until the game exits. D3DMetal stays disabled until the user accepts Apple's license in Settings.
+
+To upgrade Highball, update `VERSION` and `COMMIT` in `scripts/build_highball.py`. A new manifest moves existing bottles onto the new engine on the next launch. Intel builds do not include Highball and keep using system Wine.
+
 - Ludusavi is detected at `~/.ascendara/ludusavi` or on PATH on macOS. Install a native macOS Ludusavi binary; the Linux CDN binary is not used on Mac.
 - Steam Workshop's existing SteamCMD installer, Windows dependency installers, Defender exclusions, and the Windows uninstaller do not run on macOS. Launcher discovery supports Steam on Mac; other launcher integrations still depend on Windows metadata.
 - Live branch updates download the matching `mac-arm64.zip` or `mac-x64.zip` from the GitHub release, replace the installed app after quit, and reopen it. The app must be installed in a writable location. Testing branch switches still require a manual installation.
