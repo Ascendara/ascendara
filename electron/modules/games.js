@@ -7,7 +7,7 @@ const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
 const axios = require("axios");
-const { spawn, execSync } = require("child_process");
+const { spawn, execSync, execFileSync } = require("child_process");
 const { ipcMain, shell, dialog, BrowserWindow } = require("electron");
 const {
   isDev,
@@ -44,6 +44,27 @@ const highball = require("./highball");
 const runGameProcesses = new Map();
 // Games whose compatibility layer is still being prepared before launch
 const preparingGames = new Set();
+let devGameHandlerReady = false;
+
+/**
+ * In developer mode the game handler runs from source, so its Python
+ * dependencies must be installed for the interpreter Ascendara uses.
+ */
+function checkDevGameHandler(python) {
+  if (devGameHandlerReady) return;
+  try {
+    execFileSync(python, ["-c", "import pypresence, psutil"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    devGameHandlerReady = true;
+  } catch {
+    throw new Error(
+      `Developer mode runs the game handler from source with ${python}, which is missing its dependencies. ` +
+        `Run: ${python} -m pip install -r binaries/AscendaraGameHandler/requirements.txt`
+    );
+  }
+}
 
 function findCustomGame(game, settings, selectedExecutable = null) {
   for (const directory of [
@@ -669,16 +690,18 @@ function registerGameHandlers() {
         let executablePath;
         let handlerScript;
 
-        if (isWindows) {
-          executablePath = path.join(appDirectory, "/resources/AscendaraGameHandler.exe");
-        } else if (isDev) {
+        if (isDev) {
+          // Developer mode runs the game handler from source
           executablePath = getPythonPath();
           handlerScript = "binaries/AscendaraGameHandler/src/AscendaraGameHandler.py";
+          checkDevGameHandler(executablePath);
+        } else if (isWindows) {
+          executablePath = path.join(appDirectory, "/resources/AscendaraGameHandler.exe");
         } else {
           executablePath = path.join(process.resourcesPath, "AscendaraGameHandler");
         }
 
-        if (isWindows && !fs.existsSync(executablePath)) {
+        if (isWindows && !isDev && !fs.existsSync(executablePath)) {
           throw new Error("Game handler not found");
         }
 
@@ -812,11 +835,9 @@ function registerGameHandlers() {
         }
 
         // Build final spawn arguments
-        const spawnArgs = isWindows
-          ? gameHandlerArgs
-          : handlerScript
-            ? [handlerScript, ...gameHandlerArgs]
-            : gameHandlerArgs;
+        const spawnArgs = handlerScript
+          ? [handlerScript, ...gameHandlerArgs]
+          : gameHandlerArgs;
 
         const exitMonitor = createGameExitMonitor({ elevated: launchWithAdmin });
         let launchFailed = false;

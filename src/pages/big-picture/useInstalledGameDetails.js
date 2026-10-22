@@ -330,13 +330,6 @@ function useInstalledGameDetails({
     setIsLaunching(true);
 
     try {
-      // Check if in dev mode
-      if (await window.electron.isDev()) {
-        setTimeout(() => toast.error(t("library.cannotRunDev")), 0);
-        setIsLaunching(false);
-        return;
-      }
-
       // Check if already running
       const running = await window.electron.isGameRunning(gameName);
       if (running) {
