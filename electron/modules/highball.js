@@ -361,7 +361,7 @@ function bottlePath(name) {
  * Prepare everything a launch needs and return the GameHandler arguments.
  * Returns: { binary, bottle, renderer, home, prefix } or { error }
  */
-async function buildLaunchConfig(gameName, rendererOverride, onProgress) {
+async function buildLaunchConfig(gameName, rendererOverride, onProgress, compatQuery) {
   try {
     let status = await getStatus();
     if (!status.ready) status = await setup({ onProgress });
@@ -376,11 +376,24 @@ async function buildLaunchConfig(gameName, rendererOverride, onProgress) {
       });
     }
 
+    // The per-game choice, then the global one, then highball-db's recommendation
     const settings = getSettingsManager().getSettings();
     let renderer =
       rendererOverride && rendererOverride !== "auto"
         ? rendererOverride
         : settings.highballRenderer || "auto";
+    let rendererSource = "settings";
+    let launchArgs = [];
+    const compat = await require("./highball-db")
+      .lookup(compatQuery || { title: gameName }, { detail: true })
+      .catch(() => null);
+    if (compat?.kind === "curated") {
+      launchArgs = compat.launchArgs || [];
+      if (renderer === "auto" && compat.renderer) {
+        renderer = compat.renderer;
+        rendererSource = "highball-db";
+      }
+    }
     if (!RENDERERS.includes(renderer)) renderer = "";
     if (renderer === "d3dmetal" && !status.d3dmetalAccepted) {
       console.warn("[Highball] D3DMetal license not accepted; using the bottle default");
@@ -391,6 +404,8 @@ async function buildLaunchConfig(gameName, rendererOverride, onProgress) {
       binary: getBinary(),
       bottle,
       renderer,
+      rendererSource,
+      launchArgs,
       home: HIGHBALL_HOME,
       prefix: bottlePath(bottle),
     };

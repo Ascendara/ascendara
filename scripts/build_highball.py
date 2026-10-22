@@ -18,7 +18,11 @@ REPOSITORY = 'https://github.com/gauthierpiarrette/highball'
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DIR = ROOT / '.build-tools/macos/highball' / VERSION
 DEV_OUTPUT = ROOT / 'binaries/Highball/dist'
-STAGED_FILES = ('highball', 'engine-manifest.json', 'd3dmetal-license.txt', 'LICENSE', 'SOURCE.txt')
+# Compatibility data from highball-db, bundled as the offline fallback for runtime lookups
+COMPAT_DATA_URL = 'https://gethighball.com/data'
+COMPAT_LISTS = ('games', 'predictions')
+STAGED_FILES = ('highball', 'engine-manifest.json', 'd3dmetal-license.txt', 'LICENSE', 'SOURCE.txt',
+                *(f'compat-{name}.json' for name in COMPAT_LISTS))
 
 
 def run(args, cwd=ROOT):
@@ -29,7 +33,7 @@ def preflight():
     errors = []
     if sys.platform != 'darwin':
         errors.append('Highball builds on macOS only.')
-    for command in ('git', 'swift', 'lipo'):
+    for command in ('git', 'swift', 'lipo', 'curl'):
         if not shutil.which(command):
             errors.append(f'Missing Highball build dependency: {command} (install Xcode command line tools)')
     return errors
@@ -63,10 +67,17 @@ def build(output):
     shutil.copy2(SOURCE_DIR / 'spike/engine-manifest.json', output / 'engine-manifest.json')
     shutil.copy2(SOURCE_DIR / 'spike/d3dmetal-license.txt', output / 'd3dmetal-license.txt')
     shutil.copy2(SOURCE_DIR / 'LICENSE', output / 'LICENSE')
+    for name in COMPAT_LISTS:
+        run(['curl', '-fsSL', '--max-time', '120', '-o', output / f'compat-{name}.json',
+             f'{COMPAT_DATA_URL}/{name}.json'])
     (output / 'SOURCE.txt').write_text(
         f'Highball {VERSION} ({COMMIT})\n'
         f'Licensed under the GNU General Public License v3.0; see LICENSE.\n'
-        f'Corresponding source: {REPOSITORY}/tree/{COMMIT}\n')
+        f'Corresponding source: {REPOSITORY}/tree/{COMMIT}\n'
+        f'\ncompat-games.json: curated highball-db entries, CC0-1.0.\n'
+        f'compat-predictions.json: ODbL-1.0, derived from ProtonDB community reports\n'
+        f'(https://github.com/bdefore/protondb-data) and AreWeAntiCheatYet (MIT).\n'
+        f'Source: https://github.com/gauthierpiarrette/highball-db\n')
     return output
 
 

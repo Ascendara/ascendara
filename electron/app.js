@@ -380,6 +380,7 @@ function registerCriticalHandlers() {
   require("./modules/proton").registerRunnerHandlers();
   if (process.platform === "darwin") {
     require("./modules/highball").registerHighballHandlers();
+    require("./modules/highball-db").registerHighballDbHandlers();
   }
   if (isLinux) {
     const { registerProtonHandlers } = require("./modules/proton");

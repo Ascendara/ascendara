@@ -46,6 +46,10 @@ const runGameProcesses = new Map();
 const preparingGames = new Set();
 let devGameHandlerReady = false;
 
+// Quote an argument for the game handler, which splits launch commands like a shell
+const shellQuote = arg =>
+  /^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${String(arg).replace(/'/g, "'\\''")}'`;
+
 /**
  * In developer mode the game handler runs from source, so its Python
  * dependencies must be installed for the interpreter Ascendara uses.
@@ -564,7 +568,11 @@ function registerGameHandlers() {
           if (gameInfo.launchCommands) {
             launchCommands = gameInfo.launchCommands;
           }
-          macCompat = { runner: gameInfo.macRunner, renderer: gameInfo.highballRenderer };
+          macCompat = {
+            runner: gameInfo.macRunner,
+            renderer: gameInfo.highballRenderer,
+            steamAppId: gameInfo.steamAppId,
+          };
 
           const executableToUse = specificExecutable || gameInfo.executable;
 
@@ -651,7 +659,11 @@ function registerGameHandlers() {
           if (gameInfo.launchCommands) {
             launchCommands = gameInfo.launchCommands;
           }
-          macCompat = { runner: gameInfo.macRunner, renderer: gameInfo.highballRenderer };
+          macCompat = {
+            runner: gameInfo.macRunner,
+            renderer: gameInfo.highballRenderer,
+            steamAppId: gameInfo.steamAppId,
+          };
 
           executable = specificExecutable || gameInfo.executable;
           if (!executable) {
@@ -726,7 +738,8 @@ function registerGameHandlers() {
               macCompat.renderer,
               progress =>
                 !event.sender.isDestroyed() &&
-                event.sender.send("highball-setup-progress", { ...progress, game })
+                event.sender.send("highball-setup-progress", { ...progress, game }),
+              { steamAppId: macCompat.steamAppId, title: game }
             )
             .finally(() => preparingGames.delete(game));
           if (launchConfig.error) {
@@ -749,8 +762,15 @@ function registerGameHandlers() {
               ? ["--highball-renderer", launchConfig.renderer]
               : [])
           );
+          // Launch arguments highball-db lists for this game, unless the user set their own
+          if (!launchCommands && launchConfig.launchArgs?.length) {
+            gameHandlerArgs.push(
+              "--gameLaunchCmd",
+              launchConfig.launchArgs.map(shellQuote).join(" ")
+            );
+          }
           console.log(
-            `[Games] macOS launch via Highball (bottle ${launchConfig.bottle}, renderer ${launchConfig.renderer || "default"})`
+            `[Games] macOS launch via Highball (bottle ${launchConfig.bottle}, renderer ${launchConfig.renderer || "default"} from ${launchConfig.rendererSource})`
           );
         }
 
