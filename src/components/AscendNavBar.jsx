@@ -120,7 +120,7 @@ const AscendNavBar = ({
 
   const menuItems = [
     { id: "premium", icon: Crown, label: t("ascend.nav.premium") },
-    { id: "upcoming", icon: Rocket, label: t("ascend.nav.upcoming") },
+    { id: "notifications", icon: Bell, label: t("ascend.nav.notifications") },
     { id: "settings", icon: Settings, label: t("ascend.nav.settings") },
   ];
 
@@ -226,16 +226,16 @@ const AscendNavBar = ({
           ) : null}
 
           <button
-            onClick={() => onSectionChange("notifications")}
-            aria-label={t("ascend.nav.notifications")}
-            title={t("ascend.nav.notifications")}
+            onClick={() => onSectionChange("upcoming")}
+            aria-label={t("ascend.nav.upcoming")}
+            title={t("ascend.nav.upcoming")}
             className={`flex h-9 w-9 items-center justify-center rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
-              activeSection === "notifications"
+              activeSection === "upcoming"
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
             }`}
           >
-            <Bell className="h-4 w-4" />
+            <Rocket className="h-4 w-4" />
           </button>
 
           <DropdownMenu>
