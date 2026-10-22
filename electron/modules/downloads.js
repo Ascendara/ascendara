@@ -417,7 +417,12 @@ function registerDownloadHandlers() {
       browserAssetGameId,
       browserAssetLogoId
     ) => {
-      return withDownloadOperation(sanitizeGameName(sanitizeText(game)), async () => {
+      // Resolves early when a torrent update's backup copy starts, so the UI is
+      // not held while the operation lock stays taken for the whole copy.
+      let startedInBackground;
+      const backgroundStart = new Promise(resolve => (startedInBackground = resolve));
+      const lockKey = sanitizeGameName(sanitizeText(game));
+      const operation = withDownloadOperation(lockKey, async () => {
         if (typeof link === "string" && link.startsWith("private:")) {
           const [, sourceId, entryId] = link.split(":");
           return require("./privateSources").start(
@@ -537,11 +542,22 @@ function registerDownloadHandlers() {
           await fs.promises.mkdir(gameDirectory, { recursive: true });
         }
 
+        const linkStr = typeof link === "string" ? link.trim().toLowerCase() : "";
+        const isMagnetLink = linkStr.startsWith("magnet:");
+        const isDotTorrentFile = linkStr.split("?")[0].endsWith(".torrent");
+        const isTorrentLink = isMagnetLink || isDotTorrentFile;
+
         let updatePrepared = false;
+        let previousGameInfo = null;
         try {
-          if (updateFlow) {
-            await gameUpdateBackup.prepare(gameDirectory);
+          if (updateFlow && isTorrentLink) {
+            // Torrents write straight into the game folder, so copy it first.
+            await gameUpdateBackup.prepare(gameDirectory, () =>
+              startedInBackground({ success: true })
+            );
             updatePrepared = true;
+          } else if (updateFlow) {
+            previousGameInfo = await gameUpdateBackup.beginInPlace(gameDirectory);
           }
           // Download game header image (skip if updateFlow and header already exists, or if imgID is undefined)
           let headerImagePath;
@@ -630,10 +646,6 @@ function registerDownloadHandlers() {
           }
           let executablePath;
           let spawnCommand;
-          const linkStr = typeof link === "string" ? link.trim().toLowerCase() : "";
-          const isMagnetLink = linkStr.startsWith("magnet:");
-          const isDotTorrentFile = linkStr.split("?")[0].endsWith(".torrent");
-          const isTorrentLink = isMagnetLink || isDotTorrentFile;
 
           if (isWindows) {
             executablePath = isDev
@@ -781,6 +793,8 @@ function registerDownloadHandlers() {
             size: size,
             gameID: gameID,
             timestamp: new Date().toISOString(),
+            // Restored if this in-place update is cancelled.
+            previousGameInfo,
           };
           await fs.promises.writeFile(cachedDataPath, JSON.stringify(cacheData, null, 2));
           console.log(`Cached download data for resume: ${cachedDataPath}`);
@@ -854,6 +868,15 @@ function registerDownloadHandlers() {
                   restoreError
                 )
               );
+          } else if (previousGameInfo && !downloadProcesses.has(sanitizedGame)) {
+            await gameUpdateBackup
+              .abandonInPlace(gameDirectory, previousGameInfo, true)
+              .catch(restoreError =>
+                console.error(
+                  "Could not reset update after startup failure:",
+                  restoreError
+                )
+              );
           }
           console.error("Error in download-file handler:", error);
           event.sender.send("download-error", {
@@ -863,6 +886,8 @@ function registerDownloadHandlers() {
           return { success: false, error: error.message };
         }
       });
+      // Failures after an early return still reach the UI via download-error.
+      return Promise.race([backgroundStart, operation]);
     }
   );
 
@@ -1033,7 +1058,31 @@ function registerDownloadHandlers() {
             );
             const before = await fs.readJson(jsonFilePath);
             const protectedUpdate = await gameUpdateBackup.hasBackup(gameDirectory);
-            if (deleteContents && before.downloadingData?.updating && !protectedUpdate) {
+            const cacheFile = path.join(
+              app.getPath("userData"),
+              "downloadCache",
+              `${sanitizedGame}.json`
+            );
+            const cache = await fs.readJson(cacheFile).catch(() => ({}));
+            const torrentDownload = /^(magnet:)|\.torrent(?:\?|$)/i.test(
+              cache.link || ""
+            );
+            // AscendaraDownloader updates stage everything outside the game files
+            // and roll back their own install when stopped cooperatively. Not
+            // keyed on downloadingData.updating: the helper's error state drops it.
+            const inPlaceUpdate = Boolean(
+              before.downloadingData &&
+              cache.previousGameInfo &&
+              !protectedUpdate &&
+              !torrentDownload
+            );
+            const abandonUpdate = inPlaceUpdate && (isKill || deleteContents);
+            if (
+              deleteContents &&
+              before.downloadingData?.updating &&
+              !protectedUpdate &&
+              !inPlaceUpdate
+            ) {
               throw new Error(
                 "This update has no recovery backup. Keep its files to protect the installed game."
               );
@@ -1053,15 +1102,6 @@ function registerDownloadHandlers() {
               downloadProcesses.get(sanitizedGame)?.pid,
               retryDownloadProcesses.get(sanitizedGame)?.pid,
             ].filter(pid => Number.isInteger(pid) && pid > 0);
-            const cacheFile = path.join(
-              app.getPath("userData"),
-              "downloadCache",
-              `${sanitizedGame}.json`
-            );
-            const cache = await fs.readJson(cacheFile).catch(() => ({}));
-            const torrentDownload = /^(magnet:)|\.torrent(?:\?|$)/i.test(
-              cache.link || ""
-            );
 
             try {
               // Step 1: Update JSON to mark as stopped FIRST (before killing processes)
@@ -1073,7 +1113,7 @@ function registerDownloadHandlers() {
               if (fs.existsSync(jsonFile)) {
                 try {
                   const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-                  if (isKill && !protectedUpdate) {
+                  if (isKill && !protectedUpdate && !inPlaceUpdate) {
                     // Killing (even with files kept) means the user is abandoning the
                     // download, not pausing it - clear downloadingData entirely so it
                     // no longer shows up as an active/resumable download.
@@ -1099,8 +1139,10 @@ function registerDownloadHandlers() {
 
               // Allow the HTTP worker to checkpoint its partial transfer before falling
               // back to forced termination. Verify real helper PIDs before returning.
+              // Abandoned updates also stop cooperatively so the downloader can
+              // roll back any files it has already replaced.
               await stopHelpers(sanitizedGame, gameDirectory, knownPids, {
-                cooperative: !isKill && !torrentDownload,
+                cooperative: (!isKill || abandonUpdate) && !torrentDownload,
               });
               downloadProcesses.delete(sanitizedGame);
               retryDownloadProcesses.delete(sanitizedGame);
@@ -1117,12 +1159,21 @@ function registerDownloadHandlers() {
                 await fs.remove(cacheFile);
                 return true;
               }
+              if (abandonUpdate) {
+                await gameUpdateBackup.abandonInPlace(
+                  gameDirectory,
+                  cache.previousGameInfo,
+                  deleteContents
+                );
+                await fs.remove(cacheFile);
+                return true;
+              }
 
               // Step 4: Ensure JSON is in the expected state (in case downloader overwrote it)
               if (fs.existsSync(jsonFile)) {
                 try {
                   const gameInfo = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-                  if (isKill && !protectedUpdate) {
+                  if (isKill && !protectedUpdate && !inPlaceUpdate) {
                     delete gameInfo.downloadingData;
                   } else {
                     gameInfo.downloadingData = {

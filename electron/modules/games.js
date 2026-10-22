@@ -315,8 +315,11 @@ function registerGameHandlers() {
           const subdirectories = await fs.promises.readdir(downloadDir, {
             withFileTypes: true,
           });
+          // .ascendara-updates holds pre-update backups, not a game
           const gameDirectories = subdirectories
-            .filter(dirent => dirent.isDirectory())
+            .filter(
+              dirent => dirent.isDirectory() && dirent.name !== ".ascendara-updates"
+            )
             .map(dirent => dirent.name);
 
           const dirGames = await Promise.all(
