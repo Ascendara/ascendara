@@ -162,7 +162,9 @@ export default function DownloadHero({
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{t("gameCard.verified.tooltip")}</p>
+                    <p className="text-secondary">
+                      {t("gameCard.verified.dialogDescription")}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               )}
