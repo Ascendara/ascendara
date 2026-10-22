@@ -11,6 +11,7 @@ import {
 } from "react";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { HighballWelcomeSetup } from "@/components/HighballSettings";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
@@ -2263,35 +2264,41 @@ const Welcome = ({ welcomeData, onComplete }) => {
                           </p>
                         )}
                         {!isOnLinux ? (
-                          <div className="space-y-4 rounded-xl border bg-card p-6">
-                            <h3 className="text-xl font-semibold">
-                              {t("welcome.macWineTitle")}
-                            </h3>
-                            <p>{t("welcome.macWineDescription")}</p>
-                            <p>{t("welcome.macWineHomebrewSetup")}</p>
-                            {runnersList.map(runner => (
-                              <p key={runner.path}>
-                                {runner.name}: {runner.version}
-                              </p>
-                            ))}
-                            <div className="flex flex-wrap justify-center gap-3">
-                              <Button
-                                className="text-secondary"
-                                disabled={installingWine}
-                                onClick={installWine}
-                              >
-                                {installingWine
-                                  ? t("common.installing")
-                                  : t("welcome.installWine")}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                onClick={() => window.electron.openURL("https://brew.sh")}
-                              >
-                                {t("welcome.homebrewInstructions")}
-                              </Button>
-                            </div>
-                          </div>
+                          <HighballWelcomeSetup
+                            fallback={
+                              <div className="space-y-4 rounded-xl border bg-card p-6">
+                                <h3 className="text-xl font-semibold">
+                                  {t("welcome.macWineTitle")}
+                                </h3>
+                                <p>{t("welcome.macWineDescription")}</p>
+                                <p>{t("welcome.macWineHomebrewSetup")}</p>
+                                {runnersList.map(runner => (
+                                  <p key={runner.path}>
+                                    {runner.name}: {runner.version}
+                                  </p>
+                                ))}
+                                <div className="flex flex-wrap justify-center gap-3">
+                                  <Button
+                                    className="text-secondary"
+                                    disabled={installingWine}
+                                    onClick={installWine}
+                                  >
+                                    {installingWine
+                                      ? t("common.installing")
+                                      : t("welcome.installWine")}
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    onClick={() =>
+                                      window.electron.openURL("https://brew.sh")
+                                    }
+                                  >
+                                    {t("welcome.homebrewInstructions")}
+                                  </Button>
+                                </div>
+                              </div>
+                            }
+                          />
                         ) : (
                           <>
                             {/* Status Banner */}

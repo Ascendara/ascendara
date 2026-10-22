@@ -9,6 +9,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/LanguageContext";
+import HighballGameOptions from "@/components/gamescreen/HighballGameOptions";
 import {
   CloudOff,
   Edit3,
@@ -32,6 +33,8 @@ function DetailGroup({ title, children }) {
     </div>
   );
 }
+
+const isOnMac = window.electron?.getPlatform?.() === "darwin";
 
 /** About the game, its screenshots, and the details that describe this install. */
 export default function GameOverviewTab({
@@ -184,6 +187,10 @@ export default function GameOverviewTab({
             </DetailGroup>
           )}
         </section>
+
+        {isOnMac && /\.(exe|msi|bat)$/i.test(game?.executable || "") && (
+          <HighballGameOptions game={game} />
+        )}
 
         {isOnLinux && (
           <section className="space-y-2 rounded-xl border border-border/40 bg-card p-5">

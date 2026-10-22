@@ -739,6 +739,35 @@ const UserActivityTracker = React.memo(() => {
     updateActivity();
   }, [pathname, state?.gameData?.game, state?.game?.game, user?.uid]);
 
+  // macOS: first launch of a Windows game sets up Highball before it starts.
+  useEffect(() => {
+    return window.electron?.onHighballSetupProgress?.(progress => {
+      if (!progress?.game) return;
+      if (progress.stage === "done") {
+        toast.dismiss("highball-setup");
+        return;
+      }
+      const size = progress.totalBytes
+        ? ` (${Math.round(progress.receivedBytes / 1048576)} / ${Math.round(progress.totalBytes / 1048576)} MB)`
+        : "";
+      toast.loading(i18n.t("settings.macCompat.preparingGame", { game: progress.game }), {
+        id: "highball-setup",
+        description: `${progress.message}${size}`,
+        duration: Infinity,
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    const dismiss = () => toast.dismiss("highball-setup");
+    const unsubError = window.electron?.onGameLaunchError?.(dismiss);
+    const unsubLaunch = window.electron?.onGameLaunchSuccess?.(dismiss);
+    return () => {
+      unsubError?.();
+      unsubLaunch?.();
+    };
+  }, []);
+
   // Keep launch diagnostics alive when navigating back to the library.
   useEffect(() => {
     return window.electron?.onGameClosed?.((_, data) => {

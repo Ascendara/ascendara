@@ -93,6 +93,7 @@ import {
 import { useSettings } from "@/context/SettingsContext";
 import { verifyAscendAccess } from "@/services/firebaseService";
 import ProtonOptionsDialog from "@/components/ProtonOptionsDialog";
+import HighballSettings from "@/components/HighballSettings";
 import { useDownloadFolderCheck } from "@/hooks/useDownloadFolderCheck";
 import {
   DownloadFolderCheckProgress,
@@ -288,6 +289,7 @@ function Settings() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isOnWindows, setIsOnWindows] = useState(null);
   const [isOnLinux, setIsOnLinux] = useState(false);
+  const [isOnMac, setIsOnMac] = useState(false);
   const [downloadPath, setDownloadPath] = useState("");
   const [backupPath, setBackupPath] = useState("");
   const [canCreateFiles, setCanCreateFiles] = useState(true);
@@ -483,6 +485,7 @@ function Settings() {
       setIsOnWindows(isWindows);
       const linux = !isWindows && navigator.userAgent.toLowerCase().includes("linux");
       setIsOnLinux(linux);
+      setIsOnMac(window.electron.getPlatform() === "darwin");
 
       // Load Linux runners if on Linux
       if (linux) {
@@ -1233,13 +1236,20 @@ function Settings() {
     { id: "downloads", icon: Download },
     { id: "gaming", icon: Gamepad2 },
     { id: "backups", icon: FolderSync },
-    { id: "compatibility", icon: SquareTerminal, hidden: !isOnLinux },
+    {
+      id: "compatibility",
+      icon: SquareTerminal,
+      hidden: !isOnLinux && !isOnMac,
+      descriptionKey: isOnMac ? "descriptionMac" : "description",
+    },
     { id: "tools", icon: Package },
     { id: "advanced", icon: FlaskConical },
   ].map(category => ({
     ...category,
     title: t(`settings.categories.${category.id}.title`),
-    description: t(`settings.categories.${category.id}.description`),
+    description: t(
+      `settings.categories.${category.id}.${category.descriptionKey || "description"}`
+    ),
   }));
   const visibleCategories = settingsCategories.filter(category => !category.hidden);
   // One category is shown at a time; the rest stay mounted but hidden so
@@ -1267,7 +1277,7 @@ function Settings() {
     if (!visibleCategories.some(category => category.id === activeCategory)) {
       setActiveCategory("general");
     }
-  }, [isOnLinux]);
+  }, [isOnLinux, isOnMac]);
 
   const categoryProps = id => {
     const category = settingsCategories.find(c => c.id === id);
@@ -3271,6 +3281,14 @@ function Settings() {
                 </div>
               </Card>
             </SettingsCategory>
+
+            {isOnMac && (
+              <SettingsCategory {...categoryProps("compatibility")}>
+                <Card className="border border-border/60 p-6 shadow-none">
+                  <HighballSettings />
+                </Card>
+              </SettingsCategory>
+            )}
 
             {isOnLinux && (
               <SettingsCategory {...categoryProps("compatibility")}>
