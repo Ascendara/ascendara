@@ -44,15 +44,16 @@ module.exports = async function installUpdate(installerPath, isLinux) {
       const apps = fs.readdirSync(extracted).filter(name => name.endsWith(".app"));
       if (apps.length !== 1)
         throw new Error("The macOS update archive must contain one app.");
-      const stagedApp = path.join(stagingDir, apps[0]);
-      const executable = path.join(stagedApp, "Contents", "MacOS");
+      // Check the app where it was extracted, before it moves into place
+      const extractedApp = path.join(extracted, apps[0]);
       if (
-        !fs.existsSync(path.join(stagedApp, "Contents", "Info.plist")) ||
-        !fs.existsSync(executable)
+        !fs.existsSync(path.join(extractedApp, "Contents", "Info.plist")) ||
+        !fs.existsSync(path.join(extractedApp, "Contents", "MacOS"))
       ) {
         throw new Error("The macOS update archive does not contain a valid app.");
       }
-      fs.moveSync(path.join(extracted, apps[0]), stagedApp);
+      const stagedApp = path.join(stagingDir, apps[0]);
+      fs.moveSync(extractedApp, stagedApp);
       fs.removeSync(extracted);
       const scriptPath = path.join(stagingDir, "install.sh");
       fs.writeFileSync(
