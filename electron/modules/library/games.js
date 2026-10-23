@@ -232,6 +232,31 @@ async function createShortcutInDirectory(game, shortcutDir) {
 }
 
 /**
+ * The folder of an installed (not custom) game in one of the download directories
+ */
+function findInstalledGameDirectory(game, settings) {
+  return (
+    getGameDirectories(settings)
+      .map(directory => path.join(directory, game))
+      .find(directory => fs.existsSync(path.join(directory, `${game}.ascendara.json`))) ||
+    null
+  );
+}
+
+/**
+ * On macOS, a game shared with the Highball app gets an entry in Highball's
+ * library, which can start it and make a Mac app for it, instead of a shortcut
+ */
+async function addToHighballLibrary(game) {
+  const name = game.game || game.name;
+  return highball.addToLibrary({
+    game: name,
+    executable: game.executable,
+    directory: findInstalledGameDirectory(name, getSettingsManager().getSettings()),
+  });
+}
+
+/**
  * Create game shortcut on desktop
  */
 async function createGameShortcut(game) {
@@ -804,7 +829,10 @@ function registerGameHandlers() {
         if (isLinux && proton && proton.isWindowsExecutable(executable)) {
           // Auto-detect UMU ID if not already set
           try {
-            const { autoDetectAndSaveUmuId, getGameUmuId } = require("../compat/umu-database");
+            const {
+              autoDetectAndSaveUmuId,
+              getGameUmuId,
+            } = require("../compat/umu-database");
             const existingId = await getGameUmuId(game);
             if (!existingId) {
               autoDetectAndSaveUmuId(game).catch(() => {});
@@ -1311,7 +1339,10 @@ function registerGameHandlers() {
           deleteStartMenuShortcut(game);
         }
         if (isLinux && proton) await proton.deleteGamePrefix(game);
-        if (highball.isSupported()) await highball.resetBottle(game);
+        if (highball.isSupported()) {
+          await highball.removeFromLibrary(game);
+          await highball.resetBottle(game);
+        }
         return true;
       }
       throw new Error(`Game directory not found for ${game}`);
@@ -1716,7 +1747,38 @@ function registerGameHandlers() {
     if (isWindows) {
       return await createGameShortcut(game);
     }
+    if (highball.usesApp()) {
+      return (await addToHighballLibrary(game)).success;
+    }
     return false;
+  });
+
+  // Add every installed game to the Highball app's library (macOS)
+  ipcMain.handle("highball-add-installed-games", async () => {
+    let added = 0;
+    let failed = 0;
+    for (const directory of getGameDirectories(settingsManager.getSettings())) {
+      const entries = await fs.promises
+        .readdir(directory, { withFileTypes: true })
+        .catch(() => []);
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name === ".ascendara-updates") continue;
+        const gameDirectory = path.join(directory, entry.name);
+        const info = await fs
+          .readJson(path.join(gameDirectory, `${entry.name}.ascendara.json`))
+          .catch(() => null);
+        const executable = info?.executable || info?.executables?.[0];
+        if (!executable) continue;
+        const result = await highball.addToLibrary({
+          game: entry.name,
+          executable,
+          directory: gameDirectory,
+        });
+        if (result.success) added++;
+        else failed++;
+      }
+    }
+    return { added, failed };
   });
 
   // Create start menu shortcut handler

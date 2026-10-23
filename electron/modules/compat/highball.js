@@ -4,6 +4,9 @@
  * (https://github.com/gauthierpiarrette/highball, GPL-3.0), which manages Wine
  * engines with the DXMT, D3DMetal and DXVK renderers. Engines are downloaded on
  * first use into Ascendara's own Highball home, separate from the Highball app.
+ * People who also use the Highball app can opt into sharing its home instead:
+ * no second engine download, games in one of their environments and listed in
+ * Highball's library.
  */
 
 const fs = require("fs-extra");
@@ -22,9 +25,15 @@ const D3DMETAL_LICENSE = "apple-gptk-license-2023-08-17";
 const RENDERERS = ["dxmt", "d3dmetal", "dxvk", "vkd3d", "wined3d"];
 const SHARED_BOTTLE = "ascendara";
 const MB = 1048576;
+const APP_LOCATIONS = [
+  "/Applications/Highball.app",
+  path.join(os.homedir(), "Applications/Highball.app"),
+];
+const COVER_FILES = ["grid.ascendara.jpg", "grid.ascendara.png"];
 
 let setupPromise = null;
 let appleSilicon = null;
+let appHome = null;
 
 // Helpers
 
@@ -34,9 +43,13 @@ function resourceDir() {
     : path.join(process.resourcesPath, "Highball");
 }
 
-function getBinary() {
+function getBundledBinary() {
   const binary = path.join(resourceDir(), "highball");
   return fs.existsSync(binary) ? binary : null;
+}
+
+function getBinary() {
+  return usesApp() ? appCli(findApp()) : getBundledBinary();
 }
 
 /**
@@ -58,23 +71,104 @@ function isAppleSilicon() {
 }
 
 function isSupported() {
-  return isAppleSilicon() && !!getBinary();
+  return isAppleSilicon() && (!!getBundledBinary() || usesApp());
 }
 
-function cliEnv(extra = {}) {
-  return { ...process.env, ...extra, HIGHBALL_HOME };
+// The Highball app
+
+function readVersion(appPath) {
+  try {
+    return execFileSync(
+      "/usr/bin/plutil",
+      [
+        "-extract",
+        "CFBundleShortVersionString",
+        "raw",
+        path.join(appPath, "Contents/Info.plist"),
+      ],
+      { encoding: "utf8" }
+    ).trim();
+  } catch {
+    return null;
+  }
+}
+
+function findApp() {
+  const appPath = APP_LOCATIONS.find(location => fs.existsSync(location));
+  return appPath ? { path: appPath, version: readVersion(appPath) } : null;
+}
+
+function bundledVersion() {
+  try {
+    const source = fs.readFileSync(path.join(resourceDir(), "SOURCE.txt"), "utf8");
+    return (source.match(/^Highball v([\d.]+)/) || [])[1] || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The CLI that may work on the app's data: the one the app ships, or else the
+ * bundled one when it is the very same version. Another version would decode
+ * a bottle.json without the fields it doesn't know and save it without them.
+ */
+function appCli(app) {
+  if (!app) return null;
+  const shipped = path.join(app.path, "Contents/Resources/tools/highball");
+  if (fs.existsSync(shipped)) return shipped;
+  return app.version && app.version === bundledVersion() ? getBundledBinary() : null;
+}
+
+function getAppInfo() {
+  const app = findApp();
+  if (!app) return { installed: false };
+  return {
+    installed: true,
+    version: app.version,
+    bundledVersion: bundledVersion(),
+    compatible: !!appCli(app),
+  };
+}
+
+function usesApp() {
+  if (!isAppleSilicon()) return false;
+  if (!getSettingsManager().getSetting("highballUseApp")) return false;
+  return !!appCli(findApp());
+}
+
+/**
+ * The home the app uses, as its CLI reports it, so a home moved with
+ * "highball config home" is followed too.
+ */
+async function resolveAppHome() {
+  if (!appHome) {
+    const { stdout } = await runCli(["config"], { appDefaultHome: true });
+    appHome = (stdout.match(/^home: (.+?) \((?:default|chosen)\)/m) || [])[1];
+    if (!appHome) throw new Error("Could not find the Highball app's data folder.");
+  }
+  return appHome;
+}
+
+async function getHome() {
+  return usesApp() ? resolveAppHome() : HIGHBALL_HOME;
+}
+
+async function cliEnv() {
+  return { ...process.env, HIGHBALL_HOME: await getHome() };
 }
 
 /**
  * Run the Highball CLI. onLine receives each output line, including the
- * carriage-return progress lines of engine downloads.
+ * carriage-return progress lines of engine downloads. appDefaultHome runs it
+ * without HIGHBALL_HOME, so it reports and uses the app's own home.
  */
-function runCli(args, { onLine, timeout = 0 } = {}) {
+async function runCli(args, { onLine, timeout = 0, appDefaultHome = false } = {}) {
   const binary = getBinary();
-  if (!binary)
-    return Promise.reject(new Error("Highball is not bundled with this build."));
+  if (!binary) throw new Error("Highball is not bundled with this build.");
+  const env = appDefaultHome ? { ...process.env } : await cliEnv();
+  if (appDefaultHome) delete env.HIGHBALL_HOME;
   return new Promise((resolve, reject) => {
-    const proc = spawn(binary, args, { env: cliEnv() });
+    const proc = spawn(binary, args, { env });
     let stdout = "";
     let stderr = "";
     let pending = "";
@@ -195,10 +289,13 @@ async function getStatus() {
     d3dmetalAccepted: false,
     renderers: [],
     home: HIGHBALL_HOME,
+    app: getAppInfo(),
+    usingApp: usesApp(),
   };
   if (!status.supported) return status;
 
   status.rosetta = await hasRosetta();
+  if (status.usingApp) return getAppStatus(status);
   const manifest = readManifest();
   status.manifestId = manifest.id;
   status.downloadSize = Object.values(manifest.components).reduce(
@@ -219,6 +316,41 @@ async function getStatus() {
       status.rosetta &&
       !!status.engine &&
       bottles.some(b => b.name === SHARED_BOTTLE && b.engine === manifest.id);
+  } catch (error) {
+    status.error = error.message;
+  }
+  return status;
+}
+
+function setEngineStatus(status, engine) {
+  status.engine = engine;
+  if (!engine) return;
+  status.renderers = engine.renderers;
+  status.d3dmetalAccepted = engine.renderers.some(
+    r => r.id === "d3dmetal" && r.available
+  );
+}
+
+/**
+ * Status when sharing the Highball app's home: ready once the chosen
+ * environment exists and its engine is installed.
+ */
+async function getAppStatus(status) {
+  try {
+    status.home = await getHome();
+    const [engines, bottles] = await Promise.all([listEngines(), listBottles()]);
+    const name = bottleNameFor();
+    const bottle = bottles.find(b => b.name === name);
+    status.bottle = name;
+    status.bottles = bottles.map(b => b.name);
+    setEngineStatus(
+      status,
+      engines.find(e => e.complete && e.id === bottle?.engine) ||
+        engines.find(e => e.complete) ||
+        null
+    );
+    status.ready =
+      status.rosetta && !!bottle && !!status.engine && status.engine.id === bottle.engine;
   } catch (error) {
     status.error = error.message;
   }
@@ -257,6 +389,24 @@ function setup({ onProgress, acceptD3DMetal = false } = {}) {
         message: "Installing Rosetta 2. Enter your password if macOS asks.",
       });
       await installRosetta();
+    }
+
+    // The app installs and updates its engines itself; an environment of the
+    // person's own is used as it is, only a missing one is created
+    if (usesApp()) {
+      const status = await getStatus();
+      if (!status.engine) {
+        throw new Error("Open the Highball app once to finish its setup.");
+      }
+      if (!status.bottles?.includes(status.bottle)) {
+        await ensureBottle(status.bottle, status.engine.id, onProgress);
+      }
+      onProgress?.({
+        stage: "done",
+        message: "Game compatibility is ready.",
+        percent: 100,
+      });
+      return getStatus();
     }
 
     const manifest = readManifest();
@@ -316,8 +466,9 @@ function setup({ onProgress, acceptD3DMetal = false } = {}) {
 }
 
 async function acceptD3DMetalLicense() {
-  const manifest = readManifest();
-  await runCli(["engine", "accept", manifest.id, D3DMETAL_LICENSE]);
+  const engineId = usesApp() ? (await getStatus()).engine?.id : readManifest().id;
+  if (!engineId) throw new Error("No Highball engine is installed yet.");
+  await runCli(["engine", "accept", engineId, D3DMETAL_LICENSE]);
   getSettingsManager().updateSetting("highballD3DMetalAccepted", true);
   return getStatus();
 }
@@ -346,15 +497,20 @@ function shouldUseHighball(gameRunnerOverride) {
   return runner !== "wine";
 }
 
+/**
+ * The bottle a game runs in; without a game, the shared one. With the app's
+ * home, the shared one is the environment chosen in Settings.
+ */
 function bottleNameFor(gameName) {
   const settings = getSettingsManager().getSettings();
-  return settings.highballBottleMode === "per-game"
-    ? `ascendara-${sanitizeSlug(gameName)}`
-    : SHARED_BOTTLE;
+  if (gameName && settings.highballBottleMode === "per-game") {
+    return `ascendara-${sanitizeSlug(gameName)}`;
+  }
+  return (usesApp() && settings.highballAppBottle) || SHARED_BOTTLE;
 }
 
-function bottlePath(name) {
-  return path.join(HIGHBALL_HOME, "bottles", name);
+function bottlePath(home, name) {
+  return path.join(home, "bottles", name);
 }
 
 /**
@@ -367,8 +523,8 @@ async function buildLaunchConfig(gameName, rendererOverride, onProgress, compatQ
     if (!status.ready) status = await setup({ onProgress });
 
     const bottle = bottleNameFor(gameName);
-    if (bottle !== SHARED_BOTTLE) {
-      await ensureBottle(bottle, status.manifestId, onProgress);
+    if (bottle !== bottleNameFor()) {
+      await ensureBottle(bottle, status.engine.id, onProgress);
       onProgress?.({
         stage: "done",
         message: "Game compatibility is ready.",
@@ -400,14 +556,15 @@ async function buildLaunchConfig(gameName, rendererOverride, onProgress, compatQ
       renderer = "";
     }
 
+    const home = await getHome();
     return {
       binary: getBinary(),
       bottle,
       renderer,
       rendererSource,
       launchArgs,
-      home: HIGHBALL_HOME,
-      prefix: bottlePath(bottle),
+      home,
+      prefix: bottlePath(home, bottle),
     };
   } catch (error) {
     return { error: `Game compatibility setup failed: ${error.message}` };
@@ -419,13 +576,95 @@ async function buildLaunchConfig(gameName, rendererOverride, onProgress, compatQ
  * when asked explicitly, since every game uses it; the next launch recreates it.
  */
 async function resetBottle(gameName, { shared = false } = {}) {
+  // An environment of the Highball app may hold far more than Ascendara's games
+  if (shared && usesApp()) {
+    return { success: false, message: "Reset this environment in the Highball app." };
+  }
   const name = shared ? SHARED_BOTTLE : `ascendara-${sanitizeSlug(gameName)}`;
-  if (!fs.existsSync(bottlePath(name))) return { success: true };
   try {
+    if (!fs.existsSync(bottlePath(await getHome(), name))) return { success: true };
     await runCli(["bottle", "delete", name]);
     return { success: true };
   } catch (error) {
     return { success: false, message: error.message };
+  }
+}
+
+// Highball library
+
+/**
+ * The programs added to a bottle: "name\tpath[\tid=<uuid>][\targs=...]".
+ * Highball 0.10.22 and older print no id and can't set covers or remove.
+ */
+async function listPins(bottle) {
+  const { stdout } = await runCli(["pin", "list", bottle]);
+  return stdout
+    .split("\n")
+    .filter(line => line.includes("\t"))
+    .map(line => {
+      const [name, programPath, ...fields] = line.split("\t");
+      const id = fields.find(field => field.startsWith("id="));
+      return { name, path: programPath, id: id ? id.slice(3) : null };
+    });
+}
+
+function findCover(directory) {
+  if (!directory) return null;
+  const cover = COVER_FILES.map(file => path.join(directory, file)).find(fs.existsSync);
+  return cover || null;
+}
+
+/**
+ * Add an installed game to the Highball app's library: a program in the
+ * game's environment, with Ascendara's grid art as its cover when that
+ * Highball version can set one. Does nothing unless the app's home is shared.
+ */
+async function addToLibrary({ game, executable, directory }) {
+  if (!usesApp()) return { success: false, skipped: true };
+  if (!executable || !fs.existsSync(executable)) {
+    return { success: false, message: `Game executable not found: ${executable}` };
+  }
+  try {
+    let status = await getStatus();
+    if (!status.ready) status = await setup();
+    const bottle = bottleNameFor(game);
+    if (bottle !== status.bottle) await ensureBottle(bottle, status.engine.id);
+
+    const existing = (await listPins(bottle)).find(
+      pin => pin.name.toLowerCase() === game.toLowerCase()
+    );
+    let id = existing?.id;
+    if (!existing) {
+      const { stdout } = await runCli(["pin", "add", bottle, game, executable]);
+      id = (stdout.match(/\tid=([0-9A-F-]+)/i) || [])[1] || null;
+    }
+    const cover = findCover(directory);
+    if (id && cover) {
+      await runCli(["pin", "set", bottle, game, "cover", cover]).catch(error =>
+        console.warn(`[Highball] Could not set the cover for ${game}:`, error.message)
+      );
+    }
+    return { success: true, bottle };
+  } catch (error) {
+    console.error(`[Highball] Could not add ${game} to the library:`, error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Take an uninstalled game out of the Highball app's library again, where
+ * that Highball version can remove programs.
+ */
+async function removeFromLibrary(game) {
+  if (!usesApp()) return;
+  try {
+    const bottle = bottleNameFor(game);
+    const pin = (await listPins(bottle)).find(
+      p => p.name.toLowerCase() === game.toLowerCase()
+    );
+    if (pin?.id) await runCli(["pin", "remove", bottle, pin.name]);
+  } catch (error) {
+    console.warn(`[Highball] Could not remove ${game} from the library:`, error.message);
   }
 }
 
@@ -463,7 +702,8 @@ function registerHighballHandlers() {
   );
 
   ipcMain.handle("highball-open-bottle", async (_, gameName) => {
-    const target = gameName ? bottlePath(bottleNameFor(gameName)) : HIGHBALL_HOME;
+    const home = await getHome();
+    const target = gameName ? bottlePath(home, bottleNameFor(gameName)) : home;
     await fs.ensureDir(target);
     return shell.openPath(target);
   });
@@ -473,6 +713,9 @@ module.exports = {
   HIGHBALL_HOME,
   RENDERERS,
   isSupported,
+  usesApp,
+  addToLibrary,
+  removeFromLibrary,
   getStatus,
   setup,
   shouldUseHighball,
