@@ -178,13 +178,16 @@ async function createShortcutInDirectory(game, shortcutDir) {
 
   fs.ensureDirSync(shortcutDir);
 
+  // Single-quoted PowerShell strings never evaluate subexpressions.
+  const psEscape = value => String(value).replace(/'/g, "''");
+
   const psScript = `
     $WScriptShell = New-Object -ComObject WScript.Shell
-    $Shortcut = $WScriptShell.CreateShortcut("${shortcutPath}")
-    $Shortcut.TargetPath = "${handlerPath}"
-    $Shortcut.Arguments = '"${exePath}" ${isCustom ? 1 : 0} "--shortcut"'
-    $Shortcut.WorkingDirectory = "${path.dirname(handlerPath)}"
-    ${!exePath.match(/\.(bat|cmd)$/i) ? `$Shortcut.IconLocation = "${exePath},0"` : ""}
+    $Shortcut = $WScriptShell.CreateShortcut('${psEscape(shortcutPath)}')
+    $Shortcut.TargetPath = '${psEscape(handlerPath)}'
+    $Shortcut.Arguments = '"${psEscape(exePath)}" ${isCustom ? 1 : 0} "--shortcut"'
+    $Shortcut.WorkingDirectory = '${psEscape(path.dirname(handlerPath))}'
+    ${!exePath.match(/\.(bat|cmd)$/i) ? `$Shortcut.IconLocation = '${psEscape(exePath)},0'` : ""}
     $Shortcut.Save()
   `;
 
