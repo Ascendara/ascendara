@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useGameImage } from "@/hooks/useGameImage";
 import { useLanguage } from "@/context/LanguageContext";
+import { catalogSizeText } from "@/lib/installSpace";
 import { Loader, Download, Star, Gift, Gamepad2 } from "lucide-react";
 
 // Store card component
@@ -106,7 +107,7 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
           </span>
           {game.size && (
             <span className="mt-1 block text-xs text-slate-400">
-              {t("downloads.downloadSize", { size: game.size })}
+              {catalogSizeText(game, t)}
             </span>
           )}
         </div>

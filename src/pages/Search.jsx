@@ -60,6 +60,7 @@ import ratingQueueService from "@/services/games/ratingQueueService";
 import installedGamesService from "@/services/library/installedGamesService";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { useGameViews } from "@/hooks/useGameViews";
+import { catalogSizeText } from "@/lib/installSpace";
 
 // Module-level cache with timestamp
 let gamesCache = {
@@ -1183,7 +1184,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                                       <div className="flex items-center gap-1">
                                         <Database className="h-3 w-3" />
                                         <span>
-                                          {t("downloads.downloadSize", { size: game.size })}
+                                          {catalogSizeText(game, t)}
                                         </span>
                                       </div>
                                     )}
@@ -1713,7 +1714,7 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) 
               <span className="flex items-center gap-1.5 rounded-md bg-black/40 px-2 py-1 backdrop-blur-sm">
                 <HardDrive className="h-3 w-3 text-white/60" />
                 <span className="font-semibold tabular-nums">
-                  {t("downloads.downloadSize", { size: game.size })}
+                  {catalogSizeText(game, t)}
                 </span>
               </span>
             )}

@@ -11,6 +11,7 @@ import {
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { useLanguage } from "@/context/LanguageContext";
 import ratingQueueService from "@/services/games/ratingQueueService";
+import { catalogSizeText } from "@/lib/installSpace";
 import { gameName } from "./surfaceNavigation";
 import "./browse-game-card.css";
 
@@ -156,7 +157,7 @@ export const BrowseGameCard = memo(function BrowseGameCard({ game, focus, onOpen
               {game.size && (
                 <>
                   <HardDrive aria-hidden="true" />
-                  {t("downloads.downloadSize", { size: game.size })}
+                  {catalogSizeText(game, t)}
                 </>
               )}
             </span>

@@ -66,6 +66,8 @@ import HighballCompatibility, {
   useHighballCompat,
 } from "@/components/HighballCompatibility";
 import { toast } from "sonner";
+import { checkInstallSpace } from "@/lib/installSpace";
+import { formatBytes } from "@/services/app/systemHealthService";
 import TimemachineDialog from "@/components/TimemachineDialog";
 import steamService from "@/services/games/gameInfoService";
 import hltbService from "@/services/integrations/hltbService";
@@ -818,6 +820,37 @@ function PublicDownloadPage() {
     }
   }
 
+  // Stops a download that can't fit and warns when the install may not
+  async function confirmInstallSpace(dir) {
+    const directory = dir ? settings.additionalDirectories?.[dir - 1] : settings.downloadDirectory;
+    let freeSpace;
+    try {
+      const space = await window.electron.getDriveSpace(directory);
+      freeSpace = space?.directories?.find(entry => entry.path === directory)?.freeSpace;
+    } catch (error) {
+      console.error("Error checking free space:", error);
+    }
+    const { status, needed, measured } = checkInstallSpace(gameData, freeSpace);
+    if (status === "blocked") {
+      toast.error(
+        t("download.toast.notEnoughSpace", {
+          needed: formatBytes(needed),
+          free: formatBytes(freeSpace),
+        })
+      );
+      return false;
+    }
+    if (status === "low") {
+      toast.warning(
+        t(measured ? "download.toast.lowSpaceMeasured" : "download.toast.lowSpaceEstimated", {
+          needed: formatBytes(needed),
+          free: formatBytes(freeSpace),
+        })
+      );
+    }
+    return true;
+  }
+
   async function handleDownload(
     directUrl = null,
     dir = null,
@@ -884,6 +917,8 @@ function PublicDownloadPage() {
         console.error("Error checking game directory conflict:", error);
       }
     }
+
+    if (!gameData.isUpdating && !(await confirmInstallSpace(dir))) return;
 
     // Check if there's an active download
     const hasActive = await hasActiveDownloads();

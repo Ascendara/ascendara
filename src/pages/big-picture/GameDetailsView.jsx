@@ -5,6 +5,7 @@ import steamService from "@/services/games/gameInfoService";
 import nexusModsService from "@/services/integrations/nexusModsService";
 import flingTrainerService from "@/services/integrations/flingTrainerService";
 import installedGamesService from "@/services/library/installedGamesService";
+import { catalogSizeText } from "@/lib/installSpace";
 import {
   Download,
   Info,
@@ -428,7 +429,7 @@ const GameDetailsView = ({
                 <div className="flex items-center gap-2">
                   <Download className="h-5 w-5" />
                   <span className="font-medium">
-                    {t("downloads.downloadSize", { size: game.size })}
+                    {catalogSizeText(game, t)}
                   </span>
                 </div>
               )}

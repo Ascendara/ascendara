@@ -24,9 +24,11 @@ import {
   Heart,
   Eye,
   Download,
+  HardDrive,
   Tag,
   Sparkles,
 } from "lucide-react";
+import { formatBytes } from "@/services/app/systemHealthService";
 import {
   TooltipProvider,
   Tooltip,
@@ -417,12 +419,21 @@ function GameCardContent({ game, compact, viewCount }) {
   const torboxEnabled = provider === "torbox" && torboxService.isEnabled(settings);
 
   const specs = [
-    game.size && {
-      key: "size",
-      icon: Download,
-      label: t("gameCard.specs.size"),
-      value: game.size,
-    },
+    // The measured install size once players have reported it, else the download
+    game.installSize > 0
+      ? {
+          key: "size",
+          icon: HardDrive,
+          label: t("gameCard.specs.installSize"),
+          value: formatBytes(game.installSize),
+          title: game.size ? t("downloads.downloadSize", { size: game.size }) : undefined,
+        }
+      : game.size && {
+          key: "size",
+          icon: Download,
+          label: t("gameCard.specs.size"),
+          value: game.size,
+        },
     game.version && {
       key: "version",
       icon: Tag,

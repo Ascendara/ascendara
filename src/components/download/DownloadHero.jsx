@@ -7,6 +7,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { formatLatestUpdate, formatCompactNumber } from "@/lib/utils";
 import hltbService from "@/services/integrations/hltbService";
+import { formatBytes } from "@/services/app/systemHealthService";
 import { isImageReady, markImageReady } from "@/services/games/gamePagePreparer";
 import { useState } from "react";
 import {
@@ -261,6 +262,9 @@ export default function DownloadHero({
         {/* Key facts */}
         <dl className="grid grid-cols-2 divide-x divide-border/40 border-t border-border/40 bg-background/30 md:grid-cols-4">
           {gameData.size && <Stat label={t("download.gameSize")}>{gameData.size}</Stat>}
+          {gameData.installSize > 0 && (
+            <Stat label={t("download.installSize")}>{formatBytes(gameData.installSize)}</Stat>
+          )}
           <Stat label={t("download.latestUpdate")}>
             {formatLatestUpdate(gameData.latest_update)}
           </Stat>

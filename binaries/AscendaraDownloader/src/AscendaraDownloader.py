@@ -1591,8 +1591,12 @@ class AscendaraDownloader:
         # The catalog size is the compressed download; record what the verified
         # install really occupies, so the app's library check skips this game.
         try:
-            self.game_info['size'] = read_size(installed_size(self.download_dir))
+            measured = installed_size(self.download_dir)
+            self.game_info['size'] = read_size(measured)
             self.game_info['sizeMeasured'] = True
+            # Exact and untouched by play yet, so the app shares it with the catalog
+            self.game_info['installedBytes'] = measured
+            self.game_info.pop('sizeReported', None)
         except OSError as exc:
             logging.warning(f"[AscendaraDownloader] Could not measure installed size: {exc}")
         # Publish completion only after cleanup, before sleep/shutdown actions.
