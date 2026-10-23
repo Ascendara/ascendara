@@ -8,7 +8,7 @@ const { platforms, launchArguments, resolveAdapter, customArguments } = require(
 const expanded = require("./expanded-catalogue.json");
 const { scan, mergeScan, normalizeTitle, pathKey } = require("./scanner");
 const saves = require("./saves");
-const { setPlayingActivity, updateDiscordRPCToLibrary } = require("../discord-rpc");
+const { setPlayingActivity, updateDiscordRPCToLibrary } = require("../app/discord-rpc");
 
 function registerRetroHandlers() {
   const directory = path.join(app.getPath("userData"), "retro");

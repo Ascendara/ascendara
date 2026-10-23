@@ -140,9 +140,9 @@ function registerStoreAccountHandlers() {
   const { app, ipcMain, session, safeStorage, BrowserWindow, shell } = require("electron");
   const vault = createVault(path.join(app.getPath("userData"), "store-accounts"), safeStorage);
   const playtime = createPlaytimeStore(path.join(app.getPath("userData"), "store-accounts", "playtime.json"));
-  const { setPlayingActivity, updateDiscordRPCToLibrary } = require("../discord-rpc");
-  const { hideWindow, showWindow } = require("../window");
-  const { getSettingsManager } = require("../settings");
+  const { setPlayingActivity, updateDiscordRPCToLibrary } = require("../app/discord-rpc");
+  const { hideWindow, showWindow } = require("../app/window");
+  const { getSettingsManager } = require("../core/settings");
   const broadcast = (channel, data) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send(channel, data);
@@ -164,8 +164,8 @@ function registerStoreAccountHandlers() {
   });
   const storeGames = require("./games").createStoreGames({
     vault, directory: path.join(app.getPath("userData"), "store-artwork", "games"),
-    discover: require("../launcher-discovery").discoverLauncherGames,
-    downloadAssets: require("../launcher-import").downloadImportedAssets,
+    discover: require("../library/launcher-discovery").discoverLauncherGames,
+    downloadAssets: require("../library/launcher-import").downloadImportedAssets,
     shell,
     sessions,
   });

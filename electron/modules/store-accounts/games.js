@@ -171,7 +171,7 @@ function createStoreGames({
       const {
         buildLauncherUri,
         validateLauncherUri,
-      } = require("../launcher-discovery");
+      } = require("../library/launcher-discovery");
       const uri = buildLauncherUri(store, installation.launcherId);
       if (!uri || !validateLauncherUri(uri, store)) {
         throw new Error(

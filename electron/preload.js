@@ -12,7 +12,7 @@
 //=============================================================================
 
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
-const { createPreloadIpcTransport } = require("./modules/preload-bridge");
+const { createPreloadIpcTransport } = require("./modules/app/preload-bridge");
 
 // Keep listener wrappers private so the page never receives Electron event objects.
 const preloadIpc = createPreloadIpcTransport(ipcRenderer);

@@ -1,7 +1,7 @@
 const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
-const authHelper = require("./auth-helper");
+const authHelper = require("../core/auth-helper");
 
 const PROXY_BASE_URL = "https://api.ascendara.app/api/proxy/steamgrid";
 

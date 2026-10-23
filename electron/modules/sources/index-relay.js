@@ -5,7 +5,7 @@
  */
 
 const { BrowserWindow, session } = require("electron");
-const authHelper = require("./auth-helper");
+const authHelper = require("../core/auth-helper");
 
 const API_URL = "https://api.ascendara.app";
 const SOURCE_URL = "https://steamrip.com/";

@@ -3,7 +3,7 @@ const fs = require("fs-extra");
 const path = require("path");
 const { spawn } = require("child_process");
 const { ipcMain, BrowserWindow } = require("electron");
-const { LANG_DIR, getHelperPath, getPythonPath, isDev } = require("./config");
+const { LANG_DIR, getHelperPath, getPythonPath, isDev } = require("../core/config");
 
 let activeJob = null;
 const LANGUAGE_CODE = /^[a-z]{2,8}(?:-[a-z0-9]{2,8})*$/i;
@@ -54,7 +54,7 @@ async function runTranslation(languageCode, { updateKeys = false, source } = {})
       args.push(
         path.resolve(
           __dirname,
-          "../../binaries/AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py"
+          "../../../binaries/AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py"
         )
       );
     } else if (!fs.existsSync(executable))

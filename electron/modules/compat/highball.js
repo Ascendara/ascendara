@@ -11,8 +11,8 @@ const path = require("path");
 const os = require("os");
 const { spawn, execFile, execFileSync } = require("child_process");
 const { ipcMain, shell } = require("electron");
-const { isDev, isMac } = require("./config");
-const { getSettingsManager } = require("./settings");
+const { isDev, isMac } = require("../core/config");
+const { getSettingsManager } = require("../core/settings");
 
 const HIGHBALL_HOME = path.join(
   os.homedir(),
@@ -30,7 +30,7 @@ let appleSilicon = null;
 
 function resourceDir() {
   return isDev
-    ? path.resolve(__dirname, "../../binaries/Highball/dist")
+    ? path.resolve(__dirname, "../../../binaries/Highball/dist")
     : path.join(process.resourcesPath, "Highball");
 }
 

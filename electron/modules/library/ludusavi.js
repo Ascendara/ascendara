@@ -8,9 +8,9 @@ const path = require("path");
 const os = require("os");
 const { spawn } = require("child_process");
 const { ipcMain, app, dialog } = require("electron");
-const { isDev, isWindows, isLinux, appDirectory, getLudusaviPath } = require("./config");
-const { getSettingsManager } = require("./settings");
-const { sanitizeGameName } = require("./utils");
+const { isDev, isWindows, isLinux, appDirectory, getLudusaviPath } = require("../core/config");
+const { getSettingsManager } = require("../core/settings");
+const { sanitizeGameName } = require("../core/utils");
 
 /**
  * Build and write the ludusavi config.yaml used for all commands.
@@ -402,8 +402,8 @@ function registerLudusaviHandlers() {
 
           // Linux : add --wine-prefix if no customSavePaths for this game
           if (isLinux && game) {
-            const { sanitizeGameSlug } = require("./proton");
-            const { linuxCompatDataDir } = require("./config");
+            const { sanitizeGameSlug } = require("../compat/proton");
+            const { linuxCompatDataDir } = require("../core/config");
             const customPaths = readCustomSavePaths(game, false, settings);
             // verify custom games
             const customPathsCustom = readCustomSavePaths(game, true, settings);

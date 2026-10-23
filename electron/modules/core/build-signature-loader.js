@@ -20,7 +20,7 @@ function loadBuildSignature() {
 
   try {
     // In production, the signature file is embedded in the app
-    const signaturePath = path.join(__dirname, "..", "build-signature.json");
+    const signaturePath = path.join(__dirname, "../..", "build-signature.json");
 
     if (fs.existsSync(signaturePath)) {
       const signatureData = fs.readFileSync(signaturePath, "utf8");

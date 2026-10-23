@@ -15,8 +15,8 @@ const {
   linuxRunnersDir,
   STEAM_COMMON_PATHS,
   STEAM_INSTALL_PATHS,
-} = require("./config");
-const { getSettingsManager } = require("./settings");
+} = require("../core/config");
+const { getSettingsManager } = require("../core/settings");
 
 // Helpers
 
@@ -54,7 +54,7 @@ function findSteamInstallPath() {
  * Detects if umu-run is installed
  */
 function isUmuInstalled() {
-  const { linuxUmuBin } = require("./config");
+  const { linuxUmuBin } = require("../core/config");
   return fs.existsSync(linuxUmuBin);
 }
 
@@ -67,7 +67,7 @@ function isUmuInstalled() {
 function ensureLinuxDirectories() {
   if (!isLinux) return;
 
-  const { linuxUmuDir } = require("./config");
+  const { linuxUmuDir } = require("../core/config");
   const dirs = [linuxConfigDir, linuxCompatDataDir, linuxRunnersDir, linuxUmuDir];
 
   for (const dir of dirs) {
@@ -508,7 +508,7 @@ async function downloadUmuProton(parentWindow) {
 async function downloadUmuLauncher(parentWindow) {
   if (!isLinux) return { success: false, message: "Linux only" };
 
-  const { linuxUmuDir, linuxUmuBin } = require("./config");
+  const { linuxUmuDir, linuxUmuBin } = require("../core/config");
   const fs = require("fs-extra");
   const path = require("path");
   const os = require("os");
@@ -1305,7 +1305,7 @@ async function getPrefixSize(gameName) {
 
   if (!fs.existsSync(compatPath)) return 0;
 
-  const { getDirectorySize } = require("./system");
+  const { getDirectorySize } = require("../system/system");
   return await getDirectorySize(compatPath);
 }
 
@@ -1367,7 +1367,7 @@ async function resolveRunner(gameOverride) {
  * Returns: { cmd: string[], env: object, runner: object } or null
  */
 async function buildLaunchConfig(gameName, exePath, gameRunnerOverride, umuId, store) {
-  const { linuxUmuBin } = require("./config");
+  const { linuxUmuBin } = require("../core/config");
   const compatDataPath = getCompatDataPath(gameName);
   const winePrefix = path.join(compatDataPath, "pfx");
   fs.ensureDirSync(winePrefix);

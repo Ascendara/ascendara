@@ -7,7 +7,7 @@ const { BrowserWindow, app } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { execSync } = require("child_process");
-const { isDev } = require("./config");
+const { isDev } = require("../core/config");
 const { createWindow, setHandlingProtocolUrl, setMainWindowHidden } = require("./window");
 
 let lastHandledUrl = null;

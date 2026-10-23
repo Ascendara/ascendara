@@ -5,8 +5,8 @@ const https = require("https");
 const crypto = require("crypto");
 const { spawn } = require("child_process");
 const { app } = require("electron");
-const { getSettingsManager } = require("./settings");
-const { appBranch, appVersion, isWindows } = require("./config");
+const { getSettingsManager } = require("../core/settings");
+const { appBranch, appVersion, isWindows } = require("../core/config");
 
 const MAX_RECOVERY_POINTS = 5;
 const RECOVERY_ID_PATTERN = /^settings-\d{13}$/;

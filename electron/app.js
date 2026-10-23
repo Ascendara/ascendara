@@ -26,18 +26,18 @@ require("dotenv").config();
 
 // Finder-launched apps do not inherit Homebrew paths. Child game processes need Wine too.
 if (process.platform !== "win32") {
-  process.env.PATH = require("./modules/wine-setup").runtimePath();
+  process.env.PATH = require("./modules/compat/wine-setup").runtimePath();
 }
 
 const { app, BrowserWindow, Tray, Menu, nativeImage, powerMonitor } = require("electron");
 const http = require("http");
-const { proxyLocalRequest } = require("./modules/local-api-proxy");
+const { proxyLocalRequest } = require("./modules/core/local-api-proxy");
 const fs = require("fs-extra");
-const { isLinux } = require("./modules/config");
+const { isLinux } = require("./modules/core/config");
 const {
   isAllowedLocalRequest,
   resolvePublicFile,
-} = require("./modules/local-server-security");
+} = require("./modules/core/local-server-security");
 
 // Disable sandbox for Linux compatibility (must be set before app ready)
 if (process.platform === "linux") {
@@ -296,7 +296,7 @@ function createTray() {
  */
 function startAchievementWatcher() {
   // Migrate the legacy completion flag before the watcher can rewrite it.
-  require("./modules/onboarding").hasCompletedOnboarding();
+  require("./modules/core/onboarding").hasCompletedOnboarding();
 
   const { spawn } = require("child_process");
 
@@ -372,24 +372,24 @@ function registerCriticalHandlers() {
   tools.registerToolHandlers();
   updates.registerUpdateHandlers();
   downloads.registerDownloadHandlers();
-  require("./modules/privateSources").registerPrivateSourceHandlers();
+  require("./modules/downloads/privateSources").registerPrivateSourceHandlers();
   games.registerGameHandlers();
   require("./modules/store-accounts").registerStoreAccountHandlers();
   require("./modules/retro").registerRetroHandlers();
   system.registerSystemHandlers();
-  require("./modules/proton").registerRunnerHandlers();
+  require("./modules/compat/proton").registerRunnerHandlers();
   if (process.platform === "darwin") {
-    require("./modules/highball").registerHighballHandlers();
-    require("./modules/highball-db").registerHighballDbHandlers();
+    require("./modules/compat/highball").registerHighballHandlers();
+    require("./modules/compat/highball-db").registerHighballDbHandlers();
   }
   if (isLinux) {
-    const { registerProtonHandlers } = require("./modules/proton");
+    const { registerProtonHandlers } = require("./modules/compat/proton");
     registerProtonHandlers();
 
     const {
       registerUmuDatabaseHandlers,
       refreshUmuDatabase,
-    } = require("./modules/umu-database");
+    } = require("./modules/compat/umu-database");
     registerUmuDatabaseHandlers();
 
     refreshUmuDatabase().catch(e =>

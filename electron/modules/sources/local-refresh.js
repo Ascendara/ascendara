@@ -6,7 +6,7 @@
 const fs = require("fs-extra");
 const path = require("path");
 const { ipcMain, BrowserWindow, app } = require("electron");
-const { getSettingsManager } = require("./settings");
+const { getSettingsManager } = require("../core/settings");
 const {
   syncCommunityIndex,
   getIndexCover,

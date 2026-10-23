@@ -16,30 +16,30 @@ const {
   appDirectory,
   linuxUmuBin,
   getPythonPath,
-} = require("./config");
+} = require("../core/config");
 const {
   sanitizeGameName,
   sanitizeText,
   getExtensionFromMimeType,
   shouldLogError,
-} = require("./utils");
-const { getSettingsManager } = require("./settings");
+} = require("../core/utils");
+const { getSettingsManager } = require("../core/settings");
 const {
   getGameDirectories,
   getSelectedGameDirectories,
   getManagedGameDirectory,
 } = require("./gameDirectories");
-const { setPlayingActivity, updateDiscordRPCToLibrary } = require("./discord-rpc");
-const { hideWindow, showWindow } = require("./window");
+const { setPlayingActivity, updateDiscordRPCToLibrary } = require("../app/discord-rpc");
+const { hideWindow, showWindow } = require("../app/window");
 
 const { createGameExitMonitor } = require("./gameExitMonitor");
 
 const steamgrid = require("./steamgrid");
-const { resetOnboarding } = require("./onboarding");
+const { resetOnboarding } = require("../core/onboarding");
 
 // Load proton module only on linux
-const proton = isLinux ? require("./proton") : null;
-const highball = require("./highball");
+const proton = isLinux ? require("../compat/proton") : null;
+const highball = require("../compat/highball");
 
 const runGameProcesses = new Map();
 // Games whose compatibility layer is still being prepared before launch
@@ -802,7 +802,7 @@ function registerGameHandlers() {
         if (isLinux && proton && proton.isWindowsExecutable(executable)) {
           // Auto-detect UMU ID if not already set
           try {
-            const { autoDetectAndSaveUmuId, getGameUmuId } = require("./umu-database");
+            const { autoDetectAndSaveUmuId, getGameUmuId } = require("../compat/umu-database");
             const existingId = await getGameUmuId(game);
             if (!existingId) {
               autoDetectAndSaveUmuId(game).catch(() => {});
@@ -829,7 +829,7 @@ function registerGameHandlers() {
           // Read umuId from game's json
           let umuId = null;
           try {
-            const { getGameUmuId } = require("./umu-database");
+            const { getGameUmuId } = require("../compat/umu-database");
             umuId = await getGameUmuId(game);
           } catch (e) {
             console.warn("[Games] Could not read umuId:", e.message);

@@ -8,9 +8,9 @@
  */
 
 const { ipcMain } = require("electron");
-const security = require("./security");
-const rendererNetwork = require("./renderer-network");
-const recovery = require("./recovery");
+const security = require("./core/security");
+const rendererNetwork = require("./app/renderer-network");
+const recovery = require("./app/recovery");
 
 // Install the IPC guard before feature modules register their handlers.
 security.installIpcMainGuard(ipcMain);
@@ -37,13 +37,13 @@ function createLazyLoader(modulePath) {
 
 // Lazy loaders for non-critical modules
 const lazyLoaders = {
-  steamcmd: createLazyLoader("./steamcmd"),
-  localRefresh: createLazyLoader("./local-refresh"),
-  ludusavi: createLazyLoader("./ludusavi"),
-  translations: createLazyLoader("./translations"),
-  themes: createLazyLoader("./themes"),
-  qrcode: createLazyLoader("./qrcode"),
-  umuDatabase: createLazyLoader("./umu-database"),
+  steamcmd: createLazyLoader("./system/steamcmd"),
+  localRefresh: createLazyLoader("./sources/local-refresh"),
+  ludusavi: createLazyLoader("./library/ludusavi"),
+  translations: createLazyLoader("./app/translations"),
+  themes: createLazyLoader("./app/themes"),
+  qrcode: createLazyLoader("./app/qrcode"),
+  umuDatabase: createLazyLoader("./compat/umu-database"),
 };
 
 module.exports = {
@@ -52,35 +52,35 @@ module.exports = {
   // ============================================
 
   // Configuration
-  config: require("./config"),
+  config: require("./core/config"),
 
   // Core utilities
-  logger: require("./logger"),
-  encryption: require("./encryption"),
+  logger: require("./core/logger"),
+  encryption: require("./core/encryption"),
   recovery,
   rendererNetwork,
   security,
-  utils: require("./utils"),
+  utils: require("./core/utils"),
 
   // Settings management
-  settings: require("./settings"),
+  settings: require("./core/settings"),
 
   // Window management
-  window: require("./window"),
+  window: require("./app/window"),
 
   // Discord RPC
-  discordRpc: require("./discord-rpc"),
+  discordRpc: require("./app/discord-rpc"),
 
   // Protocol handling
-  protocol: require("./protocol"),
+  protocol: require("./app/protocol"),
 
   // Core feature modules (needed at startup)
-  tools: require("./tools"),
-  updates: require("./updates"),
-  downloads: require("./downloads"),
-  games: require("./games"),
-  system: require("./system"),
-  ipcHandlers: require("./ipc-handlers"),
+  tools: require("./system/tools"),
+  updates: require("./system/updates"),
+  downloads: require("./downloads/downloads"),
+  games: require("./library/games"),
+  system: require("./system/system"),
+  ipcHandlers: require("./app/ipc-handlers"),
 
   // ============================================
   // LAZY MODULES - Loaded on first access

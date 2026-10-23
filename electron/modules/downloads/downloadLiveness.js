@@ -9,7 +9,7 @@
 const fs = require("fs-extra");
 const path = require("path");
 const { execFile } = require("child_process");
-const { isWindows } = require("./config");
+const { isWindows } = require("../core/config");
 
 const HELPERS = /Ascendara(Downloader|GofileHelper|TorrentHandler)/i;
 // Metadata written this recently may belong to a helper that is still starting.

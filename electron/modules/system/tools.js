@@ -17,8 +17,8 @@ const {
   TIMESTAMP_FILE,
   toolExecutables,
   appDirectory,
-} = require("./config");
-const { updateTimestampFile } = require("./utils");
+} = require("../core/config");
+const { updateTimestampFile } = require("../core/utils");
 
 let installedTools = [];
 let electronDl = null;
@@ -91,7 +91,7 @@ async function installTool(tool) {
 
   let toolPath;
   if (!isWindows && tool === "ludusavi") {
-    const { unixConfigDir } = require("./config");
+    const { unixConfigDir } = require("../core/config");
     fs.ensureDirSync(unixConfigDir);
     toolPath = path.join(unixConfigDir, "ludusavi");
   } else {
@@ -131,13 +131,13 @@ function getInstalledTools() {
     const tools = ["translator", "torrent"].filter(tool =>
       fs.existsSync(getHelperPath(toolExecutables[tool]))
     );
-    if (require("./config").getLudusaviPath()) tools.push("ludusavi");
+    if (require("../core/config").getLudusaviPath()) tools.push("ludusavi");
     return tools;
   }
   if (isWindows && !isDev) {
     return installedTools;
   } else if (!isWindows) {
-    const { unixConfigDir: linuxConfigDir } = require("./config");
+    const { unixConfigDir: linuxConfigDir } = require("../core/config");
     const tools = ["translator", "torrent"];
 
     // verify ludusavi
@@ -173,7 +173,7 @@ function registerToolHandlers() {
     // On Linux, ludusavi is downloaded directly from the CDN into ~/.ascendara/
     let toolDirectory, toolExecutable;
     if (!isWindows && tool === "ludusavi") {
-      const { unixConfigDir: linuxConfigDir } = require("./config");
+      const { unixConfigDir: linuxConfigDir } = require("../core/config");
       fs.ensureDirSync(linuxConfigDir);
       toolDirectory = linuxConfigDir;
       toolExecutable = "ludusavi";

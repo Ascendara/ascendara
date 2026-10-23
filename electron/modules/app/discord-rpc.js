@@ -4,7 +4,7 @@
  */
 
 const { Client } = require("discord-rpc");
-const { clientId, isDev } = require("./config");
+const { clientId, isDev } = require("../core/config");
 const { exec } = require("child_process");
 const { promisify } = require("util");
 const execAsync = promisify(exec);
@@ -126,7 +126,7 @@ async function initializeDiscordRPC() {
     return;
   }
 
-  const { getSettingsManager } = require("./settings");
+  const { getSettingsManager } = require("../core/settings");
   const settingsManager = getSettingsManager();
   const settings = settingsManager.getSettings();
   if (settings.rpcEnabled === false) {

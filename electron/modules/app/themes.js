@@ -6,7 +6,7 @@
 const fs = require("fs-extra");
 const path = require("path");
 const { ipcMain, dialog, app } = require("electron");
-const { getSettingsManager } = require("./settings");
+const { getSettingsManager } = require("../core/settings");
 
 /**
  * Register theme-related IPC handlers

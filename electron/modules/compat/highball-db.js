@@ -12,7 +12,7 @@ const path = require("path");
 const os = require("os");
 const axios = require("axios");
 const { ipcMain } = require("electron");
-const { isDev } = require("./config");
+const { isDev } = require("../core/config");
 
 const DATA_URL = "https://gethighball.com/data";
 const CACHE_DIR = path.join(
@@ -28,7 +28,7 @@ let loading = null;
 
 function bundledDir() {
   return isDev
-    ? path.resolve(__dirname, "../../binaries/Highball/dist")
+    ? path.resolve(__dirname, "../../../binaries/Highball/dist")
     : path.join(process.resourcesPath, "Highball");
 }
 

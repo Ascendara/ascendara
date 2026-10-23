@@ -10,7 +10,7 @@ const buildSignatureLoader = require("./build-signature-loader");
 // Source checkouts do not include the private production config.
 let productionConfig = {};
 try {
-  productionConfig = require("../config.prod.js");
+  productionConfig = require("../../config.prod.js");
 } catch (error) {
   const missingPrivateConfig =
     error?.code === "MODULE_NOT_FOUND" &&

@@ -384,7 +384,7 @@ function createLauncherImporter({
 
 function registerLauncherImportHandlers() {
   const { ipcMain, BrowserWindow } = require("electron");
-  const { getSettingsManager } = require("./settings");
+  const { getSettingsManager } = require("../core/settings");
   const { discoverLauncherGames } = require("./launcher-discovery");
   const send = (channel, data) => {
     for (const win of BrowserWindow.getAllWindows()) {

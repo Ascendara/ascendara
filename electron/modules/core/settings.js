@@ -314,7 +314,7 @@ function registerSettingsHandlers() {
       event.sender.send("settings-updated", manager.getSettings());
       // Handle Discord RPC toggle immediately
       if (key === "rpcEnabled") {
-        const { initializeDiscordRPC, destroyDiscordRPC } = require("./discord-rpc");
+        const { initializeDiscordRPC, destroyDiscordRPC } = require("../app/discord-rpc");
 
         if (value) {
           initializeDiscordRPC();

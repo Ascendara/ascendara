@@ -19,9 +19,9 @@ const {
   isLinux,
   TIMESTAMP_FILE,
   DEPENDENCY_REGISTRY_PATHS,
-} = require("./config");
-const { updateTimestampFile } = require("./utils");
-const { getSettingsManager } = require("./settings");
+} = require("../core/config");
+const { updateTimestampFile } = require("../core/utils");
+const { getSettingsManager } = require("../core/settings");
 
 // Cache for drive space
 const driveSpaceCache = new Map();
@@ -1020,7 +1020,7 @@ function registerSystemHandlers() {
         findWine,
         linuxWineCommand,
         runtimePath,
-      } = require("./wine-setup");
+      } = require("../compat/wine-setup");
       process.env.PATH = runtimePath();
       if (process.platform === "darwin") {
         const brew = findCommand("brew");
@@ -1161,7 +1161,7 @@ function registerSystemHandlers() {
         `);
       };
 
-      const { findCommand, runtimePath } = require("./wine-setup");
+      const { findCommand, runtimePath } = require("../compat/wine-setup");
       process.env.PATH = runtimePath();
       let command;
       if (process.platform === "darwin") {

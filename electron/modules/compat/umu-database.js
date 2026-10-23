@@ -1,9 +1,9 @@
 const fs = require("fs-extra");
 const path = require("path");
 const { ipcMain } = require("electron");
-const { linuxConfigDir, isLinux } = require("./config");
-const { getSettingsManager } = require("./settings");
-const { sanitizeGameName } = require("./utils"); // Ajuste le chemin
+const { linuxConfigDir, isLinux } = require("../core/config");
+const { getSettingsManager } = require("../core/settings");
+const { sanitizeGameName } = require("../core/utils"); // Ajuste le chemin
 
 const UMU_CSV_URL =
   "https://raw.githubusercontent.com/Open-Wine-Components/umu-database/main/umu-database.csv";

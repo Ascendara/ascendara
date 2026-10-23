@@ -19,9 +19,9 @@ const {
   isLinux,
   TIMESTAMP_FILE,
   LANG_DIR,
-} = require("./config");
-const { updateTimestampFile } = require("./utils");
-const { runTranslation, isTranslationRunning } = require("./translations");
+} = require("../core/config");
+const { updateTimestampFile } = require("../core/utils");
+const { runTranslation, isTranslationRunning } = require("../app/translations");
 
 let isLatest = true;
 let updateDownloaded = false;

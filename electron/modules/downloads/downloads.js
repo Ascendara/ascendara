@@ -15,18 +15,18 @@ const {
   appDirectory,
   getPythonPath,
   getHelperPath,
-} = require("./config");
+} = require("../core/config");
 const {
   sanitizeText,
   sanitizeGameName,
   getExtensionFromMimeType,
   updateTimestampFile,
-} = require("./utils");
-const { getSettingsManager } = require("./settings");
+} = require("../core/utils");
+const { getSettingsManager } = require("../core/settings");
 const { prepareDownloaderRuntime } = require("./downloaderRuntime");
 const { startDownloadWatchdog } = require("./downloadLiveness");
 
-const steamgrid = require("./steamgrid");
+const steamgrid = require("../library/steamgrid");
 const gameUpdateBackup = require("./gameUpdateBackup");
 
 const {

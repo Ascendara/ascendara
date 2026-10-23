@@ -19,17 +19,17 @@ const {
   imageKey,
   steamWebApiKey,
   TIMESTAMP_FILE,
-} = require("./config");
-const { getSettingsManager } = require("./settings");
-const { sanitizeText, getExtensionFromMimeType } = require("./utils");
+} = require("../core/config");
+const { getSettingsManager } = require("../core/settings");
+const { sanitizeText, getExtensionFromMimeType } = require("../core/utils");
 const { initializeDiscordRPC, destroyDiscordRPC, setRPCState } = require("./discord-rpc");
-const steamgrid = require("./steamgrid");
-const { isSafeExternalUrl, isTrustedIpcSender } = require("./security");
+const steamgrid = require("../library/steamgrid");
+const { isSafeExternalUrl, isTrustedIpcSender } = require("../core/security");
 const {
   completeOnboarding,
   hasCompletedOnboarding,
   resetOnboarding,
-} = require("./onboarding");
+} = require("../core/onboarding");
 
 let apiKeyOverride = null;
 let has_launched = false;
@@ -154,8 +154,8 @@ function registerMiscHandlers() {
   });
 
   // Is experiment / branch
-  const { appBranch } = require("./config");
-  const { testingVersion } = require("./config");
+  const { appBranch } = require("../core/config");
+  const { testingVersion } = require("../core/config");
 
   ipcMain.handle("is-experiment", () => appBranch === "experimental");
   ipcMain.handle("get-testing-version", () => testingVersion);
@@ -181,7 +181,7 @@ function registerMiscHandlers() {
   ipcMain.handle("get-steam-api-key", () => steamWebApiKey);
 
   // Time-based authentication
-  const authHelper = require("./auth-helper");
+  const authHelper = require("../core/auth-helper");
   ipcMain.handle("get-auth-headers", () => authHelper.generateAuthHeaders());
 
   // Open URL
@@ -194,7 +194,7 @@ function registerMiscHandlers() {
         height: 800,
         icon: path.join(
           __dirname,
-          "..",
+          "../..",
           process.platform === "linux" ? "icon.png" : "icon.ico"
         ),
         webPreferences: {
@@ -1204,7 +1204,7 @@ function registerMiscHandlers() {
         }
 
         // Not a custom game - find the game directory
-        const { sanitizeText } = require("./utils");
+        const { sanitizeText } = require("../core/utils");
         const sanitizedGame = sanitizeText(gameName);
         const allDirectories = [
           settings.downloadDirectory,
@@ -1299,7 +1299,7 @@ function registerMiscHandlers() {
         const gamesData = fs.existsSync(gamesFilePath)
           ? JSON.parse(fs.readFileSync(gamesFilePath, "utf8"))
           : { games: [] };
-        const { sameGame } = require("./launcher-import");
+        const { sameGame } = require("../library/launcher-import");
         if (
           gamesData.games.some(
             existing => !existing._isDeleted && sameGame(existing, { game, executable })
@@ -1841,10 +1841,10 @@ function registerMiscHandlers() {
   });
 
   // Import Steam games handler
-  require("./launcher-import").registerLauncherImportHandlers();
+  require("../library/launcher-import").registerLauncherImportHandlers();
 
   // HowLongToBeat completion times handler
-  require("./hltb").registerHltbHandlers();
+  require("../library/hltb").registerHltbHandlers();
 
   // Download finished handler
   ipcMain.handle("download-finished", async (_, game) => {

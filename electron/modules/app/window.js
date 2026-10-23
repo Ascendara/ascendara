@@ -5,15 +5,15 @@
 
 const { BrowserWindow, screen, ipcMain, dialog, app } = require("electron");
 const path = require("path");
-const { isDev } = require("./config");
+const { isDev } = require("../core/config");
 const { initializeDiscordRPC } = require("./discord-rpc");
-const { getSettingsManager } = require("./settings");
+const { getSettingsManager } = require("../core/settings");
 const {
   isAllowedAppNavigation,
   isAllowedAuthPopup,
   isSafeExternalUrl,
   registerTrustedWebContents,
-} = require("./security");
+} = require("../core/security");
 
 let mainWindowHidden = false;
 let isHandlingProtocolUrl = false;
@@ -40,7 +40,7 @@ function createWindow() {
   const iconFile = process.platform !== "win32" ? "icon.png" : "icon.ico";
   const mainWindow = new BrowserWindow({
     title: "Ascendara",
-    icon: path.join(__dirname, "..", iconFile),
+    icon: path.join(__dirname, "../..", iconFile),
     width: windowWidth,
     height: windowHeight,
     frame: false,
@@ -53,7 +53,7 @@ function createWindow() {
         : { fullscreen: true }
       : {}),
     webPreferences: {
-      preload: path.join(__dirname, "..", "preload.js"),
+      preload: path.join(__dirname, "../..", "preload.js"),
       nodeIntegration: false,
       contextIsolation: true,
       // Disable sandbox for Linux compatibility
@@ -501,7 +501,7 @@ function registerWindowHandlers() {
     let assetPath;
     if (!app.isPackaged) {
       // In development
-      assetPath = path.join(__dirname, "../../src/public", filename);
+      assetPath = path.join(__dirname, "../../../src/public", filename);
     } else {
       // In production
       assetPath = path.join(process.resourcesPath, "public", filename);
@@ -526,7 +526,7 @@ function registerWindowHandlers() {
     let assetPath;
     if (!app.isPackaged) {
       // In development
-      assetPath = path.join(__dirname, "../../src/public", filename);
+      assetPath = path.join(__dirname, "../../../src/public", filename);
     } else {
       // In production
       assetPath = path.join(process.resourcesPath, "public", filename);

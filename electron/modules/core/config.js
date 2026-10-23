@@ -64,7 +64,7 @@ const appDirectory = path.join(path.dirname(app.getPath("exe")));
 // Load production config
 let config;
 try {
-  config = require("../config.prod.js");
+  config = require("../../config.prod.js");
 } catch (e) {
   config = {};
 }
@@ -90,14 +90,14 @@ function getPythonPath() {
 function getHelperPath(name) {
   const filename = name + (isWindows ? ".exe" : "");
   return isDev
-    ? path.resolve(__dirname, "../../binaries", name, "dist", filename)
+    ? path.resolve(__dirname, "../../../binaries", name, "dist", filename)
     : path.join(process.resourcesPath, filename);
 }
 
 function getLudusaviPath() {
   const local = path.join(unixConfigDir || appDirectory, "ludusavi");
   if (fs.existsSync(local)) return local;
-  return isMac ? require("./wine-setup").findCommand("ludusavi") : null;
+  return isMac ? require("../compat/wine-setup").findCommand("ludusavi") : null;
 }
 
 // Tool executables mapping

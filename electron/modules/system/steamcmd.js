@@ -8,8 +8,8 @@ const path = require("path");
 const os = require("os");
 const { spawn } = require("child_process");
 const { ipcMain, BrowserWindow } = require("electron");
-const { isWindows, TIMESTAMP_FILE } = require("./config");
-const { updateTimestampFile } = require("./utils");
+const { isWindows, TIMESTAMP_FILE } = require("../core/config");
+const { updateTimestampFile } = require("../core/utils");
 
 let electronDl = null;
 
