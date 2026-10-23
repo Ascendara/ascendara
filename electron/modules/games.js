@@ -178,16 +178,16 @@ async function createShortcutInDirectory(game, shortcutDir) {
 
   fs.ensureDirSync(shortcutDir);
 
-  // Single-quoted PowerShell strings never evaluate subexpressions.
-  const psEscape = value => String(value).replace(/'/g, "''");
-
+  // Values are passed as -File arguments, which PowerShell binds as literal
+  // strings, so nothing from the game name or path is ever parsed as code.
   const psScript = `
+    param($ShortcutPath, $TargetPath, $ExePath, $IsCustom, $WorkingDirectory, $SetIcon)
     $WScriptShell = New-Object -ComObject WScript.Shell
-    $Shortcut = $WScriptShell.CreateShortcut('${psEscape(shortcutPath)}')
-    $Shortcut.TargetPath = '${psEscape(handlerPath)}'
-    $Shortcut.Arguments = '"${psEscape(exePath)}" ${isCustom ? 1 : 0} "--shortcut"'
-    $Shortcut.WorkingDirectory = '${psEscape(path.dirname(handlerPath))}'
-    ${!exePath.match(/\.(bat|cmd)$/i) ? `$Shortcut.IconLocation = '${psEscape(exePath)},0'` : ""}
+    $Shortcut = $WScriptShell.CreateShortcut($ShortcutPath)
+    $Shortcut.TargetPath = $TargetPath
+    $Shortcut.Arguments = '"' + $ExePath + '" ' + $IsCustom + ' "--shortcut"'
+    $Shortcut.WorkingDirectory = $WorkingDirectory
+    if ($SetIcon -eq '1') { $Shortcut.IconLocation = $ExePath + ',0' }
     $Shortcut.Save()
   `;
 
@@ -197,7 +197,25 @@ async function createShortcutInDirectory(game, shortcutDir) {
   await new Promise((resolve, reject) => {
     const process = spawn(
       "powershell.exe",
-      ["-ExecutionPolicy", "Bypass", "-File", psPath],
+      [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        psPath,
+        "-ShortcutPath",
+        shortcutPath,
+        "-TargetPath",
+        handlerPath,
+        "-ExePath",
+        exePath,
+        "-IsCustom",
+        isCustom ? "1" : "0",
+        "-WorkingDirectory",
+        path.dirname(handlerPath),
+        "-SetIcon",
+        /\.(bat|cmd)$/i.test(exePath) ? "0" : "1",
+      ],
       {
         windowsHide: true,
       }
