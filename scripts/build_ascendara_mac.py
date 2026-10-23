@@ -207,8 +207,12 @@ def build_arch(arch, args, identity):
     config['mac']['binaries'] = [f'Contents/Resources/{name}' for name in names]
     if highball:
         config['mac']['binaries'].append('Contents/Resources/Highball/highball')
-    if identity:
-        config['mac']['identity'] = identity
+    # Without a Developer ID, ad-hoc sign so the bundle seal is valid instead of
+    # shipping Electron's stale linker signatures, which macOS reports as damaged.
+    config['mac']['identity'] = identity or '-'
+    if not identity:
+        # Hardened runtime adds nothing without notarization and needs extra entitlements ad-hoc.
+        config['mac']['hardenedRuntime'] = False
     config['mac']['notarize'] = args.release
     config['forceCodeSigning'] = args.release
     validate_resources('mac', config)
