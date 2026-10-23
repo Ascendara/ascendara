@@ -515,23 +515,6 @@ export const settingsSearchData = [
     scrollTo: "download-threads",
   },
   {
-    id: "analytics",
-    title: "Ascendara Analytics / Analytics",
-    description: "Help improve Ascendara by sharing anonymous usage data",
-    keywords: [
-      "ascendara",
-      "analytics",
-      "telemetry",
-      "data",
-      "privacy",
-      "tracking",
-      "usage data",
-      "statistics",
-    ],
-    section: "Advanced",
-    scrollTo: "analytics",
-  },
-  {
     id: "timemachine",
     title: "Ascendara Timemachine / Time Machine",
     description: "Show old download links for games",

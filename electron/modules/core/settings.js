@@ -37,7 +37,6 @@ class SettingsManager {
       autoCreateShortcuts: true,
       smoothTransitions: true,
       bigPictureHomeStyle: "ascendara",
-      sendAnalytics: true,
       autoUpdate: true,
       endOnClose: false,
       language: "en",

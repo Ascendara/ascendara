@@ -497,7 +497,6 @@ const Welcome = ({ welcomeData, onComplete }) => {
     showOldDownloadLinks: false,
     seeInappropriateContent: false,
     autoCreateShortcuts: true,
-    sendAnalytics: true,
     autoUpdate: true,
     language: "en",
     theme: "purple",
