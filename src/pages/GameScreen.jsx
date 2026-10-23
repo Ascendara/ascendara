@@ -2758,7 +2758,11 @@ function InstalledGameScreen() {
             onCreateStartMenuShortcut={async () => {
               const success = await window.electron.createStartMenuShortcut(game);
               if (success) {
-                toast.success(t("library.startMenuShortcutCreated"));
+                toast.success(
+                  window.electron.getPlatform?.() === "darwin"
+                    ? t("library.addedToApplications")
+                    : t("library.startMenuShortcutCreated")
+                );
               } else {
                 toast.error(t("library.startMenuShortcutError"));
               }

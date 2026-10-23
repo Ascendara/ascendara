@@ -41,6 +41,7 @@ const { resetOnboarding } = require("../core/onboarding");
 // Load proton module only on linux
 const proton = isLinux ? require("../compat/proton") : null;
 const highball = require("../compat/highball");
+const { createMacShortcut } = require("./macShortcuts");
 
 const runGameProcesses = new Map();
 // Games whose compatibility layer is still being prepared before launch
@@ -244,16 +245,26 @@ function findInstalledGameDirectory(game, settings) {
 }
 
 /**
- * On macOS, a game shared with the Highball app gets an entry in Highball's
- * library, which can start it and make a Mac app for it, instead of a shortcut
+ * On macOS a shortcut is a small app that starts the game through Ascendara:
+ * on the Desktop, or in ~/Applications/Ascendara for Launchpad
  */
-async function addToHighballLibrary(game) {
-  const name = game.game || game.name;
-  return highball.addToLibrary({
-    game: name,
-    executable: game.executable,
-    directory: findInstalledGameDirectory(name, getSettingsManager().getSettings()),
-  });
+async function createMacGameShortcut(game, targetDirectory) {
+  try {
+    const name = game.game || game.name;
+    await createMacShortcut(
+      {
+        game: name,
+        directory: game.custom
+          ? null
+          : findInstalledGameDirectory(name, getSettingsManager().getSettings()),
+      },
+      targetDirectory
+    );
+    return true;
+  } catch (error) {
+    console.error("Error creating macOS shortcut:", error);
+    return false;
+  }
 }
 
 /**
@@ -1779,8 +1790,8 @@ function registerGameHandlers() {
     if (isWindows) {
       return await createGameShortcut(game);
     }
-    if (highball.usesApp()) {
-      return (await addToHighballLibrary(game)).success;
+    if (process.platform === "darwin") {
+      return createMacGameShortcut(game, path.join(os.homedir(), "Desktop"));
     }
     return false;
   });
@@ -1809,6 +1820,12 @@ function registerGameHandlers() {
   ipcMain.handle("create-start-menu-shortcut", async (_, game) => {
     if (isWindows) {
       return await createStartMenuShortcut(game);
+    }
+    if (process.platform === "darwin") {
+      return createMacGameShortcut(
+        game,
+        path.join(os.homedir(), "Applications", "Ascendara")
+      );
     }
     return false;
   });

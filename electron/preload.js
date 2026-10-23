@@ -463,12 +463,19 @@ contextBridge.exposeInMainWorld("electron", {
   // PROTOCOL & DEEP LINKS
   //===========================================================================
   getPendingGameUrls: () => ipcRenderer.invoke("get-pending-game-urls"),
+  getPendingPlayGames: () => ipcRenderer.invoke("get-pending-play-games"),
+  acknowledgePlayGame: game => ipcRenderer.invoke("acknowledge-play-game", game),
   acknowledgeGameUrl: gameID => ipcRenderer.invoke("acknowledge-game-url", gameID),
   getPendingBrowserDownloads: () => ipcRenderer.invoke("get-pending-browser-downloads"),
   acknowledgeBrowserDownload: url =>
     ipcRenderer.invoke("acknowledge-browser-download", url),
   onProtocolGameUrl: callback =>
     preloadIpc.subscribe("protocol-game-url", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
+  onProtocolPlayGame: callback =>
+    preloadIpc.subscribe("protocol-play-game", callback, {
       includeEventPlaceholder: true,
       selectArgs: args => [args[0]],
     }),

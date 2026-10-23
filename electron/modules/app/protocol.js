@@ -16,6 +16,7 @@ let pendingUrls = new Set();
 const pendingCheckoutSessions = new Set();
 const pendingBrowserDownloads = new Set();
 const pendingGameUrls = new Set();
+const pendingPlayGames = new Set();
 const URL_DEBOUNCE_TIME = 2000;
 
 function findProtocolUrlInArgs(args = process.argv) {
@@ -38,6 +39,25 @@ function parseGameIdFromUrl(cleanUrl) {
     .replace(/^ascendara:\/\/game\/?\??/i, "")
     .replace(/[/?#].*$/, "")
     .trim();
+}
+
+/**
+ * The game an ascendara://play/<game>?t=<token> link starts, from a macOS
+ * shortcut. Links without this Mac's token are ignored, so a web page can't
+ * start games.
+ */
+function parsePlayGameFromUrl(cleanUrl) {
+  if (typeof cleanUrl !== "string") return "";
+  const match = cleanUrl.match(/^ascendara:\/\/play\/([^/?#]+)\?t=([0-9a-f]+)$/i);
+  if (!match) return "";
+  let game;
+  try {
+    game = decodeURIComponent(match[1]).trim();
+  } catch {
+    return "";
+  }
+  if (!game || /[/\\]|\.\./.test(game)) return "";
+  return require("../library/macShortcuts").isValidLaunchToken(match[2]) ? game : "";
 }
 
 /**
@@ -76,6 +96,10 @@ function handleProtocolUrl(url) {
   const earlyGameId = parseGameIdFromUrl(cleanUrl);
   if (earlyGameId) {
     pendingGameUrls.add(earlyGameId);
+  }
+  const playGame = parsePlayGameFromUrl(cleanUrl);
+  if (playGame) {
+    pendingPlayGames.add(playGame);
   }
 
   const existingWindow = BrowserWindow.getAllWindows().find(win => win);
@@ -181,6 +205,12 @@ function handleProtocolUrl(url) {
         } catch (error) {
           console.error("Error parsing steamrip cookie URL:", error);
         }
+      } else if (route === "play") {
+        if (playGame) {
+          existingWindow.webContents.send("protocol-play-game", { game: playGame });
+        } else {
+          console.warn("Ignored a play link without a valid token");
+        }
       } else if (route === "game") {
         try {
           const gameID = parseGameIdFromUrl(cleanUrl);
@@ -236,6 +266,10 @@ function registerProtocolHandlers() {
     return getPendingUrls();
   });
   ipcMain.handle("get-pending-game-urls", () => [...pendingGameUrls]);
+  ipcMain.handle("get-pending-play-games", () => [...pendingPlayGames]);
+  ipcMain.handle("acknowledge-play-game", (_event, game) =>
+    pendingPlayGames.delete(game)
+  );
   ipcMain.handle("acknowledge-game-url", (_event, gameID) =>
     pendingGameUrls.delete(gameID)
   );
@@ -378,6 +412,10 @@ function setupSingleInstance() {
     const startupGameId = parseGameIdFromUrl(startupProtocolUrl);
     if (startupGameId) {
       pendingGameUrls.add(startupGameId);
+    }
+    const startupPlayGame = parsePlayGameFromUrl(startupProtocolUrl);
+    if (startupPlayGame) {
+      pendingPlayGames.add(startupPlayGame);
     }
   }
 
