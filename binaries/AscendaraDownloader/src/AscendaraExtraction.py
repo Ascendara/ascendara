@@ -845,6 +845,8 @@ def _extract_inplace(tool, kind, archive, destination, listing_path, state, repo
 
 # Never let in-place extraction fill the disk completely.
 KEEP_FREE = 1_000_000_000
+# Archive data released together, so flushing and journaling stay infrequent.
+RELEASE_BATCH = 256 * 1024 * 1024
 FREED_MESSAGE = ('Part of this archive was released to make room before extraction stopped, and it '
                  'cannot resume from that point. Download the game again')
 
@@ -885,7 +887,7 @@ def rar_inplace_layout(archive):
 
 
 class RarReclaimer:
-    """Releases the archive space of entries the extractor has passed, once the disk needs it.
+    """Releases the archive space of entries the extractor has passed, in batches as it goes.
 
     With holes, every header stays in place, so a non-solid archive can reopen
     and skip what is done. Without them, whole volumes are deleted once
@@ -900,6 +902,7 @@ class RarReclaimer:
         self.deleted = set(saved.get('deleted', []))
         self.remaining = sum(e.size for i, e in enumerate(self.entries) if self.wanted[i] and i not in self.done)
         self.passed = 0
+        self.unreleased = 0
         self.unflushed = []
         self.enabled = True
         self.last_entry = {}
@@ -916,12 +919,14 @@ class RarReclaimer:
         """Entries before `passed` are behind the extractor and never read again."""
         passed = min(passed, len(self.entries))
         for index in range(self.passed, passed):
+            self.unreleased += sum(end - start for _, start, end in self.entries[index].pieces)
             if self.wanted[index] and index not in self.done:
                 self.done.add(index)
                 self.unflushed.append(index)
                 self.remaining -= self.entries[index].size
         self.passed = max(self.passed, passed)
-        if self.enabled and shutil.disk_usage(self.output).free < self.remaining + KEEP_FREE:
+        if self.enabled and (self.unreleased >= RELEASE_BATCH
+                             or shutil.disk_usage(self.output).free < self.remaining + KEEP_FREE):
             self.release()
 
     def _flush(self):
@@ -952,6 +957,7 @@ class RarReclaimer:
                        else len(self.layout.volumes))
             volumes = [v for v in range(len(self.layout.volumes)) if v not in self.deleted
                        and v < current and self.last_entry.get(v, -1) < self.passed]
+        self.unreleased = 0
         if not indices and not volumes:
             return
         try:
@@ -1053,46 +1059,44 @@ def _extract_rar_inplace(archive, layout, destination, state, report, cancelled,
         state.update(total=len(wanted), files=len(done), bytes=total_bytes - sum(entries[i].size for i in remaining),
                      percent=0, name='Preparing...')
         free = shutil.disk_usage(output).free
-        need_release = free < sum(entries[i].size for i in remaining) + KEEP_FREE
-        if need_release:
-            # The most free space the run needs at any point, releasing as it goes.
-            from AscendaraRarSpace import releasable
-            released_after = {}
+        # The most free space the run needs at any point, releasing as it goes.
+        from AscendaraRarSpace import releasable
+        released_after = {}
+        for index, entry in enumerate(entries):
+            if layout.punch and index not in saved['freed']:
+                released_after[index] = sum(releasable(start, end) for _, start, end in entry.pieces)
+        if not layout.punch:
+            last_entry = {}
             for index, entry in enumerate(entries):
-                if layout.punch and index not in saved['freed']:
-                    released_after[index] = sum(releasable(start, end) for _, start, end in entry.pieces)
-            if not layout.punch:
-                last_entry = {}
-                for index, entry in enumerate(entries):
-                    for volume, _, _ in entry.pieces:
-                        last_entry[volume] = index
-                for volume, index in last_entry.items():
-                    if volume < len(layout.volumes) - 1:
-                        released_after[index] = released_after.get(index, 0) + os.path.getsize(layout.volumes[volume])
-            used = released = peak = 0
-            remaining_set = set(remaining)
-            for index, entry in enumerate(entries):
-                if index in remaining_set:
-                    # Output an interrupted run left behind is overwritten, not added to.
-                    try:
-                        existing = os.path.getsize(os.path.join(_extended_path(output), *entry.name.split('/')))
-                    except OSError:
-                        existing = 0
-                    used += entry.size - min(existing, entry.size)
-                    peak = max(peak, used - released)
-                released += released_after.get(index, 0)
-            # A fresh start keeps the reserve. Once the archive is partly released,
-            # finishing is the only way forward, so only an impossible run is refused.
-            if peak + (0 if saved['freed'] else KEEP_FREE) > free:
-                raise OSError(f'Insufficient disk space for extraction: {peak + KEEP_FREE} bytes '
-                              f'are required while releasing the archive, {free} are free')
-            if not saved['verified'] and not saved['freed']:
-                # Nothing is released from a damaged archive; it can still be re-downloaded.
-                state.update(name='Verifying archive...', percent=0)
-                report(True)
-                _rar_backend(archive, layout, output, [], state, report, cancelled, stop, test=True)
-                saved['verified'] = True
-                _save_inplace_state(state_path, saved)
+                for volume, _, _ in entry.pieces:
+                    last_entry[volume] = index
+            for volume, index in last_entry.items():
+                if volume < len(layout.volumes) - 1:
+                    released_after[index] = released_after.get(index, 0) + os.path.getsize(layout.volumes[volume])
+        used = released = peak = 0
+        remaining_set = set(remaining)
+        for index, entry in enumerate(entries):
+            if index in remaining_set:
+                # Output an interrupted run left behind is overwritten, not added to.
+                try:
+                    existing = os.path.getsize(os.path.join(_extended_path(output), *entry.name.split('/')))
+                except OSError:
+                    existing = 0
+                used += entry.size - min(existing, entry.size)
+                peak = max(peak, used - released)
+            released += released_after.get(index, 0)
+        # A fresh start keeps the reserve. Once the archive is partly released,
+        # finishing is the only way forward, so only an impossible run is refused.
+        if peak + (0 if saved['freed'] else KEEP_FREE) > free:
+            raise OSError(f'Insufficient disk space for extraction: {peak + KEEP_FREE} bytes '
+                          f'are required while releasing the archive, {free} are free')
+        if not saved['verified'] and not saved['freed']:
+            # Nothing is released from a damaged archive; it can still be re-downloaded.
+            state.update(name='Verifying archive...', percent=0)
+            report(True)
+            _rar_backend(archive, layout, output, [], state, report, cancelled, stop, test=True)
+            saved['verified'] = True
+            _save_inplace_state(state_path, saved)
         reclaimer = RarReclaimer(layout, output, saved, lambda: _save_inplace_state(state_path, saved))
         # An unverified archive is never released: if it is damaged, a re-download must still help.
         reclaimer.enabled = saved['verified']
