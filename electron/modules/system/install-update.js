@@ -111,3 +111,25 @@ fi
   app.isQuitting = true;
   app.quit();
 };
+
+/**
+ * Remove .ascendara-update-* folders an update left beside the macOS app, as a
+ * failed extraction or an interrupted install did. Each holds a copy of the
+ * app, several hundred MB.
+ */
+module.exports.cleanupStaleUpdates = async function cleanupStaleUpdates() {
+  if (process.platform !== "darwin") return;
+  const match = process.execPath.match(/^(.*?\.app)\/Contents\/MacOS\//);
+  if (!match) return;
+  const parent = path.dirname(match[1]);
+  const entries = await fs.readdir(parent).catch(() => []);
+  for (const name of entries) {
+    if (!name.startsWith(".ascendara-update-")) continue;
+    const staged = path.join(parent, name);
+    // An install script may still be using a fresh one
+    const { mtimeMs } = await fs.stat(staged);
+    if (Date.now() - mtimeMs < 10 * 60 * 1000) continue;
+    await fs.remove(staged);
+    console.log("Removed leftover macOS update:", staged);
+  }
+};

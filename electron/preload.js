@@ -639,6 +639,11 @@ contextBridge.exposeInMainWorld("electron", {
   removeUpdateAvailableListener: callback =>
     preloadIpc.unsubscribe("update-available", callback),
   removeUpdateReadyListener: callback => preloadIpc.unsubscribe("update-ready", callback),
+  onUpdateError: callback =>
+    preloadIpc.subscribe("update-error", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
   onBranchSwitchProgress: callback =>
     preloadIpc.subscribe("branch-switch-progress", callback, {
       selectArgs: args => [args[0]],
