@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, FolderOpen, Loader, RotateCcw, ShieldCheck } from "lucide-react";
+import {
+  CheckCircle2,
+  FolderOpen,
+  Library,
+  Loader,
+  RotateCcw,
+  ShieldCheck,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -165,9 +173,11 @@ export function HighballSetupCard({ highball }) {
           <p className="text-xs text-muted-foreground">
             {status.ready
               ? t("settings.macCompat.ready", { engine: status.engine?.wineVersion })
-              : t("settings.macCompat.notSetUp", {
-                  size: formatSize(status.downloadSize || 0),
-                })}
+              : status.usingApp
+                ? t("settings.macCompat.appNotSetUp")
+                : t("settings.macCompat.notSetUp", {
+                    size: formatSize(status.downloadSize || 0),
+                  })}
           </p>
         </div>
         {status.ready ? (
@@ -200,6 +210,100 @@ export function HighballSetupCard({ highball }) {
       )}
       {!status.rosetta && !settingUp && (
         <p className="text-xs text-yellow-500">{t("settings.macCompat.rosettaNeeded")}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Sharing the Highball app's home and library. Renders nothing when the app
+ * isn't installed.
+ */
+function HighballAppCard({ highball, update }) {
+  const { t } = useTranslation();
+  const { status } = highball;
+  const [adding, setAdding] = useState(false);
+
+  if (!status.app?.installed) return null;
+
+  const toggle = async value => {
+    await update("highballUseApp", value);
+    highball.refresh();
+  };
+
+  const chooseBottle = async value => {
+    await update("highballAppBottle", value);
+    highball.refresh();
+  };
+
+  const addInstalled = async () => {
+    setAdding(true);
+    try {
+      const { added, failed } = await window.electron.highballAddInstalledGames();
+      toast.success(t("settings.macCompat.appAdded", { count: added }));
+      if (failed) toast.error(t("settings.macCompat.appAddFailed", { count: failed }));
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setAdding(false);
+      highball.refresh();
+    }
+  };
+
+  const bottle = status.bottle || "ascendara";
+  const bottles = [...new Set([...(status.bottles || []), bottle])];
+
+  return (
+    <div className="space-y-4 rounded-lg border border-border/60 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium">{t("settings.macCompat.useApp")}</p>
+          <p className="text-xs text-muted-foreground">
+            {status.app.compatible
+              ? t("settings.macCompat.useAppDescription")
+              : t("settings.macCompat.appIncompatible", {
+                  version: status.app.version,
+                  bundled: status.app.bundledVersion,
+                })}
+          </p>
+        </div>
+        <Switch
+          className="shrink-0"
+          checked={status.usingApp}
+          disabled={!status.app.compatible}
+          onCheckedChange={toggle}
+        />
+      </div>
+      {status.usingApp && (
+        <>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              {t("settings.macCompat.appBottle")}
+            </label>
+            <OptionSelect
+              value={bottle}
+              onChange={chooseBottle}
+              options={bottles.map(name => ({ value: name, label: name }))}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("settings.macCompat.appBottleHint")}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={adding}
+            onClick={addInstalled}
+          >
+            {adding ? (
+              <Loader className="h-4 w-4 animate-spin" />
+            ) : (
+              <Library className="h-4 w-4" />
+            )}
+            {t("settings.macCompat.appAddInstalled")}
+          </Button>
+        </>
       )}
     </div>
   );
@@ -313,6 +417,7 @@ export default function HighballSettings() {
 
       {usingHighball && (
         <>
+          <HighballAppCard highball={highball} update={update} />
           <HighballSetupCard highball={highball} />
 
           <div className="space-y-3">
@@ -384,16 +489,18 @@ export default function HighballSettings() {
               <FolderOpen className="h-4 w-4" />
               {t("settings.macCompat.openFolder")}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              disabled={resetting || !status.ready}
-              onClick={resetShared}
-            >
-              <RotateCcw className="h-4 w-4" />
-              {t("settings.macCompat.resetShared")}
-            </Button>
+            {!status.usingApp && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                disabled={resetting || !status.ready}
+                onClick={resetShared}
+              >
+                <RotateCcw className="h-4 w-4" />
+                {t("settings.macCompat.resetShared")}
+              </Button>
+            )}
           </div>
 
           <p className="text-xs text-muted-foreground">
