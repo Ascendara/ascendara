@@ -23,7 +23,7 @@ from typing import Optional, Tuple
 
 from AscendaraRarRecovery import (
     _load_api, _extended_path, _check_path, _member_path, _native_error,
-    _file_error, _check_archive_target,
+    _file_error, _check_archive_target, trust_link,
 )
 
 
@@ -217,6 +217,59 @@ def _find_7z():
     return next((path for path in candidates if path and os.path.isfile(path)), None)
 
 
+def _find_hatchzip():
+    roots = [getattr(sys, '_MEIPASS', ''), os.path.dirname(sys.executable), os.path.dirname(__file__)]
+    if not getattr(sys, 'frozen', False):
+        roots.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../.build-tools/hatchzip/host')))
+    name = 'hatchzip.exe' if os.name == 'nt' else 'hatchzip'
+    candidates = [os.path.join(root, name) for root in roots if root] + [shutil.which('hatchzip')]
+    return next((path for path in candidates
+                 if path and os.path.isfile(path) and os.access(path, os.X_OK)), None)
+
+
+def inplace_paths(archive):
+    """Output folder and state file of an in-place extraction, beside the archive.
+
+    The folder outlives the stage: once HatchZip has consumed the archive, its
+    output is the retained source for retries until installation finishes.
+    """
+    folder, name = os.path.split(archive)
+    output = os.path.join(folder, f'.ascendara-inplace-{name}.out')
+    return output, output[:-len('.out')] + '.json'
+
+
+def _load_inplace_state(state_path):
+    try:
+        with open(state_path, encoding='utf-8') as stream:
+            return json.load(stream)
+    except (OSError, ValueError):
+        return None
+
+
+def inplace_consumed(archive):
+    """True once part of the archive is gone and only a resumed extraction can finish it.
+
+    A re-download would throw that progress away. Archives that cannot resume
+    anyway (a solid RAR with freed data) are not consumed in this sense.
+    """
+    output, state_path = inplace_paths(archive)
+    saved = _load_inplace_state(state_path)
+    if saved is not None and saved.get('engine') == 'rar':
+        return bool(saved.get('freed')) and not saved.get('unresumable')
+    return os.path.exists(archive + '.hatchzip') or (
+        not os.path.exists(archive) and saved is not None)
+
+
+def inplace_retained(archive):
+    """True when a consumed archive's extracted output can stand in for it."""
+    output, state_path = inplace_paths(archive)
+    try:
+        with open(state_path, encoding='utf-8') as stream:
+            return bool(json.load(stream).get('complete')) and os.path.isdir(output)
+    except (OSError, ValueError):
+        return False
+
+
 def _external_tool_env():
     """Environment for spawning system binaries, undoing PyInstaller's LD_LIBRARY_PATH hijack.
 
@@ -286,7 +339,14 @@ def _extraction_io(baseline):
             max(0, own[1] - baseline[1]) + _tool_io[1] + tool[1]]
 
 
-def _run_cli(command, cancelled, activity):
+class ToolExit(RuntimeError):
+    def __init__(self, message, returncode, diagnostics):
+        super().__init__(message)
+        self.returncode = returncode
+        self.diagnostics = diagnostics
+
+
+def _run_cli(command, cancelled, activity, tick=None):
     """Drain combined output continuously and always reap the native child."""
     global _tool_process
     from collections import deque
@@ -316,18 +376,31 @@ def _run_cli(command, cancelled, activity):
             pending = lines.pop()[-8192:]
             for line in lines:
                 remember(line)
-            activity(text)
+            if not failures:
+                try:
+                    activity(text)
+                except BaseException as exc:
+                    # Raised on the main thread; keep draining so the tool never blocks.
+                    failures.append(exc)
+    failures = []
     reader = threading.Thread(target=drain, daemon=True)
     reader.start()
     try:
         while process.poll() is None:
             cancelled()
+            if failures:
+                raise failures[0]
+            if tick is not None:
+                tick()
             time.sleep(.1)
         reader.join()
+        if failures:
+            raise failures[0]
         if process.returncode != 0:
-            raise RuntimeError(f'Extractor exited with code {process.returncode}: ' +
-                               '\n'.join(diagnostics) + '\n' +
-                               b''.join(tail).decode('utf-8', errors='replace').replace('\b', '')[-4000:])
+            raise ToolExit(f'Extractor exited with code {process.returncode}: ' +
+                           '\n'.join(diagnostics) + '\n' +
+                           b''.join(tail).decode('utf-8', errors='replace').replace('\b', '')[-4000:],
+                           process.returncode, diagnostics)
         return b''.join(tail).decode('utf-8', errors='replace')
     finally:
         # Keep what the tool transferred before its handle goes away.
@@ -374,10 +447,11 @@ def _unrar_manifest(tool, archive, destination, listing_path, cancelled, activit
 
 class UnrarProgress:
     """Read UnRAR's in-place console updates across arbitrary pipe chunks."""
-    def __init__(self, destination, manifest, state):
+    def __init__(self, destination, manifest, state, on_complete=None):
         self.destination = os.path.join(destination, '').replace('\\', '/')
         self.manifest = manifest
         self.state = state
+        self.on_complete = on_complete
         self.pending = ''
         self.completed = set()
         self.completed_bytes = 0
@@ -408,6 +482,8 @@ class UnrarProgress:
                 self.completed.add(name)
                 self.completed_bytes += self.manifest[name]['size']
                 self.state.update(files=len(self.completed), bytes=self.completed_bytes)
+                if self.on_complete is not None:
+                    self.on_complete(name)
         # Bound memory even if an extractor emits a malformed, unterminated line.
         self.pending = self.pending[-16384:]
         now = time.monotonic()
@@ -426,7 +502,7 @@ class UnrarProgress:
                                       self.completed_bytes + partial_bytes)
 
 
-def _extract_unrar(tool, archive, destination, names, cancelled, activity):
+def _extract_unrar(tool, archive, destination, names, cancelled, activity, tick=None):
     # Archived read-only attributes can prevent unpacking continuation archives
     # and moving/deleting staging files on Linux.
     # A UTF-8 list avoids command-line size limits for large manifests.
@@ -437,7 +513,7 @@ def _extract_unrar(tool, archive, destination, names, cancelled, activity):
     try:
         filters = ['-scfl', '-n@' + selection_path] if names else []
         _run_cli([tool, 'x', '-cfg-', '-y', '-o+', '-ol-', '-ai', '-psteamrip.com', '-@',
-                  *filters, '--', archive, os.path.join(destination, '')], cancelled, activity)
+                  *filters, '--', archive, os.path.join(destination, '')], cancelled, activity, tick)
     finally:
         try:
             os.remove(selection_path)
@@ -446,7 +522,8 @@ def _extract_unrar(tool, archive, destination, names, cancelled, activity):
 
 
 def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
-                         on_file=None, should_stop=None, on_progress=None, members=None):
+                         on_file=None, should_stop=None, on_progress=None, members=None,
+                         on_passed=None, test=False):
     """Extract in one native UnRAR pass, with Python used only for supervision.
 
     Existing regular files are overwritten. Failed files can remain partial.
@@ -455,6 +532,8 @@ def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
     on_file(name, size) runs after each file passes CRC and closes successfully.
     should_stop() is checked per header and at most every 0.5 seconds in chunks;
     a true result raises InterruptedError after the native call returns.
+    on_passed(name, size) runs after every header, extracted or skipped, in archive order.
+    test=True decodes and checks every file without writing anything.
     """
     api = _load_api()
     archive_path = _extended_path(archive_path)
@@ -529,10 +608,10 @@ def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
             name = header.FileNameW or header.FileName.decode('utf-8', errors='strict')
             expected_size = header.UnpSize + (header.UnpSizeHigh << 32)
             normalized = name.replace('\\', '/')
-            skip = not _wanted(name) or members is not None and normalized not in members
+            skip = not test and (not _wanted(name) or members is not None and normalized not in members)
             directory = bool(header.Flags & 0x20) or name.endswith(('/', '\\'))
             extracting_file = not skip and not directory
-            if not skip:
+            if not skip and not test:
                 target = _member_path(root, name)
                 if (getattr(header, 'RedirType', 0)
                         or header.HostOS == 3 and stat.S_ISLNK(header.FileAttr)
@@ -546,20 +625,23 @@ def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
                     raise _file_error('create', target, exc) from exc
             # RAR_EXTRACT=2 writes inside UnRAR. RAR_SKIP=0 also avoids testing
             # unwanted files; UnRAR handles dictionary continuity for solid sets.
-            code = api.process(handle, 0 if skip else 2, None if skip else root + os.sep, None)
+            code = api.process(handle, 0 if skip else 1 if test else 2,
+                               None if skip or test else root + os.sep, None)
             if callback_error is not None:
                 raise callback_error
             check_stop(force=True)
             if code in (16, 17, 19):
                 raise OSError(f'Native RAR extraction could not write {name!r} (UnRAR error {code})')
             _native_error(code, f'Extracting {name!r}')
-            if not skip and not directory:
+            if not skip and not directory and not test:
                 actual_size = os.path.getsize(target)
                 if actual_size != expected_size:
                     raise RuntimeError(f'Incomplete RAR output for {name!r}: expected {expected_size} bytes, wrote {actual_size}')
                 count += 1
                 if on_file is not None:
                     on_file(name, expected_size)
+            if on_passed is not None:
+                on_passed(normalized, expected_size)
         return count
     finally:
         code = api.close(handle)
@@ -567,8 +649,575 @@ def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
             _native_error(code, 'Closing archive')
 
 
+def _zip_files(archive, destination, wanted=_wanted):
+    manifest = {}
+    with zipfile.ZipFile(archive) as source:
+        for item in source.infolist():
+            if not wanted(item.filename):
+                continue
+            _check_archive_target(archive, _member_path(destination, item.filename))
+            if stat.S_ISLNK(item.external_attr >> 16):
+                raise ValueError(f'Refusing archive link: {item.filename}')
+            if not item.is_dir():
+                manifest[item.filename.replace('\\', '/')] = {'size': item.file_size}
+    return manifest
+
+
+def _7z_files(tool, archive, destination, listing_path, cancelled, activity, wanted=_wanted):
+    # Stream the full listing to disk; large manifests must not be kept in a pipe tail.
+    with open(listing_path, 'w', encoding='utf-8', newline='') as listing:
+        def listing_activity(text):
+            listing.write(text)
+            activity(text)
+        _run_cli([tool, 'l', '-slt', '-ba', '-sccUTF-8', '-psteamrip.com', '--', archive], cancelled, listing_activity)
+    with open(listing_path, encoding='utf-8') as listing:
+        records = listing.read().split('\n\n')
+    manifest = {}
+    for record in records:
+        values = dict(line.split(' = ', 1) for line in record.splitlines() if ' = ' in line)
+        name = values.get('Path')
+        if not name or not wanted(name):
+            continue
+        _check_archive_target(archive, _member_path(destination, name))
+        if values.get('Symbolic Link') or values.get('Hard Link') or 'l' in values.get('Attributes', '').split(' ')[-1][:1]:
+            raise ValueError(f'Refusing archive link: {name}')
+        if values.get('Folder') != '+' and not values.get('Attributes', '').startswith('D'):
+            manifest[name.replace('\\', '/')] = {'size': int(values['Size'])}
+    return manifest
+
+
+def _link_output(output, destination, names, cancelled):
+    """Hard-link in-place output into the stage, keeping the output as the retained source."""
+    for name in names:
+        cancelled()
+        target = _member_path(destination, name)
+        # The retained output is ours and may still be linked from an earlier stage.
+        source = os.path.join(_extended_path(output), *name.split('/'))
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        try:
+            os.remove(target)
+        except FileNotFoundError:
+            pass
+        try:
+            os.link(source, target)
+            trust_link(target)
+        except FileNotFoundError:
+            raise IncompleteArchiveOutput(
+                f'Extracted file is no longer available for {name}; download the game again',
+                [{'file': name, 'error': 'File not found'}], recovery_attempted=True)
+        except OSError:
+            # FAT32 and exFAT have no hard links. Moving gives up the retained copy.
+            shutil.move(source, target)
+
+
+def trust_inplace_output(archive, destination, manifest):
+    """Trust, in this process, the hard links an extraction worker made for `archive`.
+
+    Each link is proven to be the retained output file before it is trusted.
+    """
+    output = inplace_paths(archive)[0]
+    if not inplace_retained(archive):
+        return
+    for name in manifest:
+        target = os.path.join(_extended_path(destination), *name.split('/'))
+        try:
+            if os.path.samefile(os.path.join(_extended_path(output), *name.split('/')), target):
+                trust_link(target)
+        except OSError:
+            pass  # Moved instead of linked, so there is no link to trust.
+
+
+def _save_inplace_state(path, value):
+    temporary = path + '.tmp'
+    with open(temporary, 'w', encoding='utf-8') as stream:
+        json.dump(value, stream)
+        stream.flush()
+        os.fsync(stream.fileno())
+    for attempt in range(8):
+        try:
+            os.replace(temporary, path)
+            return
+        except PermissionError:
+            # Security software briefly opens freshly written files.
+            if attempt == 7:
+                raise
+            time.sleep(.05 * 2 ** attempt)
+
+
+def _extract_inplace(tool, kind, archive, destination, listing_path, state, report, cancelled):
+    """Extract with HatchZip, which truncates the archive as files are written.
+
+    Only free space for the output is needed instead of the output plus the
+    archive. An interrupted run resumes from HatchZip's journal next to the
+    archive, so the output folder and state file must survive the stage.
+    """
+    output, state_path = inplace_paths(archive)
+    journal_path = archive + '.hatchzip'
+    try:
+        with open(state_path, encoding='utf-8') as stream:
+            saved = json.load(stream)
+    except (OSError, ValueError):
+        saved = None
+    fresh = os.path.exists(archive) and not os.path.exists(journal_path)
+    if fresh:
+        # Whatever is here belongs to an abandoned attempt on an older copy of
+        # the archive, and HatchZip refuses to write over existing files.
+        if os.path.isdir(output):
+            shutil.rmtree(output, onerror=lambda function, path, error: (
+                os.chmod(path, stat.S_IWRITE | stat.S_IREAD), function(path)))
+        if kind == 'zip':
+            files = _zip_files(archive, output, wanted=lambda name: True)
+        else:
+            seven = _find_7z()
+            if not seven:
+                raise RuntimeError('7z extraction requires a bundled or installed 7-Zip command-line tool')
+            files = _7z_files(seven, archive, output, listing_path, cancelled,
+                              lambda text: report(), wanted=lambda name: True)
+        saved = {'files': {name: info['size'] for name, info in files.items()}, 'complete': False}
+        _save_inplace_state(state_path, saved)
+    elif saved is None:
+        raise RuntimeError('In-place extraction state is missing for a partly extracted archive. '
+                           'Download the game again')
+    files = saved['files']
+    total_bytes = sum(files.values())
+    state.update(total=len(files), bytes=0, percent=0)
+    if not saved['complete'] and (os.path.exists(archive) or os.path.exists(journal_path)):
+        present = 0
+        for name, size in files.items():
+            try:
+                present += size if os.path.getsize(_member_path(output, name)) == size else 0
+            except OSError:
+                pass
+        archive_size = os.path.getsize(archive) if fresh else 0
+        next_journal = 0
+        def tick():
+            nonlocal next_journal
+            io = _process_io(_tool_process) if _tool_process is not None else None
+            done = None
+            if io and fresh and io[1] == 0:
+                # --verify-first reads everything before the archive is touched.
+                state.update(name='Verifying archive...',
+                             percent=min(99, io[0] / archive_size * 100) if archive_size else 0)
+                report()
+                return
+            if io:
+                done = present + io[1]
+            now = time.monotonic()
+            if done is None and now >= next_journal:
+                next_journal = now + 1
+                try:
+                    with open(journal_path, encoding='utf-8') as stream:
+                        journal = json.load(stream)
+                    original = sum(length for _, length in journal['parts'])
+                    done = total_bytes * (1 - journal['committed_len'] / original) if original else 0
+                except (OSError, ValueError, KeyError, TypeError):
+                    pass
+            if done is None:
+                return
+            done = min(total_bytes, int(done))
+            fraction = done / total_bytes if total_bytes else 1
+            state.update(name='Extracting...', bytes=done, percent=fraction * 100,
+                         files=int(len(files) * fraction))
+            report()
+        try:
+            _run_cli([tool, 'extract', '--yes', '--quiet', '--verify-first', '--keep-free', '1GB',
+                      '--password', 'steamrip.com', '--output', output, '--', archive],
+                     cancelled, lambda text: report(), tick)
+        except ToolExit as exc:
+            detail = '; '.join(exc.diagnostics) or str(exc)
+            if exc.returncode == 3:
+                raise OSError(f'Insufficient disk space for extraction: {detail}') from exc
+            if exc.returncode == 4:
+                # The archive is verified before it is modified, so a re-download is safe.
+                raise RuntimeError(f'Archive corrupt data: {detail}') from exc
+            if exc.returncode == 5:
+                raise RuntimeError(f'Incorrect password for archive: {detail}') from exc
+            raise RuntimeError(f'In-place extraction stopped: {detail}. '
+                               'Progress was saved and resumes when extraction is retried') from exc
+    saved['complete'] = True
+    _save_inplace_state(state_path, saved)
+    manifest = {name: {'size': size} for name, size in files.items() if _wanted(name)}
+    state.update(name='Linking extracted files...', files=len(files), bytes=total_bytes, percent=100)
+    report(True)
+    _link_output(output, destination, manifest, cancelled)
+    return manifest
+
+
+# Never let in-place extraction fill the disk completely.
+KEEP_FREE = 1_000_000_000
+FREED_MESSAGE = ('Part of this archive was released to make room before extraction stopped, and it '
+                 'cannot resume from that point. Download the game again')
+
+
+def _discard_inplace(output, state_path):
+    for path in (state_path, state_path + '.tmp'):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+    if os.path.isdir(output):
+        shutil.rmtree(output, onerror=lambda function, path, error: (
+            os.chmod(path, stat.S_IWRITE | stat.S_IREAD), function(path)))
+
+
+def _volume_fingerprint(layout):
+    return [[os.path.basename(path), info.st_size, info.st_mtime_ns]
+            for path, info in ((path, os.stat(path)) for path in layout.volumes)]
+
+
+def rar_inplace_layout(archive):
+    """The archive's data map when its space can be released during extraction, else None."""
+    from AscendaraRarSpace import RarLayoutError, can_punch, read_layout
+    try:
+        layout = read_layout(archive)
+    except (RarLayoutError, OSError) as exc:
+        logging.info('RAR extracts without releasing space (%s): %s', exc, archive)
+        return None
+    # Links are refused by the extractors with a clear error; a hard-linked
+    # volume shares its bytes with another copy that freeing would damage.
+    if any(entry.link for entry in layout.entries) or any(
+            os.stat(volume).st_nlink > 1 for volume in layout.volumes):
+        return None
+    layout.punch = can_punch(os.path.dirname(archive))
+    if not layout.punch and len(layout.volumes) == 1:
+        return None  # No holes here, and a single volume cannot be deleted early.
+    return layout
+
+
+class RarReclaimer:
+    """Releases the archive space of entries the extractor has passed, once the disk needs it.
+
+    With holes, every header stays in place, so a non-solid archive can reopen
+    and skip what is done. Without them, whole volumes are deleted once
+    passed, and the extraction can no longer resume.
+    """
+    def __init__(self, layout, output, saved, save):
+        self.layout, self.output, self.saved, self.save = layout, output, saved, save
+        self.entries = layout.entries
+        self.wanted = [not e.directory and _wanted(e.name) for e in self.entries]
+        self.done = set(saved['done'])
+        self.freed = set(saved['freed'])
+        self.deleted = set(saved.get('deleted', []))
+        self.remaining = sum(e.size for i, e in enumerate(self.entries) if self.wanted[i] and i not in self.done)
+        self.passed = 0
+        self.unflushed = []
+        self.enabled = True
+        self.last_entry = {}
+        for index, entry in enumerate(self.entries):
+            for volume, _, _ in entry.pieces:
+                self.last_entry[volume] = index
+
+    def disable(self, reason):
+        if self.enabled:
+            logging.warning('Stopped releasing archive space: %s', reason)
+            self.enabled = False
+
+    def advance(self, passed):
+        """Entries before `passed` are behind the extractor and never read again."""
+        passed = min(passed, len(self.entries))
+        for index in range(self.passed, passed):
+            if self.wanted[index] and index not in self.done:
+                self.done.add(index)
+                self.unflushed.append(index)
+                self.remaining -= self.entries[index].size
+        self.passed = max(self.passed, passed)
+        if self.enabled and shutil.disk_usage(self.output).free < self.remaining + KEEP_FREE:
+            self.release()
+
+    def _flush(self):
+        from AscendaraRarSpace import flush_file
+        for index in self.unflushed:
+            entry = self.entries[index]
+            path = os.path.join(_extended_path(self.output), *entry.name.split('/'))
+            try:
+                size = os.path.getsize(path)
+            except OSError:
+                size = None
+            # A wrong passed signal must never free data that is not extracted yet.
+            if size != entry.size:
+                raise RuntimeError(f'Extracted size of {entry.name!r} is {size}, expected {entry.size}')
+            flush_file(path)
+        self.unflushed = []
+
+    def release(self):
+        from AscendaraRarSpace import punch_hole
+        if self.layout.punch:
+            indices = [i for i in range(self.passed) if i not in self.freed and self.entries[i].pieces]
+            volumes = []
+        else:
+            # Volume v is closed once an entry beyond its last one is passed.
+            indices = []
+            current = (self.entries[self.passed].pieces[0][0]
+                       if self.passed < len(self.entries) and self.entries[self.passed].pieces
+                       else len(self.layout.volumes))
+            volumes = [v for v in range(len(self.layout.volumes)) if v not in self.deleted
+                       and v < current and self.last_entry.get(v, -1) < self.passed]
+        if not indices and not volumes:
+            return
+        try:
+            self._flush()
+        except (OSError, RuntimeError) as exc:
+            self.disable(exc)
+            return
+        self.saved['done'] = sorted(self.done)
+        if indices:
+            self.freed.update(indices)
+            self.saved.update(freed=sorted(self.freed), pending=indices)
+            # A solid stream must be decoded from its start, so it cannot resume.
+            self.saved['unresumable'] = self.saved.get('unresumable') or self.layout.solid
+        else:
+            self.saved['unresumable'] = True
+        self.save()
+        try:
+            if self.saved['unresumable']:
+                # Nothing rereads the headers of passed entries once resuming is
+                # impossible, so each volume's passed prefix goes in one hole.
+                spans = {}
+                for index in self.freed:
+                    for volume, start, end in self.entries[index].pieces:
+                        low, high = spans.get(volume, (start, end))
+                        spans[volume] = (min(low, start), max(high, end))
+                for volume, (start, end) in spans.items():
+                    punch_hole(self.layout.volumes[volume], start, end)
+            else:
+                for index in indices:
+                    for volume, start, end in self.entries[index].pieces:
+                        punch_hole(self.layout.volumes[volume], start, end)
+        except OSError as exc:
+            self.disable(exc)
+        for volume in volumes:
+            try:
+                os.remove(self.layout.volumes[volume])
+                self.deleted.add(volume)
+            except OSError:
+                pass  # Still open in the extractor; retried after the next entry.
+        self.saved.update(pending=None, deleted=sorted(self.deleted))
+        if indices:
+            self.saved['volumes'] = _volume_fingerprint(self.layout)
+        self.save()
+
+
+def _extract_rar_inplace(archive, layout, destination, state, report, cancelled, stop):
+    """Extract a RAR archive, releasing its space as extraction moves past each file.
+
+    Output goes to a folder beside the archive that survives the stage, and
+    progress is journaled, so an interrupted non-solid extraction resumes.
+    """
+    from AscendaraRarSpace import punch_hole
+    output, state_path = inplace_paths(archive)
+    saved = _load_inplace_state(state_path)
+    if saved is not None and saved.get('engine') != 'rar':
+        saved = None
+    if saved is not None and saved.get('complete') and os.path.isdir(output):
+        files = saved['files']
+    else:
+        if saved is not None and (saved.get('unresumable') or layout is None):
+            _discard_inplace(output, state_path)
+            raise RuntimeError(FREED_MESSAGE)
+        if layout is None:
+            raise RuntimeError('Archive volume is missing')
+        entries = layout.entries
+        files = {e.name: e.size for e in entries if not e.directory}
+        if saved is not None and saved.get('pending'):
+            # Interrupted while releasing: finish it before checking the volumes.
+            for index in saved['pending']:
+                for volume, start, end in entries[index].pieces:
+                    punch_hole(layout.volumes[volume], start, end)
+            saved.update(pending=None, volumes=_volume_fingerprint(layout))
+            _save_inplace_state(state_path, saved)
+        if saved is not None and (saved['volumes'] != _volume_fingerprint(layout) or saved['files'] != files):
+            saved = None  # The archive was replaced, for example by a repair download.
+        if saved is None:
+            _discard_inplace(output, state_path)
+            saved = {'engine': 'rar', 'files': files, 'complete': False, 'verified': False,
+                     'volumes': _volume_fingerprint(layout), 'done': [], 'freed': [], 'pending': None}
+            _save_inplace_state(state_path, saved)
+        os.makedirs(output, exist_ok=True)
+        # Only files journaled as done were flushed; anything else is redone.
+        done = set()
+        for index in saved['done']:
+            entry = entries[index]
+            try:
+                if os.path.getsize(os.path.join(_extended_path(output), *entry.name.split('/'))) == entry.size:
+                    done.add(index)
+                    continue
+            except OSError:
+                pass
+            if index in saved['freed']:
+                _discard_inplace(output, state_path)
+                raise RuntimeError(FREED_MESSAGE)
+        saved['done'] = sorted(done)
+        wanted = [i for i, e in enumerate(entries) if not e.directory and _wanted(e.name)]
+        remaining = [i for i in wanted if i not in done]
+        total_bytes = sum(entries[i].size for i in wanted)
+        state.update(total=len(wanted), files=len(done), bytes=total_bytes - sum(entries[i].size for i in remaining),
+                     percent=0, name='Preparing...')
+        free = shutil.disk_usage(output).free
+        need_release = free < sum(entries[i].size for i in remaining) + KEEP_FREE
+        if need_release:
+            # The most free space the run needs at any point, releasing as it goes.
+            from AscendaraRarSpace import releasable
+            released_after = {}
+            for index, entry in enumerate(entries):
+                if layout.punch and index not in saved['freed']:
+                    released_after[index] = sum(releasable(start, end) for _, start, end in entry.pieces)
+            if not layout.punch:
+                last_entry = {}
+                for index, entry in enumerate(entries):
+                    for volume, _, _ in entry.pieces:
+                        last_entry[volume] = index
+                for volume, index in last_entry.items():
+                    if volume < len(layout.volumes) - 1:
+                        released_after[index] = released_after.get(index, 0) + os.path.getsize(layout.volumes[volume])
+            used = released = peak = 0
+            remaining_set = set(remaining)
+            for index, entry in enumerate(entries):
+                if index in remaining_set:
+                    # Output an interrupted run left behind is overwritten, not added to.
+                    try:
+                        existing = os.path.getsize(os.path.join(_extended_path(output), *entry.name.split('/')))
+                    except OSError:
+                        existing = 0
+                    used += entry.size - min(existing, entry.size)
+                    peak = max(peak, used - released)
+                released += released_after.get(index, 0)
+            # A fresh start keeps the reserve. Once the archive is partly released,
+            # finishing is the only way forward, so only an impossible run is refused.
+            if peak + (0 if saved['freed'] else KEEP_FREE) > free:
+                raise OSError(f'Insufficient disk space for extraction: {peak + KEEP_FREE} bytes '
+                              f'are required while releasing the archive, {free} are free')
+            if not saved['verified'] and not saved['freed']:
+                # Nothing is released from a damaged archive; it can still be re-downloaded.
+                state.update(name='Verifying archive...', percent=0)
+                report(True)
+                _rar_backend(archive, layout, output, [], state, report, cancelled, stop, test=True)
+                saved['verified'] = True
+                _save_inplace_state(state_path, saved)
+        reclaimer = RarReclaimer(layout, output, saved, lambda: _save_inplace_state(state_path, saved))
+        # An unverified archive is never released: if it is damaged, a re-download must still help.
+        reclaimer.enabled = saved['verified']
+        reclaimer.advance(0)
+        state.update(name='Extracting...', percent=0)
+        report(True)
+        _rar_backend(archive, layout, output, remaining, state, report, cancelled, stop, reclaimer=reclaimer)
+        reclaimer.advance(len(entries))
+        saved.update(complete=True, done=sorted(reclaimer.done))
+        _save_inplace_state(state_path, saved)
+    manifest = {name: {'size': size} for name, size in files.items() if _wanted(name)}
+    state.update(name='Linking extracted files...', files=len(manifest), total=len(manifest), percent=100)
+    report(True)
+    _link_output(output, destination, manifest, cancelled)
+    return manifest
+
+
+def _rar_backend(archive, layout, output, remaining, state, report, cancelled, stop, reclaimer=None, test=False):
+    """Run the platform's RAR extractor over `remaining` entry indices, reporting passed entries."""
+    entries = layout.entries
+    names = {entries[i].name for i in remaining}
+    total = sum(e.size for e in entries) if test else sum(entries[i].size for i in remaining)
+    total = total or 1
+    base = state.get('bytes', 0) if not test else 0
+    index_of = {}
+    for index, entry in enumerate(entries):
+        index_of.setdefault(entry.name, []).append(index)
+    def found(name, after):
+        return next((i for i in index_of.get(name, ()) if i >= after), None)
+    if os.name == 'nt':
+        position = 0
+        finished = 0
+        def same(index, name, size):
+            return 0 <= index < len(entries) and entries[index].name == name and entries[index].size == size
+        def passed(name, size):
+            nonlocal position
+            previous = entries[position - 1] if 0 < position <= len(entries) else None
+            # Skipping a file that spans volumes reports it again from each next volume.
+            if (previous is not None and len(previous.pieces) > 1 and same(position - 1, name, size)
+                    and not same(position, name, size)):
+                return
+            if reclaimer is not None and not same(position, name, size):
+                reclaimer.disable(f'archive order differs at {name!r}')
+            position += 1
+            if reclaimer is not None:
+                # A spanning entry is only behind UnRAR once the next entry starts.
+                reclaimer.advance(position - 1 if len(entries[position - 1].pieces) > 1 else position)
+        def progress(name, written, expected):
+            state.update(name=name, bytes=base + finished + min(written, expected),
+                         percent=min(100, (finished + min(written, expected)) / total * 100))
+            report()
+        def completed(name, size):
+            nonlocal finished
+            finished += size
+            state.update(files=state.get('files', 0) + 1)
+        extract_rar_stream(archive, output, on_file=None if test else completed, should_stop=stop.is_set,
+                           on_progress=progress, members=names, on_passed=passed, test=test)
+        return
+    from AscendaraDownloadRecovery import find_unrar
+    unrar = find_unrar()
+    target = 0
+    def tick():
+        if reclaimer is not None:
+            reclaimer.advance(target)
+    if unrar:
+        if test:
+            _run_cli([unrar, 't', '-cfg-', '-y', '-psteamrip.com', '--', archive], cancelled,
+                     lambda text: report())
+            return
+        manifest = {entries[i].name: {'size': entries[i].size} for i in remaining}
+        def complete(name):
+            nonlocal target
+            index = found(name, target)
+            if index is not None:
+                target = max(target, index + 1)
+        progress = UnrarProgress(output, manifest, state, complete)
+        def activity(text):
+            progress.feed(text)
+            state['percent'] = min(100, progress.completed_bytes / total * 100)
+            report()
+        _extract_unrar(unrar, archive, output, names, cancelled, activity, tick)
+        return
+    tool = _find_7z()
+    if not tool:
+        raise RuntimeError('RAR extraction requires a bundled or installed 7-Zip command-line tool')
+    if test:
+        _run_cli([tool, 't', '-y', '-psteamrip.com', '--', archive], cancelled, lambda text: report())
+        return
+    pending = ''
+    def activity(text):
+        nonlocal pending, target
+        lines = re.split(r'[\r\n\b]', pending + text)
+        pending = lines.pop()[-8192:]
+        for line in lines:
+            # "- name" starts a file, so every entry before it is behind 7-Zip.
+            match = re.match(r'(?:\d+%\s+(?:\d+\s+)?)?- (.+)$', line.strip())
+            if match:
+                name = match.group(1).replace('\\', '/')
+                index = found(name, target)
+                if index is not None:
+                    target = max(target, index)
+                    state['name'] = name
+        percentages = re.findall(r'(\d+)%', text)
+        if percentages:
+            state['percent'] = int(percentages[-1])
+        report()
+    with NamedTemporaryFile(mode='w', encoding='utf-8', suffix='.7z-list', delete=False) as selection:
+        selection_path = selection.name
+        for name in sorted(names):
+            selection.write(name + '\n')
+    try:
+        _run_cli([tool, 'x', '-y', '-aoa', '-psteamrip.com', '-bsp1', '-bb1', '-sccUTF-8', '-scsUTF-8',
+                  '-o' + output, '-i@' + selection_path, '--', archive], cancelled, activity, tick)
+    finally:
+        try:
+            os.remove(selection_path)
+        except OSError:
+            pass
+
+
 def _retry_archive_members(kind, archive, destination, names, cancelled, activity, use_cli=False):
     selected = {name.replace('\\', '/') for name in names}
+    if kind in ('inplace', 'rarinplace'):
+        _link_output(inplace_paths(archive)[0], destination, selected, cancelled)
+        return
     if kind == 'zip' and not use_cli:
         with zipfile.ZipFile(archive) as source:
             members = {item.filename.replace('\\', '/'): item for item in source.infolist()}
@@ -622,7 +1271,7 @@ def _cancelled_value(cancelled):
     return False
 
 
-def extraction_worker(archive, destination, manifest_path, connection, stop):
+def extraction_worker(archive, destination, manifest_path, connection, stop, allow_inplace=True):
     """Only this process touches archive decoders. No frontend JSON writes here."""
     archive, destination, manifest_path = map(_extended_path, (archive, destination, manifest_path))
     last_sent = 0
@@ -658,7 +1307,32 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
         report()
     try:
         report(True)
-        kind, _ = detect_file_type(archive, cancelled)
+        hatchzip = _find_hatchzip() if allow_inplace else None
+        saved = _load_inplace_state(inplace_paths(archive)[1])
+        rar_saved = saved is not None and saved.get('engine') == 'rar'
+        layout = None
+        if rar_saved and not os.path.exists(archive):
+            # Volumes deleted to free space, or a finished extraction kept for retries.
+            kind = source_kind = 'rarinplace'
+        elif not rar_saved and inplace_consumed(archive):
+            # Partly or fully consumed: the archive can no longer be read normally.
+            kind, source_kind = 'inplace', None
+            hatchzip = hatchzip or _find_hatchzip()
+            if not hatchzip:
+                raise RuntimeError('This archive was partly extracted in place and HatchZip is '
+                                   'required to resume it. Reinstall Ascendara')
+        else:
+            source_kind, _ = detect_file_type(archive, cancelled)
+            # A hard-linked archive shares its bytes with another retained copy,
+            # which truncation would destroy.
+            kind = ('inplace' if hatchzip and source_kind in ('zip', '7z')
+                    and os.stat(archive).st_nlink == 1 else source_kind)
+            if kind == 'rar' and (allow_inplace or rar_saved):
+                layout = rar_inplace_layout(archive)
+                if layout is not None or rar_saved and (saved.get('freed') or saved.get('unresumable')):
+                    kind = 'rarinplace'
+                elif rar_saved:
+                    _discard_inplace(*inplace_paths(archive))  # Nothing was released yet.
         from AscendaraDownloadRecovery import find_unrar
         unrar = find_unrar() if kind == 'rar' and os.name != 'nt' else None
         use_cli = False
@@ -667,7 +1341,14 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
                 # Python's ZipCrypto implementation is particularly slow on large repacks.
                 use_cli = any(i.flag_bits & 1 or i.compress_type not in (0, 8, 12, 14)
                               for i in source.infolist())
-        if kind == 'zip' and not use_cli:
+        if kind == 'inplace':
+            state['engine'] = 'HatchZip'
+            manifest = _extract_inplace(hatchzip, source_kind, archive, destination,
+                                        manifest_path + '.listing', state, report, cancelled)
+        elif kind == 'rarinplace':
+            state['engine'] = 'RAR in place'
+            manifest = _extract_rar_inplace(archive, layout, destination, state, report, cancelled, stop)
+        elif kind == 'zip' and not use_cli:
             state.update(engine='Python ZIP', bytes=0)
             with zipfile.ZipFile(archive) as source:
                 members = [i for i in source.infolist() if _wanted(i.filename)]
@@ -768,25 +1449,8 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
             tool = _find_7z()
             if not tool:
                 raise RuntimeError(f'{kind.upper()} extraction requires a bundled or installed 7-Zip command-line tool')
-            # Stream the full listing to disk; large manifests must not be kept in a pipe tail.
-            listing_path = manifest_path + '.listing'
-            with open(listing_path, 'w', encoding='utf-8', newline='') as listing:
-                def listing_activity(text):
-                    listing.write(text)
-                    report()
-                _run_cli([tool, 'l', '-slt', '-ba', '-sccUTF-8', '-psteamrip.com', '--', archive], cancelled, listing_activity)
-            with open(listing_path, encoding='utf-8') as listing:
-                records = listing.read().split('\n\n')
-            for record in records:
-                values = dict(line.split(' = ', 1) for line in record.splitlines() if ' = ' in line)
-                name = values.get('Path')
-                if not name or not _wanted(name):
-                    continue
-                _check_archive_target(archive, _member_path(destination, name))
-                if values.get('Symbolic Link') or values.get('Hard Link') or 'l' in values.get('Attributes', '').split(' ')[-1][:1]:
-                    raise ValueError(f'Refusing archive link: {name}')
-                if values.get('Folder') != '+' and not values.get('Attributes', '').startswith('D'):
-                    manifest[name.replace('\\', '/')] = {'size': int(values['Size'])}
+            manifest = _7z_files(tool, archive, destination, manifest_path + '.listing',
+                                 cancelled, lambda text: report())
             total_bytes = sum(v['size'] for v in manifest.values())
             if total_bytes > shutil.disk_usage(destination).free:
                 raise OSError('Insufficient disk space for extraction')
@@ -853,13 +1517,14 @@ def extraction_worker(archive, destination, manifest_path, connection, stop):
         connection.close()
 
 
-def supervise_extraction(archive, destination, check_cancelled, progress, recovery, workdir, idle_timeout=300):
+def supervise_extraction(archive, destination, check_cancelled, progress, recovery, workdir, idle_timeout=300,
+                         inplace=True):
     context = multiprocessing.get_context('spawn')
     receiver, sender = context.Pipe(duplex=True)
     stop = StopSignal(context)
     manifest_path = os.path.join(workdir, 'worker-manifest.json')
     process = context.Process(target=extraction_worker,
-                              args=(archive, destination, manifest_path, sender, stop), daemon=True)
+                              args=(archive, destination, manifest_path, sender, stop, inplace), daemon=True)
     process.start()
     sender.close()
     last_activity = time.monotonic()

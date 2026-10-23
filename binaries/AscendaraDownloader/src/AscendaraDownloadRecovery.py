@@ -71,6 +71,8 @@ def is_archive_integrity_error(error):
         'unrar error 12', 'unrar error 13', 'unrar error 15',
         'incomplete rar output', 'file is not a zip file', 'bad magic number',
         'unrar exited with code 3', 'unrar failed (exit 3)',
+        # In-place RAR extraction released part of the archive and cannot resume.
+        'archive was released to make room',
     ))
 
 

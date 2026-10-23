@@ -33,7 +33,8 @@ from AscendaraGofile import GofileClient, content_id as gofile_content_id
 from AscendaraRarRecovery import _extended_path, _check_path, _member_path
 from AscendaraExtraction import (
     IncompleteArchiveOutput, ExtractionRecoveryCancelled, detect_file_type,
-    verify_manifest, supervise_extraction, _wanted,
+    verify_manifest, supervise_extraction, _wanted, inplace_consumed, inplace_paths,
+    inplace_retained, trust_inplace_output,
 )
 
 DOWNLOADER_VERSION = '4.0.1'
@@ -1038,6 +1039,8 @@ class AscendaraDownloader:
             # Collect all .exe files in the download directory
             exe_files = []
             for root, dirs, files in os.walk(self.download_dir):
+                # Stages and retained in-place output are not part of the game.
+                dirs[:] = [d for d in dirs if not d.startswith('.ascendara-')]
                 for file in files:
                     if file.lower().endswith('.exe'):
                         full_path = os.path.join(root, file)
@@ -1383,16 +1386,23 @@ class AscendaraDownloader:
         while True:
             self._check_cancelled()
             try:
-                return supervise_extraction(archive, payload, self._check_cancelled,
+                result = supervise_extraction(archive, payload, self._check_cancelled,
                     lambda state: self._extraction_progress(state, started),
-                    self._await_extraction_recovery, stage)
+                    self._await_extraction_recovery, stage,
+                    # Private packages keep their archive after extraction.
+                    inplace=not self.game_info.get('privateSource'))
+                trust_inplace_output(archive, payload, result)
+                return result
             except (InterruptedError, ExtractionRecoveryCancelled):
                 raise
             except Exception as exc:
                 failure = exc
                 # Preserve the existing one-shot repair, but a user's extraction
                 # retry must never silently start another download.
-                if not manual_retry and not repair_attempted and not isinstance(exc, IncompleteArchiveOutput):
+                # A re-download would replace an archive HatchZip already
+                # truncated; retrying resumes it from its journal instead.
+                if (not manual_retry and not repair_attempted and not isinstance(exc, IncompleteArchiveOutput)
+                        and not inplace_consumed(archive)):
                     repair_attempted = True
                     try:
                         self._repair_archive(exc, archive, 0)
@@ -1502,6 +1512,8 @@ class AscendaraDownloader:
                     for path in family:
                         os.remove(path)
                         manifest.pop(os.path.relpath(path, payload).replace('\\', '/'), None)
+                    # In-place extraction already removed the archive itself.
+                    manifest.pop(os.path.relpath(archive, payload).replace('\\', '/'), None)
                 # All primary archives may contribute to the same wrapper directory.
                 if not pending:
                     manifest = flatten_payload(payload, manifest, self.game)
@@ -1555,7 +1567,7 @@ class AscendaraDownloader:
             archive_dir = os.path.dirname(archive)
             family = archive_sources(archive, {os.path.join(archive_dir, n): None
                                                for n in os.listdir(archive_dir)})
-            for path in family:
+            for path in [*family, *inplace_paths(archive)]:
                 cleanup_temporary(path, self.download_dir)
         if cleanup_folder is not None:
             cleanup_temporary(cleanup_folder, self.download_dir)
@@ -1796,14 +1808,15 @@ def retry_local_extraction(metadata_path):
     worker.updateFlow = bool((plan or {}).get('updating', info.get('downloadingData', {}).get('updating', False)))
     prevent_sleep()
     try:
-        def source_path(name):
+        def source_path(name, archive=False):
             target = _member_path(worker.download_dir, name)
             _check_path(worker.download_dir, target)
-            if not os.path.isfile(target):
+            # An archive consumed by in-place extraction is retained as its output.
+            if not os.path.isfile(target) and not (archive and inplace_retained(target)):
                 raise FileNotFoundError(f'Retained source is missing: {name}')
             return target
         if plan:
-            archives = [source_path(name) for name in plan['archives']]
+            archives = [source_path(name, archive=True) for name in plan['archives']]
             loose = [dict(item, source=source_path(item['source'])) for item in plan.get('loose', [])]
         else:
             # Older downloads did not record a source manifest. Search only the
@@ -1813,7 +1826,8 @@ def retry_local_extraction(metadata_path):
             cache = os.path.join(worker.download_dir, '.ascendara-downloads')
             if os.path.isdir(cache):
                 roots.extend(root for root, dirs, files in os.walk(cache)
-                             if '.ascendara-receipts' not in root.split(os.sep))
+                             if '.ascendara-receipts' not in root.split(os.sep)
+                             and not any(part.startswith('.ascendara-inplace-') for part in root.split(os.sep)))
             for root in roots:
                 for name in os.listdir(root):
                     if name.lower().endswith(('.zip', '.rar', '.7z')):

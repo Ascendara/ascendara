@@ -59,6 +59,16 @@ def _load_api():
         close=bind('RARCloseArchive', ctypes.c_int, ctypes.c_void_p))
 
 
+# Files hard-linked on purpose: in-place extraction output shared with its
+# retained copy. Keyed by (device, inode) so the trust follows renames.
+_trusted_links = set()
+
+
+def trust_link(path):
+    info = os.lstat(_extended_path(path))
+    _trusted_links.add((info.st_dev, info.st_ino))
+
+
 def _check_path(root, target):
     # Native extraction and Python inspection must resolve the same long paths.
     root, target = _extended_path(root), _extended_path(target)
@@ -70,7 +80,8 @@ def _check_path(root, target):
             info = os.lstat(current)
             if stat.S_ISLNK(info.st_mode) or getattr(info, 'st_file_attributes', 0) & 0x400:
                 raise ValueError(f'Refusing symlink or reparse-point path: {current!r}')
-            if current == target and not stat.S_ISDIR(info.st_mode) and info.st_nlink > 1:
+            if (current == target and not stat.S_ISDIR(info.st_mode) and info.st_nlink > 1
+                    and (info.st_dev, info.st_ino) not in _trusted_links):
                 raise ValueError(f'Refusing hard-linked output: {current!r}')
         # Ancestors of the chosen destination may be user-managed symlinks
         # (for example /mnt). Reject links at and below the output root only.
