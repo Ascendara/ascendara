@@ -29,8 +29,10 @@ import {
   Gamepad2,
   TestTube2,
   Loader,
+  Search,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { useSearch } from "@/context/SearchContext";
 import { checkForUpdates } from "@/services/app/updateCheckingService";
 import { exportToSvg } from "@/lib/exportToSvg";
 
@@ -38,6 +40,7 @@ const MenuBar = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
+  const { openSearch } = useSearch();
   const libraryBackupBusy = useLibraryBackupStore(state => state.busy);
   const libraryBackupProgress = useLibraryBackupStore(state => state.progress);
   const libraryBackupScreen = useLibraryBackupStore(state => state.screen);
@@ -66,6 +69,11 @@ const MenuBar = () => {
   const [audioDownloadCount, setAudioDownloadCount] = useState(0);
   const mainContentRef = useRef(null);
   const checkIntervalRef = useRef(null);
+
+  const platform = navigator.userAgentData?.platform || navigator.platform || "";
+  const modifierKey = platform.toUpperCase().includes("MAC") ? "⌘" : "Ctrl";
+  const showSearchPill =
+    !location.pathname.startsWith("/welcome") && location.pathname !== "/bigpicture";
 
   // Check for dev mode
   useEffect(() => {
@@ -472,8 +480,25 @@ const MenuBar = () => {
             </button>
           </div>
         )}
+        {showSearchPill && (
+          <button
+            type="button"
+            onClick={() => openSearch("global")}
+            className="ml-2 flex h-7 items-center gap-2 rounded-full border border-border bg-muted/50 pl-2.5 pr-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            style={{ WebkitAppRegion: "no-drag" }}
+            aria-label={t("globalSearch.placeholder.global")}
+          >
+            <Search className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className="hidden pr-4 sm:inline">
+              {t("globalSearch.placeholder.global")}
+            </span>
+            <kbd className="inline-flex h-5 select-none items-center rounded-full border border-border bg-background px-2 font-mono text-[10px] font-medium">
+              {modifierKey}+K
+            </kbd>
+          </button>
+        )}
       </div>
-      <div className="window-controls mr-2 flex items-center">
+      <div className="window-controls mr-2 mt-2 flex items-center">
         <div className="flex items-center space-x-2">
           <button
             className="text-muted-foreground transition-colors hover:text-foreground"
