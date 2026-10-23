@@ -50,8 +50,45 @@ const STEAM_INSTALL_PATHS = isLinux
 
 // File paths
 const TIMESTAMP_FILE = !isWindows
-  ? path.join(os.homedir(), "timestamp.ascendara.json")
+  ? path.join(unixConfigDir, "timestamp.ascendara.json")
   : path.join(process.env.USERPROFILE, "timestamp.ascendara.json");
+
+// Older versions kept these files loose in the Unix home directory. Move them
+// into ~/.ascendara before anything else reads or writes them.
+function migrateHomeFiles() {
+  if (isWindows) return;
+  try {
+    fs.mkdirSync(unixConfigDir, { recursive: true });
+  } catch (error) {
+    console.error("Failed to create config directory:", error);
+    return;
+  }
+  for (const name of [
+    "timestamp.ascendara.json",
+    "onboarding.ascendara.json",
+    "translation_progress.ascendara.json",
+  ]) {
+    const legacy = path.join(os.homedir(), name);
+    const target = path.join(unixConfigDir, name);
+    try {
+      if (!fs.existsSync(legacy)) continue;
+      if (fs.existsSync(target)) {
+        fs.rmSync(legacy, { force: true });
+        continue;
+      }
+      try {
+        fs.renameSync(legacy, target);
+      } catch (error) {
+        if (error.code !== "EXDEV") throw error;
+        fs.copyFileSync(legacy, target);
+        fs.rmSync(legacy, { force: true });
+      }
+    } catch (error) {
+      console.error(`Failed to migrate ${name}:`, error);
+    }
+  }
+}
+migrateHomeFiles();
 
 const LANG_DIR = isWindows
   ? path.join(process.env.LOCALAPPDATA, "Ascendara", "languages")

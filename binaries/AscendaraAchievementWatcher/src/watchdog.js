@@ -16,7 +16,10 @@ const { spawn } = require("child_process");
 
 // Get config from ENV or IPC
 const homeDir = process.env.USERPROFILE || process.env.HOME || require("os").homedir();
-const timestampFilePath = path.join(homeDir, "timestamp.ascendara.json");
+const timestampFilePath =
+  process.platform === "win32"
+    ? path.join(homeDir, "timestamp.ascendara.json")
+    : path.join(homeDir, ".ascendara", "timestamp.ascendara.json");
 let watchdogRunning = false;
 
 // Resource optimization constants
@@ -31,11 +34,14 @@ const fileEventTimers = new Map();
 // Performance monitoring
 function logMemoryUsage() {
   const usage = process.memoryUsage();
-  const formatMB = (bytes) => (bytes / 1024 / 1024).toFixed(2);
-  console.log(`Memory Usage: RSS=${formatMB(usage.rss)}MB, Heap=${formatMB(usage.heapUsed)}/${formatMB(usage.heapTotal)}MB`);
-  
+  const formatMB = bytes => (bytes / 1024 / 1024).toFixed(2);
+  console.log(
+    `Memory Usage: RSS=${formatMB(usage.rss)}MB, Heap=${formatMB(usage.heapUsed)}/${formatMB(usage.heapTotal)}MB`
+  );
+
   // Warn if memory usage is excessive
-  if (usage.heapUsed > 500 * 1024 * 1024) { // 500MB
+  if (usage.heapUsed > 500 * 1024 * 1024) {
+    // 500MB
     console.warn(`WARNING: High memory usage detected: ${formatMB(usage.heapUsed)}MB`);
   }
 }
@@ -127,8 +133,6 @@ let sendNotification = async opts => {
   }
 };
 
-
-
 // Extracted file event processing logic
 async function processFileEvent(name, options, self) {
   try {
@@ -151,9 +155,7 @@ async function processFileEvent(name, options, self) {
 
     console.log(`Achievement file change detected: ${name}`);
 
-    if (
-      moment().diff(moment(self.tick)) <= self.options.notification_advanced.tick
-    ) {
+    if (moment().diff(moment(self.tick)) <= self.options.notification_advanced.tick) {
       console.log(`Spamming protection active, skipping notification.`);
       throw "Spamming protection is enabled > SKIPPING";
     }
@@ -172,7 +174,10 @@ async function processFileEvent(name, options, self) {
           // Use a separator-agnostic pattern so this works on both
           // Windows ("\\") and Linux/Proton ("/") paths.
           appID = filePath.dir
-            .replace(/([\\/]stats$)|([\\/]SteamEmu$)|([\\/]SteamEmu[\\/]UserStats$)/gi, "")
+            .replace(
+              /([\\/]stats$)|([\\/]SteamEmu$)|([\\/]SteamEmu[\\/]UserStats$)/gi,
+              ""
+            )
             .match(/([0-9]+$)/g)[0];
         }
       }
@@ -208,8 +213,7 @@ async function processFileEvent(name, options, self) {
                 } else {
                   return (
                     achievement.name == achievements[i].name ||
-                    achievement.name.toUpperCase() ==
-                      achievements[i].name.toUpperCase()
+                    achievement.name.toUpperCase() == achievements[i].name.toUpperCase()
                   );
                 }
               });
@@ -220,20 +224,14 @@ async function processFileEvent(name, options, self) {
                 delete achievements[i].crc;
               }
 
-              let previous = cache.find(
-                achievement => achievement.name === ach.name
-              ) || {
+              let previous = cache.find(achievement => achievement.name === ach.name) || {
                 Achieved: false,
                 CurProgress: 0,
                 MaxProgress: 0,
                 UnlockTime: 0,
               };
 
-              if (
-                !previous.Achieved &&
-                achievements[i].Achieved &&
-                !previous.Notified
-              ) {
+              if (!previous.Achieved && achievements[i].Achieved && !previous.Notified) {
                 if (!achievements[i].UnlockTime || achievements[i].UnlockTime == 0)
                   achievements[i].UnlockTime = moment().unix();
                 console.log("Unlocked:" + ach.displayName);
@@ -277,10 +275,7 @@ async function processFileEvent(name, options, self) {
                   try {
                     await updateAchievementsJsonForRunningGame(game, cache);
                   } catch (err) {
-                    console.error(
-                      "Failed to update achievements.ascendara.json:",
-                      err
-                    );
+                    console.error("Failed to update achievements.ascendara.json:", err);
                   }
                 } catch (err) {
                   console.error("Failed to send notification:", err);
@@ -341,8 +336,12 @@ var app = {
         try {
           const gameFolders = await fs.readdir(downloadDir, { withFileTypes: true });
           const emuConfigFiles = [
-            "ALI213.ini", "valve.ini", "hlm.ini", "ds.ini",
-            "steam_api.ini", "SteamConfig.ini"
+            "ALI213.ini",
+            "valve.ini",
+            "hlm.ini",
+            "ds.ini",
+            "steam_api.ini",
+            "SteamConfig.ini",
           ];
 
           for (const dirent of gameFolders) {
@@ -355,7 +354,9 @@ var app = {
                 try {
                   await fs.access(path.join(gameFolderPath, configFile));
                   shouldMonitor = true;
-                  console.log(`[Watcher] Adding ${dirent.name} - found emulator config: ${configFile}`);
+                  console.log(
+                    `[Watcher] Adding ${dirent.name} - found emulator config: ${configFile}`
+                  );
                   break;
                 } catch (e) {
                   // Config file doesn't exist, continue
@@ -365,7 +366,10 @@ var app = {
               // Also monitor if folder has .ascendara.json (installed through Ascendara)
               if (!shouldMonitor) {
                 try {
-                  const ascendaraJsonPath = path.join(gameFolderPath, `${dirent.name}.ascendara.json`);
+                  const ascendaraJsonPath = path.join(
+                    gameFolderPath,
+                    `${dirent.name}.ascendara.json`
+                  );
                   await fs.access(ascendaraJsonPath);
                   shouldMonitor = true;
                   console.log(`[Watcher] Adding ${dirent.name} - found .ascendara.json`);
@@ -377,10 +381,15 @@ var app = {
               // Also monitor if folder has achievements.ascendara.json (previously tracked)
               if (!shouldMonitor) {
                 try {
-                  const achievementsPath = path.join(gameFolderPath, "achievements.ascendara.json");
+                  const achievementsPath = path.join(
+                    gameFolderPath,
+                    "achievements.ascendara.json"
+                  );
                   await fs.access(achievementsPath);
                   shouldMonitor = true;
-                  console.log(`[Watcher] Adding ${dirent.name} - found existing achievements.ascendara.json`);
+                  console.log(
+                    `[Watcher] Adding ${dirent.name} - found existing achievements.ascendara.json`
+                  );
                 } catch (e) {
                   // achievements file doesn't exist
                 }
@@ -408,43 +417,45 @@ var app = {
 
       const folders = await monitor.getFolders(tempFile);
       console.log(`monitor.getFolders() returned ${folders.length} folders`);
-      
+
       const foldersToWatch = folders.slice(0, MAX_WATCHERS);
       if (folders.length > MAX_WATCHERS) {
-        console.warn(`Limiting watchers to ${MAX_WATCHERS} (found ${folders.length} potential folders)`);
+        console.warn(
+          `Limiting watchers to ${MAX_WATCHERS} (found ${folders.length} potential folders)`
+        );
       }
-      
+
       let watcherCount = 0;
       for (let folder of foldersToWatch) {
         try {
           await fs.access(folder.dir);
           self.watch(watcherCount, folder.dir, folder.options);
           watcherCount++;
-        } catch (err) {
-        }
+        } catch (err) {}
       }
-      
+
       console.log(`Started ${watcherCount} file watchers`);
-      
+
       // Log initial memory usage
       logMemoryUsage();
-      
+
       // Cache cleanup and memory monitoring interval
       setInterval(() => {
         if (self.cache.length > MAX_CACHE_SIZE) {
           console.log(`Cleaning cache (size: ${self.cache.length})`);
           self.cache = self.cache.slice(-MAX_CACHE_SIZE);
         }
-        
+
         // Log memory usage periodically
         logMemoryUsage();
-        
+
         // Clean up old debounce timers (shouldn't happen, but just in case)
         if (fileEventTimers.size > 100) {
-          console.warn(`WARNING: Large number of pending file events: ${fileEventTimers.size}`);
+          console.warn(
+            `WARNING: Large number of pending file events: ${fileEventTimers.size}`
+          );
         }
       }, CACHE_CLEANUP_INTERVAL_MS);
-      
     } catch (err) {
       console.log(err);
       instance.unlock();
@@ -484,12 +495,12 @@ var app = {
           if (fileEventTimers.has(debounceKey)) {
             clearTimeout(fileEventTimers.get(debounceKey));
           }
-          
+
           const timerId = setTimeout(async () => {
             fileEventTimers.delete(debounceKey);
             await processFileEvent(name, options, self);
           }, FILE_EVENT_DEBOUNCE_MS);
-          
+
           fileEventTimers.set(debounceKey, timerId);
         } catch (err) {
           console.warn(err);

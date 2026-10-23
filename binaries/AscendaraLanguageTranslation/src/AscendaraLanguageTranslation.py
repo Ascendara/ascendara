@@ -63,6 +63,12 @@ def language_directory():
     return Path.home() / ".ascendara/languages"
 
 
+def default_progress_path():
+    if sys.platform == "win32":
+        return Path.home() / "translation_progress.ascendara.json"
+    return Path.home() / ".ascendara/translation_progress.ascendara.json"
+
+
 class RateLimiter:
     def __init__(self, limit=8):
         self.limit = limit
@@ -81,7 +87,7 @@ class RateLimiter:
 
 class TranslationProgress:
     def __init__(self, language_code, path=None):
-        self.path = path or Path.home() / "translation_progress.ascendara.json"
+        self.path = path or default_progress_path()
         self.language_code = language_code
         self.total = 0
         self.done = 0
