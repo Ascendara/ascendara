@@ -304,6 +304,8 @@ def _external_tool_env():
 # that already exited, plus the one still running.
 _tool_io = [0, 0]
 _tool_process = None
+# Held while a finished tool's counters move into _tool_io, so samples never dip.
+_tool_lock = threading.Lock()
 
 
 def _process_io(process=None):
@@ -333,10 +335,11 @@ def _extraction_io(baseline):
     own = _process_io()
     if own is None or baseline is None:
         return None
-    tool = _process_io(_tool_process) if _tool_process is not None else None
-    tool = tool or (0, 0)
-    return [max(0, own[0] - baseline[0]) + _tool_io[0] + tool[0],
-            max(0, own[1] - baseline[1]) + _tool_io[1] + tool[1]]
+    with _tool_lock:
+        process = _tool_process
+        tool = (_process_io(process) if process is not None else None) or (0, 0)
+        return [max(0, own[0] - baseline[0]) + _tool_io[0] + tool[0],
+                max(0, own[1] - baseline[1]) + _tool_io[1] + tool[1]]
 
 
 class ToolExit(RuntimeError):
@@ -404,11 +407,12 @@ def _run_cli(command, cancelled, activity, tick=None):
         return b''.join(tail).decode('utf-8', errors='replace')
     finally:
         # Keep what the tool transferred before its handle goes away.
-        final = _process_io(process)
-        _tool_process = None
-        if final:
-            _tool_io[0] += final[0]
-            _tool_io[1] += final[1]
+        with _tool_lock:
+            final = _process_io(process)
+            _tool_process = None
+            if final:
+                _tool_io[0] += final[0]
+                _tool_io[1] += final[1]
         if process.poll() is None:
             process.terminate()
             try:
@@ -1293,16 +1297,35 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
     def cancelled():
         if stop.is_set():
             raise InterruptedError('Extraction cancelled')
+    send_lock = threading.Lock()
+    def send(message):
+        with send_lock:
+            connection.send(message)
     def report(force=False):
         nonlocal last_sent
         cancelled()
-        now = time.monotonic()
-        if force or now - last_sent >= .5:
-            io = _extraction_io(io_baseline)
-            if io:
-                state['io'] = io
-            connection.send(('progress', dict(state)))
-            last_sent = now
+        with send_lock:
+            now = time.monotonic()
+            if force or now - last_sent >= .5:
+                io = _extraction_io(io_baseline)
+                if io:
+                    state['io'] = io
+                connection.send(('progress', dict(state)))
+                last_sent = now
+    def io_watch():
+        # Flushing, releasing archive space and verifying report no progress,
+        # so disk rates are sampled on their own clock rather than going stale.
+        while not stop.wait(.5):
+            try:
+                # Sampled under the lock so samples reach the parent in counter order.
+                with send_lock:
+                    io = _extraction_io(io_baseline)
+                    if io is None:
+                        return
+                    connection.send(('io', io))
+            except (OSError, ValueError):
+                return
+    threading.Thread(target=io_watch, daemon=True).start()
     def completed(name, size):
         normalized = name.replace('\\', '/')
         manifest[normalized] = {'size': size}
@@ -1480,7 +1503,7 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
             raise RuntimeError('Archive contains no installable files')
         errors = verify_manifest(destination, manifest, cancelled)
         if errors:
-            connection.send(('recoverable', {
+            send(('recoverable', {
                 'type': 'missingExtractedFiles',
                 'archive': os.path.basename(archive),
                 'files': errors,
@@ -1507,14 +1530,14 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
         report(True)
         with open(manifest_path, 'w', encoding='utf-8') as stream:
             json.dump(manifest, stream)
-        connection.send(('done', None))
+        send(('done', None))
     except BaseException as exc:
         if isinstance(exc, zlib.error):
             exc = RuntimeError(f'Archive corrupt data: {exc}')
         try:
             details = ({'errors': exc.errors, 'recovery_attempted': exc.recovery_attempted}
                        if isinstance(exc, IncompleteArchiveOutput) else {})
-            connection.send(('error', (type(exc).__name__, str(exc), details)))
+            send(('error', (type(exc).__name__, str(exc), details)))
         except (OSError, EOFError):
             pass
     finally:
@@ -1532,6 +1555,7 @@ def supervise_extraction(archive, destination, check_cancelled, progress, recove
     process.start()
     sender.close()
     last_activity = time.monotonic()
+    latest = None
     try:
         while True:
             check_cancelled()
@@ -1540,8 +1564,17 @@ def supervise_extraction(archive, destination, check_cancelled, progress, recove
                     event, value = receiver.recv()
                 except EOFError:
                     raise RuntimeError(f'Extraction worker exited unexpectedly (code {process.exitcode})')
+                if event == 'io':
+                    if latest is not None:
+                        # Disk samples only count as activity while the counters still move.
+                        if value != latest.get('io'):
+                            last_activity = time.monotonic()
+                        latest = dict(latest, io=value)
+                        progress(latest)
+                    continue
                 last_activity = time.monotonic()
                 if event == 'progress':
+                    latest = value
                     progress(value)
                 elif event == 'recoverable':
                     receiver.send(recovery(value))

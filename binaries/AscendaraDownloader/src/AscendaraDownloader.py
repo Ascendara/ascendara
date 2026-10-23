@@ -1397,11 +1397,15 @@ class AscendaraDownloader:
         while True:
             self._check_cancelled()
             try:
-                result = supervise_extraction(archive, payload, self._check_cancelled,
-                    lambda state: self._extraction_progress(state, started),
-                    self._await_extraction_recovery, stage,
-                    # Private packages keep their archive after extraction.
-                    inplace=not self.game_info.get('privateSource'))
+                try:
+                    result = supervise_extraction(archive, payload, self._check_cancelled,
+                        lambda state: self._extraction_progress(state, started),
+                        self._await_extraction_recovery, stage,
+                        # Private packages keep their archive after extraction.
+                        inplace=not self.game_info.get('privateSource'))
+                finally:
+                    self._end_extraction_io()
+                safe_write_json(self.game_info_path, self.game_info)
                 trust_inplace_output(archive, payload, result)
                 return result
             except (InterruptedError, ExtractionRecoveryCancelled):
@@ -1734,6 +1738,13 @@ class AscendaraDownloader:
             logging.info('Extraction [%s]: %s, %s/%s files, %.2f%%, %s',
                          state.get('engine', 'Preparing'), speed, done, total, percent, name)
             self._last_extraction_log = now
+
+    def _end_extraction_io(self):
+        """The worker is gone; its last disk rates must not linger on the graph."""
+        self._io_samples = None
+        progress = self.game_info.get('downloadingData', {}).get('extractionProgress')
+        if progress and 'readSpeed' in progress:
+            progress.update(readSpeed=0, writeSpeed=0)
 
     def _install_payload(self, payload, manifest, stage):
         """Journal overwritten files by rename and roll back a failed installation."""
