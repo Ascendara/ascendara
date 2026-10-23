@@ -557,6 +557,17 @@ def read_size(size: int, decimal_places: int = 2) -> str:
     return f"{size_float:.{decimal_places}f} {units[i]}"
 
 
+def installed_size(folder: str) -> int:
+    total = 0
+    for root, _, files in os.walk(folder):
+        for name in files:
+            try:
+                total += os.lstat(os.path.join(root, name)).st_size
+            except OSError:
+                pass
+    return total
+
+
 def sanitize_folder_name(name: str) -> str:
     valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
     return ''.join(c for c in name if c in valid_chars)
@@ -1573,6 +1584,13 @@ class AscendaraDownloader:
             cleanup_temporary(cleanup_folder, self.download_dir)
         cleanup_temporary(os.path.join(self.download_dir, '.ascendara-downloads'),
                           self.download_dir, empty_only=True)
+        # The catalog size is the compressed download; record what the verified
+        # install really occupies, so the app's library check skips this game.
+        try:
+            self.game_info['size'] = read_size(installed_size(self.download_dir))
+            self.game_info['sizeMeasured'] = True
+        except OSError as exc:
+            logging.warning(f"[AscendaraDownloader] Could not measure installed size: {exc}")
         # Publish completion only after cleanup, before sleep/shutdown actions.
         del self.game_info['downloadingData']
         self.game_info.pop('extractionSources', None)

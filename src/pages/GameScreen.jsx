@@ -3717,7 +3717,7 @@ function InstalledGameScreen() {
                       true, // isUpdating
                       updateInfo?.latestVersion || "",
                       game?.imgID,
-                      game?.size || "",
+                      updateInfo?.size || "",
                       dir,
                       game?.gameID || ""
                     );

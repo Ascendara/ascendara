@@ -1021,6 +1021,8 @@ const gameService = {
       gameName: indexGame.game,
       latestVersion,
       localVersion,
+      // Download size of the new version; the installed game records its size on disk
+      size: indexGame.size || "",
       updateAvailable: true,
       autoUpdateSupported: SEAMLESS_PROVIDERS.some(
         provider =>

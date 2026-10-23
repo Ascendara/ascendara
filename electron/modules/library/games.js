@@ -33,6 +33,7 @@ const { setPlayingActivity, updateDiscordRPCToLibrary } = require("../app/discor
 const { hideWindow, showWindow } = require("../app/window");
 
 const { createGameExitMonitor } = require("./gameExitMonitor");
+const { ensureInstallSize } = require("./installSize");
 
 const steamgrid = require("./steamgrid");
 const { resetOnboarding } = require("../core/onboarding");
@@ -349,6 +350,7 @@ function registerGameHandlers() {
               try {
                 const gameInfoData = await fs.promises.readFile(gameInfoPath, "utf8");
                 const parsed = JSON.parse(gameInfoData);
+                ensureInstallSize(parsed, path.join(downloadDir, dir), gameInfoPath);
                 return {
                   ...parsed,
                   isCustom: false,
