@@ -1,14 +1,4 @@
 import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -25,23 +15,10 @@ import {
   Clock,
   ExternalLink,
   Eye,
-  FileQuestion,
   History,
   ShieldCheck,
   Star,
 } from "lucide-react";
-
-// Compressed downloads expand on extraction; estimate the space needed while
-// installing from the listed game size.
-const estimateInstallSize = size => {
-  const match = size
-    ?.trim()
-    .toLowerCase()
-    .match(/^([\d.]+)\s*(gb|mb)$/);
-  if (!match) return null;
-  const estimate = parseFloat(match[1]) * 2.1;
-  return match[2] === "gb" ? `~${estimate.toFixed(1)} GB` : `~${Math.round(estimate)} MB`;
-};
 
 // Shown at once when the image is already loaded (usually preloaded before the
 // page opened); otherwise it fades in a single time. Remounts never replay it.
@@ -117,7 +94,6 @@ export default function DownloadHero({
   onOpenTimemachine,
 }) {
   const { t } = useLanguage();
-  const installSize = estimateInstallSize(gameData.size);
   const isVr = gameData.category?.includes("Virtual Reality");
 
   return (
@@ -285,32 +261,6 @@ export default function DownloadHero({
         {/* Key facts */}
         <dl className="grid grid-cols-2 divide-x divide-border/40 border-t border-border/40 bg-background/30 md:grid-cols-4">
           {gameData.size && <Stat label={t("download.gameSize")}>{gameData.size}</Stat>}
-          {installSize && (
-            <Stat label={t("download.installSize")}>
-              {installSize}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <FileQuestion className="h-3.5 w-3.5 shrink-0 cursor-pointer text-muted-foreground hover:text-foreground" />
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      {t("download.installSizeInfo.title")}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t("download.installSizeInfo.description")}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <p className="text-sm text-muted-foreground">
-                    {t("download.installSizeInfo.note")}
-                  </p>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t("common.close")}</AlertDialogCancel>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </Stat>
-          )}
           <Stat label={t("download.latestUpdate")}>
             {formatLatestUpdate(gameData.latest_update)}
           </Stat>

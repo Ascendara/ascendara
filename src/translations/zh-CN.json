@@ -1507,12 +1507,6 @@
     "goToLibrary": "去图书馆",
     "hours": "小时",
     "infoMaybeInaccurate": "游戏信息可能不准确。",
-    "installSize": "安装尺寸",
-    "installSizeInfo": {
-      "description": "安装大小是游戏解压缩后将在磁盘上占用多少空间的估计值。压缩的下载内容在解压缩时会扩展，因此最终大小通常大于下载大小。",
-      "note": "下载完成后，压缩文件将被删除，并且只占用游戏大小旁边列出的空间量。",
-      "title": "关于安装尺寸"
-    },
     "latestUpdate": "最后更新",
     "linkCopied": "链接已复制到剪贴板",
     "mainPlusExtras": "主要+附加内容",

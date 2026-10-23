@@ -1511,12 +1511,6 @@
     "goToLibrary": "Vai alla Biblioteca",
     "hours": "ore",
     "infoMaybeInaccurate": "Le informazioni sul gioco potrebbero essere imprecise.",
-    "installSize": "Dimensioni di installazione",
-    "installSizeInfo": {
-      "description": "La dimensione dell'installazione è una stima dello spazio che il gioco occuperà sul disco dopo l'estrazione. I download compressi si espandono quando vengono estratti, quindi la dimensione finale è in genere maggiore della dimensione del download.",
-      "note": "Una volta completato il download, il file compresso verrà eliminato e dovrebbe occupare solo la quantità di spazio indicata accanto alla dimensione del gioco.",
-      "title": "Informazioni sulle dimensioni dell'installazione"
-    },
     "latestUpdate": "Ultimo aggiornamento",
     "linkCopied": "Link copiato negli appunti",
     "mainPlusExtras": "Principale + Extra",

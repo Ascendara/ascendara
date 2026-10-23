@@ -1513,12 +1513,6 @@
     "goToLibrary": "Go to Library",
     "hours": "hours",
     "infoMaybeInaccurate": "Game information may be inaccurate.",
-    "installSize": "Installation Size",
-    "installSizeInfo": {
-      "description": "The installation size is an estimate of how much space the game will take on your disk after extraction. Compressed downloads expand when extracted, so the final size is typically larger than the download size.",
-      "note": "After the download is complete the compressed file will be deleted and should only take the amount of space listed next to game size.",
-      "title": "About Installation Size"
-    },
     "latestUpdate": "Last Updated",
     "linkCopied": "Link copied to clipboard",
     "mainPlusExtras": "Main + Extras",
