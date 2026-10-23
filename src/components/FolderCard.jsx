@@ -1,5 +1,5 @@
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { ChevronRight, Folder, FolderOpen, Trash2 } from "lucide-react";
+import { ChevronRight, Folder, FolderOpen, Import, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { getFolderByName, deleteFolder, loadFolders } from "@/lib/folderManager";
@@ -36,6 +36,7 @@ const FolderCard = ({
   refreshKey,
   folder: suppliedFolder,
   variant = "grid",
+  updateCount = 0,
 }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -142,6 +143,15 @@ const FolderCard = ({
               <Folder className="h-3 w-3" />
               {folderGames.length}
             </span>
+            {updateCount > 0 && (
+              <span
+                className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-secondary"
+                title={t("gameScreen.updateBadge")}
+              >
+                <Import className="h-3 w-3" />
+                {updateCount}
+              </span>
+            )}
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
@@ -233,6 +243,15 @@ const FolderCard = ({
                 )}
                 {folderGames.length}
               </span>
+
+              {updateCount > 0 && (
+                <span className="absolute bottom-2 left-2 z-20 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-secondary">
+                  <Import className="h-3 w-3" />
+                  {updateCount > 1
+                    ? `${t("gameScreen.updateBadge")} (${updateCount})`
+                    : t("gameScreen.updateBadge")}
+                </span>
+              )}
             </div>
           </CardContent>
           <CardFooter className="flex flex-col items-start gap-1 px-3 py-2">

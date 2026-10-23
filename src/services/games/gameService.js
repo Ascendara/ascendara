@@ -1,4 +1,5 @@
 import { sanitizeText } from "@/lib/utils";
+import { SEAMLESS_PROVIDERS } from "@/config/providers";
 
 const API_URL = "https://api.ascendara.app";
 const CACHE_KEY = "ascendara_games_cache";
@@ -812,6 +813,8 @@ const gameService = {
 
   clearMemoryCache() {
     console.log("[GameService] Clearing memory cache");
+    // Index-based update answers depend on the index that is being swapped out
+    updateCheckCache.clear();
     memoryCache = {
       games: null,
       metadata: null,
@@ -982,8 +985,16 @@ const gameService = {
     }
 
     let failed = false;
-    const result = this.fetchGameUpdate(gameID, localVersion).then(update => {
+    const result = this.fetchGameUpdate(gameID, localVersion).then(async update => {
       failed = update === UPDATE_CHECK_FAILED;
+      if (update && !failed && update.updateAvailable) return update;
+      // The API's index can lag behind the one Search shows, so fall back to the
+      // loaded index; otherwise Search says "update" while the library stays quiet
+      const indexUpdate = await this.checkIndexUpdate(gameID, localVersion);
+      if (indexUpdate) {
+        failed = false;
+        return indexUpdate;
+      }
       return failed ? null : update;
     });
     // Hold the pending request so concurrent callers share it
@@ -992,6 +1003,31 @@ const gameService = {
     const cacheDuration = failed ? UPDATE_CHECK_RETRY_DELAY : UPDATE_CHECK_CACHE_DURATION;
     updateCheckCache.set(cacheKey, { result, expires: Date.now() + cacheDuration });
     return result;
+  },
+
+  // Same rule Search uses: any version difference against the index is an update
+  async checkIndexUpdate(gameID, localVersion) {
+    if (!localVersion) return null;
+    const indexGame = await this.findGameByGameID(gameID);
+    const latestVersion = indexGame?.version;
+    if (!latestVersion || latestVersion === localVersion) return null;
+
+    const downloadLinks = indexGame.download_links || {};
+    console.log(
+      `[GameService] Index has newer version for ${gameID}: ${localVersion} -> ${latestVersion}`
+    );
+    return {
+      gameID,
+      gameName: indexGame.game,
+      latestVersion,
+      localVersion,
+      updateAvailable: true,
+      autoUpdateSupported: SEAMLESS_PROVIDERS.some(
+        provider =>
+          Array.isArray(downloadLinks[provider]) && downloadLinks[provider].length
+      ),
+      downloadLinks,
+    };
   },
 
   async fetchGameUpdate(gameID, localVersion) {

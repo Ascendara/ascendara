@@ -1,4 +1,9 @@
-import { libraryInstallKey, resolveLibraryConflicts, readLibraryChoices, reconcileFolderItems } from "@/lib/libraryConflicts";
+import {
+  libraryInstallKey,
+  resolveLibraryConflicts,
+  readLibraryChoices,
+  reconcileFolderItems,
+} from "@/lib/libraryConflicts";
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import "@/components/ui/button";
@@ -10,6 +15,7 @@ import {
   FolderUp,
   Pencil,
   Folder,
+  Import,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -23,6 +29,9 @@ import {
 } from "@/lib/folderManager";
 import { Input } from "@/components/ui/input";
 import { gameImageCache } from "@/lib/gameImageCache";
+import { useAuth } from "@/context/AuthContext";
+import { verifyAscendAccess } from "@/services/firebase/firebaseService";
+import gameService from "@/services/games/gameService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,7 +52,7 @@ const imageCache = {
 // Defined outside FolderView so it never gets recreated on parent re-render,
 // which was causing the cleanup `cancelled = true` to fire before IPC resolved.
 const GameCard = React.memo(
-  ({ game, favorites, onPlay, onRemove, onToggleFavorite, t }) => {
+  ({ game, favorites, hasUpdate, onPlay, onRemove, onToggleFavorite, t }) => {
     const [isHovered, setIsHovered] = useState(false);
     const [imageData, setImageData] = useState(
       () => imageCache.get(game.game || game.name) ?? null
@@ -100,6 +109,12 @@ const GameCard = React.memo(
               <div className="flex h-full w-full items-center justify-center bg-muted">
                 <Gamepad2 className="h-12 w-12 text-muted-foreground/30" />
               </div>
+            )}
+            {hasUpdate && (
+              <span className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-secondary">
+                <Import className="h-3 w-3" />
+                {t("gameScreen.updateBadge")}
+              </span>
             )}
             <div
               className={cn(
@@ -173,6 +188,8 @@ const sameFolderGames = (a, b) =>
       (g.game || g.name) === (h.game || h.name) &&
       g._sourceDir === h._sourceDir &&
       g.executable === h.executable &&
+      g.gameID === h.gameID &&
+      g.version === h.version &&
       g.playTime === h.playTime &&
       g.online === h.online &&
       g.dlc === h.dlc
@@ -198,6 +215,56 @@ const FolderView = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [renameError, setRenameError] = useState("");
+  const { user } = useAuth();
+  const [hasAscendAccess, setHasAscendAccess] = useState(false);
+  const [gameUpdates, setGameUpdates] = useState({}); // {gameID: updateInfo}
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) {
+      setHasAscendAccess(false);
+      return;
+    }
+    verifyAscendAccess()
+      .then(result => !cancelled && setHasAscendAccess(!!result?.hasAccess))
+      .catch(() => !cancelled && setHasAscendAccess(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  // Same check the library runs; answers are shared through gameService's cache
+  const updateCheckKey = folderGames
+    .filter(g => !g.isCustom && g.gameID)
+    .map(g => `${g.gameID}|${g.version || ""}`)
+    .sort()
+    .join("\n");
+  useEffect(() => {
+    if (!hasAscendAccess || !updateCheckKey) {
+      setGameUpdates({});
+      return;
+    }
+    const gamesToCheck = [...new Set(updateCheckKey.split("\n"))].map(entry => {
+      const sep = entry.indexOf("|");
+      return { gameID: entry.slice(0, sep), version: entry.slice(sep + 1) };
+    });
+    let cancelled = false;
+    Promise.all(
+      gamesToCheck.map(({ gameID, version }) =>
+        gameService.checkGameUpdate(gameID, version).catch(() => null)
+      )
+    ).then(results => {
+      if (cancelled) return;
+      const updates = {};
+      results.forEach((result, i) => {
+        if (result?.updateAvailable) updates[gamesToCheck[i].gameID] = result;
+      });
+      setGameUpdates(updates);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasAscendAccess, updateCheckKey]);
 
   // Keep the last valid folderName and games for smooth transition
   React.useEffect(() => {
@@ -272,8 +339,14 @@ const FolderView = () => {
         if (cancelled || currentRequest !== requestId) return;
 
         const records = [
-          ...(Array.isArray(installedGames) ? installedGames : []).map(game => ({ ...game, isCustom: false })),
-          ...(Array.isArray(customGames) ? customGames : []).map(game => ({ ...game, isCustom: true })),
+          ...(Array.isArray(installedGames) ? installedGames : []).map(game => ({
+            ...game,
+            isCustom: false,
+          })),
+          ...(Array.isArray(customGames) ? customGames : []).map(game => ({
+            ...game,
+            isCustom: true,
+          })),
         ];
         const visible = resolveLibraryConflicts(records, readLibraryChoices()).games;
         libraryRecordsRef.current = records;
@@ -443,7 +516,13 @@ const FolderView = () => {
     try {
       // First try to get from installed games
       const installedGames = await window.electron.getGames();
-      const installedGame = installedGames.find(g => !game.isCustom && (g.game || g.name) === gameId && (!game._sourceDir || (g._sourceDir === game._sourceDir && g.executable === game.executable)));
+      const installedGame = installedGames.find(
+        g =>
+          !game.isCustom &&
+          (g.game || g.name) === gameId &&
+          (!game._sourceDir ||
+            (g._sourceDir === game._sourceDir && g.executable === game.executable))
+      );
 
       if (installedGame) {
         // Use the installed game data but preserve any folder-specific properties
@@ -465,7 +544,12 @@ const FolderView = () => {
 
       // If not found in installed games, try custom games
       const customGames = await window.electron.getCustomGames();
-      const customGame = customGames.find(g => (g.game || g.name) === gameId && (!game._sourceDir || (g._sourceDir === game._sourceDir && g.executable === game.executable)));
+      const customGame = customGames.find(
+        g =>
+          (g.game || g.name) === gameId &&
+          (!game._sourceDir ||
+            (g._sourceDir === game._sourceDir && g.executable === game.executable))
+      );
 
       if (customGame) {
         // Use the custom game data but preserve any folder-specific properties
@@ -727,6 +811,7 @@ const FolderView = () => {
                     key={libraryInstallKey(game)}
                     game={game}
                     favorites={favorites}
+                    hasUpdate={!!(game.gameID && gameUpdates[game.gameID])}
                     onPlay={handlePlayGame}
                     onRemove={handleRemoveFromFolder}
                     onToggleFavorite={toggleFavorite}

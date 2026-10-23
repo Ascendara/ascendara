@@ -7,7 +7,7 @@ import {
   getLibraryIdentityKey,
 } from "@/lib/libraryGames";
 import { useLibraryBackupStore } from "@/services/library/libraryBackupStore";
-import React, { useState, useEffect, useRef, useCallback, memo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -919,65 +919,69 @@ const Library = () => {
     }
   };
 
+  // gameID|version of every catalog game, including those inside folders. The
+  // games array is rebuilt every few seconds during downloads, so the update
+  // check keys off this instead to only re-run when something relevant changed.
+  const updateCheckKey = useMemo(
+    () =>
+      games
+        .flatMap(g => (g.isFolder ? g.items || [] : [g]))
+        .filter(g => !g.isCustom && g.gameID)
+        .map(g => `${g.gameID}|${g.version || ""}`)
+        .sort()
+        .join("\n"),
+    [games]
+  );
+
   // Check for game updates when games are loaded (only for Ascend subscribers)
   useEffect(() => {
+    if (!isInitialized) return;
+    if (!user || !ascendAccess.hasAccess) {
+      setGameUpdates({});
+      return;
+    }
+    if (!updateCheckKey) {
+      setGameUpdates({});
+      return;
+    }
+
+    const gamesToCheck = [...new Set(updateCheckKey.split("\n"))].map(entry => {
+      const sep = entry.indexOf("|");
+      return { gameID: entry.slice(0, sep), version: entry.slice(sep + 1) };
+    });
+    let cancelled = false;
+
     const checkGameUpdates = async () => {
-      console.log("[Library] checkGameUpdates called, games:", games.length);
-
-      // Only check if user has Ascend access
-      if (!user || !ascendAccess.hasAccess) {
-        console.log("[Library] Skipping update check - no Ascend access");
-        setGameUpdates({});
-        return;
-      }
-
-      // Only check for non-custom games with gameID
-      const gamesWithId = games.filter(g => !g.isFolder && !g.isCustom && g.gameID);
-      console.log(
-        "[Library] Games with gameID:",
-        gamesWithId.length,
-        gamesWithId.map(g => ({ name: g.game, gameID: g.gameID, version: g.version }))
+      const results = await Promise.all(
+        gamesToCheck.map(({ gameID, version }) =>
+          gameService.checkGameUpdate(gameID, version).catch(error => {
+            console.error(`[Library] Error checking update for ${gameID}:`, error);
+            return null;
+          })
+        )
       );
-      if (gamesWithId.length === 0) {
-        console.log("[Library] No games with gameID found, skipping update check");
-        return;
-      }
+      // A newer run owns the state now
+      if (cancelled) return;
 
       const updates = {};
-      // Check updates in parallel but limit concurrency
-      const checkPromises = gamesWithId.map(async game => {
-        try {
-          console.log(
-            `[Library] Checking update for ${game.game} (${game.gameID}), version: ${game.version}`
-          );
-          const result = await gameService.checkGameUpdate(game.gameID, game.version);
-          console.log(`[Library] Update result for ${game.game}:`, result);
-          if (result?.updateAvailable) {
-            console.log(`[Library] Update available for ${game.game}!`);
-            updates[game.gameID] = result;
-          }
-        } catch (error) {
-          console.error(`[Library] Error checking update for ${game.game}:`, error);
-        }
+      results.forEach((result, i) => {
+        if (result?.updateAvailable) updates[gamesToCheck[i].gameID] = result;
       });
-
-      await Promise.all(checkPromises);
-      console.log("[Library] All updates checked, updates found:", updates);
+      console.log("[Library] Update check finished, updates found:", updates);
       setGameUpdates(updates);
     };
 
-    if (isInitialized && games.length > 0) {
-      console.log(
-        "[Library] Triggering update check, isInitialized:",
-        isInitialized,
-        "games.length:",
-        games.length,
-        "hasAccess:",
-        ascendAccess.hasAccess
-      );
-      checkGameUpdates();
-    }
-  }, [isInitialized, games, user, ascendAccess.hasAccess]);
+    checkGameUpdates();
+    // Answers are cached in gameService, so re-checking only re-requests the ones
+    // that failed; a single network blip shouldn't hide an update until restart
+    const retry = setInterval(checkGameUpdates, 2 * 60 * 1000);
+    window.addEventListener("index-refreshed", checkGameUpdates);
+    return () => {
+      cancelled = true;
+      clearInterval(retry);
+      window.removeEventListener("index-refreshed", checkGameUpdates);
+    };
+  }, [isInitialized, updateCheckKey, user, ascendAccess.hasAccess]);
 
   // Load cloud-only games (games in cloud but not installed locally)
   useEffect(() => {
@@ -2849,6 +2853,11 @@ const Library = () => {
                         folder={game}
                         refreshKey={game.items ? game.items.length : 0}
                         variant={viewMode}
+                        updateCount={
+                          (game.items || []).filter(
+                            item => item.gameID && gameUpdates[item.gameID]
+                          ).length
+                        }
                       />
                     </DroppableFolderCard>
                   ) : (
