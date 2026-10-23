@@ -793,9 +793,12 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const handleReferralContinue = async () => {
     // Only report once, even if the user comes back to this step
     if (referralSending) return;
+    // Report skips too so every new user is counted
     const sourceToSend =
-      referralSource === "other" ? customReferral || "other" : referralSource;
-    if (sourceToSend && !referralSent) {
+      referralSource === "other"
+        ? customReferral || "other"
+        : referralSource || "skipped";
+    if (!referralSent) {
       setReferralSending(true);
       try {
         const authHeaders = await window.electron.getAuthHeaders();
