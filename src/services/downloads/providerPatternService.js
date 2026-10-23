@@ -1,4 +1,5 @@
-const PROVIDER_API_URL = "https://api.ascendara.app/app/json/providers";
+import { API_URL } from "@/config/api";
+const PROVIDER_API_URL = `${API_URL}/app/json/providers`;
 const CACHE_KEY = "providerPatternsCache";
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 

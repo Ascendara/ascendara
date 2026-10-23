@@ -16,6 +16,7 @@ import {
 import { Sparkles, Zap, Loader2, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { userAuthenticatedFetch } from "@/utils/authHelper";
+import { API_URL } from "@/config/api";
 
 const LifetimeSubscriptionDialog = ({ launchCount }) => {
   const { t } = useTranslation();
@@ -49,7 +50,7 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
             try {
               const response = await userAuthenticatedFetch(
                 user,
-                "https://api.ascendara.app/stripe/calculate-lifetime-discount",
+                `${API_URL}/stripe/calculate-lifetime-discount`,
                 {
                   method: "POST",
                   headers: {
@@ -98,7 +99,7 @@ const LifetimeSubscriptionDialog = ({ launchCount }) => {
       let priceId = "price_1QnMnNCfu5zjwIKZFbCRwBHd"; // Monthly $1.50
       if (isLifetime) {
         const productResponse = await fetch(
-          "https://api.ascendara.app/stripe/products/prod_TZdRiUAwPpMEjW"
+          `${API_URL}/stripe/products/prod_TZdRiUAwPpMEjW`
         );
         if (!productResponse.ok) throw new Error("Unable to load lifetime price");
         const product = await productResponse.json();

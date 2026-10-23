@@ -1,8 +1,9 @@
 const https = require("https");
+const { API_URL } = require("../core/config");
 
 const ALLOWED_SERVICE_HOSTS = new Set([
   "monitor.ascendara.app",
-  "api.ascendara.app",
+  new URL(API_URL).hostname,
   "cdn.ascendara.app",
   "lfs.ascendara.app",
   "r2.ascendara.app",

@@ -85,6 +85,7 @@ import {
   VERIFIED_PROVIDERS as CENTRAL_VERIFIED_PROVIDERS,
   TORBOX_PROVIDER_DISPLAY_NAMES,
 } from "@/config/providers";
+import { API_URL } from "@/config/api";
 
 const LOCAL_FALLBACK_PATTERNS = {
   fileditch: /https?:\/\/(fileditchfiles\.me|fileditch\.com)\/file\.php\?f=.+/i,
@@ -1112,7 +1113,7 @@ function PublicDownloadPage() {
         notifyDownloadStart(sanitizedGameName, gameData.game);
 
         try {
-          await fetch("https://api.ascendara.app/stats/download", {
+          await fetch(`${API_URL}/stats/download`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ game: gameData.game }),
@@ -1209,7 +1210,7 @@ function PublicDownloadPage() {
 
           // Track download statistics
           try {
-            await fetch("https://api.ascendara.app/stats/download", {
+            await fetch(`${API_URL}/stats/download`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ game: gameData.game }),
@@ -1545,7 +1546,7 @@ function PublicDownloadPage() {
 
       // Track download statistics
       try {
-        await fetch("https://api.ascendara.app/stats/download", {
+        await fetch(`${API_URL}/stats/download`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ game: gameData.game }),

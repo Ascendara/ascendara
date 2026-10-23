@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { API_URL } from "@/config/api";
 
 const FILE_ISSUE_REPORT_PATTERN =
   /\b(?:missing|corrupt(?:ed|ion)?|incomplete|damaged)\b.{0,30}\b(?:files?|downloads?|archives?|installations?)\b|\b(?:files?|downloads?|archives?|installations?)\b.{0,30}\b(?:missing|corrupt(?:ed|ion)?|incomplete|damaged)\b/i;
@@ -74,7 +75,7 @@ const rememberReportedGame = gameData => {
 
 export const fetchAuthToken = async () => {
   const authHeaders = await window.electron.getAuthHeaders();
-  const response = await fetch("https://api.ascendara.app/auth/token", {
+  const response = await fetch(`${API_URL}/auth/token`, {
     headers: authHeaders,
   });
   if (!response.ok) {
@@ -121,8 +122,8 @@ export default function ReportGameDialog({
     try {
       // Use v2 endpoint with gameID if using local index
       const endpoint = useV2
-        ? "https://api.ascendara.app/app/v2/report"
-        : "https://api.ascendara.app/app/report";
+        ? `${API_URL}/app/v2/report`
+        : `${API_URL}/app/report`;
 
       const body = JSON.stringify({
         reportType: "GameBrowsing",

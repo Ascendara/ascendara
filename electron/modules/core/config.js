@@ -201,7 +201,12 @@ const appBranch = "live";
 const appVersion = "11.6.0";
 const testingVersion = "";
 
+// The Ascendara API every main-process request goes to. VITE_API_URL points
+// both this and the renderer (src/config/api.js) at another server.
+const API_URL = (process.env.VITE_API_URL || "https://api.ascendara.app").replace(/\/+$/, "");
+
 module.exports = {
+  API_URL,
   appVersion,
   appBranch,
   testingVersion,

@@ -11,6 +11,7 @@ const crypto = require("crypto");
 const { spawn } = require("child_process");
 const { ipcMain, shell, dialog, app, BrowserWindow, Notification } = require("electron");
 const {
+  API_URL,
   isDev,
   isWindows,
   appDirectory,
@@ -121,11 +122,11 @@ function registerMiscHandlers() {
       if (url.includes("storesearch")) {
         // Extract search term from URL
         const term = urlObj.searchParams.get("term");
-        proxyUrl = `https://api.ascendara.app/api/proxy/steam/search?term=${encodeURIComponent(term)}`;
+        proxyUrl = `${API_URL}/api/proxy/steam/search?term=${encodeURIComponent(term)}`;
       } else if (url.includes("appdetails")) {
         // Extract appids from URL
         const appids = urlObj.searchParams.get("appids");
-        proxyUrl = `https://api.ascendara.app/api/proxy/steam/appdetails?appids=${appids}`;
+        proxyUrl = `${API_URL}/api/proxy/steam/appdetails?appids=${appids}`;
       } else {
         // Fallback to direct request for unknown endpoints
         console.warn("Unknown Steam API endpoint, using direct request:", url);
@@ -584,7 +585,7 @@ function registerMiscHandlers() {
   // Fetch API image
   ipcMain.handle("fetch-api-image", async (_, endpoint, imgID, timestamp, signature) => {
     try {
-      const url = `https://api.ascendara.app/${endpoint}/${imgID}`;
+      const url = `${API_URL}/${endpoint}/${imgID}`;
       const response = await axios.get(url, {
         headers: {
           "X-Timestamp": timestamp.toString(),
@@ -668,7 +669,7 @@ function registerMiscHandlers() {
       }
 
       const response = await axios.post(
-        "https://api.ascendara.app/support/upload-logs",
+        `${API_URL}/support/upload-logs`,
         { session_token: sessionToken, logs },
         {
           headers: {

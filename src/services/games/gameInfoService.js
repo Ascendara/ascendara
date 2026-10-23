@@ -5,12 +5,13 @@
 
 // Import cache service
 import gameApiCache from "./gameInfoCacheService";
+import { API_URL } from "@/config/api";
 
 // Constants for APIs
 const isDev = import.meta.env.DEV;
 
 // Steam API proxy endpoints - always use proxy to avoid API key exposure
-const STEAM_PROXY_BASE = "https://api.ascendara.app/api/proxy/steam";
+const STEAM_PROXY_BASE = `${API_URL}/api/proxy/steam`;
 const STEAM_STORE_SEARCH_URL = `${STEAM_PROXY_BASE}/search`;
 const STEAM_APP_DETAILS_URL = `${STEAM_PROXY_BASE}/appdetails`;
 

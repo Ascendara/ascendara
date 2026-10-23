@@ -10,8 +10,8 @@
 const fs = require("fs-extra");
 const path = require("path");
 const authHelper = require("../core/auth-helper");
+const { API_URL } = require("../core/config");
 
-const API_URL = "https://api.ascendara.app";
 
 const queued = new Set();
 const queue = [];

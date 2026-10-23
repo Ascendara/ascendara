@@ -61,6 +61,7 @@ import installedGamesService from "@/services/library/installedGamesService";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { useGameViews } from "@/hooks/useGameViews";
 import { catalogSizeText } from "@/lib/installSpace";
+import { API_URL } from "@/config/api";
 
 // Module-level cache with timestamp
 let gamesCache = {
@@ -448,7 +449,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
 
   // Fetch featured game ID from API
   useEffect(() => {
-    fetch("https://api.ascendara.app/json/featured-game")
+    fetch(`${API_URL}/json/featured-game`)
       .then(res => res.json())
       .then(data => {
         if (data?.gameId) setFeaturedGameId(data.gameId);

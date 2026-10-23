@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { userAuthenticatedFetch } from "@/utils/authHelper";
+import { API_URL } from "@/config/api";
 
 // Checkout can return on any page, including while Firebase is restoring login.
 export default function CheckoutReturnHandler() {
@@ -49,7 +50,7 @@ export default function CheckoutReturnHandler() {
       let retryable = true;
       try {
         const response = await userAuthenticatedFetch(user,
-          "https://api.ascendara.app/stripe/verify-checkout", {
+          `${API_URL}/stripe/verify-checkout`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sessionId, userId: user.uid }),

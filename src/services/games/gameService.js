@@ -1,7 +1,7 @@
 import { sanitizeText } from "@/lib/utils";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
+import { API_URL } from "@/config/api";
 
-const API_URL = "https://api.ascendara.app";
 const CACHE_KEY = "ascendara_games_cache";
 const CACHE_TIMESTAMP_KEY = "local_ascendara_games_timestamp";
 const METADATA_CACHE_KEY = "local_ascendara_metadata_cache";

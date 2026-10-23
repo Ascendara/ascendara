@@ -8,8 +8,9 @@
  *
  * Shape: { gameID, sgdbGameId, gridId, gridUrl, heroId, heroUrl } or null.
  */
+import { API_URL } from "@/config/api";
 
-const API_URL = "https://api.ascendara.app/app/artwork/override";
+const OVERRIDE_URL = `${API_URL}/app/artwork/override`;
 const LS_PREFIX = "ascendara_artwork_override::";
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 2500;
@@ -54,7 +55,7 @@ class ArtworkOverrideService {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       try {
-        const response = await fetch(`${API_URL}/${encodeURIComponent(key)}`, {
+        const response = await fetch(`${OVERRIDE_URL}/${encodeURIComponent(key)}`, {
           signal: controller.signal,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);

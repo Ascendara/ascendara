@@ -147,6 +147,7 @@ import {
   filterGamesNotInFolders,
   getGamesInFolders,
 } from "@/lib/folderManager";
+import { API_URL } from "@/config/api";
 
 const Retro = React.lazy(() => import("./Retro"));
 
@@ -4688,7 +4689,7 @@ const InstalledGameCard = memo(
       }
       try {
         // Use SteamGridDB for proper grid covers (600x900 portrait)
-        const searchUrl = `https://api.ascendara.app/api/proxy/steamgrid/search/autocomplete/${encodeURIComponent(query)}`;
+        const searchUrl = `${API_URL}/api/proxy/steamgrid/search/autocomplete/${encodeURIComponent(query)}`;
         const searchResponse = await fetch(searchUrl);
 
         if (!searchResponse.ok) {
@@ -4705,7 +4706,7 @@ const InstalledGameCard = memo(
           for (const game of searchData.data.slice(0, 9)) {
             try {
               // Fetch 600x900 grid images for this game
-              const gridsUrl = `https://api.ascendara.app/api/proxy/steamgrid/grids/game/${game.id}?styles=alternate&dimensions=600x900`;
+              const gridsUrl = `${API_URL}/api/proxy/steamgrid/grids/game/${game.id}?styles=alternate&dimensions=600x900`;
               const gridsResponse = await fetch(gridsUrl);
 
               if (gridsResponse.ok) {
@@ -6640,7 +6641,7 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
       setCoverSearch(prev => ({ ...prev, isLoading: true }));
       try {
         // Use SteamGridDB for proper grid covers (600x900 portrait)
-        const searchUrl = `https://api.ascendara.app/api/proxy/steamgrid/search/autocomplete/${encodeURIComponent(query)}`;
+        const searchUrl = `${API_URL}/api/proxy/steamgrid/search/autocomplete/${encodeURIComponent(query)}`;
         const searchResponse = await fetch(searchUrl);
 
         if (!searchResponse.ok) {
@@ -6657,7 +6658,7 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
           for (const game of searchData.data.slice(0, 9)) {
             try {
               // Fetch 600x900 grid images for this game
-              const gridsUrl = `https://api.ascendara.app/api/proxy/steamgrid/grids/game/${game.id}?styles=alternate&dimensions=600x900`;
+              const gridsUrl = `${API_URL}/api/proxy/steamgrid/grids/game/${game.id}?styles=alternate&dimensions=600x900`;
               const gridsResponse = await fetch(gridsUrl);
 
               if (gridsResponse.ok) {
@@ -6847,7 +6848,7 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
         let downloadedCount = 0;
         for (const { type, filename, params } of assetTypes) {
           try {
-            const url = `https://api.ascendara.app/api/proxy/steamgrid/${type}/game/${coverSearch.selectedCover.gameID}${params}`;
+            const url = `${API_URL}/api/proxy/steamgrid/${type}/game/${coverSearch.selectedCover.gameID}${params}`;
             const response = await fetch(url);
 
             if (response.ok) {

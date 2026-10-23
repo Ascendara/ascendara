@@ -13,6 +13,7 @@ import { fetchAuthToken } from "@/components/download/ReportGameDialog";
 import { Check, ChevronLeft, ImageOff, Loader, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { API_URL } from "@/config/api";
 
 // A game's artwork can be corrected once a day from this install
 const CORRECTED_GAMES_KEY = "ascendara_artwork_corrections";
@@ -116,7 +117,7 @@ export default function ArtworkCorrectionDialog({ open, onOpenChange, gameData }
         ...(artwork.hero && { heroId: artwork.hero.id, heroUrl: artwork.hero.url }),
       });
       const submit = async () =>
-        fetch("https://api.ascendara.app/app/artwork/submit", {
+        fetch(`${API_URL}/app/artwork/submit`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

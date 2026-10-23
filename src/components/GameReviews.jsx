@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/LanguageContext";
+import { API_URL } from "@/config/api";
 
 const guestNames = [
   "cosmicOtter",
@@ -49,7 +50,7 @@ export default function GameReviews({ gameID, onRating, onReviewCount, sectionRe
     async function load() {
       try {
         const response = await fetch(
-          `https://api.ascendara.app/app/v2/gamerating/${encodeURIComponent(gameID)}`,
+          `${API_URL}/app/v2/gamerating/${encodeURIComponent(gameID)}`,
           { signal: controller.signal }
         );
         if (!response.ok) throw new Error("Failed to fetch reviews");

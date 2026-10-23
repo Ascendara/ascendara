@@ -11,6 +11,7 @@ const { pipeline } = require("stream/promises");
 const installUpdate = require("./install-update");
 const { ipcMain, BrowserWindow, app } = require("electron");
 const {
+  API_URL,
   appVersion,
   appBranch,
   testingVersion,
@@ -44,7 +45,7 @@ function macUpdateName(version) {
  */
 async function checkBrokenVersion() {
   try {
-    const response = await axios.get("https://api.ascendara.app/app/brokenversions", {
+    const response = await axios.get(`${API_URL}/app/brokenversions`, {
       timeout: 10000,
     });
     const brokenVersions = response.data;
@@ -119,18 +120,18 @@ async function checkVersionAndUpdate() {
     let latestVersion;
 
     if (currentBranch === "live") {
-      const response = await axios.get("https://api.ascendara.app/");
+      const response = await axios.get(`${API_URL}/`);
       latestVersion = response.data.appVer;
     } else {
       // For public-testing and experimental, check branch-specific versions
       // If the branch no longer exists or version matches live, treat as up-to-date
       try {
-        const response = await axios.get("https://api.ascendara.app/branch-versions");
+        const response = await axios.get(`${API_URL}/branch-versions`);
         const branchData = response.data;
         latestVersion = branchData[currentBranch] || branchData.live || appVersion;
       } catch {
         // Fallback to live API if branch-versions endpoint fails
-        const response = await axios.get("https://api.ascendara.app/");
+        const response = await axios.get(`${API_URL}/`);
         latestVersion = response.data.appVer;
       }
     }
@@ -190,7 +191,7 @@ async function checkReferenceLanguage() {
     if (!files.length) return;
     let timestamp = {};
     if (fs.existsSync(TIMESTAMP_FILE)) timestamp = await fs.readJson(TIMESTAMP_FILE);
-    const response = await axios.get("https://api.ascendara.app/language/version", {
+    const response = await axios.get(`${API_URL}/language/version`, {
       timeout: 30000,
     });
     const version = response.data?.version;
@@ -202,7 +203,7 @@ async function checkReferenceLanguage() {
     if (version === timestamp.extraLangVer && timestamp.extraLangUpdateFormat === 2)
       return;
     translationUpdateInProgress = true;
-    const reference = await axios.get("https://api.ascendara.app/language/en", {
+    const reference = await axios.get(`${API_URL}/language/en`, {
       timeout: 30000,
     });
     if (

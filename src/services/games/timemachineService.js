@@ -1,7 +1,7 @@
 // Past versions of a game, from the API's time machine release log
+import { API_URL } from "@/config/api";
 const versionCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
-const API_URL = "https://api.ascendara.app"; // Production API
 
 /** Thrown while the server is still building its version history. */
 export class TimemachineBusyError extends Error {

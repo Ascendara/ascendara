@@ -1,7 +1,8 @@
+import { API_URL } from "@/config/api";
 let wordLists = null;
 let fetchPromise = null;
 
-const API_URL = "https://api.ascendara.app/app/json/profanity";
+const PROFANITY_URL = `${API_URL}/app/json/profanity`;
 
 function escapeRegExp(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -41,7 +42,7 @@ async function fetchBadWords() {
     return fetchPromise;
   }
 
-  fetchPromise = fetch(API_URL)
+  fetchPromise = fetch(PROFANITY_URL)
     .then(response => {
       if (!response.ok) {
         throw new Error("Failed to fetch profanity list");

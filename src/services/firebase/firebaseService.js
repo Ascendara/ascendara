@@ -43,6 +43,7 @@ import {
   startAfter,
   runTransaction,
 } from "firebase/firestore";
+import { API_URL } from "@/config/api";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -539,7 +540,7 @@ export const deleteAccount = async (password, reason) => {
     // Send deletion request to API
     const response = await userAuthenticatedFetch(
       user,
-      "https://api.ascendara.app/account/request-deletion",
+      `${API_URL}/account/request-deletion`,
       {
         method: "POST",
         headers: {
@@ -1181,7 +1182,7 @@ export const recomputeProfileStats = async (joinDate = null) => {
 
     const response = await userAuthenticatedFetch(
       user,
-      "https://api.ascendara.app/v3/profile/recompute-stats",
+      `${API_URL}/v3/profile/recompute-stats`,
       {
         method: "POST",
         headers: {
@@ -1456,7 +1457,7 @@ const getMaskedHardwareEmail = async hardwareId => {
   try {
     const response = await userAuthenticatedFetch(
       auth.currentUser,
-      `https://api.ascendara.app/v3/account/hardware-email?hardwareId=${encodeURIComponent(hardwareId)}`
+      `${API_URL}/v3/account/hardware-email?hardwareId=${encodeURIComponent(hardwareId)}`
     );
     if (!response.ok) return null;
     const data = await response.json();
@@ -3011,7 +3012,7 @@ export const uploadBackup = async (file, gameName, backupName) => {
 
     const response = await userAuthenticatedFetch(
       user,
-      "https://api.ascendara.app/ascend/backups/upload",
+      `${API_URL}/ascend/backups/upload`,
       {
         method: "POST",
         body: formData,
@@ -3048,7 +3049,7 @@ export const listBackups = async (gameName = null) => {
       return { backups: [], error: "Not authenticated" };
     }
 
-    const url = new URL("https://api.ascendara.app/ascend/backups/list");
+    const url = new URL(`${API_URL}/ascend/backups/list`);
     url.searchParams.append("userId", user.uid);
     if (gameName) {
       url.searchParams.append("gameName", gameName);
@@ -3093,7 +3094,7 @@ export const getBackupDownloadUrl = async backupId => {
       };
     }
 
-    const url = new URL(`https://api.ascendara.app/ascend/backups/download/${backupId}`);
+    const url = new URL(`${API_URL}/ascend/backups/download/${backupId}`);
     url.searchParams.append("userId", user.uid);
 
     const response = await userAuthenticatedFetch(user, url, {
@@ -3137,7 +3138,7 @@ export const deleteBackup = async backupId => {
       return { success: false, error: "Not authenticated" };
     }
 
-    const url = new URL(`https://api.ascendara.app/ascend/backups/delete/${backupId}`);
+    const url = new URL(`${API_URL}/ascend/backups/delete/${backupId}`);
     url.searchParams.append("userId", user.uid);
 
     const response = await userAuthenticatedFetch(user, url, {

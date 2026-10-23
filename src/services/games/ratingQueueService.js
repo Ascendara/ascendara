@@ -3,6 +3,7 @@
  * Fetches game ratings one at a time with controlled pacing to prevent API flooding
  * and ensure the UI remains responsive.
  */
+import { API_URL } from "@/config/api";
 
 class RatingQueueService {
   constructor() {
@@ -118,7 +119,7 @@ class RatingQueueService {
 
       try {
         const response = await fetch(
-          `https://api.ascendara.app/app/v2/gamerating/${gameID}`
+          `${API_URL}/app/v2/gamerating/${gameID}`
         );
 
         if (response.ok) {

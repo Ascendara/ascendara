@@ -22,6 +22,7 @@ import {
   PanelsTopLeft,
 } from "lucide-react";
 import { toast } from "sonner";
+import { API_URL } from "@/config/api";
 
 // The value is what shows up as the report's category on the Discord side
 const ISSUE_CATEGORIES = [
@@ -71,7 +72,7 @@ const ReportIssue = ({ isOpen, onClose }) => {
         details: details.trim(),
       });
       const submit = async () =>
-        fetch("https://api.ascendara.app/app/report/feature", {
+        fetch(`${API_URL}/app/report/feature`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

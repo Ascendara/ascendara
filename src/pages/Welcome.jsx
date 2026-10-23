@@ -73,6 +73,7 @@ import {
   DownloadFolderCheckResult,
   DOWNLOAD_FOLDER_CHECK_DOCS,
 } from "@/components/DownloadFolderCheck";
+import { API_URL } from "@/config/api";
 
 const DEPENDENCIES = [
   {
@@ -801,7 +802,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
       setReferralSending(true);
       try {
         const authHeaders = await window.electron.getAuthHeaders();
-        const tokenResponse = await fetch("https://api.ascendara.app/auth/token", {
+        const tokenResponse = await fetch(`${API_URL}/auth/token`, {
           headers: authHeaders,
         });
 
@@ -811,7 +812,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
           if (referralLink) {
             payload.link = referralLink;
           }
-          await fetch("https://api.ascendara.app/app/downloadedfrom", {
+          await fetch(`${API_URL}/app/downloadedfrom`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

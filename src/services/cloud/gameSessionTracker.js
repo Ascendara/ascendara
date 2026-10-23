@@ -20,8 +20,9 @@ import {
   recomputeProfileStats,
 } from "../firebase/firebaseService";
 import { userAuthenticatedFetch } from "@/utils/authHelper";
+import { API_URL } from "@/config/api";
 
-const SESSION_API = "https://api.ascendara.app/v3/playtime/session";
+const SESSION_API = `${API_URL}/v3/playtime/session`;
 
 // Active sessions keyed by gameName -> { baselinePlayTime, baselineLaunchCount,
 // startedAt, isCustom, gameID, sessionId, legacy, timer, missedRunningChecks }

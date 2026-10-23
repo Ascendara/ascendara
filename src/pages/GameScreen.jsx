@@ -83,6 +83,7 @@ import AchievementsTab from "@/components/gamescreen/AchievementsTab";
 import SoundtrackTab from "@/components/gamescreen/SoundtrackTab";
 import ModsTrainersTab from "@/components/gamescreen/ModsTrainersTab";
 import { useGameRunning } from "@/hooks/useGameRunning";
+import { API_URL } from "@/config/api";
 
 const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t, onSave }) => {
   const [executables, setExecutables] = useState([]);
@@ -985,7 +986,7 @@ const EditGameInfoDialog = ({
     if (!searchQuery.trim()) return;
     setIsSearching(true);
     try {
-      const searchUrl = `https://api.ascendara.app/api/proxy/steam/search?term=${encodeURIComponent(searchQuery)}`;
+      const searchUrl = `${API_URL}/api/proxy/steam/search?term=${encodeURIComponent(searchQuery)}`;
       const response = await fetch(searchUrl);
       if (response.ok) {
         const data = await response.json();
@@ -994,7 +995,7 @@ const EditGameInfoDialog = ({
           const resultsWithDetails = await Promise.all(
             data.items.slice(0, 5).map(async item => {
               try {
-                const detailsUrl = `https://api.ascendara.app/api/proxy/steam/appdetails?appids=${item.id}`;
+                const detailsUrl = `${API_URL}/api/proxy/steam/appdetails?appids=${item.id}`;
                 const detailsRes = await fetch(detailsUrl);
                 if (detailsRes.ok) {
                   const detailsData = await detailsRes.json();

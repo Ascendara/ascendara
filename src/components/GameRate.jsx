@@ -18,6 +18,7 @@ import { Sparkles, Star } from "lucide-react";
 import "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { API_URL } from "@/config/api";
 
 const GameRate = ({ game, isOpen, onClose, onRated }) => {
   const { t } = useLanguage();
@@ -61,7 +62,7 @@ const GameRate = ({ game, isOpen, onClose, onRated }) => {
   const getToken = async () => {
     try {
       const authHeaders = await window.electron.getAuthHeaders();
-      const response = await fetch("https://api.ascendara.app/auth/token", {
+      const response = await fetch(`${API_URL}/auth/token`, {
         headers: authHeaders,
       });
 
@@ -92,7 +93,7 @@ const GameRate = ({ game, isOpen, onClose, onRated }) => {
       const freshToken = await getToken();
       const ascendToken = user ? await user.getIdToken() : null;
 
-      const response = await fetch("https://api.ascendara.app/app/v2/gamerate", {
+      const response = await fetch(`${API_URL}/app/v2/gamerate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

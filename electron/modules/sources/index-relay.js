@@ -6,8 +6,8 @@
 
 const { BrowserWindow, session } = require("electron");
 const authHelper = require("../core/auth-helper");
+const { API_URL } = require("../core/config");
 
-const API_URL = "https://api.ascendara.app";
 const SOURCE_URL = "https://steamrip.com/";
 const PROBE_URL = "https://steamrip.com/wp-json/wp/v2/posts?per_page=1";
 const RELAY_PARTITION = "persist:index-relay";

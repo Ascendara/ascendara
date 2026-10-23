@@ -56,6 +56,7 @@ import {
   cleanupMessageListeners,
 } from "@/services/firebase/firebaseService";
 import { syncFavoritesNow } from "@/services/cloud/favoritesCloudSync";
+import { API_URL } from "@/config/api";
 
 export default function useAscendPage({ cloudOnly = false } = {}) {
   const navigate = useNavigate();
@@ -856,7 +857,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       const authHeaders = await window.electron.getAuthHeaders();
       const userId = user?.uid || "";
       const response = await fetch(
-        `https://api.ascendara.app/ascend/leaderboard${userId ? `?userId=${userId}` : ""}`,
+        `${API_URL}/ascend/leaderboard${userId ? `?userId=${userId}` : ""}`,
         {
           headers: authHeaders,
         }
@@ -881,7 +882,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const loadUpcomingChangelog = async () => {
     setLoadingUpcoming(true);
     try {
-      const response = await fetch("https://api.ascendara.app/json/changelog/v2");
+      const response = await fetch(`${API_URL}/json/changelog/v2`);
       if (response.ok) {
         const data = await response.json();
         // Filter to only show entries where release is false (unreleased)
@@ -1693,7 +1694,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     setIsReportingUser(true);
     try {
       const authHeaders = await window.electron.getAuthHeaders();
-      const response = await fetch("https://api.ascendara.app/auth/token", {
+      const response = await fetch(`${API_URL}/auth/token`, {
         headers: authHeaders,
       });
 
@@ -1703,7 +1704,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
 
       const { token: authToken } = await response.json();
 
-      const reportResponse = await fetch("https://api.ascendara.app/app/report", {
+      const reportResponse = await fetch(`${API_URL}/app/report`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1720,7 +1721,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       if (!reportResponse.ok) {
         if (reportResponse.status === 401) {
           const newAuthHeaders = await window.electron.getAuthHeaders();
-          const newTokenResponse = await fetch("https://api.ascendara.app/auth/token", {
+          const newTokenResponse = await fetch(`${API_URL}/auth/token`, {
             headers: newAuthHeaders,
           });
 
@@ -1730,7 +1731,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
 
           const { token: newAuthToken } = await newTokenResponse.json();
 
-          const retryResponse = await fetch("https://api.ascendara.app/app/report", {
+          const retryResponse = await fetch(`${API_URL}/app/report`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -1953,7 +1954,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       }
 
       const productResponse = await fetch(
-        "https://api.ascendara.app/stripe/products/prod_TZdRiUAwPpMEjW"
+        `${API_URL}/stripe/products/prod_TZdRiUAwPpMEjW`
       );
       if (!productResponse.ok) {
         toast.error(t("ascend.settings.checkoutError"));
@@ -2028,7 +2029,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     try {
       const response = await userAuthenticatedFetch(
         user,
-        "https://api.ascendara.app/stripe/customer-portal",
+        `${API_URL}/stripe/customer-portal`,
         {
           method: "POST",
           headers: {
@@ -2057,7 +2058,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     try {
       const response = await userAuthenticatedFetch(
         user,
-        "https://api.ascendara.app/stripe/customer-portal",
+        `${API_URL}/stripe/customer-portal`,
         {
           method: "POST",
           headers: {

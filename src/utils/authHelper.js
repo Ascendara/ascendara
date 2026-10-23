@@ -3,6 +3,7 @@
  * Provides a consistent way to make authenticated API requests
  * Uses time-based HMAC signatures that rotate every hour
  */
+import { API_URL } from "@/config/api";
 
 export function getClientVersionHeaders() {
   return typeof __APP_VERSION__ === "string"
@@ -22,8 +23,8 @@ export async function getUserAuthHeaders(user, forceRefresh = false) {
 }
 
 export async function userAuthenticatedFetch(user, url, options = {}) {
-  const target = new URL(url, "https://api.ascendara.app");
-  if (target.origin !== "https://api.ascendara.app") {
+  const target = new URL(url, API_URL);
+  if (target.origin !== new URL(API_URL).origin) {
     throw new Error("Account credentials may only be sent to the Ascendara API.");
   }
   const send = async forceRefresh => {
@@ -47,7 +48,7 @@ export async function userAuthenticatedFetch(user, url, options = {}) {
 export async function getAuthToken() {
   try {
     const authHeaders = await window.electron.getAuthHeaders();
-    const response = await fetch("https://api.ascendara.app/auth/token", {
+    const response = await fetch(`${API_URL}/auth/token`, {
       headers: { ...authHeaders, ...getClientVersionHeaders() },
     });
 

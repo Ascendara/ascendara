@@ -1,7 +1,8 @@
+import { API_URL } from "@/config/api";
 const getToken = async () => {
   try {
     const authHeaders = await window.electron.getAuthHeaders();
-    const response = await fetch("https://api.ascendara.app/auth/token", {
+    const response = await fetch(`${API_URL}/auth/token`, {
       headers: authHeaders,
     });
 
@@ -20,7 +21,7 @@ const getToken = async () => {
 const fetchEarlyChanges = async () => {
   try {
     const token = await getToken();
-    const response = await fetch("https://api.ascendara.app/app/earlychanges/read", {
+    const response = await fetch(`${API_URL}/app/earlychanges/read`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -32,7 +33,7 @@ const fetchEarlyChanges = async () => {
       // If token expired, try once with a new token
       const newToken = await getToken();
       const retryResponse = await fetch(
-        "https://api.ascendara.app/app/earlychanges/read",
+        `${API_URL}/app/earlychanges/read`,
         {
           headers: {
             Authorization: `Bearer ${newToken}`,
@@ -62,7 +63,7 @@ const voteForFeature = async (featureId, voteType) => {
       }
 
       const token = await getToken();
-      const response = await fetch("https://api.ascendara.app/app/earlychanges/vote", {
+      const response = await fetch(`${API_URL}/app/earlychanges/vote`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -82,7 +83,7 @@ const voteForFeature = async (featureId, voteType) => {
         // If token expired, try once with a new token
         const newToken = await getToken();
         const retryResponse = await fetch(
-          "https://api.ascendara.app/app/earlychanges/vote",
+          `${API_URL}/app/earlychanges/vote`,
           {
             method: "POST",
             headers: {

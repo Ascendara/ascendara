@@ -36,6 +36,7 @@ import {
   Gamepad2,
 } from "lucide-react";
 import "@/lib/utils";
+import { API_URL } from "@/config/api";
 
 const CommunityHub = ({ user, userData }) => {
   const { t } = useTranslation();
@@ -223,7 +224,7 @@ const CommunityHub = ({ user, userData }) => {
     // Forward message to Discord webhook via API
     try {
       const idToken = await user.getIdToken();
-      await fetch("https://api.ascendara.app/community/forward-message", {
+      await fetch(`${API_URL}/community/forward-message`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -246,7 +247,7 @@ const CommunityHub = ({ user, userData }) => {
     try {
       const idToken = await user.getIdToken();
       const response = await fetch(
-        "https://api.ascendara.app/community/owner/approve-join",
+        `${API_URL}/community/owner/approve-join`,
         {
           method: "POST",
           headers: {
@@ -282,7 +283,7 @@ const CommunityHub = ({ user, userData }) => {
     try {
       const idToken = await user.getIdToken();
       const response = await fetch(
-        "https://api.ascendara.app/community/owner/deny-join",
+        `${API_URL}/community/owner/deny-join`,
         {
           method: "POST",
           headers: {

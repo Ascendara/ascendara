@@ -65,6 +65,7 @@ import {
 import { cn } from "@/lib/utils";
 import { privateSourceMessage } from "@/lib/privateSourceMessages";
 import SpeedGraph, { formatSpeed, markDownloadStart } from "@/components/SpeedGraph";
+import { API_URL } from "@/config/api";
 
 // Helper function to check if download speed is above 50 MB/s
 const isHighSpeed = speedString => {
@@ -1577,7 +1578,7 @@ const DownloadCard = ({
     setIsReporting(true);
     try {
       const authHeaders = await window.electron.getAuthHeaders();
-      const response = await fetch("https://api.ascendara.app/auth/token", {
+      const response = await fetch(`${API_URL}/auth/token`, {
         headers: authHeaders,
       });
       if (!response.ok) throw new Error("Failed to obtain token");
@@ -1607,7 +1608,7 @@ const DownloadCard = ({
         `• Timestamp: ${new Date().toISOString()}`,
       ].join("\n");
 
-      const reportResponse = await fetch("https://api.ascendara.app/app/report/feature", {
+      const reportResponse = await fetch(`${API_URL}/app/report/feature`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -5,8 +5,9 @@
 
 const fs = require("fs-extra");
 const path = require("path");
+const { API_URL } = require("../core/config");
 
-const GAMES_URL = "https://api.ascendara.app/json/v2/games";
+const GAMES_URL = `${API_URL}/json/v2/games`;
 const COVERS_URL = "https://r2.ascendara.app/covers";
 const GAMES_FILE = "ascendara_games.json";
 const SYNC_STATE_FILE = "sync.json";

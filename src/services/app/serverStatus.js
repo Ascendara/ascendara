@@ -1,6 +1,7 @@
+import { API_URL } from "@/config/api";
 const ENDPOINTS = {
   monitor: "https://monitor.ascendara.app/",
-  api: "https://api.ascendara.app/",
+  api: `${API_URL}/`,
   storage: "https://cdn.ascendara.app/",
   lfs: "https://lfs.ascendara.app/",
   r2: "https://r2.ascendara.app/",

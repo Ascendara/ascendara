@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Star, MessageCircle, DollarSign, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { API_URL } from "@/config/api";
 
 const SupportDialog = ({ onClose }) => {
   const { t } = useTranslation();
@@ -14,7 +15,7 @@ const SupportDialog = ({ onClose }) => {
     const fetchToken = async () => {
       try {
         const authHeaders = await window.electron.getAuthHeaders();
-        const response = await fetch("https://api.ascendara.app/auth/token", {
+        const response = await fetch(`${API_URL}/auth/token`, {
           headers: authHeaders,
         });
         const data = await response.json();
@@ -48,7 +49,7 @@ const SupportDialog = ({ onClose }) => {
       }
 
       // Send the rating to the API
-      fetch("https://api.ascendara.app/app/rate", {
+      fetch(`${API_URL}/app/rate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

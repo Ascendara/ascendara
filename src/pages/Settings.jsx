@@ -103,6 +103,7 @@ import {
   DownloadFolderCheckResult,
 } from "@/components/DownloadFolderCheck";
 import GameIndexManager from "@/components/GameIndexManager";
+import { API_URL } from "@/config/api";
 
 const themes = [
   // Light themes
@@ -470,7 +471,7 @@ function Settings() {
   useEffect(() => {
     const fetchBranchVersions = async () => {
       try {
-        const response = await fetch("https://api.ascendara.app/branch-versions");
+        const response = await fetch(`${API_URL}/branch-versions`);
         const data = await response.json();
         setBranchVersions(data);
       } catch (error) {
@@ -1089,7 +1090,7 @@ function Settings() {
     setShowPublicThemesDialog(true);
     setLoadingPublicThemes(true);
     try {
-      const response = await fetch("https://api.ascendara.app/json/publicthemes");
+      const response = await fetch(`${API_URL}/json/publicthemes`);
       const data = await response.json();
       // Ensure we always have an array
       let themesArray = [];
@@ -5764,7 +5765,7 @@ function Settings() {
                 try {
                   // Step 1: Validate the support code
                   const validateResponse = await fetch(
-                    "https://api.ascendara.app/support/validate",
+                    `${API_URL}/support/validate`,
                     {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
@@ -5790,7 +5791,7 @@ function Settings() {
                   // Step 2: Get app token
                   const authHeaders = await window.electron.getAuthHeaders();
                   const tokenResponse = await fetch(
-                    "https://api.ascendara.app/auth/token",
+                    `${API_URL}/auth/token`,
                     {
                       headers: authHeaders,
                     }

@@ -13,8 +13,9 @@ import "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import "@/components/ui/separator";
 import { Loader, Plus, Wrench, TrendingUp, Trash2, ExternalLink } from "lucide-react";
+import { API_URL } from "@/config/api";
 
-const CHANGELOG_API_URL = "https://api.ascendara.app/json/changelog/v2";
+const CHANGELOG_API_URL = `${API_URL}/json/changelog/v2`;
 
 const ChangelogDialog = ({ open, onOpenChange, currentVersion }) => {
   const { t } = useLanguage();

@@ -6,8 +6,9 @@
  * service only avoids sending games it has already reported.
  */
 import { getAuthToken } from "@/utils/authHelper";
+import { API_URL } from "@/config/api";
 
-const API_URL = "https://api.ascendara.app/app/v1/gameviews";
+const GAME_VIEWS_URL = `${API_URL}/app/v1/gameviews`;
 const VISIBLE_RATIO = 0.5;
 const DWELL_MS = 1000;
 const FLUSH_DELAY_MS = 3000;
@@ -87,7 +88,7 @@ class GameViewService {
 
   async loadCounts() {
     if (this.countsRequest || Date.now() - this.countsFetchedAt < COUNTS_TTL_MS) return;
-    this.countsRequest = fetch(API_URL)
+    this.countsRequest = fetch(GAME_VIEWS_URL)
       .then(response => (response.ok ? response.json() : null))
       .then(views => {
         if (views) this.setCounts(views);
@@ -178,7 +179,7 @@ class GameViewService {
 
     try {
       const send = async forceRefresh =>
-        fetch(API_URL, {
+        fetch(GAME_VIEWS_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

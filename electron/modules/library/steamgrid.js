@@ -2,8 +2,9 @@ const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
 const authHelper = require("../core/auth-helper");
+const { API_URL } = require("../core/config");
 
-const PROXY_BASE_URL = "https://api.ascendara.app/api/proxy/steamgrid";
+const PROXY_BASE_URL = `${API_URL}/api/proxy/steamgrid`;
 
 // ---------------------------------------------------------------------------
 // Request throttling - the upstream proxy rate-limits us hard when browsing

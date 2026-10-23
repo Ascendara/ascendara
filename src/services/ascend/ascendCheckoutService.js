@@ -1,4 +1,5 @@
 import { userAuthenticatedFetch } from "@/utils/authHelper";
+import { API_URL } from "@/config/api";
 
 const pendingUsers = new Set();
 
@@ -12,7 +13,7 @@ export async function openAscendCheckout(user, priceId) {
   try {
     const response = await userAuthenticatedFetch(
       user,
-      "https://api.ascendara.app/stripe/create-checkout-session",
+      `${API_URL}/stripe/create-checkout-session`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

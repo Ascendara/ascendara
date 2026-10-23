@@ -14,6 +14,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { API_URL } from "@/config/api";
 
 /**
  * GameAssetSearchDialog - Search and replace game assets (grid, logo, hero)
@@ -209,7 +210,7 @@ export const GameAssetSearchDialog = ({
     searchDebounceRef.current = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const searchUrl = `https://api.ascendara.app/api/proxy/steamgrid/search/autocomplete/${encodeURIComponent(query)}`;
+        const searchUrl = `${API_URL}/api/proxy/steamgrid/search/autocomplete/${encodeURIComponent(query)}`;
         const response = await fetch(searchUrl);
 
         if (!response.ok) {
@@ -248,7 +249,7 @@ export const GameAssetSearchDialog = ({
       const previews = {};
       for (const { type, key, params } of assetTypes) {
         try {
-          const url = `https://api.ascendara.app/api/proxy/steamgrid/${type}/game/${game.id}${params}`;
+          const url = `${API_URL}/api/proxy/steamgrid/${type}/game/${game.id}${params}`;
           const response = await fetch(url);
           if (response.ok) {
             const data = await response.json();
@@ -298,7 +299,7 @@ export const GameAssetSearchDialog = ({
 
       for (const { type, key, filename, params } of assetTypes) {
         try {
-          const url = `https://api.ascendara.app/api/proxy/steamgrid/${type}/game/${selectedGame.id}${params}`;
+          const url = `${API_URL}/api/proxy/steamgrid/${type}/game/${selectedGame.id}${params}`;
           const response = await fetch(url);
 
           if (response.ok) {

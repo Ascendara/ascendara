@@ -64,6 +64,7 @@ import imageCacheService from "@/services/images/imageCacheService";
 import gameService from "@/services/games/gameService";
 import PrivateSources from "@/components/PrivateSources";
 import { cn } from "@/lib/utils";
+import { API_URL } from "@/config/api";
 
 // The shared index refresh finishes almost instantly, so hold the busy state
 // long enough to be seen and then confirm the result on the button itself.
@@ -202,7 +203,7 @@ const GameIndexManager = ({
 
   const fetchIndexInfo = async () => {
     try {
-      const infoResponse = await fetch("https://api.ascendara.app/localindex/info");
+      const infoResponse = await fetch(`${API_URL}/localindex/info`);
       const infoData = await infoResponse.json();
       if (infoData.success) {
         setIndexInfo({
@@ -568,7 +569,7 @@ const GameIndexManager = ({
         }
 
         const url =
-          "https://api.ascendara.app/api/sources/bucket?url=" +
+          `${API_URL}/api/sources/bucket?url=` +
           encodeURIComponent(targetBucket) +
           "&page=1&limit=100";
 

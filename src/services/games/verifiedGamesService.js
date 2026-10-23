@@ -1,3 +1,4 @@
+import { API_URL } from "@/config/api";
 class VerifiedGamesService {
   constructor() {
     this.verifiedGameIds = new Set();
@@ -41,7 +42,7 @@ class VerifiedGamesService {
       }
 
       // Fetch from API
-      const response = await fetch("https://api.ascendara.app/v3/verifiedgames");
+      const response = await fetch(`${API_URL}/v3/verifiedgames`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch verified games: ${response.status}`);

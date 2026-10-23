@@ -3,8 +3,9 @@ import { useTranslation } from "react-i18next";
 import { Loader, Search, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { API_URL } from "@/config/api";
 
-const BASE = "https://api.ascendara.app/api/proxy/steamgrid";
+const BASE = `${API_URL}/api/proxy/steamgrid`;
 
 export default function BrowserDownloadArtwork({
   initialQuery,
