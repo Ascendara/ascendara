@@ -2,12 +2,11 @@ import GameReviews from "@/components/GameReviews";
 import PrivateGameDetails from "@/components/download/PrivateGameDetails";
 import AscendPerks from "@/components/download/AscendPerks";
 import {
-  DirectoryConflictDialog,
+  ExistingInstallDialog,
   NewUserGuideDialog,
   NoDownloadPathDialog,
   ProviderBlockedDialog,
   QueueDialog,
-  ReinstallDialog,
   SelectPathDialog,
   UpdateDialog,
   VerifiedDialog,
@@ -433,13 +432,10 @@ function PublicDownloadPage() {
   const [isExternalSourcesMode, setIsExternalSourcesMode] = useState(false);
   const [antivirusWarningDismissed, setAntivirusWarningDismissed] = useState(false);
   const [isGameInstalled, setIsGameInstalled] = useState(false);
-  const [showReinstallWarning, setShowReinstallWarning] = useState(false);
-  const [pendingReinstallUrl, setPendingReinstallUrl] = useState(null);
   const [showProviderBlockedDialog, setShowProviderBlockedDialog] = useState(false);
-  // Folder-name conflict: an existing directory with this game's name was
-  // found in the target games directory before starting a new download.
-  const [directoryConflict, setDirectoryConflict] = useState(null); // { path, sanitizedName, pendingArgs }
-  const [conflictStep, setConflictStep] = useState("choose"); // "choose" | "confirmDelete" | "confirmMerge"
+  // The game is installed or a folder with its name already exists, so the
+  // download waits until the user decides what to do with the existing copy.
+  const [existingInstall, setExistingInstall] = useState(null); // { installed, dir, conflicts, pendingArgs }
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
   const [retainedDownload, setRetainedDownload] = useState(null);
   const [retryingExtraction, setRetryingExtraction] = useState(false);
@@ -745,10 +741,10 @@ function PublicDownloadPage() {
       return;
     }
 
-    // Warn if game is already installed
+    // Installed games go straight to the existing-install prompt, which has
+    // its own location picker, so skip the separate path selection here
     if (isGameInstalled) {
-      setPendingReinstallUrl(directUrl);
-      setShowReinstallWarning(true);
+      await handleDownload(directUrl);
       return;
     }
 
@@ -762,42 +758,56 @@ function PublicDownloadPage() {
     }
   }
 
-  // Resolve a detected folder-name conflict per the user's chosen action,
-  // then resume the download that was paused waiting for a decision.
-  async function resolveDirectoryConflict(action, { saveData = false } = {}) {
-    if (!directoryConflict) return;
-    const { pendingArgs, sanitizedName } = directoryConflict;
+  const installDirectories = [
+    { index: 0, path: settings.downloadDirectory },
+    ...(settings.additionalDirectories || []).map((path, i) => ({ index: i + 1, path })),
+  ];
+
+  // Look for an existing folder with this game's name in every games directory
+  async function findDirectoryConflicts() {
+    const results = await Promise.all(
+      installDirectories.map(({ index }) =>
+        window.electron.checkGameDirectoryConflict(gameData.game, index).catch(error => {
+          console.error("Error checking game directory conflict:", error);
+          return null;
+        })
+      )
+    );
+    return Object.fromEntries(results.map((result, index) => [index, result]));
+  }
+
+  // Apply the user's choice for the existing copy, then resume the download
+  // that was paused waiting for a decision.
+  async function resolveExistingInstall(action, { saveData = false } = {}) {
+    if (!existingInstall) return;
+    const { dir, conflicts, pendingArgs } = existingInstall;
+    const conflict = conflicts[dir];
 
     setIsResolvingConflict(true);
     try {
-      if (action === "rename") {
+      if (conflict?.exists && action === "rename") {
         const result = await window.electron.renameExistingGameDirectory(
           gameData.game,
-          pendingArgs.dir || 0
+          dir
         );
         if (!result?.success) {
           toast.error(t("download.toast.renameFailed"));
           return;
         }
         toast.success(t("download.toast.renamedExisting"));
-      } else if (action === "delete") {
+      } else if (conflict?.exists && action === "delete") {
         if (saveData) {
-          await window.electron.saveDeletedGameData(sanitizedName);
+          await window.electron.saveDeletedGameData(conflict.sanitizedName);
         }
-        await window.electron.deleteGame(sanitizedName);
+        await window.electron.deleteGame(conflict.sanitizedName);
         toast.success(t("download.toast.deletedExisting"));
       }
       // "merge" requires no action here; the download will write into the
       // existing folder, keeping any files that aren't overwritten.
 
-      setDirectoryConflict(null);
-      setConflictStep("choose");
-      await handleDownload(
-        pendingArgs.directUrl,
-        pendingArgs.dir,
-        pendingArgs.forceStart,
-        true
-      );
+      setExistingInstall(null);
+      setIsGameInstalled(false);
+      await handleDownload(pendingArgs.directUrl, dir, pendingArgs.forceStart, true);
     } catch (error) {
       console.error("Failed to resolve directory conflict:", error);
       toast.error(t("download.toast.conflictResolveFailed"));
@@ -894,27 +904,25 @@ function PublicDownloadPage() {
       return;
     }
 
-    // Scan the target games directory for a folder that already has this
-    // game's name (e.g. a leftover install) before starting a fresh
-    // download. Skipped for update flows, which intentionally reuse the
-    // existing folder, and once the user has already resolved a conflict.
+    // Before a fresh download, ask once what to do if the game is installed
+    // or a folder with its name already exists (e.g. a leftover install).
+    // Skipped for update flows, which intentionally reuse the existing
+    // folder, and once the user has already made that decision.
     if (!skipConflictCheck && !gameData.isUpdating) {
-      try {
-        const conflict = await window.electron.checkGameDirectoryConflict(
-          gameData.game,
-          dir || 0
-        );
-        if (conflict?.exists) {
-          setConflictStep("choose");
-          setDirectoryConflict({
-            path: conflict.path,
-            sanitizedName: conflict.sanitizedName,
-            pendingArgs: { directUrl, dir, forceStart },
-          });
-          return;
-        }
-      } catch (error) {
-        console.error("Error checking game directory conflict:", error);
+      const conflicts = await findDirectoryConflicts();
+      const targetDir = dir ?? 0;
+      if (isGameInstalled || conflicts[targetDir]?.exists) {
+        // Without an explicit location, preselect where the existing copy lives
+        const existingDir = installDirectories.find(
+          ({ index }) => conflicts[index]?.exists
+        )?.index;
+        setExistingInstall({
+          installed: isGameInstalled,
+          dir: dir == null && existingDir != null ? existingDir : targetDir,
+          conflicts,
+          pendingArgs: { directUrl, forceStart },
+        });
+        return;
       }
     }
 
@@ -2338,27 +2346,6 @@ function PublicDownloadPage() {
         }}
       />
 
-      <ReinstallDialog
-        open={showReinstallWarning}
-        onOpenChange={setShowReinstallWarning}
-        onGoToLibrary={() => {
-          setShowReinstallWarning(false);
-          navigate("/library");
-        }}
-        onContinue={() => {
-          setShowReinstallWarning(false);
-          setIsGameInstalled(false);
-          if (
-            settings.additionalDirectories &&
-            settings.additionalDirectories.length > 0
-          ) {
-            setShowSelectPath(true);
-          } else {
-            handleDownload(pendingReinstallUrl, 0);
-          }
-        }}
-      />
-
       <SelectPathDialog
         open={showSelectPath}
         onOpenChange={setShowSelectPath}
@@ -2370,17 +2357,18 @@ function PublicDownloadPage() {
         }}
       />
 
-      <DirectoryConflictDialog
-        conflict={directoryConflict}
-        step={conflictStep}
-        onStepChange={setConflictStep}
+      <ExistingInstallDialog
+        prompt={existingInstall}
+        directories={installDirectories}
         busy={isResolvingConflict}
         gameName={gameData.game}
-        onResolve={resolveDirectoryConflict}
-        onDismiss={() => {
-          setDirectoryConflict(null);
-          setConflictStep("choose");
+        onDirChange={dir => setExistingInstall(prev => prev && { ...prev, dir })}
+        onConfirm={resolveExistingInstall}
+        onGoToLibrary={() => {
+          setExistingInstall(null);
+          navigate("/library");
         }}
+        onDismiss={() => setExistingInstall(null)}
       />
 
       <QueueDialog
@@ -2402,7 +2390,13 @@ function PublicDownloadPage() {
         onStartNow={() => {
           setShowQueuePrompt(false);
           if (pendingDownloadData) {
-            handleDownload(pendingDownloadData.directUrl, pendingDownloadData.dir, true);
+            // The existing-install check already ran before the queue prompt
+            handleDownload(
+              pendingDownloadData.directUrl,
+              pendingDownloadData.dir,
+              true,
+              true
+            );
           }
           setPendingDownloadData(null);
         }}

@@ -8,169 +8,217 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useLanguage } from "@/context/LanguageContext";
+import { cn } from "@/lib/utils";
 import {
   Check,
   FolderIcon,
   FolderSync,
   Library,
+  Loader,
   Star,
   Trash2,
   TriangleAlert,
   Trophy,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
-export function ReinstallDialog({ open, onOpenChange, onGoToLibrary, onContinue }) {
-  const { t } = useLanguage();
+function ChoiceCard({ selected, disabled, onSelect, children, className }) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            {t("download.reinstallWarning.title") || "Game Already Installed"}
-          </AlertDialogTitle>
-          <AlertDialogDescription className="text-muted-foreground">
-            {t("download.reinstallWarning.desc") ||
-              "This game is already installed in your library. Reinstalling may cause issues such as overwriting save data or corrupting existing files. Are you sure you want to continue?"}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => onOpenChange(false)}>
-            {t("common.cancel")}
-          </AlertDialogCancel>
-          <Button className="text-foreground" onClick={onGoToLibrary}>
-            <Library className="mr-2 h-4 w-4" />
-            {t("download.goToLibrary") || "Go to Library"}
-          </Button>
-          <Button variant="destructive" className="text-foreground" onClick={onContinue}>
-            {t("download.reinstallWarning.continueAnyway") || "Reinstall Anyway"}
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-function ConflictOption({ icon: Icon, title, description, className, ...props }) {
-  return (
-    <Button
-      variant="outline"
-      className={`h-auto flex-col items-start gap-1 whitespace-normal py-2 text-left ${className || ""}`}
-      {...props}
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      disabled={disabled}
+      onClick={onSelect}
+      className={cn(
+        "flex w-full items-start gap-3 rounded-lg border px-3 py-2 text-left transition-colors disabled:opacity-50",
+        selected
+          ? "border-primary bg-primary/10"
+          : "border-border hover:border-primary/50 hover:bg-muted/50",
+        className
+      )}
     >
-      <span className="flex items-center gap-2 font-medium">
-        <Icon className="h-4 w-4" />
-        {title}
-      </span>
-      <span className="text-xs font-normal text-muted-foreground">{description}</span>
-    </Button>
+      {children}
+    </button>
   );
 }
 
-export function DirectoryConflictDialog({
-  conflict,
-  step,
-  onStepChange,
+// One screen for redownloading a game that is already installed or whose
+// folder already exists: where to install, what to do with the old copy,
+// and whether to keep its stats, instead of a chain of separate prompts.
+export function ExistingInstallDialog({
+  prompt,
+  directories,
   busy,
   gameName,
-  onResolve,
+  onDirChange,
+  onConfirm,
+  onGoToLibrary,
   onDismiss,
 }) {
   const { t } = useLanguage();
+  const [action, setAction] = useState("delete");
+  const [keepData, setKeepData] = useState(true);
+  const open = !!prompt;
+
+  useEffect(() => {
+    if (open) {
+      setAction("delete");
+      setKeepData(true);
+    }
+  }, [open]);
+
+  const conflict = prompt?.conflicts[prompt.dir];
+  const hasFolder = !!conflict?.exists;
+
+  const options = [
+    {
+      id: "delete",
+      icon: Trash2,
+      title: t("download.existingInstall.replace"),
+      description: t("download.existingInstall.replaceDesc"),
+    },
+    {
+      id: "rename",
+      icon: FolderSync,
+      title: t("download.directoryConflict.rename"),
+      description: t("download.directoryConflict.renameDesc"),
+    },
+    {
+      id: "merge",
+      icon: TriangleAlert,
+      title: t("download.directoryConflict.merge"),
+      description: t("download.directoryConflict.mergeDesc"),
+    },
+  ];
+
   return (
     <AlertDialog
-      open={!!conflict}
-      onOpenChange={open => {
-        if (!open && !busy) onDismiss();
+      open={open}
+      onOpenChange={next => {
+        if (!next && !busy) onDismiss();
       }}
     >
-      <AlertDialogContent>
+      <AlertDialogContent className="sm:max-w-[480px]">
         <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            {step === "confirmMerge"
-              ? t("download.directoryConflict.confirmMergeTitle")
+          <AlertDialogTitle>
+            {prompt?.installed
+              ? t("download.reinstallWarning.title")
               : t("download.directoryConflict.title")}
           </AlertDialogTitle>
           <AlertDialogDescription className="text-muted-foreground">
-            {step === "confirmDelete"
-              ? t("library.saveGameDataDescription", { game: gameName })
-              : step === "confirmMerge"
-                ? t("download.directoryConflict.confirmMergeDesc")
-                : t("download.directoryConflict.desc", {
-                    folder: conflict?.sanitizedName,
-                  })}
+            {prompt?.installed
+              ? t("download.existingInstall.descInstalled", { game: gameName })
+              : t("download.directoryConflict.desc", {
+                  folder: conflict?.sanitizedName,
+                })}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        {step === "choose" && (
-          <div className="flex flex-col gap-2 text-foreground">
-            <ConflictOption
-              icon={FolderSync}
-              title={t("download.directoryConflict.rename")}
-              description={t("download.directoryConflict.renameDesc")}
-              disabled={busy}
-              onClick={() => onResolve("rename")}
-            />
-            <ConflictOption
-              icon={Trash2}
-              title={t("download.directoryConflict.delete")}
-              description={t("download.directoryConflict.deleteDesc")}
-              disabled={busy}
-              onClick={() => onStepChange("confirmDelete")}
-            />
-            <ConflictOption
-              icon={TriangleAlert}
-              title={t("download.directoryConflict.merge")}
-              description={t("download.directoryConflict.mergeDesc")}
-              disabled={busy}
-              onClick={() => onStepChange("confirmMerge")}
-            />
-          </div>
-        )}
+        <div className="flex flex-col gap-4 text-foreground">
+          {directories.length > 1 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">
+                {t("download.existingInstall.installTo")}
+              </span>
+              <div role="radiogroup" className="flex flex-col gap-1.5">
+                {directories.map(({ index, path }) => (
+                  <ChoiceCard
+                    key={index}
+                    selected={prompt?.dir === index}
+                    disabled={busy}
+                    onSelect={() => onDirChange(index)}
+                    className="items-center py-1.5"
+                  >
+                    <FolderIcon className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-sm">{path}</span>
+                    {prompt?.conflicts[index]?.exists && (
+                      <span className="shrink-0 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
+                        {t("download.existingInstall.existingCopy")}
+                      </span>
+                    )}
+                  </ChoiceCard>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasFolder ? (
+            <div role="radiogroup" className="flex flex-col gap-1.5">
+              {options.map(({ id, icon: Icon, title, description }) => (
+                <ChoiceCard
+                  key={id}
+                  selected={action === id}
+                  disabled={busy}
+                  onSelect={() => setAction(id)}
+                >
+                  <Icon
+                    className={cn(
+                      "mt-0.5 h-4 w-4 shrink-0",
+                      id === "merge" && "text-yellow-500"
+                    )}
+                  />
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium">{title}</span>
+                    <span className="text-xs text-muted-foreground">{description}</span>
+                  </span>
+                </ChoiceCard>
+              ))}
+              {action === "delete" && (
+                <div className="mt-1 flex items-center gap-2 px-1 text-sm">
+                  <Checkbox
+                    checked={keepData}
+                    disabled={busy}
+                    onCheckedChange={setKeepData}
+                  />
+                  <span
+                    className="cursor-pointer select-none"
+                    onClick={() => !busy && setKeepData(!keepData)}
+                  >
+                    {t("download.existingInstall.keepData")}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {t("download.existingInstall.noFolderHere")}
+            </p>
+          )}
+        </div>
 
         <AlertDialogFooter>
-          {step !== "choose" && (
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => onStepChange("choose")}
-            >
-              {t("common.back") || "Back"}
-            </Button>
-          )}
           <AlertDialogCancel disabled={busy} onClick={onDismiss}>
             {t("common.cancel")}
           </AlertDialogCancel>
-          {step === "confirmDelete" && (
-            <>
-              <Button
-                variant="outline"
-                className="text-primary"
-                disabled={busy}
-                onClick={() => onResolve("delete", { saveData: false })}
-              >
-                {t("library.saveGameDataNo")}
-              </Button>
-              <Button
-                variant="destructive"
-                className="text-foreground"
-                disabled={busy}
-                onClick={() => onResolve("delete", { saveData: true })}
-              >
-                {t("library.saveGameDataYes")}
-              </Button>
-            </>
-          )}
-          {step === "confirmMerge" && (
+          {prompt?.installed && (
             <Button
-              variant="destructive"
-              className="text-foreground"
+              variant="outline"
+              className="text-primary"
               disabled={busy}
-              onClick={() => onResolve("merge")}
+              onClick={onGoToLibrary}
             >
-              {t("download.directoryConflict.confirmMerge")}
+              <Library className="mr-2 h-4 w-4" />
+              {t("download.goToLibrary")}
             </Button>
           )}
+          <Button
+            variant={hasFolder && action !== "rename" ? "destructive" : "default"}
+            className={hasFolder && action !== "rename" ? "text-foreground" : "text-secondary"}
+            disabled={busy}
+            onClick={() =>
+              onConfirm(hasFolder ? action : null, {
+                saveData: action === "delete" && keepData,
+              })
+            }
+          >
+            {busy && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+            {prompt?.installed
+              ? t("download.existingInstall.reinstall")
+              : t("download.existingInstall.continue")}
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

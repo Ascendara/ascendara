@@ -1491,6 +1491,17 @@
     },
     "downloadSource": "Download Source",
     "enableProtection": "Enable Protection",
+    "existingInstall": {
+      "continue": "Continue",
+      "descInstalled": "{{game}} is already in your library. Choose what happens to the current copy before downloading it again.",
+      "existingCopy": "Existing copy",
+      "installTo": "Install to",
+      "keepData": "Keep my playtime, achievements and stats",
+      "noFolderHere": "There's no existing copy in this folder, so a fresh copy will be installed here.",
+      "reinstall": "Reinstall",
+      "replace": "Replace Existing Install",
+      "replaceDesc": "Delete the current folder and download a clean copy in its place."
+    },
     "failedToLoadSpecs": "Failed to load system specs",
     "filesUnavailable": {
       "checkBack": "There's nothing to fix on your side. If working files become available again, the download options will come back after you refresh your game index.",
