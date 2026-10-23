@@ -23,7 +23,7 @@ import {
   ShieldCheck,
   Heart,
   Eye,
-  HardDrive,
+  Download,
   Tag,
   Sparkles,
 } from "lucide-react";
@@ -419,7 +419,7 @@ function GameCardContent({ game, compact, viewCount }) {
   const specs = [
     game.size && {
       key: "size",
-      icon: HardDrive,
+      icon: Download,
       label: t("gameCard.specs.size"),
       value: game.size,
     },

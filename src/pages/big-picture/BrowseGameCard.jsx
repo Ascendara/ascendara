@@ -9,6 +9,7 @@ import {
   Users,
 } from "lucide-react";
 import { useImageLoader } from "@/hooks/useImageLoader";
+import { useLanguage } from "@/context/LanguageContext";
 import ratingQueueService from "@/services/games/ratingQueueService";
 import { gameName } from "./surfaceNavigation";
 import "./browse-game-card.css";
@@ -19,6 +20,7 @@ const validRating = value => {
 };
 
 export const BrowseGameCard = memo(function BrowseGameCard({ game, focus, onOpen }) {
+  const { t } = useLanguage();
   const ref = useRef(null);
   const id = useId();
   const name = gameName(game);
@@ -154,7 +156,7 @@ export const BrowseGameCard = memo(function BrowseGameCard({ game, focus, onOpen
               {game.size && (
                 <>
                   <HardDrive aria-hidden="true" />
-                  {game.size}
+                  {t("downloads.downloadSize", { size: game.size })}
                 </>
               )}
             </span>

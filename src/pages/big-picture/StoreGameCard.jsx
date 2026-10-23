@@ -1,9 +1,11 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useGameImage } from "@/hooks/useGameImage";
+import { useLanguage } from "@/context/LanguageContext";
 import { Loader, Download, Star, Gift, Gamepad2 } from "lucide-react";
 
 // Store card component
 const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
+  const { t } = useLanguage();
   const cardRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
   const { imageData, loading } = useGameImage(game, {
@@ -103,7 +105,9 @@ const StoreGameCard = React.memo(({ game, isSelected, onClick }) => {
             {game.game}
           </span>
           {game.size && (
-            <span className="mt-1 block text-xs text-slate-400">{game.size}</span>
+            <span className="mt-1 block text-xs text-slate-400">
+              {t("downloads.downloadSize", { size: game.size })}
+            </span>
           )}
         </div>
       )}

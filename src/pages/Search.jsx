@@ -1182,7 +1182,9 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                                     {game.size && (
                                       <div className="flex items-center gap-1">
                                         <Database className="h-3 w-3" />
-                                        <span>{game.size}</span>
+                                        <span>
+                                          {t("downloads.downloadSize", { size: game.size })}
+                                        </span>
                                       </div>
                                     )}
                                     {game.latest_update && (
@@ -1710,7 +1712,9 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) 
             {game.size && (
               <span className="flex items-center gap-1.5 rounded-md bg-black/40 px-2 py-1 backdrop-blur-sm">
                 <HardDrive className="h-3 w-3 text-white/60" />
-                <span className="font-semibold tabular-nums">{game.size}</span>
+                <span className="font-semibold tabular-nums">
+                  {t("downloads.downloadSize", { size: game.size })}
+                </span>
               </span>
             )}
             {game.version && (

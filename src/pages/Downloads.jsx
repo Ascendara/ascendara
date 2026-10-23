@@ -1787,7 +1787,7 @@ const DownloadCard = ({
               {game.size && (
                 <>
                   <span>·</span>
-                  <span>{game.size}</span>
+                  <span>{t("downloads.downloadSize", { size: game.size })}</span>
                 </>
               )}
               {isDownloading && settings.downloadLimit > 0 && (

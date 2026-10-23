@@ -1140,7 +1140,7 @@
       "onlineMultiplayer": "Online Multiplayer",
       "pressToDownload": "Press to Download",
       "rating": "Rating",
-      "size": "Size"
+      "size": "Download Size"
     },
     "controllerAndKeyboard": "Controller & keyboard",
     "controllerDetected": "Controller Detected",
@@ -1507,7 +1507,7 @@
     "gameNeedsEmulator": "This requires an emulator to run.",
     "gameNeedsVR": "VR may be required for this game.",
     "gameNotRated": "This game has not been reviewed by critics",
-    "gameSize": "Game Size",
+    "gameSize": "Download Size",
     "genres": "Genres",
     "getAscend": "Join Ascend",
     "goToLibrary": "Go to Library",
@@ -1887,6 +1887,7 @@
     "largeFileNotice": "Writing a large file to disk... this may take a moment.",
     "lastExtracted": "Last extracted",
     "limitedTo": "Limited to",
+    "downloadSize": "{{size}} download",
     "logViewerTitle": "Download Manager Log",
     "manualInstallDescription": "Download complete. Run the installer as Administrator to finish installing the game.",
     "manualInstallTitle": "One Last Step",
@@ -2004,7 +2005,7 @@
     "reportGameDescription": "Broken links, wrong details and more",
     "showLess": "Show Less",
     "specs": {
-      "size": "Size",
+      "size": "Download",
       "updated": "Updated",
       "version": "Version"
     },

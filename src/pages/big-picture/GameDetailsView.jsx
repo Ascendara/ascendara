@@ -427,7 +427,9 @@ const GameDetailsView = ({
               {game.size && (
                 <div className="flex items-center gap-2">
                   <Download className="h-5 w-5" />
-                  <span className="font-medium">{game.size}</span>
+                  <span className="font-medium">
+                    {t("downloads.downloadSize", { size: game.size })}
+                  </span>
                 </div>
               )}
               {game.version && (
