@@ -1,7 +1,6 @@
 // Firebase SDK initialization for Ascendara account management
 import { userAuthenticatedFetch } from "@/utils/authHelper";
 import { initializeApp } from "firebase/app";
-import { getAnalytics, isSupported } from "firebase/analytics";
 import {
   getAuth,
   createUserWithEmailAndPassword,
@@ -65,7 +64,6 @@ const hasFirebaseCredentials = !!(
 
 // Initialize Firebase only if credentials are available
 let app = null;
-let analytics = null;
 let auth = null;
 let db = null;
 let googleProvider = null;
@@ -73,13 +71,7 @@ let googleProvider = null;
 if (hasFirebaseCredentials) {
   // Initialize Firebase
   app = initializeApp(firebaseConfig);
-
-  // Initialize Analytics (only in browser environment where supported)
-  isSupported().then(supported => {
-    if (supported) {
-      analytics = getAnalytics(app);
-    }
-  });
+  // Analytics is set up by services/app/analyticsService
 
   // Initialize Auth
   auth = getAuth(app);
@@ -3917,4 +3909,4 @@ export const getUserCommunities = async () => {
 };
 
 // Export Firebase instances for advanced usage
-export { app, auth, db, analytics };
+export { app, auth, db };

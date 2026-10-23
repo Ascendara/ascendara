@@ -15,6 +15,7 @@ import {
   reloadCurrentUser,
   signInWithGoogle,
 } from "@/services/firebase/firebaseService";
+import { track } from "@/services/app/analyticsService";
 
 const AuthContext = createContext(null);
 
@@ -196,6 +197,8 @@ export const AuthProvider = ({ children }) => {
     const result = await registerUser(email, password, displayName, hardwareId);
     if (result.error) {
       setError(result.error);
+    } else {
+      track("sign_up", { method: "email" });
     }
     return result;
   };
@@ -206,6 +209,8 @@ export const AuthProvider = ({ children }) => {
     const result = await loginUser(email, password);
     if (result.error) {
       setError(result.error);
+    } else {
+      track("login", { method: "email" });
     }
     return result;
   };
@@ -216,6 +221,8 @@ export const AuthProvider = ({ children }) => {
     const result = await logoutUser();
     if (result.error) {
       setError(result.error);
+    } else {
+      track("logout");
     }
     return result;
   };
@@ -301,6 +308,8 @@ export const AuthProvider = ({ children }) => {
     const result = await signInWithGoogle();
     if (result.error) {
       setError(result.error);
+    } else {
+      track("login", { method: "google" });
     }
     return result;
   };

@@ -74,6 +74,12 @@ import { Toaster, toast } from "sonner";
 import Home from "./pages/Home";
 // Search is rendered persistently in Layout, not via Routes
 import i18n from "./i18n";
+import {
+  identifyUser,
+  startAnalyticsListeners,
+  track,
+  trackScreen,
+} from "@/services/app/analyticsService";
 import "./index.css";
 import "./styles/scrollbar.css";
 import { AlertTriangle, RefreshCwIcon, X, Circle, Square, Triangle } from "lucide-react";
@@ -1097,6 +1103,16 @@ const AppRoutes = () => {
   const unsubscribeProtocolRef = useRef(null);
   const lastHandledGameProtocolRef = useRef({ gameID: null, time: 0 });
 
+  useEffect(() => startAnalyticsListeners(), []);
+
+  useEffect(() => {
+    trackScreen(location.pathname);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    identifyUser(user);
+  }, [user?.uid]);
+
   useEffect(() => {
     const loadIconPath = async () => {
       try {
@@ -1822,6 +1838,10 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("Fatal error caught by ErrorBoundary:", error, errorInfo);
+    track("app_crash", {
+      error: `${error?.name || "Error"}: ${error?.message || ""}`,
+      component: errorInfo?.componentStack?.trim().split("\n")[0],
+    });
   }
 
   render() {

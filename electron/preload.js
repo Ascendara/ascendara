@@ -550,6 +550,11 @@ contextBridge.exposeInMainWorld("electron", {
     preloadIpc.subscribe("download-error", callback, {
       selectArgs: args => [args[0]],
     }),
+  // Main-process events for the renderer's analytics service to send
+  onAnalyticsEvent: callback =>
+    preloadIpc.subscribe("analytics-event", callback, {
+      selectArgs: args => [args[0]],
+    }),
 
   //===========================================================================
   // FILE & DIRECTORY MANAGEMENT

@@ -28,6 +28,11 @@ const { startDownloadWatchdog } = require("./downloadLiveness");
 
 const steamgrid = require("../library/steamgrid");
 const gameUpdateBackup = require("./gameUpdateBackup");
+const {
+  sendAnalyticsEvent,
+  linkProvider,
+  trackDownloadOutcome,
+} = require("../app/analytics");
 
 const {
   listHelpers,
@@ -848,6 +853,14 @@ function registerDownloadHandlers() {
           });
 
           await waitForSpawn(downloadProcess);
+          const analyticsParams = {
+            game: sanitizedGame,
+            game_id: gameID,
+            provider: browserDirect ? "browser" : linkProvider(link),
+            update: updateFlow ? "true" : "false",
+          };
+          sendAnalyticsEvent("download_start", { ...analyticsParams, download_size: size });
+          trackDownloadOutcome(downloadProcess, gameDirectory, analyticsParams);
           downloadProcess.once("exit", code => {
             if (code === 0 && updateFlow) {
               withDownloadOperation(sanitizedGame, () =>
@@ -1744,6 +1757,9 @@ function registerDownloadHandlers() {
             if (downloadProcesses.get(sanitizedGame) === downloadProcess)
               downloadProcesses.delete(sanitizedGame);
           });
+          const analyticsParams = { game: sanitizedGame, game_id: gameInfo.gameID };
+          sendAnalyticsEvent("download_resume", analyticsParams);
+          trackDownloadOutcome(downloadProcess, path.dirname(jsonFile), analyticsParams);
 
           downloadProcesses.set(sanitizedGame, downloadProcess);
           downloadProcess.unref();
