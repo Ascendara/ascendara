@@ -31,10 +31,13 @@ export const markDownloadStart = label => {
   let busy = false;
   for (const { key } of SERIES) busy = busy || history[key].some(value => value > 0.0005);
   // Nothing drawn yet means nothing to separate from.
-  if (!busy || now - lastSampleAt > 1000) return;
+  if (!busy) return;
   // End the old curves at the divider; whatever is still running eases back in.
   for (const { key } of SERIES) live[key] = 0;
-  markers.push({ age: -(now - lastSampleAt) / SAMPLE_MS, label, created: now });
+  // While the graph was away it resumes with a single sample, so the divider
+  // lands at the live edge.
+  const age = now - lastSampleAt > 1000 ? -1 : -(now - lastSampleAt) / SAMPLE_MS;
+  markers.push({ age, label, created: now });
   if (markers.length > MAX_MARKERS) markers.shift();
 };
 
