@@ -4384,6 +4384,9 @@
     "macCompat": {
       "appBottle": "Highball environment",
       "appBottleHint": "Games run in this environment and appear in Highball's library with their cover. If it doesn't exist yet, Ascendara creates it with your Highball engine.",
+      "appEnvironmentMode": "Environment's mode",
+      "appGameMode": "Mode for this game",
+      "appGameModeHint": "Saved in Highball, so it applies whether you play from Ascendara or from Highball.",
       "appIncompatible": "Highball {{version}} is installed, but Ascendara includes Highball {{bundled}}. Sharing turns on once both use the same version.",
       "appNotSetUp": "Your Highball environment is prepared the first time you play a Windows game.",
       "appSync": "Keep Highball's library in sync",

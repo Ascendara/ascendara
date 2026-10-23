@@ -1785,6 +1785,20 @@ function registerGameHandlers() {
     return false;
   });
 
+  // A game's settings in the Highball app (macOS, shared home)
+  ipcMain.handle("highball-get-game-settings", (_, game) =>
+    highball.getGameSettings(game).catch(error => ({ error: error.message }))
+  );
+  ipcMain.handle("highball-set-game-mode", async (_, game, mode) => {
+    try {
+      const installed = (await listInstalledGames()).find(entry => entry.game === game);
+      if (!installed) throw new Error(`${game} is not installed`);
+      return await highball.setGameMode(installed, mode);
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
   // Keep the Highball app's library in step with the installed games (macOS)
   ipcMain.handle("highball-sync-library", () => syncHighballLibrary());
   setTimeout(() => {

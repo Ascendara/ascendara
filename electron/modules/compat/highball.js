@@ -544,15 +544,13 @@ async function buildLaunchConfig(
     // Ascendara is passed on, Highball weighs everything else as for Play
     if (usesApp()) {
       const { program } = await ensureProgram({ game: gameName, executable, directory });
-      const renderer =
-        rendererOverride && RENDERERS.includes(rendererOverride) ? rendererOverride : "";
       const home = await getHome();
       return {
         binary: getBinary(),
         bottle,
         program,
-        renderer,
-        rendererSource: renderer ? "game" : "highball",
+        renderer: "",
+        rendererSource: "highball",
         launchArgs: [],
         home,
         prefix: bottlePath(home, bottle),
@@ -620,8 +618,9 @@ async function resetBottle(gameName, { shared = false } = {}) {
 // Highball library
 
 /**
- * The programs added to a bottle: "name\tpath[\tid=<uuid>][\targs=...]".
- * Highball 0.10.22 and older print no id and can't set covers or remove.
+ * The programs added to a bottle: "name\tpath[\tid=<uuid>][\tmode=<renderer>][\targs=...]",
+ * mode being the one chosen on the game's page in Highball. Highball 0.10.22
+ * and older print no id or mode and can't set covers, modes or remove.
  */
 async function listPins(bottle) {
   const { stdout } = await runCli(["pin", "list", bottle]);
@@ -630,8 +629,14 @@ async function listPins(bottle) {
     .filter(line => line.includes("\t"))
     .map(line => {
       const [name, programPath, ...fields] = line.split("\t");
-      const id = fields.find(field => field.startsWith("id="));
-      return { name, path: programPath, id: id ? id.slice(3) : null };
+      const field = key =>
+        fields.find(f => f.startsWith(`${key}=`))?.slice(key.length + 1);
+      return {
+        name,
+        path: programPath,
+        id: field("id") || null,
+        mode: field("mode") || null,
+      };
     });
 }
 
@@ -684,6 +689,30 @@ async function addToLibrary(game) {
     console.error(`[Highball] Could not add ${game.game} to the library:`, error);
     return { success: false, message: error.message };
   }
+}
+
+/**
+ * A game's settings as Highball keeps them: its program and the mode chosen
+ * for it on its page ("auto" when it follows the environment).
+ */
+async function getGameSettings(game) {
+  if (!usesApp()) return null;
+  const bottle = bottleNameFor(game);
+  const pin = (await listPins(bottle)).find(
+    p => p.name.toLowerCase() === game.toLowerCase()
+  );
+  return { bottle, program: pin?.name || null, mode: pin?.mode || "auto" };
+}
+
+/**
+ * Set the mode for one game as on its page in Highball, which Play and every
+ * launch from Ascendara use; "auto" goes back to the environment's mode.
+ */
+async function setGameMode(game, mode) {
+  const { bottle, program } = await ensureProgram(game);
+  const value = RENDERERS.includes(mode) ? mode : "default";
+  await runCli(["pin", "set", bottle, program, "mode", value]);
+  return { success: true };
 }
 
 /**
@@ -792,6 +821,8 @@ module.exports = {
   addToLibrary,
   removeFromLibrary,
   syncLibrary,
+  getGameSettings,
+  setGameMode,
   getStatus,
   setup,
   shouldUseHighball,
