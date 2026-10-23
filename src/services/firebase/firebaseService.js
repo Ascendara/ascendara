@@ -952,20 +952,26 @@ export const syncCloudLibrary = async games => {
     const existingCloudLibrary = userDoc.exists() ? userDoc.data().cloudLibrary : null;
     const existingGames = existingCloudLibrary?.games || [];
 
-    // Merge: keep existing cloud games, update/add local games
+    // Merge: keep existing cloud games, update/add local games. Keyed the way
+    // the server's playtime ledger keys games (trimmed, case-insensitive), so
+    // name variants can't become duplicate entries.
     const mergedGamesMap = new Map();
+    const gameKey = name => (name || "").trim().toLowerCase();
 
-    // First, add all existing cloud games
+    // First, add all existing cloud games (collapsing old duplicates)
     existingGames.forEach(game => {
-      mergedGamesMap.set(game.name, game);
+      const existing = mergedGamesMap.get(gameKey(game.name));
+      if (!existing || (game.playTime || 0) > (existing.playTime || 0)) {
+        mergedGamesMap.set(gameKey(game.name), game);
+      }
     });
 
     // Then, update/add local games (local data takes priority for games that exist locally)
     localGamesData.forEach(game => {
-      const existing = mergedGamesMap.get(game.name);
+      const existing = mergedGamesMap.get(gameKey(game.name));
       if (existing) {
         // Merge: keep higher playtime, launch count, and update other fields
-        mergedGamesMap.set(game.name, {
+        mergedGamesMap.set(gameKey(game.name), {
           ...game,
           playTime: Math.max(game.playTime || 0, existing.playTime || 0),
           launchCount: Math.max(game.launchCount || 0, existing.launchCount || 0),
@@ -975,7 +981,7 @@ export const syncCloudLibrary = async games => {
           gameID: game.gameID || existing.gameID || null,
         });
       } else {
-        mergedGamesMap.set(game.name, game);
+        mergedGamesMap.set(gameKey(game.name), game);
       }
     });
 
