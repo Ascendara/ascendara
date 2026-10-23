@@ -90,7 +90,7 @@ contextBridge.exposeInMainWorld("electron", {
   highballResetBottle: (gameName, options) =>
     ipcRenderer.invoke("highball-reset-bottle", gameName, options),
   highballOpenBottle: gameName => ipcRenderer.invoke("highball-open-bottle", gameName),
-  highballAddInstalledGames: () => ipcRenderer.invoke("highball-add-installed-games"),
+  highballSyncLibrary: () => ipcRenderer.invoke("highball-sync-library"),
   highballDbLookup: (query, options) =>
     ipcRenderer.invoke("highball-db-lookup", query, options),
   onHighballSetupProgress: callback =>

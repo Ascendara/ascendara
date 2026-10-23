@@ -92,6 +92,7 @@ class SettingsManager {
       // Share the Highball app's home and library instead of Ascendara's own
       highballUseApp: false,
       highballAppBottle: "",
+      highballSyncLibrary: true,
       promptPurchaseAfter3Hours: true,
       openOnStartup: false,
       startMinimized: false,

@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  CheckCircle2,
-  FolderOpen,
-  Library,
-  Loader,
-  RotateCcw,
-  ShieldCheck,
-} from "lucide-react";
+import { CheckCircle2, FolderOpen, Loader, RotateCcw, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -222,7 +215,14 @@ export function HighballSetupCard({ highball }) {
 function HighballAppCard({ highball, update }) {
   const { t } = useTranslation();
   const { status } = highball;
-  const [adding, setAdding] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [sync, setSync] = useState(true);
+
+  useEffect(() => {
+    window.electron
+      .getSettings()
+      .then(settings => setSync(settings.highballSyncLibrary !== false));
+  }, []);
 
   if (!status.app?.installed) return null;
 
@@ -236,16 +236,19 @@ function HighballAppCard({ highball, update }) {
     highball.refresh();
   };
 
-  const addInstalled = async () => {
-    setAdding(true);
+  const toggleSync = async value => {
+    setSync(value);
+    await update("highballSyncLibrary", value);
+    if (!value) return;
+    setSyncing(true);
     try {
-      const { added, failed } = await window.electron.highballAddInstalledGames();
-      toast.success(t("settings.macCompat.appAdded", { count: added }));
-      if (failed) toast.error(t("settings.macCompat.appAddFailed", { count: failed }));
+      const { added, removed, failed } = await window.electron.highballSyncLibrary();
+      toast.success(t("settings.macCompat.appSynced", { added, removed }));
+      if (failed) toast.error(t("settings.macCompat.appSyncFailed", { count: failed }));
     } catch (error) {
       toast.error(error.message);
     } finally {
-      setAdding(false);
+      setSyncing(false);
       highball.refresh();
     }
   };
@@ -289,20 +292,19 @@ function HighballAppCard({ highball, update }) {
               {t("settings.macCompat.appBottleHint")}
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            disabled={adding}
-            onClick={addInstalled}
-          >
-            {adding ? (
-              <Loader className="h-4 w-4 animate-spin" />
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">{t("settings.macCompat.appSync")}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("settings.macCompat.appSyncDescription")}
+              </p>
+            </div>
+            {syncing ? (
+              <Loader className="h-5 w-5 shrink-0 animate-spin" />
             ) : (
-              <Library className="h-4 w-4" />
+              <Switch className="shrink-0" checked={sync} onCheckedChange={toggleSync} />
             )}
-            {t("settings.macCompat.appAddInstalled")}
-          </Button>
+          </div>
         </>
       )}
     </div>

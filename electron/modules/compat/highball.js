@@ -34,6 +34,7 @@ const COVER_FILES = ["grid.ascendara.jpg", "grid.ascendara.png"];
 let setupPromise = null;
 let appleSilicon = null;
 let appHome = null;
+let syncPromise = null;
 
 // Helpers
 
@@ -517,7 +518,13 @@ function bottlePath(home, name) {
  * Prepare everything a launch needs and return the GameHandler arguments.
  * Returns: { binary, bottle, renderer, home, prefix } or { error }
  */
-async function buildLaunchConfig(gameName, rendererOverride, onProgress, compatQuery) {
+async function buildLaunchConfig(
+  gameName,
+  rendererOverride,
+  onProgress,
+  compatQuery,
+  { executable, directory } = {}
+) {
   try {
     let status = await getStatus();
     if (!status.ready) status = await setup({ onProgress });
@@ -530,6 +537,26 @@ async function buildLaunchConfig(gameName, rendererOverride, onProgress, compatQ
         message: "Game compatibility is ready.",
         percent: 100,
       });
+    }
+
+    // With the app's home the game starts as its program there, so the
+    // settings made in Highball apply; only a mode chosen for this game in
+    // Ascendara is passed on, Highball weighs everything else as for Play
+    if (usesApp()) {
+      const { program } = await ensureProgram({ game: gameName, executable, directory });
+      const renderer =
+        rendererOverride && RENDERERS.includes(rendererOverride) ? rendererOverride : "";
+      const home = await getHome();
+      return {
+        binary: getBinary(),
+        bottle,
+        program,
+        renderer,
+        rendererSource: renderer ? "game" : "highball",
+        launchArgs: [],
+        home,
+        prefix: bottlePath(home, bottle),
+      };
     }
 
     // The per-game choice, then the global one, then highball-db's recommendation
@@ -615,40 +642,88 @@ function findCover(directory) {
 }
 
 /**
- * Add an installed game to the Highball app's library: a program in the
- * game's environment, with Ascendara's grid art as its cover when that
- * Highball version can set one. Does nothing unless the app's home is shared.
+ * Make sure an installed game is a program in its environment of the Highball
+ * app, with Ascendara's grid art as its cover when that Highball version can
+ * set one. Returns the environment and the program's name.
  */
-async function addToLibrary({ game, executable, directory }) {
-  if (!usesApp()) return { success: false, skipped: true };
+async function ensureProgram({ game, executable, directory }) {
   if (!executable || !fs.existsSync(executable)) {
-    return { success: false, message: `Game executable not found: ${executable}` };
+    throw new Error(`Game executable not found: ${executable}`);
   }
-  try {
-    let status = await getStatus();
-    if (!status.ready) status = await setup();
-    const bottle = bottleNameFor(game);
-    if (bottle !== status.bottle) await ensureBottle(bottle, status.engine.id);
+  let status = await getStatus();
+  if (!status.ready) status = await setup();
+  const bottle = bottleNameFor(game);
+  if (bottle !== status.bottle) await ensureBottle(bottle, status.engine.id);
 
-    const existing = (await listPins(bottle)).find(
-      pin => pin.name.toLowerCase() === game.toLowerCase()
+  const existing = (await listPins(bottle)).find(
+    pin => pin.name.toLowerCase() === game.toLowerCase()
+  );
+  if (existing) return { bottle, program: existing.name, created: false };
+
+  const { stdout } = await runCli(["pin", "add", bottle, game, executable]);
+  const id = (stdout.match(/\tid=([0-9A-F-]+)/i) || [])[1];
+  const cover = findCover(directory);
+  if (id && cover) {
+    await runCli(["pin", "set", bottle, game, "cover", cover]).catch(error =>
+      console.warn(`[Highball] Could not set the cover for ${game}:`, error.message)
     );
-    let id = existing?.id;
-    if (!existing) {
-      const { stdout } = await runCli(["pin", "add", bottle, game, executable]);
-      id = (stdout.match(/\tid=([0-9A-F-]+)/i) || [])[1] || null;
-    }
-    const cover = findCover(directory);
-    if (id && cover) {
-      await runCli(["pin", "set", bottle, game, "cover", cover]).catch(error =>
-        console.warn(`[Highball] Could not set the cover for ${game}:`, error.message)
-      );
-    }
+  }
+  return { bottle, program: game, created: true };
+}
+
+/**
+ * Add an installed game to the Highball app's library. Does nothing unless
+ * the app's home is shared.
+ */
+async function addToLibrary(game) {
+  if (!usesApp()) return { success: false, skipped: true };
+  try {
+    const { bottle } = await ensureProgram(game);
     return { success: true, bottle };
   } catch (error) {
-    console.error(`[Highball] Could not add ${game} to the library:`, error);
+    console.error(`[Highball] Could not add ${game.game} to the library:`, error);
     return { success: false, message: error.message };
   }
+}
+
+/**
+ * Keep the Highball app's library in step with the installed games: add the
+ * missing ones, and take out the ones Ascendara added that are no longer
+ * installed. Programs added in Highball itself are never touched.
+ * installed: [{ game, executable, directory }]
+ */
+function syncLibrary(installed) {
+  if (syncPromise) return syncPromise;
+  syncPromise = (async () => {
+    const result = { added: 0, removed: 0, failed: 0 };
+    const manager = getSettingsManager();
+    if (!usesApp() || manager.getSetting("highballSyncLibrary") === false) return result;
+    const owned = new Set(manager.getSetting("highballSyncedGames") || []);
+    for (const game of installed) {
+      try {
+        const { created } = await ensureProgram(game);
+        if (created) {
+          owned.add(game.game);
+          result.added++;
+        }
+      } catch (error) {
+        console.warn(`[Highball] Could not sync ${game.game}:`, error.message);
+        result.failed++;
+      }
+    }
+    const names = new Set(installed.map(game => game.game.toLowerCase()));
+    for (const name of [...owned]) {
+      if (names.has(name.toLowerCase())) continue;
+      await removeFromLibrary(name);
+      owned.delete(name);
+      result.removed++;
+    }
+    manager.updateSetting("highballSyncedGames", [...owned]);
+    return result;
+  })().finally(() => {
+    syncPromise = null;
+  });
+  return syncPromise;
 }
 
 /**
@@ -716,6 +791,7 @@ module.exports = {
   usesApp,
   addToLibrary,
   removeFromLibrary,
+  syncLibrary,
   getStatus,
   setup,
   shouldUseHighball,
