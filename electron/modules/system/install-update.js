@@ -3,6 +3,21 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { app } = require("electron");
 
+/**
+ * Delete a folder that holds a copy of the app. Electron's fs reads app.asar
+ * files as directories, so fs-extra can't delete one (ENOTEMPTY) and failed
+ * updates stayed behind; original-fs sees them as the files they are.
+ */
+async function removeTree(target) {
+  let rawFs = fs;
+  try {
+    rawFs = require("original-fs");
+  } catch {
+    // Outside Electron there is no asar patching
+  }
+  await rawFs.promises.rm(target, { recursive: true, force: true });
+}
+
 // Share the same installation path for automatic updates and branch switches.
 module.exports = async function installUpdate(installerPath, isLinux) {
   let command = installerPath;
@@ -105,7 +120,7 @@ fi
       });
     });
   } catch (error) {
-    if (stagingDir) await fs.remove(stagingDir);
+    if (stagingDir) await removeTree(stagingDir);
     throw error;
   }
   app.isQuitting = true;
@@ -129,7 +144,7 @@ module.exports.cleanupStaleUpdates = async function cleanupStaleUpdates() {
     // An install script may still be using a fresh one
     const { mtimeMs } = await fs.stat(staged);
     if (Date.now() - mtimeMs < 10 * 60 * 1000) continue;
-    await fs.remove(staged);
+    await removeTree(staged);
     console.log("Removed leftover macOS update:", staged);
   }
 };
