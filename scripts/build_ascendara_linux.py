@@ -192,9 +192,20 @@ def build_python_binaries_linux():
                        '--add-binary', f'{unrar}:.',
                        '--add-data', f'{unrar_license}:licenses/unrar']
 
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import setup_hatchzip
+    try:
+        hatchzip = str(setup_hatchzip.build())
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
+        print(f'Failed to build HatchZip: {error}')
+        return False
+    downloader_args = extraction_args + ['--add-binary', f'{hatchzip}:.']
+    for file in setup_hatchzip.LICENSES:
+        downloader_args += ['--add-data', f'{os.path.join(os.path.dirname(hatchzip), file)}:licenses/hatchzip']
+
     # Map: (output name, script path relative to binaries_dir, extra PyInstaller args)
     binaries = [
-        ('AscendaraDownloader',         'AscendaraDownloader/src/AscendaraDownloader.py',         extraction_args),
+        ('AscendaraDownloader',         'AscendaraDownloader/src/AscendaraDownloader.py',         downloader_args),
         ('AscendaraGameHandler',         'AscendaraGameHandler/src/AscendaraGameHandler.py',        []),
         ('AscendaraLanguageTranslation', 'AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py', []),
         ('AscendaraTorrentHandler',      'AscendaraTorrentHandler/src/AscendaraTorrentHandler.py',  extraction_args),
