@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HelpCircle, MessageSquare, Star } from "lucide-react";
+import { BadgeCheck, Crown, Hammer, HelpCircle, MessageSquare, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -60,9 +60,12 @@ export default function GameReviews({ gameID, onRating, onReviewCount, sectionRe
         if (Number.isFinite(rating) && rating >= 0 && rating <= 5) onRating(rating);
         const writtenReviews = (Array.isArray(data.reviews) ? data.reviews : [])
           .filter(
-            review => review && typeof review.comments === "string" && review.comments.trim()
+            review =>
+              review && typeof review.comments === "string" && review.comments.trim()
           )
-          .sort((left, right) => Number(isGuestReview(left)) - Number(isGuestReview(right)));
+          .sort(
+            (left, right) => Number(isGuestReview(left)) - Number(isGuestReview(right))
+          );
         setReviews(writtenReviews);
         onReviewCount({ gameID, count: writtenReviews.length });
         setStatus("ready");
@@ -135,11 +138,14 @@ export default function GameReviews({ gameID, onRating, onReviewCount, sectionRe
           const isGuest = isGuestReview(review);
           const username = isGuest
             ? t("download.reviews.guestName", {
-                name: t(`download.reviews.guestNames.${guestNames[hash % guestNames.length]}`),
+                name: t(
+                  `download.reviews.guestNames.${guestNames[hash % guestNames.length]}`
+                ),
                 number: 1000 + (hash % 9000),
               })
             : name;
           const photoURL = !isGuest && review.photoURL;
+          const badges = (!isGuest && review.badges) || {};
           const date = review.createdAt ? new Date(review.createdAt) : null;
           const formattedDate =
             date && !Number.isNaN(date.getTime())
@@ -152,12 +158,24 @@ export default function GameReviews({ gameID, onRating, onReviewCount, sectionRe
           return (
             <article
               key={review.id || index}
-              className="min-w-0 rounded-lg border-none bg-background/50 p-5"
+              className={`relative min-w-0 overflow-hidden rounded-lg p-5 ${
+                isGuest
+                  ? "border-none bg-background/50"
+                  : "border border-primary/30 bg-gradient-to-br from-primary/15 via-primary/5 to-background/50 shadow-[0_0_24px_-12px_rgb(var(--color-primary))]"
+              }`}
             >
-              <div className="mb-3 flex items-center gap-3">
+              {!isGuest && (
                 <div
                   aria-hidden="true"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-semibold text-primary"
+                  className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-primary/20 blur-2xl"
+                />
+              )}
+              <div className="relative mb-3 flex items-center gap-3">
+                <div
+                  aria-hidden="true"
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-semibold text-primary ${
+                    isGuest ? "" : "ring-2 ring-primary/60 ring-offset-2 ring-offset-card"
+                  }`}
                 >
                   {photoURL ? (
                     <>
@@ -168,7 +186,9 @@ export default function GameReviews({ gameID, onRating, onReviewCount, sectionRe
                         className="h-full w-full object-cover"
                         onError={event => {
                           event.currentTarget.style.display = "none";
-                          event.currentTarget.nextElementSibling?.classList.remove("hidden");
+                          event.currentTarget.nextElementSibling?.classList.remove(
+                            "hidden"
+                          );
                         }}
                       />
                       <span className="hidden">{username.slice(0, 1).toUpperCase()}</span>
@@ -182,6 +202,15 @@ export default function GameReviews({ gameID, onRating, onReviewCount, sectionRe
                     <p className="break-words text-sm font-semibold text-foreground">
                       {username}
                     </p>
+                    {badges.owner && (
+                      <Crown className="h-4 w-4 shrink-0 text-yellow-500" />
+                    )}
+                    {badges.contributor && (
+                      <Hammer className="h-4 w-4 shrink-0 text-orange-500" />
+                    )}
+                    {badges.verified && (
+                      <BadgeCheck className="h-4 w-4 shrink-0 text-blue-500" />
+                    )}
                     {isGuest && (
                       <TooltipProvider>
                         <Tooltip
@@ -231,13 +260,13 @@ export default function GameReviews({ gameID, onRating, onReviewCount, sectionRe
                   )}
                 </div>
               </div>
-              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+              <p className="relative whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
                 {review.comments}
               </p>
               {formattedDate && (
                 <time
                   dateTime={date.toISOString()}
-                  className="mt-3 block text-xs text-muted-foreground"
+                  className="relative mt-3 block text-xs text-muted-foreground"
                 >
                   {formattedDate}
                 </time>

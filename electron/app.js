@@ -314,14 +314,21 @@ function startAchievementWatcher() {
     return;
   }
 
-  watcherProcess = spawn(watcherExePath, [], {
-    stdio: ["ignore", "pipe", "pipe"],
-    env: {
-      ...process.env,
-      ASCENDARA_STEAM_WEB_API_KEY: config.steamWebApiKey,
-    },
-    windowsHide: !isUnix,
-  });
+  try {
+    watcherProcess = spawn(watcherExePath, [], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        ASCENDARA_STEAM_WEB_API_KEY: config.steamWebApiKey,
+      },
+      windowsHide: !isUnix,
+    });
+  } catch (error) {
+    // spawn throws synchronously for binaries built for another platform (ENOEXEC)
+    console.error("Failed to start achievement watcher:", error);
+    watcherProcess = null;
+    return;
+  }
 
   watcherProcess.stdout.on("data", data => {
     console.log(`[WATCHER] ${data.toString().trim()}`);
@@ -520,7 +527,7 @@ async function initializeApp() {
     // Create system tray
     createTray();
 
-    // Start achievement watcher (Windows and Linux)
+    // Start achievement watcher
     startAchievementWatcher();
 
     // Defer non-critical initialization until after window loads

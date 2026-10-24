@@ -29,6 +29,7 @@ import GlobalSearch from "@/components/GlobalSearch";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useGameIndexSearch } from "@/hooks/useGameIndexSearch";
 import { useSettingsSearch } from "@/hooks/useSettingsSearch";
+import { useAppIcon } from "@/hooks/useAppIcon";
 import { useLibrarySearch } from "@/hooks/useLibrarySearch";
 import {
   initializeStatusService,
@@ -1087,7 +1088,7 @@ const AppRoutes = () => {
   const [hasInitialRedirect, setHasInitialRedirect] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
-  const [iconData, setIconData] = useState("");
+  const iconData = useAppIcon();
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [showPlatformWarning, setShowPlatformWarning] = useState(false);
   const [isBrokenVersion, setIsBrokenVersion] = useState(false);
@@ -1101,6 +1102,7 @@ const AppRoutes = () => {
   const hasShownUpdateReadyNotification = useRef(false);
   const protocolHandlerRef = useRef(null);
   const unsubscribeProtocolRef = useRef(null);
+  const unsubscribePlayRef = useRef(null);
   const lastHandledGameProtocolRef = useRef({ gameID: null, time: 0 });
 
   useEffect(() => startAnalyticsListeners(), []);
@@ -1112,20 +1114,6 @@ const AppRoutes = () => {
   useEffect(() => {
     identifyUser(user);
   }, [user?.uid]);
-
-  useEffect(() => {
-    const loadIconPath = async () => {
-      try {
-        const data = await window.electron.getAssetPath("icon.png");
-        if (data) {
-          setIconData(data);
-        }
-      } catch (error) {
-        console.error("Failed to load icon:", error);
-      }
-    };
-    loadIconPath();
-  }, []);
 
   const ensureMinLoadingTime = () => {
     const currentTime = Date.now();
@@ -1272,6 +1260,36 @@ const AppRoutes = () => {
           protocolHandlerRef.current
         );
 
+        // macOS shortcuts start an installed game through an ascendara://play link
+        const handlePlayProtocol = async (_event, payload) => {
+          const game = payload?.game;
+          if (!game) return;
+          window.electron.acknowledgePlayGame?.(game);
+          const [installed, custom] = await Promise.all([
+            window.electron.getGames().catch(() => []),
+            window.electron.getCustomGames().catch(() => []),
+          ]);
+          const isInstalled = (installed || []).some(entry => entry.game === game);
+          const isCustom = (custom || []).some(
+            entry => (entry.game || entry.name) === game
+          );
+          if (!isInstalled && !isCustom) {
+            console.warn("Play link for a game that is not installed:", game);
+            return;
+          }
+          await window.electron.playGame(game, !isInstalled && isCustom);
+        };
+        unsubscribePlayRef.current =
+          window.electron.onProtocolPlayGame?.(handlePlayProtocol);
+        try {
+          const pendingPlays = await window.electron.getPendingPlayGames?.();
+          for (const game of pendingPlays || []) {
+            await handlePlayProtocol(null, { game });
+          }
+        } catch (error) {
+          console.error("Error reading pending play links:", error);
+        }
+
         // Drain any game protocol URLs that arrived while the app was starting up
         try {
           const pendingGameIds = await window.electron.getPendingGameUrls?.();
@@ -1384,6 +1402,10 @@ const AppRoutes = () => {
       setIsLoading(false);
       setIsUpdating(false);
       setIsInstalling(false);
+      if (unsubscribePlayRef.current) {
+        unsubscribePlayRef.current();
+        unsubscribePlayRef.current = null;
+      }
       if (unsubscribeProtocolRef.current) {
         unsubscribeProtocolRef.current();
         unsubscribeProtocolRef.current = null;

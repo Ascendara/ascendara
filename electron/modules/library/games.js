@@ -41,6 +41,7 @@ const { resetOnboarding } = require("../core/onboarding");
 // Load proton module only on linux
 const proton = isLinux ? require("../compat/proton") : null;
 const highball = require("../compat/highball");
+const { createMacShortcut } = require("./macShortcuts");
 
 const runGameProcesses = new Map();
 // Games whose compatibility layer is still being prepared before launch
@@ -229,6 +230,68 @@ async function createShortcutInDirectory(game, shortcutDir) {
       else reject(new Error(`Process exited with code ${code}`));
     });
   });
+}
+
+/**
+ * The folder of an installed (not custom) game in one of the download directories
+ */
+function findInstalledGameDirectory(game, settings) {
+  return (
+    getGameDirectories(settings)
+      .map(directory => path.join(directory, game))
+      .find(directory => fs.existsSync(path.join(directory, `${game}.ascendara.json`))) ||
+    null
+  );
+}
+
+/**
+ * On macOS a shortcut is a small app that starts the game through Ascendara:
+ * on the Desktop, or in ~/Applications/Ascendara for Launchpad
+ */
+async function createMacGameShortcut(game, targetDirectory) {
+  try {
+    const name = game.game || game.name;
+    await createMacShortcut(
+      {
+        game: name,
+        directory: game.custom
+          ? null
+          : findInstalledGameDirectory(name, getSettingsManager().getSettings()),
+      },
+      targetDirectory
+    );
+    return true;
+  } catch (error) {
+    console.error("Error creating macOS shortcut:", error);
+    return false;
+  }
+}
+
+/**
+ * The installed (not custom) games with their executable, for the Highball sync
+ */
+async function listInstalledGames() {
+  const games = [];
+  for (const directory of getGameDirectories(getSettingsManager().getSettings())) {
+    const entries = await fs.promises
+      .readdir(directory, { withFileTypes: true })
+      .catch(() => []);
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name === ".ascendara-updates") continue;
+      const gameDirectory = path.join(directory, entry.name);
+      const info = await fs
+        .readJson(path.join(gameDirectory, `${entry.name}.ascendara.json`))
+        .catch(() => null);
+      const executable = info?.executable || info?.executables?.[0];
+      if (executable)
+        games.push({ game: entry.name, executable, directory: gameDirectory });
+    }
+  }
+  return games;
+}
+
+async function syncHighballLibrary() {
+  return highball.syncLibrary(await listInstalledGames());
 }
 
 /**
@@ -765,7 +828,11 @@ function registerGameHandlers() {
               progress =>
                 !event.sender.isDestroyed() &&
                 event.sender.send("highball-setup-progress", { ...progress, game }),
-              { steamAppId: macCompat.steamAppId, title: game }
+              { steamAppId: macCompat.steamAppId, title: game },
+              {
+                executable,
+                directory: isCustom ? null : findInstalledGameDirectory(game, settings),
+              }
             )
             .finally(() => preparingGames.delete(game));
           if (launchConfig.error) {
@@ -784,6 +851,7 @@ function registerGameHandlers() {
             launchConfig.bottle,
             "--highball-home",
             launchConfig.home,
+            ...(launchConfig.program ? ["--highball-program", launchConfig.program] : []),
             ...(launchConfig.renderer
               ? ["--highball-renderer", launchConfig.renderer]
               : [])
@@ -804,7 +872,10 @@ function registerGameHandlers() {
         if (isLinux && proton && proton.isWindowsExecutable(executable)) {
           // Auto-detect UMU ID if not already set
           try {
-            const { autoDetectAndSaveUmuId, getGameUmuId } = require("../compat/umu-database");
+            const {
+              autoDetectAndSaveUmuId,
+              getGameUmuId,
+            } = require("../compat/umu-database");
             const existingId = await getGameUmuId(game);
             if (!existingId) {
               autoDetectAndSaveUmuId(game).catch(() => {});
@@ -1311,7 +1382,10 @@ function registerGameHandlers() {
           deleteStartMenuShortcut(game);
         }
         if (isLinux && proton) await proton.deleteGamePrefix(game);
-        if (highball.isSupported()) await highball.resetBottle(game);
+        if (highball.isSupported()) {
+          await highball.removeFromLibrary(game);
+          await highball.resetBottle(game);
+        }
         return true;
       }
       throw new Error(`Game directory not found for ${game}`);
@@ -1716,13 +1790,42 @@ function registerGameHandlers() {
     if (isWindows) {
       return await createGameShortcut(game);
     }
+    if (process.platform === "darwin") {
+      return createMacGameShortcut(game, path.join(os.homedir(), "Desktop"));
+    }
     return false;
   });
+
+  // A game's settings in the Highball app (macOS, shared home)
+  ipcMain.handle("highball-get-game-settings", (_, game) =>
+    highball.getGameSettings(game).catch(error => ({ error: error.message }))
+  );
+  ipcMain.handle("highball-set-game-mode", async (_, game, mode) => {
+    try {
+      const installed = (await listInstalledGames()).find(entry => entry.game === game);
+      if (!installed) throw new Error(`${game} is not installed`);
+      return await highball.setGameMode(installed, mode);
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Keep the Highball app's library in step with the installed games (macOS)
+  ipcMain.handle("highball-sync-library", () => syncHighballLibrary());
+  setTimeout(() => {
+    if (highball.usesApp()) syncHighballLibrary().catch(() => {});
+  }, 15000);
 
   // Create start menu shortcut handler
   ipcMain.handle("create-start-menu-shortcut", async (_, game) => {
     if (isWindows) {
       return await createStartMenuShortcut(game);
+    }
+    if (process.platform === "darwin") {
+      return createMacGameShortcut(
+        game,
+        path.join(os.homedir(), "Applications", "Ascendara")
+      );
     }
     return false;
   });
