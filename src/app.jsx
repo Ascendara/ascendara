@@ -1680,11 +1680,19 @@ const AppRoutes = () => {
 
     window.electron.onUpdateReady(updateReadyHandler);
     window.addEventListener("request-app-update", requestUpdate);
+    const unsubscribeUpdateError = window.electron.onUpdateError?.((_event, message) => {
+      if (!isSubscribed) return;
+      toast.error(t("app.toasts.updateFailed"), {
+        description: message || t("app.toasts.updateFailedDesc"),
+        id: "update-failed",
+      });
+    });
 
     return () => {
       isSubscribed = false;
       window.electron.removeUpdateReadyListener(updateReadyHandler);
       window.removeEventListener("request-app-update", requestUpdate);
+      unsubscribeUpdateError?.();
     };
   }, [showWelcome]);
 

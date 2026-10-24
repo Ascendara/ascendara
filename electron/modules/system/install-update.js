@@ -3,6 +3,21 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { app } = require("electron");
 
+/**
+ * Delete a folder that holds a copy of the app. Electron's fs reads app.asar
+ * files as directories, so fs-extra can't delete one (ENOTEMPTY) and failed
+ * updates stayed behind; original-fs sees them as the files they are.
+ */
+async function removeTree(target) {
+  let rawFs = fs;
+  try {
+    rawFs = require("original-fs");
+  } catch {
+    // Outside Electron there is no asar patching
+  }
+  await rawFs.promises.rm(target, { recursive: true, force: true });
+}
+
 // Share the same installation path for automatic updates and branch switches.
 module.exports = async function installUpdate(installerPath, isLinux) {
   let command = installerPath;
@@ -29,15 +44,16 @@ module.exports = async function installUpdate(installerPath, isLinux) {
       const apps = fs.readdirSync(extracted).filter(name => name.endsWith(".app"));
       if (apps.length !== 1)
         throw new Error("The macOS update archive must contain one app.");
-      const stagedApp = path.join(stagingDir, apps[0]);
-      const executable = path.join(stagedApp, "Contents", "MacOS");
+      // Check the app where it was extracted, before it moves into place
+      const extractedApp = path.join(extracted, apps[0]);
       if (
-        !fs.existsSync(path.join(stagedApp, "Contents", "Info.plist")) ||
-        !fs.existsSync(executable)
+        !fs.existsSync(path.join(extractedApp, "Contents", "Info.plist")) ||
+        !fs.existsSync(path.join(extractedApp, "Contents", "MacOS"))
       ) {
         throw new Error("The macOS update archive does not contain a valid app.");
       }
-      fs.moveSync(path.join(extracted, apps[0]), stagedApp);
+      const stagedApp = path.join(stagingDir, apps[0]);
+      fs.moveSync(extractedApp, stagedApp);
       fs.removeSync(extracted);
       const scriptPath = path.join(stagingDir, "install.sh");
       fs.writeFileSync(
@@ -105,9 +121,31 @@ fi
       });
     });
   } catch (error) {
-    if (stagingDir) await fs.remove(stagingDir);
+    if (stagingDir) await removeTree(stagingDir);
     throw error;
   }
   app.isQuitting = true;
   app.quit();
+};
+
+/**
+ * Remove .ascendara-update-* folders an update left beside the macOS app, as a
+ * failed extraction or an interrupted install did. Each holds a copy of the
+ * app, several hundred MB.
+ */
+module.exports.cleanupStaleUpdates = async function cleanupStaleUpdates() {
+  if (process.platform !== "darwin") return;
+  const match = process.execPath.match(/^(.*?\.app)\/Contents\/MacOS\//);
+  if (!match) return;
+  const parent = path.dirname(match[1]);
+  const entries = await fs.readdir(parent).catch(() => []);
+  for (const name of entries) {
+    if (!name.startsWith(".ascendara-update-")) continue;
+    const staged = path.join(parent, name);
+    // An install script may still be using a fresh one
+    const { mtimeMs } = await fs.stat(staged);
+    if (Date.now() - mtimeMs < 10 * 60 * 1000) continue;
+    await removeTree(staged);
+    console.log("Removed leftover macOS update:", staged);
+  }
 };

@@ -35,6 +35,11 @@ let languageCheckInProgress = false;
 let translationUpdateInProgress = false;
 let availableVersion = null;
 
+// A stalled connection is retried from where it stopped; the timeout is for
+// inactivity, not for the whole download
+const UPDATE_STALL_TIMEOUT = 30000;
+const UPDATE_DOWNLOAD_ATTEMPTS = 5;
+
 function macUpdateName(version) {
   const arch = process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "x64" : null;
   if (!arch) throw new Error(`Unsupported macOS architecture: ${process.arch}`);
@@ -177,6 +182,83 @@ async function checkVersionAndUpdate() {
   }
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Download an update into destination and resolve only when every byte the
+ * server announced has arrived. The file is written as destination.part and
+ * renamed at the end, so an interrupted download is never taken for a finished
+ * one. A connection that stalls or drops is resumed with a Range request where
+ * the server supports it.
+ */
+async function downloadUpdateFile(url, destination, headers, onProgress) {
+  const partial = `${destination}.part`;
+  await fs.remove(partial);
+  let total = 0;
+  for (let attempt = 1; ; attempt++) {
+    const resumeFrom = fs.existsSync(partial) ? fs.statSync(partial).size : 0;
+    try {
+      const response = await axios({
+        url,
+        method: "GET",
+        responseType: "stream",
+        headers: {
+          ...headers,
+          "Cache-Control": "no-cache",
+          ...(resumeFrom > 0 ? { Range: `bytes=${resumeFrom}-` } : {}),
+        },
+        maxRedirects: 5,
+        timeout: UPDATE_STALL_TIMEOUT,
+      });
+      // A server that ignores the range sends the whole file again
+      const resumed = resumeFrom > 0 && response.status === 206;
+      const length = parseInt(response.headers["content-length"], 10) || 0;
+      if (!total && length) total = (resumed ? resumeFrom : 0) + length;
+      let received = resumed ? resumeFrom : 0;
+      response.data.on("data", chunk => {
+        received += chunk.length;
+        if (total > 0) onProgress?.(Math.round((received * 100) / total));
+      });
+      await pipeline(
+        response.data,
+        fs.createWriteStream(partial, { flags: resumed ? "a" : "w" })
+      );
+      const size = fs.statSync(partial).size;
+      if (total && size !== total) {
+        throw new Error(`The download stopped at ${size} of ${total} bytes`);
+      }
+      await fs.move(partial, destination, { overwrite: true });
+      return;
+    } catch (error) {
+      console.warn(`Update download attempt ${attempt} failed:`, error.message);
+      if (attempt >= UPDATE_DOWNLOAD_ATTEMPTS) {
+        await fs.remove(partial);
+        throw error;
+      }
+      await sleep(2000 * attempt);
+    }
+  }
+}
+
+/**
+ * True when a zip file ends with its central directory, which a cut-off
+ * download never has.
+ */
+async function isCompleteZip(file) {
+  const { size } = await fs.stat(file);
+  const length = Math.min(size, 65557);
+  const handle = await fs.open(file, "r");
+  try {
+    const buffer = Buffer.alloc(length);
+    await fs.read(handle, buffer, 0, length, size - length);
+    return buffer.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06])) !== -1;
+  } finally {
+    await fs.close(handle);
+  }
+}
+
 /**
  * Check reference language version
  */
@@ -247,6 +329,7 @@ async function checkReferenceLanguage() {
 async function downloadUpdateInBackground() {
   if (updateDownloadInProgress) return;
   updateDownloadInProgress = true;
+  let blockerId = null;
 
   try {
     // Set downloadingUpdate to true in timestamp
@@ -379,6 +462,7 @@ async function downloadUpdateInBackground() {
       window.webContents.send("update-error", error.message);
     });
   } finally {
+    if (blockerId !== null) powerSaveBlocker.stop(blockerId);
     updateDownloadInProgress = false;
     downloadUpdatePromise = null;
     updateTimestampFile({ downloadingUpdate: false });
@@ -389,6 +473,11 @@ async function downloadUpdateInBackground() {
  * Register update-related IPC handlers
  */
 function registerUpdateHandlers() {
+  installUpdate
+    .cleanupStaleUpdates()
+    .catch(error =>
+      console.warn("Could not remove leftover macOS updates:", error.message)
+    );
   ipcMain.handle("check-for-updates", async () => {
     if (isDev) return true;
     try {
@@ -572,6 +661,8 @@ module.exports = {
   checkVersionAndUpdate,
   checkReferenceLanguage,
   downloadUpdateInBackground,
+  downloadUpdateFile,
+  isCompleteZip,
   registerUpdateHandlers,
   getIsLatest: () => isLatest,
   getUpdateDownloaded: () => updateDownloaded,
