@@ -89,6 +89,10 @@ class SettingsManager {
       highballRenderer: "auto",
       highballBottleMode: "shared",
       highballD3DMetalAccepted: false,
+      // Share the Highball app's home and library instead of Ascendara's own
+      highballUseApp: false,
+      highballAppBottle: "",
+      highballSyncLibrary: true,
       promptPurchaseAfter3Hours: true,
       openOnStartup: false,
       startMinimized: false,

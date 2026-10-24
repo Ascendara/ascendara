@@ -34,6 +34,8 @@ import {
   Trash2,
 } from "lucide-react";
 
+const isOnMac = window.electron?.getPlatform?.() === "darwin";
+
 const formatBytes = bytes =>
   bytes < 1024 * 1024
     ? `${(bytes / 1024).toFixed(0)} KB`
@@ -235,7 +237,9 @@ export default function GameActions({
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2" onSelect={onCreateStartMenuShortcut}>
               <LayoutGrid className="h-4 w-4" />
-              {t("library.createStartMenuShortcut")}
+              {isOnMac
+                ? t("library.addToApplications")
+                : t("library.createStartMenuShortcut")}
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />

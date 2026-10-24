@@ -90,6 +90,10 @@ contextBridge.exposeInMainWorld("electron", {
   highballResetBottle: (gameName, options) =>
     ipcRenderer.invoke("highball-reset-bottle", gameName, options),
   highballOpenBottle: gameName => ipcRenderer.invoke("highball-open-bottle", gameName),
+  highballSyncLibrary: () => ipcRenderer.invoke("highball-sync-library"),
+  highballGetGameSettings: game => ipcRenderer.invoke("highball-get-game-settings", game),
+  highballSetGameMode: (game, mode) =>
+    ipcRenderer.invoke("highball-set-game-mode", game, mode),
   highballDbLookup: (query, options) =>
     ipcRenderer.invoke("highball-db-lookup", query, options),
   onHighballSetupProgress: callback =>
@@ -459,12 +463,19 @@ contextBridge.exposeInMainWorld("electron", {
   // PROTOCOL & DEEP LINKS
   //===========================================================================
   getPendingGameUrls: () => ipcRenderer.invoke("get-pending-game-urls"),
+  getPendingPlayGames: () => ipcRenderer.invoke("get-pending-play-games"),
+  acknowledgePlayGame: game => ipcRenderer.invoke("acknowledge-play-game", game),
   acknowledgeGameUrl: gameID => ipcRenderer.invoke("acknowledge-game-url", gameID),
   getPendingBrowserDownloads: () => ipcRenderer.invoke("get-pending-browser-downloads"),
   acknowledgeBrowserDownload: url =>
     ipcRenderer.invoke("acknowledge-browser-download", url),
   onProtocolGameUrl: callback =>
     preloadIpc.subscribe("protocol-game-url", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
+  onProtocolPlayGame: callback =>
+    preloadIpc.subscribe("protocol-play-game", callback, {
       includeEventPlaceholder: true,
       selectArgs: args => [args[0]],
     }),
