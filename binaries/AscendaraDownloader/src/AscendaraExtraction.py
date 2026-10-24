@@ -304,6 +304,8 @@ def _external_tool_env():
 # that already exited, plus the one still running.
 _tool_io = [0, 0]
 _tool_process = None
+# Last counters sampled from the running tool, kept for when it has been reaped.
+_tool_seen = [0, 0]
 # Held while a finished tool's counters move into _tool_io, so samples never dip.
 _tool_lock = threading.Lock()
 
@@ -323,11 +325,23 @@ def _process_io(process=None):
             if not kernel32.GetProcessIoCounters(handle, ctypes.byref(counters)):
                 return None
             return counters.read, counters.written
+        if sys.platform == 'darwin':
+            # rusage_info_v2 up to its disk I/O fields; reads count physical disk reads only.
+            class Usage(ctypes.Structure):
+                _fields_ = [('uuid', ctypes.c_uint8 * 16)] + [
+                    (str(index), ctypes.c_uint64) for index in range(16)] + [
+                    ('read', ctypes.c_uint64), ('written', ctypes.c_uint64)]
+            usage = Usage()
+            libproc = ctypes.CDLL('/usr/lib/libproc.dylib')
+            if libproc.proc_pid_rusage(process.pid if process is not None else os.getpid(),
+                                       2, ctypes.byref(usage)) != 0:
+                return None
+            return usage.read, usage.written
         with open(f'/proc/{process.pid if process is not None else os.getpid()}/io') as stream:
             values = dict(line.split(': ', 1) for line in stream.read().splitlines())
         return int(values['rchar']), int(values['wchar'])
     except Exception:
-        return None  # No per-process counters (for example macOS); progress still works.
+        return None  # No per-process counters; progress still works.
 
 
 def _extraction_io(baseline):
@@ -337,7 +351,13 @@ def _extraction_io(baseline):
         return None
     with _tool_lock:
         process = _tool_process
-        tool = (_process_io(process) if process is not None else None) or (0, 0)
+        tool = _process_io(process) if process is not None else None
+        if tool:
+            _tool_seen[:] = tool
+        elif process is not None:
+            tool = _tool_seen  # Exited and reaped: its counters are gone.
+        else:
+            tool = (0, 0)
         return [max(0, own[0] - baseline[0]) + _tool_io[0] + tool[0],
                 max(0, own[1] - baseline[1]) + _tool_io[1] + tool[1]]
 
@@ -358,7 +378,9 @@ def _run_cli(command, cancelled, activity, tick=None):
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                stderr=subprocess.STDOUT, env=_external_tool_env(),
                                creationflags=0x08000000 if os.name == 'nt' else 0)
-    _tool_process = process
+    with _tool_lock:
+        _tool_seen[:] = 0, 0
+        _tool_process = process
     def drain():
         import codecs
         decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
@@ -408,7 +430,7 @@ def _run_cli(command, cancelled, activity, tick=None):
     finally:
         # Keep what the tool transferred before its handle goes away.
         with _tool_lock:
-            final = _process_io(process)
+            final = _process_io(process) or _tool_seen
             _tool_process = None
             if final:
                 _tool_io[0] += final[0]
