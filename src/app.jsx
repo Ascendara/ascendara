@@ -29,6 +29,7 @@ import GlobalSearch from "@/components/GlobalSearch";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useGameIndexSearch } from "@/hooks/useGameIndexSearch";
 import { useSettingsSearch } from "@/hooks/useSettingsSearch";
+import { useAppIcon } from "@/hooks/useAppIcon";
 import { useLibrarySearch } from "@/hooks/useLibrarySearch";
 import {
   initializeStatusService,
@@ -1087,7 +1088,7 @@ const AppRoutes = () => {
   const [hasInitialRedirect, setHasInitialRedirect] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
-  const [iconData, setIconData] = useState("");
+  const iconData = useAppIcon();
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [showPlatformWarning, setShowPlatformWarning] = useState(false);
   const [isBrokenVersion, setIsBrokenVersion] = useState(false);
@@ -1112,20 +1113,6 @@ const AppRoutes = () => {
   useEffect(() => {
     identifyUser(user);
   }, [user?.uid]);
-
-  useEffect(() => {
-    const loadIconPath = async () => {
-      try {
-        const data = await window.electron.getAssetPath("icon.png");
-        if (data) {
-          setIconData(data);
-        }
-      } catch (error) {
-        console.error("Failed to load icon:", error);
-      }
-    };
-    loadIconPath();
-  }, []);
 
   const ensureMinLoadingTime = () => {
     const currentTime = Date.now();

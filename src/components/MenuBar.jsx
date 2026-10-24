@@ -35,6 +35,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useSearch } from "@/context/SearchContext";
 import { checkForUpdates } from "@/services/app/updateCheckingService";
 import { exportToSvg } from "@/lib/exportToSvg";
+import { useAppIcon } from "@/hooks/useAppIcon";
 
 const MenuBar = () => {
   const { t } = useLanguage();
@@ -57,7 +58,7 @@ const MenuBar = () => {
     };
   });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [iconData, setIconData] = useState("");
+  const iconData = useAppIcon();
   const [showTorrentWarning, setShowTorrentWarning] = useState(false);
   const [isLatest, setIsLatest] = useState(true);
   const [appBranch, setAppBranch] = useState("live");
@@ -231,20 +232,6 @@ const MenuBar = () => {
     checkStatus();
 
     return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const loadIconPath = async () => {
-      try {
-        const data = await window.electron.getAssetPath("icon.png");
-        if (data) {
-          setIconData(data);
-        }
-      } catch (error) {
-        console.error("Failed to load icon:", error);
-      }
-    };
-    loadIconPath();
   }, []);
 
   useEffect(() => {
