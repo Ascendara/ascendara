@@ -19,7 +19,9 @@ const MAX_ENTRIES = 60;
 // key -> { promise, result, at }
 const entries = new Map();
 
-const keyFor = game => `${game?.gameID || ""}::${game?.game || ""}::${game?.imgID || ""}`;
+// Includes the language so switching it doesn't reuse game info in the old one
+const keyFor = game =>
+  `${steamService.getDetailsLanguage()}::${game?.gameID || ""}::${game?.game || ""}::${game?.imgID || ""}`;
 
 const settle = (promise, fallback = null) =>
   Promise.resolve(promise).then(
