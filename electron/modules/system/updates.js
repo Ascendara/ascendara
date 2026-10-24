@@ -10,7 +10,7 @@ const axios = require("axios");
 const { pipeline } = require("stream/promises");
 const installUpdate = require("./install-update");
 const { downloadDifferentialUpdate } = require("./differential-update");
-const { ipcMain, BrowserWindow, app } = require("electron");
+const { ipcMain, BrowserWindow, app, powerSaveBlocker } = require("electron");
 const {
   API_URL,
   appVersion,
@@ -386,6 +386,10 @@ async function downloadUpdateInBackground() {
     }
     const mainWindow = BrowserWindow.getAllWindows()[0];
 
+    // Keep macOS from suspending the app while it downloads in the background
+    blockerId = powerSaveBlocker.start("prevent-app-suspension");
+    await fs.remove(installerPath);
+
     // Live Windows releases ship blockmaps, so only the changed blocks need
     // downloading; any failure falls back to the full installer below.
     let rebuilt = false;
@@ -411,34 +415,13 @@ async function downloadUpdateInBackground() {
     }
 
     if (!rebuilt) {
-      const response = await axios({
-        url: updateUrl,
-        method: "GET",
-        responseType: "stream",
-        headers: {
-          ...headers,
-          "Accept-Encoding": "gzip, deflate, br",
-          Connection: "keep-alive",
-          "Cache-Control": "no-cache",
-        },
-        maxRedirects: 5,
-        timeout: 30000,
-      });
-
-      // Get total size from content-length header
-      const totalSize = parseInt(response.headers["content-length"], 10) || 0;
-      let downloadedSize = 0;
-
-      // Track progress from the stream
-      response.data.on("data", chunk => {
-        downloadedSize += chunk.length;
-        if (totalSize > 0) {
-          const progress = Math.round((downloadedSize * 100) / totalSize);
-          mainWindow?.webContents.send("update-download-progress", progress);
-        }
-      });
-
-      await pipeline(response.data, fs.createWriteStream(installerPath));
+      await downloadUpdateFile(updateUrl, installerPath, headers, progress =>
+        mainWindow?.webContents.send("update-download-progress", progress)
+      );
+    }
+    if (process.platform === "darwin" && !(await isCompleteZip(installerPath))) {
+      await fs.remove(installerPath);
+      throw new Error("The downloaded macOS update is incomplete.");
     }
 
     updateDownloaded = true;
