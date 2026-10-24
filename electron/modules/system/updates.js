@@ -9,6 +9,7 @@ const os = require("os");
 const axios = require("axios");
 const { pipeline } = require("stream/promises");
 const installUpdate = require("./install-update");
+const { downloadDifferentialUpdate } = require("./differential-update");
 const { ipcMain, BrowserWindow, app } = require("electron");
 const {
   API_URL,
@@ -302,34 +303,60 @@ async function downloadUpdateInBackground() {
     }
     const mainWindow = BrowserWindow.getAllWindows()[0];
 
-    const response = await axios({
-      url: updateUrl,
-      method: "GET",
-      responseType: "stream",
-      headers: {
-        ...headers,
-        "Accept-Encoding": "gzip, deflate, br",
-        Connection: "keep-alive",
-        "Cache-Control": "no-cache",
-      },
-      maxRedirects: 5,
-      timeout: 30000,
-    });
-
-    // Get total size from content-length header
-    const totalSize = parseInt(response.headers["content-length"], 10) || 0;
-    let downloadedSize = 0;
-
-    // Track progress from the stream
-    response.data.on("data", chunk => {
-      downloadedSize += chunk.length;
-      if (totalSize > 0) {
-        const progress = Math.round((downloadedSize * 100) / totalSize);
-        mainWindow?.webContents.send("update-download-progress", progress);
+    // Live Windows releases ship blockmaps, so only the changed blocks need
+    // downloading; any failure falls back to the full installer below.
+    let rebuilt = false;
+    if (
+      isWindows &&
+      currentBranch === "live" &&
+      /^\d+(?:\.\d+)*(?:-\d+)?$/.test(availableVersion || "")
+    ) {
+      try {
+        await downloadDifferentialUpdate(
+          appVersion,
+          availableVersion,
+          installerPath,
+          progress => mainWindow?.webContents.send("update-download-progress", progress)
+        );
+        rebuilt = true;
+      } catch (error) {
+        console.warn(
+          "Differential update unavailable, downloading full installer:",
+          error.message
+        );
       }
-    });
+    }
 
-    await pipeline(response.data, fs.createWriteStream(installerPath));
+    if (!rebuilt) {
+      const response = await axios({
+        url: updateUrl,
+        method: "GET",
+        responseType: "stream",
+        headers: {
+          ...headers,
+          "Accept-Encoding": "gzip, deflate, br",
+          Connection: "keep-alive",
+          "Cache-Control": "no-cache",
+        },
+        maxRedirects: 5,
+        timeout: 30000,
+      });
+
+      // Get total size from content-length header
+      const totalSize = parseInt(response.headers["content-length"], 10) || 0;
+      let downloadedSize = 0;
+
+      // Track progress from the stream
+      response.data.on("data", chunk => {
+        downloadedSize += chunk.length;
+        if (totalSize > 0) {
+          const progress = Math.round((downloadedSize * 100) / totalSize);
+          mainWindow?.webContents.send("update-download-progress", progress);
+        }
+      });
+
+      await pipeline(response.data, fs.createWriteStream(installerPath));
+    }
 
     updateDownloaded = true;
     updateDownloadInProgress = false;
