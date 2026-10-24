@@ -1813,6 +1813,13 @@
     }
   },
   "downloads": {
+    "stalled": {
+      "title": "No progress for {{minutes}} min",
+      "download": "No data has arrived from the download host. It may be throttling or the connection is stuck. Ascendara keeps retrying; you can also pause and resume the download, or choose another download source.",
+      "extraction": "Extraction is not moving. Check that the drive has free space and is not busy, and that antivirus is not holding the files.",
+      "toast": "{{game}} has stopped making progress",
+      "view": "View"
+    },
     "actionRequired": "Action Required",
     "actions": {
       "cancelAndDelete": "Cancel & Delete",

@@ -29,6 +29,7 @@ import GlobalSearch from "@/components/GlobalSearch";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useGameIndexSearch } from "@/hooks/useGameIndexSearch";
 import { useSettingsSearch } from "@/hooks/useSettingsSearch";
+import { onDownloadStallChange } from "@/hooks/useDownloadStall";
 import { useAppIcon } from "@/hooks/useAppIcon";
 import { useLibrarySearch } from "@/hooks/useLibrarySearch";
 import {
@@ -930,6 +931,37 @@ const AscendStatusInitializer = () => {
       };
     }
   }, [user?.uid]);
+
+  return null;
+};
+
+// Warn wherever the user is when a running download stops making progress.
+const DownloadStallNotifier = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    return onDownloadStallChange(stall => {
+      if (!stall?.game) return;
+      const id = `download-stall-${stall.game}`;
+      if (!stall.stalled) {
+        toast.dismiss(id);
+        return;
+      }
+      toast.warning(i18n.t("downloads.stalled.toast", { game: stall.game }), {
+        id,
+        description:
+          stall.phase === "extraction"
+            ? i18n.t("downloads.stalled.extraction")
+            : i18n.t("downloads.stalled.download"),
+        duration: Infinity,
+        closeButton: true,
+        action: {
+          label: i18n.t("downloads.stalled.view"),
+          onClick: () => navigate("/downloads"),
+        },
+      });
+    });
+  }, [navigate]);
 
   return null;
 };
@@ -2083,6 +2115,7 @@ function App() {
                     <ScrollToTop />
                     <AscendStatusInitializer />
                     <DownloadSyncInitializer />
+                    <DownloadStallNotifier />
                     <DiscordRPCTracker />
                     <UserActivityTracker />
                     <MessageNotificationChecker />

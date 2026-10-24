@@ -66,6 +66,7 @@ import { cn } from "@/lib/utils";
 import { privateSourceMessage } from "@/lib/privateSourceMessages";
 import SpeedGraph, { formatSpeed, markDownloadStart } from "@/components/SpeedGraph";
 import { API_URL } from "@/config/api";
+import { useDownloadStall } from "@/hooks/useDownloadStall";
 
 // Helper function to check if download speed is above 50 MB/s
 const isHighSpeed = speedString => {
@@ -1339,6 +1340,7 @@ const DownloadCard = ({
   const { settings, updateSetting } = useSettings();
 
   const { downloadingData } = game;
+  const stall = useDownloadStall(game.game);
 
   // Determine if download is in resuming state
   const isResumingState = isResuming || (downloadingData?.stopped && isResuming);
@@ -2252,6 +2254,25 @@ const DownloadCard = ({
                       : t("common.reportToAscendara")}
                 </Button>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* No progress for a while */}
+        {stall && !hasError && !isStopped && !isWaiting && (
+          <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-amber-600">
+                {t("downloads.stalled.title", {
+                  minutes: Math.max(1, Math.round((Date.now() - stall.since) / 60000)),
+                })}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {stall.phase === "extraction"
+                  ? t("downloads.stalled.extraction")
+                  : t("downloads.stalled.download")}
+              </p>
             </div>
           </div>
         )}

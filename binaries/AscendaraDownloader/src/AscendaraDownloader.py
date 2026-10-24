@@ -341,6 +341,7 @@ class ChunkedDownloader:
         self.game_info, self.game_info_path = game_info, game_info_path
         self.stopped, self.last_error = False, None
         self._eta = SmoothETA()
+        self._speed_samples = deque()
         self._progress_writer = ProgressWriter()
         self.session, self.expected_size = session, expected_size
 
@@ -357,11 +358,25 @@ class ChunkedDownloader:
     def _progress(self, done, total, speed):
         if self._check_for_stop():
             raise InterruptedError('Download cancelled')
-        eta = self._eta.update(done, total, speed, time.monotonic())
+        now = time.monotonic()
+        data = self.game_info['downloadingData']
+        # Show the speed over the last few seconds, so a stall reads 0 B/s
+        # instead of slowly decaying from the average since the start.
+        samples = self._speed_samples
+        if samples and done < samples[-1][1]:
+            samples.clear()
+        if not samples or done > samples[-1][1]:
+            # The app warns about a stalled download from this wall-clock time.
+            data['lastProgress'] = time.time()
+        samples.append((now, done))
+        while len(samples) > 2 and samples[1][0] <= now - 5:
+            samples.popleft()
+        if speed and len(samples) > 1:
+            speed = (done - samples[0][1]) / max(.001, now - samples[0][0])
+        eta = self._eta.update(done, total, speed, now)
         eta_text = f'{eta}s' if eta < 60 else f'{eta // 60}m {eta % 60}s'
         if eta >= 3600:
             eta_text = f'{eta // 3600}h {(eta % 3600) // 60}m'
-        data = self.game_info['downloadingData']
         data.update(downloading=True, extracting=False, verifying=False,
                     progressCompleted=f'{min(100, done / total * 100) if total else 0:.2f}',
                     progressDownloadSpeeds=read_size(speed) + '/s',
@@ -1724,6 +1739,11 @@ class AscendaraDownloader:
             speed = f'{read_size(byte_rate)}/s'
         name = state['name'].replace('\\', '/').rstrip('/').rsplit('/', 1)[-1]
         percent = state.get('percent', done / total * 100 if total else 0)
+        # Files, bytes, percent or disk activity moving means extraction is not stalled.
+        marker = (done, byte_count, percent, state.get('io'))
+        if marker != getattr(self, '_extraction_marker', None):
+            self._extraction_marker = marker
+            self.game_info['downloadingData']['lastProgress'] = time.time()
         self.game_info['downloadingData']['extractionProgress'] = {
             'currentFile': name, 'filesExtracted': done,
             'totalFiles': total, 'percentComplete': f'{min(100, percent):.2f}',

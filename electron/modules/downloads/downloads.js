@@ -24,7 +24,7 @@ const {
 } = require("../core/utils");
 const { getSettingsManager } = require("../core/settings");
 const { prepareDownloaderRuntime } = require("./downloaderRuntime");
-const { startDownloadWatchdog } = require("./downloadLiveness");
+const { startDownloadWatchdog, getDownloadStalls } = require("./downloadLiveness");
 
 const steamgrid = require("../library/steamgrid");
 const gameUpdateBackup = require("./gameUpdateBackup");
@@ -1786,6 +1786,7 @@ function registerDownloadHandlers() {
     retryExtraction,
     resumeDownload,
   });
+  ipcMain.handle("get-download-stalls", () => getDownloadStalls());
 
   // Download soundtrack
   ipcMain.handle("download-soundtrack", async (_, soundtracklink, game = "none") => {

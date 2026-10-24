@@ -489,6 +489,11 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   // DOWNLOADS
   //===========================================================================
+  getDownloadStalls: () => ipcRenderer.invoke("get-download-stalls"),
+  onDownloadStall: callback =>
+    preloadIpc.subscribe("download-stall", callback, {
+      selectArgs: args => [args[0]],
+    }),
   downloadFile: (
     link,
     game,
