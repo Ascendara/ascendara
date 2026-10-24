@@ -1286,7 +1286,7 @@ def _retry_archive_members(kind, archive, destination, names, cancelled, activit
         _run_cli([tool, 'x', '-y', '-aoa', '-psteamrip.com', '-bb1', '-sccUTF-8',
                   '-o' + destination, '--', archive, *sorted(selected)], cancelled, activity)
         return
-    if kind == 'exe':
+    if kind in ('exe', 'unknown'):
         name = os.path.basename(archive).replace('\\', '/')
         if name not in selected:
             raise IncompleteArchiveOutput(f'Archive member is unavailable for recovery: {next(iter(selected))}')
@@ -1515,7 +1515,8 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
                 report()
             _run_cli([tool, 'x', '-y', '-aoa', '-psteamrip.com', '-bsp1', '-bb1', '-sccUTF-8', '-ssc-',
                       '-xr!*.url', '-xr!*_commonredist*', '-o' + destination, '--', archive], cancelled, cli_activity)
-        elif kind == 'exe':
+        elif kind == 'exe' or not archive.lower().endswith(('.zip', '.rar', '.7z')):
+            # Anything that is not an archive is installed as the file itself.
             name = os.path.basename(archive)
             shutil.copyfile(archive, _member_path(destination, name))
             completed(name, os.path.getsize(archive))

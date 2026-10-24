@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import re
 import shutil
 import threading
 import time
@@ -24,6 +25,16 @@ def validate_download_url(url):
     if parsed.scheme not in ('http', 'https') or not parsed.hostname:
         raise ValueError('The download link is invalid. Refresh the game source or choose another download link.')
     return url.strip()
+
+
+def resolve_share_url(url):
+    """Turn a file host's viewer page link into the link that serves the file itself."""
+    parsed = urlparse(url)
+    host = (parsed.hostname or '').lower()
+    match = re.fullmatch(r'/u/([A-Za-z0-9]+)/?', parsed.path)
+    if host in ('pixeldrain.com', 'www.pixeldrain.com') and match:
+        return f'https://pixeldrain.com/api/file/{match[1]}?download'
+    return url
 
 
 def connection_count(settings):

@@ -28,7 +28,7 @@ from urllib.parse import urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
-from AscendaraTransfer import Transfer, validate_download_url, connection_count
+from AscendaraTransfer import Transfer, validate_download_url, connection_count, resolve_share_url
 from AscendaraGofile import GofileClient, content_id as gofile_content_id
 from AscendaraRarRecovery import _extended_path, _check_path, _member_path
 from AscendaraExtraction import (
@@ -822,6 +822,10 @@ class AscendaraDownloader:
                     raise ExtractionRecoveryCancelled(
                         'Extraction recovery cancelled; the downloaded source files were retained', exc) from exc
         logging.info(f"[AscendaraDownloader] Detected file type: {filetype}")
+        # Hosts answer expired, blocked or rate-limited links with a web page.
+        if filetype == 'unknown' and bytes.fromhex(hexsig).removeprefix(b'\xef\xbb\xbf').lstrip().startswith(b'<'):
+            raise RuntimeError('The download host returned a web page instead of the game file. '
+                               'The link may have expired or be rate limited; try again later or choose another download link.')
         
         ext_map = {'zip': '.zip', 'rar': '.rar', '7z': '.7z', 'exe': '.exe'}
         correct_ext = ext_map.get(filetype)
@@ -1268,8 +1272,8 @@ class AscendaraDownloader:
                 if withNotification and 'downloadingData' not in self.game_info:
                     _launch_notification(withNotification, 'Download Complete', f'Successfully downloaded {self.game}')
                 return
+            url = resolve_share_url(validate_download_url(url))
             host = (urlparse(url).hostname or '').lower()
-            url = validate_download_url(url)
             if provider != 'direct' and any(host == domain or host.endswith('.' + domain) for domain in self.VALID_BUZZHEAVIER_DOMAINS):
                 self._download_buzzheavier(url)
                 return
@@ -1574,8 +1578,11 @@ class AscendaraDownloader:
             self.game_info.pop('extractionSources', None)
             safe_write_json(self.game_info_path, self.game_info)
             return
+        downloads = os.path.join(self.download_dir, '.ascendara-downloads')
         for archive in archives:
-            if not archive.lower().endswith(('.zip', '.rar', '.7z')):
+            # A downloaded non-archive file was copied into the install, so drop the source too.
+            if (not archive.lower().endswith(('.zip', '.rar', '.7z'))
+                    and os.path.commonpath([downloads, archive]) != downloads):
                 continue
             if os.path.commonpath([self.download_dir, archive]) != self.download_dir:
                 continue
