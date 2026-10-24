@@ -89,6 +89,8 @@ class SettingsManager {
       highballRenderer: "auto",
       highballBottleMode: "shared",
       highballD3DMetalAccepted: false,
+      // Checked by ascendara://play links from macOS game shortcuts
+      shortcutLaunchToken: "",
       promptPurchaseAfter3Hours: true,
       openOnStartup: false,
       startMinimized: false,
