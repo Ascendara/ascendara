@@ -17,9 +17,10 @@ const CACHE_PREFIXES = {
  * Get cached game data from a specific API
  * @param {string} gameName - Name of the game
  * @param {string} apiType - API type ("steam")
+ * @param {string} [lang] - Language the data must be in; other languages miss
  * @returns {Object|null} Cached game data or null if not found/expired
  */
-const getCachedGame = (gameName, apiType = "steam") => {
+const getCachedGame = (gameName, apiType = "steam", lang) => {
   try {
     // Get the appropriate cache prefix
     const prefix = getCachePrefix(apiType);
@@ -34,7 +35,12 @@ const getCachedGame = (gameName, apiType = "steam") => {
       return null;
     }
 
-    const { data, timestamp } = JSON.parse(cachedData);
+    const { data, timestamp, lang: cachedLang } = JSON.parse(cachedData);
+
+    // Entries from before languages were tracked were fetched in English
+    if (lang && (cachedLang || "en") !== lang) {
+      return null;
+    }
 
     // Check if cache is expired
     if (!Number.isFinite(timestamp) || Date.now() - timestamp > CACHE_EXPIRY) {
@@ -159,8 +165,9 @@ const evictForSpace = (targetBytes = 512 * 1024) => {
  * @param {string} gameName - Name of the game
  * @param {Object} gameData - Game data to cache
  * @param {string} apiType - API type ("steam")
+ * @param {string} [lang] - Language the data was fetched in
  */
-const cacheGame = (gameName, gameData, apiType = "steam") => {
+const cacheGame = (gameName, gameData, apiType = "steam", lang) => {
   try {
     if (!gameData) return;
 
@@ -174,6 +181,7 @@ const cacheGame = (gameName, gameData, apiType = "steam") => {
     const cacheObject = {
       data: gameData,
       timestamp: Date.now(),
+      lang,
     };
 
     const serialized = JSON.stringify(cacheObject);

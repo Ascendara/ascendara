@@ -6,6 +6,7 @@
 // Import cache service
 import gameApiCache from "./gameInfoCacheService";
 import { API_URL } from "@/config/api";
+import i18n from "@/i18n";
 
 // Constants for APIs
 const isDev = import.meta.env.DEV;
@@ -14,6 +15,9 @@ const isDev = import.meta.env.DEV;
 const STEAM_PROXY_BASE = `${API_URL}/api/proxy/steam`;
 const STEAM_STORE_SEARCH_URL = `${STEAM_PROXY_BASE}/search`;
 const STEAM_APP_DETAILS_URL = `${STEAM_PROXY_BASE}/appdetails`;
+
+// UI language, sent so Steam returns descriptions, genres etc. in that language
+const getDetailsLanguage = () => i18n.language || "en";
 
 /**
  * Normalize game title for better matching
@@ -223,7 +227,7 @@ const getGameDetailByIdSteam = async (appId, apiKey) => {
     console.log(`Fetching Steam details for app ID: ${appId}`);
 
     // Get game details from Steam Store API via proxy
-    const url = `${STEAM_APP_DETAILS_URL}?appids=${appId}`;
+    const url = `${STEAM_APP_DETAILS_URL}?appids=${appId}&lang=${encodeURIComponent(getDetailsLanguage())}`;
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -287,7 +291,7 @@ const getGameDetailsSteam = async (gameName, config) => {
     console.log(`Successfully processed Steam data for: ${gameName}`);
 
     // Cache the processed game data
-    gameApiCache.cacheGame(gameName, formattedDetails, "steam");
+    gameApiCache.cacheGame(gameName, formattedDetails, "steam", getDetailsLanguage());
 
     return formattedDetails;
   } catch (error) {
@@ -722,7 +726,7 @@ const getGameDetails = async (gameName, config = {}) => {
   console.log("Using Steam proxy endpoints");
 
   // Check cache first
-  let cachedData = gameApiCache.getCachedGame(gameName, "steam");
+  let cachedData = gameApiCache.getCachedGame(gameName, "steam", getDetailsLanguage());
   if (cachedData) {
     console.log(`Using cached Steam data for: ${gameName}`);
     // Ensure appid field exists in cached data (migration for old cache)
@@ -739,7 +743,7 @@ const getGameDetails = async (gameName, config = {}) => {
 
   // Cache the data if we found any
   if (gameData) {
-    gameApiCache.cacheGame(gameName, gameData, "steam");
+    gameApiCache.cacheGame(gameName, gameData, "steam", getDetailsLanguage());
   } else {
     console.log(`No game data found for: ${gameName}`);
   }
@@ -781,6 +785,7 @@ export default {
   // Individual API functions
   getGameDetailsSteam,
   getGameDetailByIdSteam,
+  getDetailsLanguage,
 
   // Data formatting
   formatSteamData,

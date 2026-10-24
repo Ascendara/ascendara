@@ -63,6 +63,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { validateInput } from "@/services/ascend/profanityFilterService";
+import GameInfoLanguageBadge from "@/components/GameInfoLanguageBadge";
 import ImportGamesDialog from "@/components/ImportGamesDialog";
 import ImportFromLaunchersDialog from "@/components/ImportFromLaunchersDialog";
 import StoreAccountsDialog from "@/components/StoreAccountsDialog";
@@ -1503,6 +1504,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       >
                         <div className="text-3xl">{lang.icon}</div>
                         <span className="text-xl font-medium">{lang.name}</span>
+                        <GameInfoLanguageBadge code={lang.id} className="!ml-auto" />
                       </motion.button>
                     ))}
                   </motion.div>

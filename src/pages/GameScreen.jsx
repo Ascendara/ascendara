@@ -995,7 +995,7 @@ const EditGameInfoDialog = ({
           const resultsWithDetails = await Promise.all(
             data.items.slice(0, 5).map(async item => {
               try {
-                const detailsUrl = `${API_URL}/api/proxy/steam/appdetails?appids=${item.id}`;
+                const detailsUrl = `${API_URL}/api/proxy/steam/appdetails?appids=${item.id}&lang=${encodeURIComponent(steamService.getDetailsLanguage())}`;
                 const detailsRes = await fetch(detailsUrl);
                 if (detailsRes.ok) {
                   const detailsData = await detailsRes.json();
@@ -2525,7 +2525,7 @@ function InstalledGameScreen() {
 
   // Fetch Steam data by specific App ID
   const fetchSteamDataByAppId = async appId => {
-    const cached = steamAppDataCache.get(String(appId));
+    const cached = steamAppDataCache.get(`${steamService.getDetailsLanguage()}:${appId}`);
     if (cached) {
       setSteamData(cached);
       return;
@@ -2549,7 +2549,10 @@ function InstalledGameScreen() {
           );
         }
         console.log("Steam data fetched by App ID:", formattedData.appid);
-        steamAppDataCache.set(String(appId), formattedData);
+        steamAppDataCache.set(
+          `${steamService.getDetailsLanguage()}:${appId}`,
+          formattedData
+        );
         setSteamData(formattedData);
       } else {
         console.log("No game data found for App ID:", appId);

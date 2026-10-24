@@ -77,6 +77,7 @@ import {
   getAvailableLanguages,
   handleLanguageChange,
 } from "@/services/app/languageService";
+import GameInfoLanguageBadge from "@/components/GameInfoLanguageBadge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1806,9 +1807,7 @@ function Settings() {
                         <span className="min-w-0 flex-1 truncate text-sm font-medium">
                           {lang.name}
                         </span>
-                        {language === lang.id && (
-                          <CheckCircle className="h-4 w-4 shrink-0 text-primary" />
-                        )}
+                        <GameInfoLanguageBadge code={lang.id} />
                       </button>
                     ))}
                   </div>

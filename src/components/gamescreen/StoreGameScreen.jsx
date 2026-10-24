@@ -46,7 +46,7 @@ const storeDetailsCache = new Map();
 // Steam games can be matched exactly by App ID; other stores fall back to a
 // name search, the same way installed games without an App ID are matched
 async function loadStoreDetails(game) {
-  const key = `${game.store}:${game.id}`;
+  const key = `${steamService.getDetailsLanguage()}:${game.store}:${game.id}`;
   if (storeDetailsCache.has(key)) return storeDetailsCache.get(key);
   let data = null;
   if (game.store === "steam" && game.id) {

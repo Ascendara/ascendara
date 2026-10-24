@@ -32,6 +32,7 @@ import {
 import { extraLanguages } from "@/lib/extraLanguages";
 import { baseLanguages } from "@/i18n";
 import { toast } from "sonner";
+import GameInfoLanguageBadge from "@/components/GameInfoLanguageBadge";
 
 function ExtraLanguages() {
   const { language, changeLanguage, t } = useLanguage();
@@ -156,8 +157,13 @@ function ExtraLanguages() {
             >
               <span>{lang.icon}</span>
               <span>{lang.nativeName}</span>
-              {lang.downloaded && (
+              {lang.downloaded ? (
                 <CircleCheck className="ml-auto h-4 w-4 text-green-500" />
+              ) : (
+                <GameInfoLanguageBadge
+                  code={lang.id}
+                  className={language === lang.id ? "ml-auto text-secondary" : "ml-auto"}
+                />
               )}
             </Button>
           ))}
@@ -247,6 +253,7 @@ function ExtraLanguages() {
                   )}
                   <span>{lang.nativeName}</span>
                   <span className="text-muted-foreground">({lang.name})</span>
+                  {!isAvailable && <GameInfoLanguageBadge code={lang.id} />}
                 </div>
 
                 {/* Progress Bar */}
