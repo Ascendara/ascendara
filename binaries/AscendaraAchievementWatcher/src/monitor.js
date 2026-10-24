@@ -162,16 +162,28 @@ module.exports.getFolders = async userDir_file => {
     }
   }
 
-  // --- LINUX PATHS (Proton/Wine Prefixes) ---
+  // --- LINUX/MACOS PATHS (Proton/Wine Prefixes, Highball Bottles) ---
   else if (process.platform === "linux" || process.platform === "darwin") {
-    const compatDataRoot = path.join(os.homedir(), ".ascendara/compatdata");
+    // Proton/Wine prefixes keep drive_c under pfx/, Highball bottles hold it directly
+    const prefixRoots = [
+      { root: path.join(os.homedir(), ".ascendara/compatdata"), driveC: "pfx/drive_c" },
+    ];
+    if (process.platform === "darwin") {
+      prefixRoots.push({
+        root: path.join(
+          os.homedir(),
+          "Library/Application Support/ascendara/highball/bottles"
+        ),
+        driveC: "drive_c",
+      });
+    }
 
     try {
-      if (await fs.stat(compatDataRoot).catch(() => false)) {
-        const gameFolders = await fs.readdir(compatDataRoot);
+      for (const prefixRoot of prefixRoots) {
+        const gameFolders = await fs.readdir(prefixRoot.root).catch(() => []);
 
         for (const game of gameFolders) {
-          const driveC = path.join(compatDataRoot, game, "pfx/drive_c");
+          const driveC = path.join(prefixRoot.root, game, prefixRoot.driveC);
           if (!(await fs.stat(driveC).catch(() => false))) continue;
 
           // Note: "steamuser" is default user of Proton/Wine
@@ -270,7 +282,7 @@ module.exports.getFolders = async userDir_file => {
         }
       }
     } catch (e) {
-      console.error("Error scanning Linux prefixes:", e);
+      console.error("Error scanning Wine prefixes:", e);
     }
   }
 
