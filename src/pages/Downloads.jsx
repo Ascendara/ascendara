@@ -518,9 +518,6 @@ const Downloads = () => {
             prev => new Set([...prev, ...newlyCompleted.map(g => g.game)])
           );
 
-          // macOS: list the new games in the Highball app when its library is synced
-          window.electron.highballSyncLibrary?.().catch(() => {});
-
           // Automatically create a desktop shortcut as soon as the download/install
           // finishes, regardless of whether the game has ever been launched.
           if (settingsRef.current.autoCreateShortcuts) {

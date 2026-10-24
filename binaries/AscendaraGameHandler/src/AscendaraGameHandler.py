@@ -74,7 +74,6 @@ def parse_linux_runner_args(args):
         "highball_bottle": None,
         "highball_home": None,
         "highball_renderer": None,
-        "highball_program": None,
     }
 
     i = 0
@@ -105,9 +104,6 @@ def parse_linux_runner_args(args):
             i += 2
         elif args[i] == "--highball-renderer" and i + 1 < len(args):
             config["highball_renderer"] = args[i + 1]
-            i += 2
-        elif args[i] == "--highball-program" and i + 1 < len(args):
-            config["highball_program"] = args[i + 1]
             i += 2
         else:
             i += 1
@@ -316,13 +312,11 @@ def _highball_env(highball_config):
     return env
 
 
-def launch_with_highball(exe_path, highball_config, game_launch_cmd=None, program=None):
+def launch_with_highball(exe_path, highball_config, game_launch_cmd=None):
     """
     Launch a Windows executable on Apple Silicon through the bundled Highball CLI:
-    highball run [--renderer R] <bottle> <exe|program> -- <args>
-    program names the game's entry in the Highball app's library, so Highball
-    applies the settings made there. The CLI stays running until the game exits
-    and returns the game's exit code.
+    highball run [--renderer R] <bottle> <exe> -- <args>
+    The CLI stays running until the game exits and returns the game's exit code.
     """
     highball_bin = highball_config["runner_path"]
     if not highball_bin or not os.path.isfile(highball_bin):
@@ -336,7 +330,7 @@ def launch_with_highball(exe_path, highball_config, game_launch_cmd=None, progra
     cmd = [highball_bin, "run"]
     if highball_config.get("highball_renderer"):
         cmd += ["--renderer", highball_config["highball_renderer"]]
-    cmd += [highball_config["highball_bottle"], program or exe_path]
+    cmd += [highball_config["highball_bottle"], exe_path]
     if extra_args:
         cmd += ["--", *extra_args]
 
@@ -1081,12 +1075,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         elif (current_platform == 'darwin' and is_windows_exe and linux_runner_config
               and linux_runner_config["runner_type"] == "highball"):
             logging.info(f"[Launch] Using Highball bottle: {linux_runner_config['highball_bottle']}")
-            process = launch_with_highball(
-                exe_path,
-                linux_runner_config,
-                game_launch_cmd,
-                linux_runner_config.get("highball_program"),
-            )
+            process = launch_with_highball(exe_path, linux_runner_config, game_launch_cmd)
             if process is None:
                 error_msg = "Failed to launch with Highball"
                 logging.error(error_msg)

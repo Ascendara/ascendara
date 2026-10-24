@@ -268,33 +268,6 @@ async function createMacGameShortcut(game, targetDirectory) {
 }
 
 /**
- * The installed (not custom) games with their executable, for the Highball sync
- */
-async function listInstalledGames() {
-  const games = [];
-  for (const directory of getGameDirectories(getSettingsManager().getSettings())) {
-    const entries = await fs.promises
-      .readdir(directory, { withFileTypes: true })
-      .catch(() => []);
-    for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name === ".ascendara-updates") continue;
-      const gameDirectory = path.join(directory, entry.name);
-      const info = await fs
-        .readJson(path.join(gameDirectory, `${entry.name}.ascendara.json`))
-        .catch(() => null);
-      const executable = info?.executable || info?.executables?.[0];
-      if (executable)
-        games.push({ game: entry.name, executable, directory: gameDirectory });
-    }
-  }
-  return games;
-}
-
-async function syncHighballLibrary() {
-  return highball.syncLibrary(await listInstalledGames());
-}
-
-/**
  * Create game shortcut on desktop
  */
 async function createGameShortcut(game) {
@@ -828,11 +801,7 @@ function registerGameHandlers() {
               progress =>
                 !event.sender.isDestroyed() &&
                 event.sender.send("highball-setup-progress", { ...progress, game }),
-              { steamAppId: macCompat.steamAppId, title: game },
-              {
-                executable,
-                directory: isCustom ? null : findInstalledGameDirectory(game, settings),
-              }
+              { steamAppId: macCompat.steamAppId, title: game }
             )
             .finally(() => preparingGames.delete(game));
           if (launchConfig.error) {
@@ -851,7 +820,6 @@ function registerGameHandlers() {
             launchConfig.bottle,
             "--highball-home",
             launchConfig.home,
-            ...(launchConfig.program ? ["--highball-program", launchConfig.program] : []),
             ...(launchConfig.renderer
               ? ["--highball-renderer", launchConfig.renderer]
               : [])
@@ -872,10 +840,7 @@ function registerGameHandlers() {
         if (isLinux && proton && proton.isWindowsExecutable(executable)) {
           // Auto-detect UMU ID if not already set
           try {
-            const {
-              autoDetectAndSaveUmuId,
-              getGameUmuId,
-            } = require("../compat/umu-database");
+            const { autoDetectAndSaveUmuId, getGameUmuId } = require("../compat/umu-database");
             const existingId = await getGameUmuId(game);
             if (!existingId) {
               autoDetectAndSaveUmuId(game).catch(() => {});
@@ -1382,10 +1347,7 @@ function registerGameHandlers() {
           deleteStartMenuShortcut(game);
         }
         if (isLinux && proton) await proton.deleteGamePrefix(game);
-        if (highball.isSupported()) {
-          await highball.removeFromLibrary(game);
-          await highball.resetBottle(game);
-        }
+        if (highball.isSupported()) await highball.resetBottle(game);
         return true;
       }
       throw new Error(`Game directory not found for ${game}`);
@@ -1795,26 +1757,6 @@ function registerGameHandlers() {
     }
     return false;
   });
-
-  // A game's settings in the Highball app (macOS, shared home)
-  ipcMain.handle("highball-get-game-settings", (_, game) =>
-    highball.getGameSettings(game).catch(error => ({ error: error.message }))
-  );
-  ipcMain.handle("highball-set-game-mode", async (_, game, mode) => {
-    try {
-      const installed = (await listInstalledGames()).find(entry => entry.game === game);
-      if (!installed) throw new Error(`${game} is not installed`);
-      return await highball.setGameMode(installed, mode);
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Keep the Highball app's library in step with the installed games (macOS)
-  ipcMain.handle("highball-sync-library", () => syncHighballLibrary());
-  setTimeout(() => {
-    if (highball.usesApp()) syncHighballLibrary().catch(() => {});
-  }, 15000);
 
   // Create start menu shortcut handler
   ipcMain.handle("create-start-menu-shortcut", async (_, game) => {

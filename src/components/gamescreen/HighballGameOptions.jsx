@@ -18,16 +18,10 @@ export default function HighballGameOptions({ game, steamAppId }) {
   const [overrides, setOverrides] = useState(null);
   const [bottleMode, setBottleMode] = useState("shared");
   const [resetting, setResetting] = useState(false);
-  const [appSettings, setAppSettings] = useState(null);
 
   useEffect(() => {
     if (!gameName) return;
-    window.electron.highballGetStatus().then(next => {
-      setStatus(next);
-      if (next?.usingApp) {
-        window.electron.highballGetGameSettings(gameName).then(setAppSettings);
-      }
-    });
+    window.electron.highballGetStatus().then(setStatus);
     window.electron.getMacCompatOverrides(gameName, isCustom).then(setOverrides);
     window.electron
       .getSettings()
@@ -45,13 +39,6 @@ export default function HighballGameOptions({ game, steamAppId }) {
       isCustom
     );
     if (!saved) toast.error(t("settings.macCompat.saveFailed"));
-  };
-
-  const updateMode = async mode => {
-    setAppSettings(current => ({ ...current, mode }));
-    const result = await window.electron.highballSetGameMode(gameName, mode);
-    if (!result?.success)
-      toast.error(result?.error || t("settings.macCompat.saveFailed"));
   };
 
   const resetBottle = async () => {
@@ -87,28 +74,7 @@ export default function HighballGameOptions({ game, steamAppId }) {
         />
       </label>
 
-      {overrides.macRunner !== "wine" && status.usingApp && appSettings && (
-        <label className="block space-y-1">
-          <span className="text-xs text-muted-foreground">
-            {t("settings.macCompat.appGameMode")}
-          </span>
-          <OptionSelect
-            className="h-8 text-xs"
-            value={appSettings.mode || "auto"}
-            onChange={updateMode}
-            options={rendererOptions(
-              t,
-              status.d3dmetalAccepted,
-              t("settings.macCompat.appEnvironmentMode")
-            )}
-          />
-          <span className="block text-xs text-muted-foreground">
-            {t("settings.macCompat.appGameModeHint")}
-          </span>
-        </label>
-      )}
-
-      {overrides.macRunner !== "wine" && !status.usingApp && (
+      {overrides.macRunner !== "wine" && (
         <label className="block space-y-1">
           <span className="text-xs text-muted-foreground">
             {t("settings.macCompat.renderer")}
