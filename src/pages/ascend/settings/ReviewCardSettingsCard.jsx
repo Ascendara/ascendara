@@ -5,16 +5,19 @@ import {
   Clock,
   Image as ImageIcon,
   Loader2,
+  RotateCcw,
   Trash2,
   Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import ImageCropDialog from "@/components/ImageCropDialog";
 import ReviewCard from "@/components/ReviewCard";
 import { cropImage } from "@/lib/cropImage";
 import {
   deleteReviewCardBackground,
-  getReviewCardBackground,
+  getReviewCard,
+  updateReviewCardStyle,
   uploadReviewCardBackground,
 } from "@/services/firebase/firebaseService";
 
@@ -25,6 +28,90 @@ const MAX_BYTES = 8 * 1024 * 1024;
 // The original only has to be openable; the cropped result is what's uploaded
 const MAX_SOURCE_BYTES = 50 * 1024 * 1024;
 const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const MIN_IMAGE_OPACITY = 10;
+const STYLE_FIELDS = ["auraColor", "textColor", "imageOpacity"];
+const COLOR_PRESETS = [
+  "#ffffff",
+  "#ef4444",
+  "#f97316",
+  "#eab308",
+  "#22c55e",
+  "#06b6d4",
+  "#3b82f6",
+  "#a855f7",
+  "#ec4899",
+];
+
+// The viewer's theme color as #rrggbb, shown when no custom color is set
+const themeHex = variable => {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(variable);
+  const channels = value.trim().split(/\s+/).map(Number);
+  if (channels.length !== 3 || channels.some(Number.isNaN)) return "#ffffff";
+  return `#${channels.map(channel => channel.toString(16).padStart(2, "0")).join("")}`;
+};
+
+function ColorField({
+  label,
+  value,
+  fallbackVariable,
+  onChange,
+  defaultLabel,
+  disabled,
+}) {
+  const current = value || themeHex(fallbackVariable);
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">{label}</span>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            disabled={disabled}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <RotateCcw className="h-3 w-3" />
+            {defaultLabel}
+          </button>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <label
+          className={`relative h-7 w-10 cursor-pointer overflow-hidden rounded-md border border-border ${
+            disabled ? "pointer-events-none opacity-50" : ""
+          }`}
+          style={{ backgroundColor: current }}
+          title={current}
+        >
+          <input
+            type="color"
+            value={current}
+            onChange={event => onChange(event.target.value.toLowerCase())}
+            disabled={disabled}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            aria-label={label}
+          />
+        </label>
+        <span className="w-16 font-mono text-xs text-muted-foreground">
+          {value || "—"}
+        </span>
+        {COLOR_PRESETS.map(color => (
+          <button
+            key={color}
+            type="button"
+            onClick={() => onChange(color)}
+            disabled={disabled}
+            aria-label={color}
+            className={`h-5 w-5 rounded-full border border-border transition-transform hover:scale-110 disabled:opacity-50 ${
+              value === color ? "ring-2 ring-primary ring-offset-2 ring-offset-card" : ""
+            }`}
+            style={{ backgroundColor: color }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const loadImage = file =>
   new Promise((resolve, reject) => {
@@ -47,13 +134,19 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
   const [busy, setBusy] = useState(false);
   const [previewDate] = useState(() => new Date().toISOString());
   const [cropFile, setCropFile] = useState(null);
+  // savedStyle is what everyone sees; style is the draft shown in the preview
+  const [savedStyle, setSavedStyle] = useState({});
+  const [style, setStyle] = useState({});
+  const [savingStyle, setSavingStyle] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
-    getReviewCardBackground().then(result => {
+    getReviewCard().then(result => {
       if (cancelled) return;
       setBackground(result.background);
+      setSavedStyle(result.style || {});
+      setStyle(result.style || {});
       setStatus(result.error ? "error" : "ready");
     });
     return () => {
@@ -127,6 +220,29 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
     toast.success(t("ascend.settings.reviewCard.removed"));
   };
 
+  const styleChanged = STYLE_FIELDS.some(field => style[field] !== savedStyle[field]);
+  const setStyleField = (field, value) =>
+    setStyle(current => {
+      const next = { ...current, [field]: value };
+      if (value === null || value === undefined) delete next[field];
+      return next;
+    });
+
+  const handleSaveStyle = async () => {
+    setSavingStyle(true);
+    const result = await updateReviewCardStyle(
+      Object.fromEntries(STYLE_FIELDS.map(field => [field, style[field] ?? null]))
+    );
+    setSavingStyle(false);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    setSavedStyle(result.style || {});
+    setStyle(result.style || {});
+    toast.success(t("ascend.settings.reviewCard.styleSaved"));
+  };
+
   const name =
     userData?.username ||
     userData?.displayName ||
@@ -185,6 +301,7 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
                   verified: userData?.verified === true,
                 },
                 cardBackground: background?.url,
+                cardStyle: style,
                 createdAt: previewDate,
               }}
               username={name}
@@ -238,6 +355,78 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
               <Trash2 className="h-4 w-4" />
               {t("ascend.settings.reviewCard.remove")}
             </Button>
+          )}
+        </div>
+
+        <div className="space-y-4 border-t border-border/50 pt-4">
+          <div>
+            <h3 className="text-sm font-semibold">
+              {t("ascend.settings.reviewCard.styleTitle")}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("ascend.settings.reviewCard.styleDescription")}
+            </p>
+          </div>
+          <ColorField
+            label={t("ascend.settings.reviewCard.auraColor")}
+            value={style.auraColor}
+            fallbackVariable="--color-primary"
+            onChange={value => setStyleField("auraColor", value)}
+            defaultLabel={t("ascend.settings.reviewCard.useDefault")}
+            disabled={savingStyle || status === "loading"}
+          />
+          <ColorField
+            label={t("ascend.settings.reviewCard.textColor")}
+            value={style.textColor}
+            fallbackVariable="--color-foreground"
+            onChange={value => setStyleField("textColor", value)}
+            defaultLabel={t("ascend.settings.reviewCard.useDefault")}
+            disabled={savingStyle || status === "loading"}
+          />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">
+                {t("ascend.settings.reviewCard.imageOpacity")}
+              </span>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {style.imageOpacity ?? 100}%
+              </span>
+            </div>
+            <Slider
+              value={[style.imageOpacity ?? 100]}
+              min={MIN_IMAGE_OPACITY}
+              max={100}
+              step={1}
+              disabled={savingStyle || !background}
+              onValueChange={([value]) =>
+                setStyleField("imageOpacity", value === 100 ? null : value)
+              }
+              aria-label={t("ascend.settings.reviewCard.imageOpacity")}
+            />
+            {!background && (
+              <p className="text-xs text-muted-foreground">
+                {t("ascend.settings.reviewCard.imageOpacityHint")}
+              </p>
+            )}
+          </div>
+          {styleChanged && (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={handleSaveStyle}
+                disabled={savingStyle}
+                className="gap-2 text-secondary"
+              >
+                {savingStyle && <Loader2 className="h-4 w-4 animate-spin" />}
+                {t("ascend.settings.reviewCard.saveStyle")}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setStyle(savedStyle)}
+                disabled={savingStyle}
+              >
+                {t("ascend.settings.reviewCard.discardStyle")}
+              </Button>
+            </div>
           )}
         </div>
       </div>

@@ -8,6 +8,12 @@ import {
 } from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/LanguageContext";
 
+// "#rrggbb" -> "r g b", the format the theme's color variables use
+const toThemeColor = hex =>
+  typeof hex === "string" && /^#[0-9a-f]{6}$/i.test(hex)
+    ? [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16)).join(" ")
+    : null;
+
 // One review on the game page. Also rendered as the live preview in Ascend's
 // review card settings, so both always look the same.
 export default function ReviewCard({ review, username, isGuest }) {
@@ -21,6 +27,14 @@ export default function ReviewCard({ review, username, isGuest }) {
     typeof review.cardBackground === "string" &&
     review.cardBackground.startsWith("https://") &&
     review.cardBackground;
+  // Aura recolors everything themed with primary (border, glow, gradient,
+  // avatar ring); text recolors the name, review and meta text
+  const auraColor = !isGuest && toThemeColor(review.cardStyle?.auraColor);
+  const textColor = !isGuest && toThemeColor(review.cardStyle?.textColor);
+  const imageOpacity = Number(review.cardStyle?.imageOpacity);
+  const metaTextClass = textColor
+    ? "text-muted-foreground opacity-75"
+    : "text-muted-foreground";
   const date = review.createdAt ? new Date(review.createdAt) : null;
   const formattedDate =
     date && !Number.isNaN(date.getTime())
@@ -37,6 +51,13 @@ export default function ReviewCard({ review, username, isGuest }) {
           ? "border-none bg-background/50"
           : "border border-primary/30 bg-gradient-to-br from-primary/15 via-primary/5 to-background/50 shadow-[0_0_24px_-12px_rgb(var(--color-primary))]"
       }`}
+      style={{
+        ...(auraColor && { "--color-primary": auraColor }),
+        ...(textColor && {
+          "--color-foreground": textColor,
+          "--color-muted-foreground": textColor,
+        }),
+      }}
     >
       {cardBackground ? (
         <>
@@ -46,6 +67,11 @@ export default function ReviewCard({ review, username, isGuest }) {
             aria-hidden="true"
             loading="lazy"
             className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+            style={
+              imageOpacity >= 10 && imageOpacity <= 100
+                ? { opacity: imageOpacity / 100 }
+                : undefined
+            }
             onError={event => {
               event.currentTarget.style.display = "none";
               event.currentTarget.nextElementSibling.style.display = "none";
@@ -136,7 +162,7 @@ export default function ReviewCard({ review, username, isGuest }) {
                   />
                 ))}
               </div>
-              <span className="text-xs text-muted-foreground">
+              <span className={`text-xs ${metaTextClass}`}>
                 {t("download.reviews.rating", { rating: review.rating })}
               </span>
             </div>
@@ -149,7 +175,7 @@ export default function ReviewCard({ review, username, isGuest }) {
       {formattedDate && (
         <time
           dateTime={date.toISOString()}
-          className="relative mt-3 block text-xs text-muted-foreground"
+          className={`relative mt-3 block text-xs ${metaTextClass}`}
         >
           {formattedDate}
         </time>

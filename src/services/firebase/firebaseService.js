@@ -3120,11 +3120,12 @@ export const listMyReports = async () => {
 };
 
 /**
- * Send a review card background request. GET reads the current one, POST
- * uploads a new one (waits for approval), DELETE removes it.
- * @returns {Promise<{background: object|null, error: string|null, code?: string}>}
+ * Send a review card customization request. GET reads the background and
+ * style, POST uploads a background (waits for approval), PATCH changes the
+ * style (aura/text colors, image opacity), DELETE removes the background.
+ * @returns {Promise<{background: object|null, style: object|undefined, error: string|null, code?: string}>}
  */
-const reviewCardRequest = async (method, body) => {
+const reviewCardRequest = async (method, body, headers) => {
   try {
     const user = auth.currentUser;
     if (!user) {
@@ -3134,6 +3135,7 @@ const reviewCardRequest = async (method, body) => {
     const response = await userAuthenticatedFetch(user, `${API_URL}/ascend/review-card`, {
       method,
       body,
+      headers,
     });
     const data = await response.json().catch(() => ({}));
 
@@ -3145,14 +3147,14 @@ const reviewCardRequest = async (method, body) => {
       };
     }
 
-    return { background: data.background || null, error: null };
+    return { background: data.background || null, style: data.style, error: null };
   } catch (error) {
     console.error("Review card request error:", error);
     return { background: null, error: error.message };
   }
 };
 
-export const getReviewCardBackground = () => reviewCardRequest("GET");
+export const getReviewCard = () => reviewCardRequest("GET");
 
 export const uploadReviewCardBackground = file => {
   const formData = new FormData();
@@ -3161,6 +3163,15 @@ export const uploadReviewCardBackground = file => {
 };
 
 export const deleteReviewCardBackground = () => reviewCardRequest("DELETE");
+
+/**
+ * @param {{auraColor?: string|null, textColor?: string|null, imageOpacity?: number|null}} style
+ *   colors as #RRGGBB, opacity as 10-100; null resets a field
+ */
+export const updateReviewCardStyle = style =>
+  reviewCardRequest("PATCH", JSON.stringify(style), {
+    "Content-Type": "application/json",
+  });
 
 /**
  * Get download URL for a backup
