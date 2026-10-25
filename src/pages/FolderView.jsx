@@ -28,7 +28,7 @@ import {
   loadFolders,
 } from "@/lib/folderManager";
 import { Input } from "@/components/ui/input";
-import { gameImageCache } from "@/lib/gameImageCache";
+import { gameImageCache, loadGameCover } from "@/lib/gameImageCache";
 import { useAuth } from "@/context/AuthContext";
 import { verifyAscendAccess } from "@/services/firebase/firebaseService";
 import gameService from "@/services/games/gameService";
@@ -66,22 +66,13 @@ const GameCard = React.memo(
         setImageData(imageCache.get(gameId));
         return;
       }
-      (async () => {
-        try {
-          const base64 = await window.electron.getGameImage(gameId, "grid");
-          if (!cancelled && base64) {
-            const dataUrl = `data:image/jpeg;base64,${base64}`;
-            imageCache.set(gameId, dataUrl);
-            setImageData(dataUrl);
-          }
-        } catch {
-          // no image available
-        }
-      })();
+      loadGameCover(game).then(image => {
+        if (!cancelled && image) setImageData(image);
+      });
       return () => {
         cancelled = true;
       };
-    }, [gameId]);
+    }, [gameId, game.isCustom]);
 
     return (
       <Card

@@ -3,6 +3,7 @@ import { ChevronRight, Folder, FolderOpen, Import, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { getFolderByName, deleteFolder, loadFolders } from "@/lib/folderManager";
+import { loadGameCover } from "@/lib/gameImageCache";
 import { useLanguage } from "@/context/LanguageContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -52,18 +53,14 @@ const FolderCard = ({
   useEffect(() => {
     let active = true;
     const ids = JSON.parse(previewKey);
+    const games = folderGames.slice(0, 4);
     const refresh = async () => {
       const results = await Promise.all(
-        ids.map(async id => {
+        ids.map(async (id, index) => {
           let image = thumbnailCache.get(id);
           if (!image) {
-            try {
-              const base64 = await window.electron.getGameImage(id, "grid");
-              image = base64 ? `data:image/jpeg;base64,${base64}` : null;
-              if (image) thumbnailCache.set(id, image);
-            } catch {
-              image = null;
-            }
+            image = await loadGameCover(games[index]);
+            if (image) thumbnailCache.set(id, image);
           }
           return { id, name: id, image };
         })

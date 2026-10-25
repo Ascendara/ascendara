@@ -138,7 +138,12 @@ import EditCoverDialog from "@/components/EditCoverDialog";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { useGameRunning } from "@/hooks/useGameRunning";
-import { gameImageCache, heroImageCache, logoImageCache } from "@/lib/gameImageCache";
+import {
+  gameImageCache,
+  heroImageCache,
+  logoImageCache,
+  loadGameCover,
+} from "@/lib/gameImageCache";
 import {
   loadFolders,
   saveFolders,
@@ -4401,66 +4406,8 @@ const InstalledGameCard = memo(
       const loadGameImage = async () => {
         // Already cached from a previous mount — no IPC call needed
         if (gameImageCache.has(gameId)) return;
-
-        try {
-          // Prefer portrait grid image (600x900) for the 2:3 card layout
-          const imageBase64 = await window.electron.getGameImage(gameId, "grid");
-          if (imageBase64 && isMounted) {
-            const dataUrl = `data:image/jpeg;base64,${imageBase64}`;
-            gameImageCache.set(gameId, dataUrl);
-            setImageData(dataUrl);
-            return;
-          }
-        } catch (error) {
-          console.error("Error loading game image:", error);
-        }
-        // No portrait grid on disk — fall back to an existing banner/hero image
-        // so the card slot isn't left blank while a proper cover is found.
-        try {
-          const bannerBase64 =
-            (await window.electron.getGameImage(gameId, "hero")) ||
-            (await window.electron.getGameImage(gameId));
-          if (bannerBase64 && isMounted) {
-            const dataUrl = `data:image/jpeg;base64,${bannerBase64}`;
-            gameImageCache.set(gameId, dataUrl);
-            setImageData(dataUrl);
-            return;
-          }
-        } catch (error) {
-          console.error("Error loading fallback game image:", error);
-        }
-
-        // Still nothing on disk — attempt to repair (re-download) it. Installed
-        // games use the local index/SteamGridDB header repair; custom and
-        // imported games query SteamGridDB directly by name.
-        if (!game.isCustom && isMounted) {
-          try {
-            const repairedBase64 = await window.electron.repairGameImage(gameId);
-            if (repairedBase64 && isMounted) {
-              const dataUrl = `data:image/jpeg;base64,${repairedBase64}`;
-              gameImageCache.set(gameId, dataUrl);
-              setImageData(dataUrl);
-              return;
-            }
-          } catch (e) {
-            console.warn("Could not repair game image:", e);
-          }
-        }
-
-        if (game.isCustom && isMounted) {
-          try {
-            const { default: sgSvc } =
-              await import("@/services/images/steamGridImageService");
-            const assets = await sgSvc.getAssets(gameId);
-            const url = sgSvc.pickUrl(assets, "card");
-            if (url && isMounted) {
-              gameImageCache.set(gameId, url);
-              setImageData(url);
-            }
-          } catch {
-            /* silent */
-          }
-        }
+        const image = await loadGameCover(game);
+        if (image && isMounted) setImageData(image);
       };
 
       // Listen for game cover update events
