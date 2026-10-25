@@ -14,6 +14,16 @@ const toThemeColor = hex =>
     ? [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16)).join(" ")
     : null;
 
+// Outline color that keeps text and icons legible over a background image:
+// the card's own background, or whichever of black/white contrasts with a
+// custom text color
+const haloColor = textColor => {
+  if (!textColor) return "rgb(var(--color-background) / 0.85)";
+  const [red, green, blue] = textColor.split(" ").map(Number);
+  const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
+  return luminance > 0.6 ? "rgb(0 0 0 / 0.65)" : "rgb(255 255 255 / 0.8)";
+};
+
 // One review on the game page. Also rendered as the live preview in Ascend's
 // review card settings, so both always look the same.
 export default function ReviewCard({ review, username, isGuest }) {
@@ -35,6 +45,10 @@ export default function ReviewCard({ review, username, isGuest }) {
   const metaTextClass = textColor
     ? "text-muted-foreground opacity-75"
     : "text-muted-foreground";
+  const halo = cardBackground && haloColor(textColor);
+  const iconHaloStyle = halo
+    ? { filter: `drop-shadow(0 0 1px ${halo}) drop-shadow(0 0 2px ${halo})` }
+    : undefined;
   const date = review.createdAt ? new Date(review.createdAt) : null;
   const formattedDate =
     date && !Number.isNaN(date.getTime())
@@ -56,6 +70,10 @@ export default function ReviewCard({ review, username, isGuest }) {
         ...(textColor && {
           "--color-foreground": textColor,
           "--color-muted-foreground": textColor,
+        }),
+        // Inherited by every line of text in the card
+        ...(halo && {
+          textShadow: `0 0 2px ${halo}, 0 0 6px ${halo}, 0 1px 1px ${halo}`,
         }),
       }}
     >
@@ -120,11 +138,21 @@ export default function ReviewCard({ review, username, isGuest }) {
             <p className="break-words text-sm font-semibold text-foreground">
               {username}
             </p>
-            {badges.owner && <Crown className="h-4 w-4 shrink-0 text-yellow-500" />}
-            {badges.contributor && (
-              <Hammer className="h-4 w-4 shrink-0 text-orange-500" />
+            {badges.owner && (
+              <Crown className="h-4 w-4 shrink-0 text-yellow-500" style={iconHaloStyle} />
             )}
-            {badges.verified && <BadgeCheck className="h-4 w-4 shrink-0 text-blue-500" />}
+            {badges.contributor && (
+              <Hammer
+                className="h-4 w-4 shrink-0 text-orange-500"
+                style={iconHaloStyle}
+              />
+            )}
+            {badges.verified && (
+              <BadgeCheck
+                className="h-4 w-4 shrink-0 text-blue-500"
+                style={iconHaloStyle}
+              />
+            )}
             {isGuest && (
               <TooltipProvider>
                 <Tooltip open={guestInfoOpen} onOpenChange={setGuestInfoOpen}>
@@ -149,6 +177,7 @@ export default function ReviewCard({ review, username, isGuest }) {
             <div className="mt-1 flex items-center gap-2">
               <div
                 className="flex gap-0.5"
+                style={iconHaloStyle}
                 role="img"
                 aria-label={t("download.reviews.stars", {
                   rating: review.rating,
