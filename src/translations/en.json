@@ -327,6 +327,12 @@
       "views": "Views",
       "yourAds": "Your Ads"
     },
+    "badges": {
+      "bugCatcher": "Bug Catcher",
+      "bugCatcherDescription": "Reported a bug that got fixed",
+      "gameReviewer": "Game Reviewer",
+      "gameReviewerDescription": "Reviewed 3 different games"
+    },
     "checkingVersion": "Checking version...",
     "cloudBackups": {
       "deleteDesc": "This will permanently delete this backup from cloud storage. This action cannot be undone.",

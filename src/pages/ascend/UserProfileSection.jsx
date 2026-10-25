@@ -39,6 +39,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import EarnedBadges from "@/components/EarnedBadges";
 
 export default function UserProfileSection({
   handleBackFromProfile,
@@ -151,6 +152,7 @@ export default function UserProfileSection({
                     {viewingProfile.verified && (
                       <BadgeCheck className="mb-2 h-7 w-7 shrink-0 text-blue-500" />
                     )}
+                    <EarnedBadges user={viewingProfile} className="mb-2 h-7 w-7" />
                   </div>
 
                   {/* Level Badge & Status - only show if not private */}

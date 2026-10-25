@@ -21,6 +21,7 @@ import {
   UserCheck,
   Inbox,
 } from "lucide-react";
+import EarnedBadges from "@/components/EarnedBadges";
 
 export default function SearchSection({
   t,
@@ -174,6 +175,7 @@ export default function SearchSection({
                       {result.verified && (
                         <BadgeCheck className="h-4 w-4 shrink-0 text-blue-500" />
                       )}
+                      <EarnedBadges user={result} className="h-4 w-4" />
                       {!result.private && result.level > 1 && (
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                           Lv. {result.level}

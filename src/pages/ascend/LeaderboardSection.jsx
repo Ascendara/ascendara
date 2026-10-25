@@ -17,6 +17,7 @@ import {
   BadgeCheck,
   Hammer,
 } from "lucide-react";
+import EarnedBadges from "@/components/EarnedBadges";
 
 export default function LeaderboardSection({
   leaderboardData,
@@ -150,6 +151,7 @@ export default function LeaderboardSection({
                     {player.verified && (
                       <BadgeCheck className="h-4 w-4 shrink-0 text-blue-500" />
                     )}
+                    <EarnedBadges user={player} className="h-4 w-4" />
                   </div>
                   <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
                     <Star className="h-3 w-3" />
@@ -231,6 +233,7 @@ export default function LeaderboardSection({
                         {user.verified && (
                           <BadgeCheck className="h-4 w-4 text-blue-500" />
                         )}
+                        <EarnedBadges user={user} className="h-4 w-4" />
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">

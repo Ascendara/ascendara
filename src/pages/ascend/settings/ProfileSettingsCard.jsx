@@ -17,6 +17,7 @@ import {
   Hammer,
   Megaphone,
 } from "lucide-react";
+import EarnedBadges from "@/components/EarnedBadges";
 
 export default function ProfileSettingsCard({
   t,
@@ -303,6 +304,7 @@ export default function ProfileSettingsCard({
                 {userData?.verified && (
                   <BadgeCheck className="mt-1 h-4 w-4 shrink-0 text-blue-500" />
                 )}
+                <EarnedBadges user={userData} className="mt-1 h-4 w-4" />
                 {userData?.adUser && (
                   <Megaphone className="mt-1 h-4 w-4 shrink-0 text-purple-500" />
                 )}

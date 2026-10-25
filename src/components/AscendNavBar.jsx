@@ -33,6 +33,7 @@ import { subscribeToUserStatus } from "@/services/firebase/firebaseService";
 import { setUserOnlineStatus } from "@/services/ascend/ascendStatusService";
 import { toast } from "sonner";
 import DiscordIcon from "@/pages/ascend/DiscordIcon";
+import EarnedBadges from "@/components/EarnedBadges";
 
 const DiscordOutlineIcon = props => <DiscordIcon {...props} outline />;
 
@@ -278,6 +279,7 @@ const AscendNavBar = ({
                   {userData?.verified && (
                     <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-blue-500" />
                   )}
+                  <EarnedBadges user={userData} className="h-3.5 w-3.5" />
                   {userData?.adUser && (
                     <Megaphone className="h-3.5 w-3.5 shrink-0 text-purple-500" />
                   )}

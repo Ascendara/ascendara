@@ -63,6 +63,7 @@ import {
   Trophy,
   Upload,
 } from "lucide-react";
+import EarnedBadges from "@/components/EarnedBadges";
 
 const VUS = ["online", "away", "busy", "invisible"];
 
@@ -1219,6 +1220,7 @@ const Profile = () => {
                   {UserData?.verified && (
                     <BadgeCheck className="h-5 w-5 shrink-0 text-blue-500" />
                   )}
+                  <EarnedBadges user={UserData} className="h-5 w-5" />
                 </>
               ) : (
                 <UsernameDialog />
