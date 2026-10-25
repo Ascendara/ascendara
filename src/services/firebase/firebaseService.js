@@ -3120,6 +3120,49 @@ export const listMyReports = async () => {
 };
 
 /**
+ * Send a review card background request. GET reads the current one, POST
+ * uploads a new one (waits for approval), DELETE removes it.
+ * @returns {Promise<{background: object|null, error: string|null, code?: string}>}
+ */
+const reviewCardRequest = async (method, body) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { background: null, error: "Not authenticated" };
+    }
+
+    const response = await userAuthenticatedFetch(user, `${API_URL}/ascend/review-card`, {
+      method,
+      body,
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        background: null,
+        error: data.error || "Review card request failed",
+        code: data.code,
+      };
+    }
+
+    return { background: data.background || null, error: null };
+  } catch (error) {
+    console.error("Review card request error:", error);
+    return { background: null, error: error.message };
+  }
+};
+
+export const getReviewCardBackground = () => reviewCardRequest("GET");
+
+export const uploadReviewCardBackground = file => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return reviewCardRequest("POST", formData);
+};
+
+export const deleteReviewCardBackground = () => reviewCardRequest("DELETE");
+
+/**
  * Get download URL for a backup
  * @param {string} backupId - The backup ID
  * @returns {Promise<{downloadUrl: string|null, backupName: string|null, gameName: string|null, error: string|null}>}

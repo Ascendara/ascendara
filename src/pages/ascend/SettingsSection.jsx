@@ -1,12 +1,13 @@
 import ProfileSettingsCard from "./settings/ProfileSettingsCard";
 import PrivacySettingsCard from "./settings/PrivacySettingsCard";
+import ReviewCardSettingsCard from "./settings/ReviewCardSettingsCard";
 import SubscriptionSettingsCard from "./settings/SubscriptionSettingsCard";
 import SubscriptionSuccessDialog from "./settings/SubscriptionSuccessDialog";
 import AccountActionsCard from "./settings/AccountActionsCard";
 import SectionHeader from "./SectionHeader";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { User, Crown, Shield, LogOut } from "lucide-react";
+import { User, Crown, Image as ImageIcon, Shield, LogOut } from "lucide-react";
 export default function SettingsSection({
   t,
   isEditingProfile,
@@ -57,8 +58,21 @@ export default function SettingsSection({
   deleteConfirmed,
   setDeleteHoldProgress,
 }) {
+  // Custom review card backgrounds are a paid perk
+  const canCustomizeReviewCard = Boolean(
+    ascendAccess?.isSubscribed || userData?.verified
+  );
   const sections = [
     { id: "profile", icon: User, label: t("ascend.settings.profile") },
+    ...(canCustomizeReviewCard
+      ? [
+          {
+            id: "reviewCard",
+            icon: ImageIcon,
+            label: t("ascend.settings.reviewCard.nav"),
+          },
+        ]
+      : []),
     { id: "subscription", icon: Crown, label: t("ascend.settings.subscription") },
     { id: "privacy", icon: Shield, label: t("ascend.settings.privacy") },
     { id: "account", icon: LogOut, label: t("account.actions") },
@@ -79,7 +93,7 @@ export default function SettingsSection({
     );
     Object.values(sectionRefs.current).forEach(node => node && observer.observe(node));
     return () => observer.disconnect();
-  }, []);
+  }, [canCustomizeReviewCard]);
 
   const scrollTo = id => {
     setActiveId(id);
@@ -159,6 +173,12 @@ export default function SettingsSection({
               userData={userData}
             />
           </section>
+
+          {canCustomizeReviewCard && (
+            <section {...sectionProps("reviewCard")}>
+              <ReviewCardSettingsCard t={t} user={user} userData={userData} />
+            </section>
+          )}
 
           <section {...sectionProps("subscription")}>
             <SubscriptionSettingsCard

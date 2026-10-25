@@ -84,6 +84,7 @@
     "firebase": "^12.9.0",
     "framer-motion": "^12.34.3",
     "fs-extra": "^11.3.3",
+    "gifenc": "1.0.3",
     "i18next": "^25.8.13",
     "jszip": "^3.10.1",
     "lucide-react": "^0.575.0",

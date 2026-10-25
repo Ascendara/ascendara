@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
-import { BadgeCheck, Crown, Hammer, HelpCircle, MessageSquare, Star } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import ReviewCard from "@/components/ReviewCard";
 import { useLanguage } from "@/context/LanguageContext";
 import { API_URL } from "@/config/api";
 
@@ -35,11 +30,10 @@ const isGuestReview = review => {
 };
 
 export default function GameReviews({ gameID, onRating, onReviewCount, sectionRef }) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const [reviews, setReviews] = useState([]);
   const [status, setStatus] = useState("loading");
   const [attempt, setAttempt] = useState(0);
-  const [activeGuestInfo, setActiveGuestInfo] = useState(null);
 
   useEffect(() => {
     if (!gameID) return;
@@ -144,134 +138,13 @@ export default function GameReviews({ gameID, onRating, onReviewCount, sectionRe
                 number: 1000 + (hash % 9000),
               })
             : name;
-          const photoURL = !isGuest && review.photoURL;
-          const badges = (!isGuest && review.badges) || {};
-          const date = review.createdAt ? new Date(review.createdAt) : null;
-          const formattedDate =
-            date && !Number.isNaN(date.getTime())
-              ? new Intl.DateTimeFormat(language, {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                }).format(date)
-              : null;
           return (
-            <article
+            <ReviewCard
               key={review.id || index}
-              className={`relative min-w-0 overflow-hidden rounded-lg p-5 ${
-                isGuest
-                  ? "border-none bg-background/50"
-                  : "border border-primary/30 bg-gradient-to-br from-primary/15 via-primary/5 to-background/50 shadow-[0_0_24px_-12px_rgb(var(--color-primary))]"
-              }`}
-            >
-              {!isGuest && (
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-primary/20 blur-2xl"
-                />
-              )}
-              <div className="relative mb-3 flex items-center gap-3">
-                <div
-                  aria-hidden="true"
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-semibold text-primary ${
-                    isGuest ? "" : "ring-2 ring-primary/60 ring-offset-2 ring-offset-card"
-                  }`}
-                >
-                  {photoURL ? (
-                    <>
-                      <img
-                        src={photoURL}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                        className="h-full w-full object-cover"
-                        onError={event => {
-                          event.currentTarget.style.display = "none";
-                          event.currentTarget.nextElementSibling?.classList.remove(
-                            "hidden"
-                          );
-                        }}
-                      />
-                      <span className="hidden">{username.slice(0, 1).toUpperCase()}</span>
-                    </>
-                  ) : (
-                    username.slice(0, 1).toUpperCase()
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="break-words text-sm font-semibold text-foreground">
-                      {username}
-                    </p>
-                    {badges.owner && (
-                      <Crown className="h-4 w-4 shrink-0 text-yellow-500" />
-                    )}
-                    {badges.contributor && (
-                      <Hammer className="h-4 w-4 shrink-0 text-orange-500" />
-                    )}
-                    {badges.verified && (
-                      <BadgeCheck className="h-4 w-4 shrink-0 text-blue-500" />
-                    )}
-                    {isGuest && (
-                      <TooltipProvider>
-                        <Tooltip
-                          open={activeGuestInfo === index}
-                          onOpenChange={open => setActiveGuestInfo(open ? index : null)}
-                        >
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              onClick={() => setActiveGuestInfo(index)}
-                              className="shrink-0 cursor-help text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              aria-label={t("download.reviews.guestInfoLabel")}
-                            >
-                              <HelpCircle className="h-3.5 w-3.5" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p className="text-secondary">
-                              {t("download.reviews.guestInfo")}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  </div>
-                  {Number(review.rating) >= 1 && Number(review.rating) <= 5 && (
-                    <div className="mt-1 flex items-center gap-2">
-                      <div
-                        className="flex gap-0.5"
-                        role="img"
-                        aria-label={t("download.reviews.stars", {
-                          rating: review.rating,
-                        })}
-                      >
-                        {[1, 2, 3, 4, 5].map(star => (
-                          <Star
-                            key={star}
-                            aria-hidden="true"
-                            className={`h-3.5 w-3.5 ${star <= Number(review.rating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/40"}`}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {t("download.reviews.rating", { rating: review.rating })}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <p className="relative whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
-                {review.comments}
-              </p>
-              {formattedDate && (
-                <time
-                  dateTime={date.toISOString()}
-                  className="relative mt-3 block text-xs text-muted-foreground"
-                >
-                  {formattedDate}
-                </time>
-              )}
-            </article>
+              review={review}
+              username={username}
+              isGuest={isGuest}
+            />
           );
         })}
       </div>
