@@ -8,12 +8,12 @@ let remoteIconPromise = null;
 
 export function loadRemoteIcon() {
   if (!remoteIconPromise) {
-    remoteIconPromise = new Promise(resolve => {
-      const img = new Image();
-      img.onload = () => resolve(REMOTE_ICON_URL);
-      img.onerror = () => resolve(null);
-      img.src = REMOTE_ICON_URL;
-    });
+    // Revalidate instead of trusting the API's max-age, otherwise a changed
+    // logo stays hidden behind the HTTP cache for hours
+    remoteIconPromise = fetch(REMOTE_ICON_URL, { cache: "no-cache" })
+      .then(response => (response.ok ? response.blob() : null))
+      .then(blob => (blob?.type.startsWith("image/") ? URL.createObjectURL(blob) : null))
+      .catch(() => null);
   }
   return remoteIconPromise;
 }
