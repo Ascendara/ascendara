@@ -16,6 +16,7 @@ import {
 import { validateInput } from "@/services/ascend/profanityFilterService";
 import { toast } from "sonner";
 import {
+  getReporterHeaders,
   searchUsers,
   sendFriendRequest,
   getIncomingRequests,
@@ -1709,6 +1710,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${authToken}`,
+          ...(await getReporterHeaders()),
         },
         body: JSON.stringify({
           reportType: "UserReport",
@@ -1736,6 +1738,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${newAuthToken}`,
+              ...(await getReporterHeaders()),
             },
             body: JSON.stringify({
               reportType: "UserReport",

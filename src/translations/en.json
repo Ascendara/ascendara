@@ -573,6 +573,33 @@
       "title": "Messages",
       "you": "You"
     },
+    "myReports": {
+      "empty": "No reports yet",
+      "emptyDescription": "Reports you send while signed in show up here, so you can see when they've been handled.",
+      "filters": {
+        "all": "All",
+        "fixed": "Handled",
+        "open": "Open"
+      },
+      "loadFailed": "Couldn't load your reports",
+      "noMatches": "No reports match this filter",
+      "refresh": "Refresh",
+      "response": "Response from the team",
+      "retry": "Try again",
+      "status": {
+        "fixed": "Handled",
+        "open": "Open"
+      },
+      "subtitle": "Track the issues and game reports you've sent and see which ones have been handled",
+      "title": "My Reports",
+      "trackingId": "Tracking ID",
+      "types": {
+        "AscendaraApp": "App issue",
+        "GameBrowsing": "Game report",
+        "GameDownload": "Download error",
+        "UserReport": "User report"
+      }
+    },
     "nav": {
       "adStats": "Ad Stats",
       "cloud": "Your Data",
@@ -589,6 +616,7 @@
       "notifications": "Notifications",
       "overview": "Overview",
       "premium": "Premium Features",
+      "reports": "My Reports",
       "requests": "Requests",
       "search": "Search",
       "settings": "Settings",
@@ -1813,13 +1841,6 @@
     }
   },
   "downloads": {
-    "stalled": {
-      "title": "No progress for {{minutes}} min",
-      "download": "No data has arrived from the download host. It may be throttling or the connection is stuck. Ascendara keeps retrying; you can also pause and resume the download, or choose another download source.",
-      "extraction": "Extraction is not moving. Check that the drive has free space and is not busy, and that antivirus is not holding the files.",
-      "toast": "{{game}} has stopped making progress",
-      "view": "View"
-    },
     "actionRequired": "Action Required",
     "actions": {
       "cancelAndDelete": "Cancel & Delete",
@@ -1858,6 +1879,7 @@
     "diskWrite": "Write",
     "downloadConflictError": "The download could not start (Conflict). Refresh the download link or choose another source. If this continues, check downloadmanager.log for the original error.",
     "downloadError": "Download Error",
+    "downloadSize": "{{size}} download",
     "downloading": "Downloading",
     "downloadsInProgress": "{{count}} download in progress",
     "error": "Error",
@@ -1899,6 +1921,7 @@
     "installComplete": "Installation Complete",
     "installCompleteDesc": "Your game is ready to play",
     "installCompleteFailed": "Could not finalize installation",
+    "installSize": "{{size}} install",
     "installerLaunchFailed": "Could not launch installer",
     "installerLaunched": "Installer launched",
     "installerLaunchedDesc": "Follow the on-screen steps to finish installing the game.",
@@ -1910,8 +1933,6 @@
     "largeFileNotice": "Writing a large file to disk... this may take a moment.",
     "lastExtracted": "Last extracted",
     "limitedTo": "Limited to",
-    "downloadSize": "{{size}} download",
-    "installSize": "{{size}} install",
     "logViewerTitle": "Download Manager Log",
     "manualInstallDescription": "Download complete. Run the installer as Administrator to finish installing the game.",
     "manualInstallTitle": "One Last Step",
@@ -1947,6 +1968,13 @@
     "setInstallLocationDescription": "In the installer, set the destination folder to the path below. This must match the game's existing folder so Ascendara can detect it.",
     "setInstallLocationTitle": "Set the Install Location",
     "speedHistory": "Download Speeds",
+    "stalled": {
+      "download": "No data has arrived from the download host. It may be throttling or the connection is stuck. Ascendara keeps retrying; you can also pause and resume the download, or choose another download source.",
+      "extraction": "Extraction is not moving. Check that the drive has free space and is not busy, and that antivirus is not holding the files.",
+      "title": "No progress for {{minutes}} min",
+      "toast": "{{game}} has stopped making progress",
+      "view": "View"
+    },
     "startingSoon": "Starting soon...",
     "stopped": "Download Stopped",
     "stoppedDescription": "The download has been stopped. Click Resume to continue from where it left off.",
@@ -4255,6 +4283,7 @@
       "skipManifestCheckDesc": "Skip checking if backing up the game is having issues. Only enable if you know what you're doing.",
       "title": "Game Backups"
     },
+    "gameInfoTranslated": "Game info like descriptions and genres is also shown in this language",
     "gaming": "Gaming",
     "general": "General",
     "getHelp": "Get Help",
@@ -4282,7 +4311,6 @@
     "joinDiscord": "Join the Discord server",
     "keyboardLayout": "Keyboard Layout",
     "keyboardLayoutDescription": "Choose the keyboard layout for the virtual keyboard in Big Picture mode",
-    "gameInfoTranslated": "Game info like descriptions and genres is also shown in this language",
     "languageSetNote": "NOTE: This will not change game names or tags. Languages with a check also show game info like descriptions and genres in that language",
     "languageSettings": "Language Settings",
     "languageSettingsDescription": "Choose your preferred language for the UI",

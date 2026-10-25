@@ -66,6 +66,7 @@ import { cn } from "@/lib/utils";
 import { privateSourceMessage } from "@/lib/privateSourceMessages";
 import SpeedGraph, { formatSpeed, markDownloadStart } from "@/components/SpeedGraph";
 import { API_URL } from "@/config/api";
+import { getReporterHeaders } from "@/services/firebase/firebaseService";
 import { useDownloadStall } from "@/hooks/useDownloadStall";
 
 // Helper function to check if download speed is above 50 MB/s
@@ -1615,6 +1616,7 @@ const DownloadCard = ({
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          ...(await getReporterHeaders()),
         },
         body: JSON.stringify({
           reportType: "GameDownload",

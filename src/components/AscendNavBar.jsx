@@ -8,6 +8,7 @@ import {
   Settings,
   Smartphone,
   Bell,
+  Flag,
   Clock,
   BadgeCheck,
   Crown,
@@ -121,6 +122,7 @@ const AscendNavBar = ({
   const menuItems = [
     { id: "premium", icon: Crown, label: t("ascend.nav.premium") },
     { id: "notifications", icon: Bell, label: t("ascend.nav.notifications") },
+    { id: "reports", icon: Flag, label: t("ascend.nav.reports") },
     { id: "settings", icon: Settings, label: t("ascend.nav.settings") },
   ];
 

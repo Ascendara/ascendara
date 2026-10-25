@@ -3078,6 +3078,48 @@ export const listBackups = async (gameName = null) => {
 };
 
 /**
+ * Header that links a report to the signed-in member so they can track it in Ascend
+ * @returns {Promise<object>} Empty when signed out or the token can't be read
+ */
+export const getReporterHeaders = async () => {
+  const user = auth?.currentUser;
+  if (!user) return {};
+  try {
+    return { "X-Ascend-Token": await user.getIdToken() };
+  } catch (error) {
+    console.warn("Could not attach Ascend account to report:", error);
+    return {};
+  }
+};
+
+/**
+ * List the reports the current user sent while signed in, newest first
+ * @returns {Promise<{reports: array, error: string|null}>}
+ */
+export const listMyReports = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { reports: [], error: "Not authenticated" };
+    }
+
+    const response = await userAuthenticatedFetch(user, `${API_URL}/ascend/reports`, {
+      method: "GET",
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return { reports: [], error: data.error || "Failed to load reports" };
+    }
+
+    return { reports: data.reports || [], error: null };
+  } catch (error) {
+    console.error("List reports error:", error);
+    return { reports: [], error: error.message };
+  }
+};
+
+/**
  * Get download URL for a backup
  * @param {string} backupId - The backup ID
  * @returns {Promise<{downloadUrl: string|null, backupName: string|null, gameName: string|null, error: string|null}>}

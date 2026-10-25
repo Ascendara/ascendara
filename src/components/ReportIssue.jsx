@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { API_URL } from "@/config/api";
+import { getReporterHeaders } from "@/services/firebase/firebaseService";
 
 // The value is what shows up as the report's category on the Discord side
 const ISSUE_CATEGORIES = [
@@ -78,6 +79,7 @@ const ReportIssue = ({ isOpen, onClose }) => {
             "Content-Type": "application/json",
             // Get a fresh token for each request to ensure timestamp validity
             Authorization: `Bearer ${await getToken()}`,
+            ...(await getReporterHeaders()),
           },
           body,
         });
@@ -178,10 +180,19 @@ const ReportIssue = ({ isOpen, onClose }) => {
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" className="text-primary" onClick={onClose}>
+            <Button
+              type="button"
+              variant="outline"
+              className="text-primary"
+              onClick={onClose}
+            >
               {t("common.reportDialog.cancel")}
             </Button>
-            <Button type="submit" className="text-secondary" disabled={isLoading || !canSubmit}>
+            <Button
+              type="submit"
+              className="text-secondary"
+              disabled={isLoading || !canSubmit}
+            >
               {isLoading ? (
                 <>
                   <Loader className="mr-2 h-4 w-4 animate-spin" />

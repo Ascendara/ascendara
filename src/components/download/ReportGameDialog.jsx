@@ -25,6 +25,7 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { API_URL } from "@/config/api";
+import { getReporterHeaders } from "@/services/firebase/firebaseService";
 
 const FILE_ISSUE_REPORT_PATTERN =
   /\b(?:missing|corrupt(?:ed|ion)?|incomplete|damaged)\b.{0,30}\b(?:files?|downloads?|archives?|installations?)\b|\b(?:files?|downloads?|archives?|installations?)\b.{0,30}\b(?:missing|corrupt(?:ed|ion)?|incomplete|damaged)\b/i;
@@ -121,9 +122,7 @@ export default function ReportGameDialog({
     setIsReporting(true);
     try {
       // Use v2 endpoint with gameID if using local index
-      const endpoint = useV2
-        ? `${API_URL}/app/v2/report`
-        : `${API_URL}/app/report`;
+      const endpoint = useV2 ? `${API_URL}/app/v2/report` : `${API_URL}/app/report`;
 
       const body = JSON.stringify({
         reportType: "GameBrowsing",
@@ -138,6 +137,7 @@ export default function ReportGameDialog({
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${await fetchAuthToken()}`,
+            ...(await getReporterHeaders()),
           },
           body,
         });
@@ -206,7 +206,9 @@ export default function ReportGameDialog({
                     <div
                       className={cn(
                         "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
-                        selected ? "bg-primary text-secondary" : "bg-accent/30 text-foreground"
+                        selected
+                          ? "bg-primary text-secondary"
+                          : "bg-accent/30 text-foreground"
                       )}
                     >
                       <Icon className="h-4 w-4" />
