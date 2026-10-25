@@ -4500,6 +4500,17 @@ function Settings() {
                             >
                               Show Test Notification
                             </Button>
+                            <Button
+                              className="w-full"
+                              variant="outline"
+                              onClick={() =>
+                                window.dispatchEvent(
+                                  new CustomEvent("ascendara:dev-emulate-checkout")
+                                )
+                              }
+                            >
+                              Emulate Checkout Success
+                            </Button>
                           </>
                         )}
                       </div>
@@ -5763,14 +5774,11 @@ function Settings() {
 
                 try {
                   // Step 1: Validate the support code
-                  const validateResponse = await fetch(
-                    `${API_URL}/support/validate`,
-                    {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ code }),
-                    }
-                  );
+                  const validateResponse = await fetch(`${API_URL}/support/validate`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ code }),
+                  });
 
                   const validateData = await validateResponse.json();
 
@@ -5789,12 +5797,9 @@ function Settings() {
 
                   // Step 2: Get app token
                   const authHeaders = await window.electron.getAuthHeaders();
-                  const tokenResponse = await fetch(
-                    `${API_URL}/auth/token`,
-                    {
-                      headers: authHeaders,
-                    }
-                  );
+                  const tokenResponse = await fetch(`${API_URL}/auth/token`, {
+                    headers: authHeaders,
+                  });
 
                   if (!tokenResponse.ok) {
                     throw new Error("Failed to obtain token");

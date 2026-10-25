@@ -1209,6 +1209,58 @@
     },
     "welcome": "Welcome back, {{name}}!"
   },
+  "ascendTour": {
+    "account": {
+      "content": "Open this menu to set your status, customize your profile and review card, check your notifications and follow any reports you've sent.",
+      "title": "Make It Yours"
+    },
+    "cloudBackups": {
+      "content": "Back up your game saves, including your Retro library's memory cards, and restore them on any device. Never lose your progress again.",
+      "title": "Save Backups"
+    },
+    "cloudLibrary": {
+      "content": "Sync your library to the cloud. Your games, playtime and achievements follow you to any PC you sign in on.",
+      "title": "Cloud Library"
+    },
+    "community": {
+      "content": "Add friends, see who's online and what they're playing, find other players and climb the public leaderboard.",
+      "title": "Friends & Community"
+    },
+    "companion": {
+      "content": "Pair your phone to follow downloads live, pause or resume them, launch games on your PC and browse the index, all from your phone's browser.",
+      "title": "Ascendara Companion"
+    },
+    "discord": {
+      "content": "Verify your account on the Ascendara Discord to get the verified role and access channels only Ascend members can see.",
+      "title": "Discord Perks"
+    },
+    "everywhere": {
+      "content": "Ascend isn't just this page. These are now switched on throughout the app, and you can find them all anytime under Premium Features.",
+      "title": "Unlocked Across Ascendara"
+    },
+    "final": {
+      "content": "New features are added to Ascend all the time, and your subscription helps fund every one of them. Thank you for supporting Ascendara.",
+      "title": "You're All Set"
+    },
+    "finish": "Start exploring",
+    "messages": {
+      "content": "Message your friends without leaving Ascendara. Share recommendations and plan your next session together.",
+      "title": "Real-time Chat"
+    },
+    "overview": {
+      "content": "Your Ascend home base. See your friends, your synced library and your account at a glance.",
+      "title": "Overview"
+    },
+    "start": "Show me around",
+    "upcoming": {
+      "content": "Get an early look at what's coming in the next Ascendara update before anyone else.",
+      "title": "Update Preview"
+    },
+    "welcome": {
+      "content": "Thank you for supporting Ascendara! Your subscription is active and every feature is unlocked. Let's take a minute to show you what you can do now.",
+      "title": "Welcome to Ascend"
+    }
+  },
   "bigPicture": {
     "activeDownloads": "Active Downloads",
     "addedToPlayLater": "Added to Play Later",

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { userAuthenticatedFetch } from "@/utils/authHelper";
@@ -9,6 +10,7 @@ import { API_URL } from "@/config/api";
 export default function CheckoutReturnHandler() {
   const { user } = useAuth();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const sessionId = sessions[0];
 
@@ -16,23 +18,52 @@ export default function CheckoutReturnHandler() {
     let disposed = false;
     const enqueue = id => {
       if (!disposed && typeof id === "string" && /^cs_[A-Za-z0-9_]{1,255}$/.test(id)) {
-        setSessions(current => current.includes(id) ? current : [...current, id]);
+        setSessions(current => (current.includes(id) ? current : [...current, id]));
       }
     };
     // Subscribe before reading the queue so startup callbacks cannot be lost.
-    const unsubscribe = window.electron?.onCheckoutSuccess?.(data => enqueue(data?.sessionId));
+    const unsubscribe = window.electron?.onCheckoutSuccess?.(data =>
+      enqueue(data?.sessionId)
+    );
     const unsubscribeCanceled = window.electron?.onCheckoutCanceled?.(() => {
       toast.info(t("ascend.settings.checkoutCanceled"));
     });
-    window.electron?.getPendingCheckouts?.().then(ids => ids.forEach(enqueue)).catch(error => {
-      console.error("Unable to read pending checkouts:", error);
-    });
+    window.electron
+      ?.getPendingCheckouts?.()
+      .then(ids => ids.forEach(enqueue))
+      .catch(error => {
+        console.error("Unable to read pending checkouts:", error);
+      });
     return () => {
       disposed = true;
       unsubscribe?.();
       unsubscribeCanceled?.();
     };
   }, [t]);
+
+  // Dev-only: replays the post-verification UI without a real Stripe session.
+  useEffect(() => {
+    let timer;
+    const onEmulate = async () => {
+      if (!(await window.electron?.isDev?.())) return;
+      const toastId = "checkout-dev-emulated";
+      toast.loading(
+        t("ascend.settings.verifyingPayment", "Verifying your payment, please wait..."),
+        { id: toastId }
+      );
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("ascendara:checkout-verified"));
+        toast.success(t("ascend.settings.subscriptionSuccessMessage"), { id: toastId });
+        navigate("/ascend", { state: { ascendWelcome: true } });
+      }, 1500);
+    };
+    window.addEventListener("ascendara:dev-emulate-checkout", onEmulate);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("ascendara:dev-emulate-checkout", onEmulate);
+    };
+  }, [t, navigate]);
 
   useEffect(() => {
     if (!sessionId || !user?.uid || typeof user.getIdToken !== "function") return;
@@ -42,20 +73,26 @@ export default function CheckoutReturnHandler() {
     let controller;
     let toastSettled = false;
     const toastId = `checkout-${sessionId}`;
-    toast.loading(t("ascend.settings.verifyingPayment", "Verifying your payment, please wait..."), { id: toastId });
+    toast.loading(
+      t("ascend.settings.verifyingPayment", "Verifying your payment, please wait..."),
+      { id: toastId }
+    );
 
     const verify = async attempt => {
       controller = new AbortController();
       requestTimer = setTimeout(() => controller.abort(), 15000);
       let retryable = true;
       try {
-        const response = await userAuthenticatedFetch(user,
-          `${API_URL}/stripe/verify-checkout`, {
+        const response = await userAuthenticatedFetch(
+          user,
+          `${API_URL}/stripe/verify-checkout`,
+          {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sessionId, userId: user.uid }),
             signal: controller.signal,
-          });
+          }
+        );
         if (disposed) return;
         retryable = response.ok || response.status === 429 || response.status >= 500;
         const data = await response.json();
@@ -65,6 +102,8 @@ export default function CheckoutReturnHandler() {
           window.dispatchEvent(new CustomEvent("ascendara:checkout-verified"));
           toast.success(t("ascend.settings.subscriptionSuccessMessage"), { id: toastId });
           toastSettled = true;
+          // The welcome tour lives on the Ascend page, wherever checkout returned to
+          navigate("/ascend", { state: { ascendWelcome: true } });
           window.electron?.acknowledgeCheckout?.(sessionId).catch(console.error);
           setSessions(current => current.filter(id => id !== sessionId));
           return;
@@ -76,11 +115,18 @@ export default function CheckoutReturnHandler() {
       }
       if (disposed) return;
       if (retryable && attempt < 5) {
-        retryTimer = setTimeout(() => verify(attempt + 1), Math.min(2000 * 2 ** attempt, 10000));
+        retryTimer = setTimeout(
+          () => verify(attempt + 1),
+          Math.min(2000 * 2 ** attempt, 10000)
+        );
       } else {
-        toast.error(t("ascend.settings.verifyCheckoutRetryFailed",
-          "Unable to verify your payment. Please reopen the checkout return link to retry, or contact support if you were charged."),
-        { id: toastId, duration: 10000 });
+        toast.error(
+          t(
+            "ascend.settings.verifyCheckoutRetryFailed",
+            "Unable to verify your payment. Please reopen the checkout return link to retry, or contact support if you were charged."
+          ),
+          { id: toastId, duration: 10000 }
+        );
         toastSettled = true;
         // Leave the main-process queue intact so a renderer reload can retry.
         setSessions(current => current.filter(id => id !== sessionId));
@@ -94,7 +140,7 @@ export default function CheckoutReturnHandler() {
       controller?.abort();
       if (!toastSettled) toast.dismiss(toastId);
     };
-  }, [sessionId, user, t]);
+  }, [sessionId, user, t, navigate]);
 
   return null;
 }

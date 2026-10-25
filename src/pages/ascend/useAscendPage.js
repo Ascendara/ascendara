@@ -152,7 +152,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const ascendAccess = applyAscendEntitlements(checkedAccess, userData);
   const accessRequestRef = useRef(0);
   const [verifyingAccess, setVerifyingAccess] = useState(true);
-  const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
+  const [showWelcomeTour, setShowWelcomeTour] = useState(false);
   // Subscription tier info from API (more reliable than Firestore data)
   const [subscriptionTierInfo, setSubscriptionTierInfo] = useState(null);
 
@@ -2090,13 +2090,18 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
 
   // The app-wide handler verifies checkout even when this page is unmounted.
   useEffect(() => {
-    const onVerified = () => {
-      setShowSubscriptionSuccess(true);
-      verifyAccess();
-    };
+    const onVerified = () => verifyAccess();
     window.addEventListener("ascendara:checkout-verified", onVerified);
     return () => window.removeEventListener("ascendara:checkout-verified", onVerified);
   }, [user?.uid]);
+
+  // A verified checkout routes here with this flag to start the welcome tour.
+  // Clearing it keeps a back/forward navigation from replaying the tour.
+  useEffect(() => {
+    if (!location.state?.ascendWelcome) return;
+    setShowWelcomeTour(true);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.state?.ascendWelcome]);
 
   // Check email verification every 5 seconds
   useEffect(() => {
@@ -2842,8 +2847,8 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     setDevSubscriptionState,
     handleViewInvoices,
     handleManageSubscription,
-    showSubscriptionSuccess,
-    setShowSubscriptionSuccess,
+    showWelcomeTour,
+    setShowWelcomeTour,
     showDeleteDialog,
     setShowDeleteDialog,
     showDepartureDialog,

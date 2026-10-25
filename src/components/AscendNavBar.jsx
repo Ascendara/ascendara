@@ -169,6 +169,7 @@ const AscendNavBar = ({
                 {index === 4 && <div className="mx-1.5 h-5 w-px bg-border/50" />}
                 <button
                   onClick={() => onSectionChange(item.id)}
+                  data-tour={`ascend-${item.id}`}
                   aria-label={item.label}
                   aria-current={isActive ? "page" : undefined}
                   title={item.label}
@@ -229,6 +230,7 @@ const AscendNavBar = ({
 
           <button
             onClick={() => onSectionChange("upcoming")}
+            data-tour="ascend-upcoming"
             aria-label={t("ascend.nav.upcoming")}
             title={t("ascend.nav.upcoming")}
             className={`flex h-9 w-9 items-center justify-center rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
@@ -242,7 +244,10 @@ const AscendNavBar = ({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1.5 rounded-xl p-1 pr-2 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-primary">
+              <button
+                data-tour="ascend-account"
+                className="flex items-center gap-1.5 rounded-xl p-1 pr-2 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-primary"
+              >
                 <span className="relative shrink-0">
                   <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-primary/70">
                     {user?.photoURL ? (

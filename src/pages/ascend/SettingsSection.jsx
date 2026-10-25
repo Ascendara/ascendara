@@ -2,7 +2,6 @@ import ProfileSettingsCard from "./settings/ProfileSettingsCard";
 import PrivacySettingsCard from "./settings/PrivacySettingsCard";
 import ReviewCardSettingsCard from "./settings/ReviewCardSettingsCard";
 import SubscriptionSettingsCard from "./settings/SubscriptionSettingsCard";
-import SubscriptionSuccessDialog from "./settings/SubscriptionSuccessDialog";
 import AccountActionsCard from "./settings/AccountActionsCard";
 import SectionHeader from "./SectionHeader";
 import { useEffect, useRef, useState } from "react";
@@ -41,8 +40,6 @@ export default function SettingsSection({
   handleManageSubscription,
   deletedAccountWarning,
   handleSubscribe,
-  showSubscriptionSuccess,
-  setShowSubscriptionSuccess,
   handleLogout,
   showDeleteDialog,
   setShowDeleteDialog,
@@ -198,13 +195,6 @@ export default function SettingsSection({
           <section {...sectionProps("privacy")}>
             <PrivacySettingsCard t={t} userData={userData} updateData={updateData} />
           </section>
-
-          {/* Subscription Success Dialog */}
-          <SubscriptionSuccessDialog
-            showSubscriptionSuccess={showSubscriptionSuccess}
-            setShowSubscriptionSuccess={setShowSubscriptionSuccess}
-            t={t}
-          />
 
           <section {...sectionProps("account")}>
             <AccountActionsCard

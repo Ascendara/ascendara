@@ -22,6 +22,7 @@ import { lazy, Suspense } from "react";
 import useAscendPage from "./ascend/useAscendPage";
 import SectionLoading from "./ascend/SectionLoading";
 import CommunityTabs, { COMMUNITY_SECTIONS } from "./ascend/CommunityTabs";
+import AscendWelcomeTour from "./ascend/AscendWelcomeTour";
 const HomeSection = lazy(() => import("./ascend/HomeSection"));
 const SearchSection = lazy(() => import("./ascend/SearchSection"));
 const FriendsSection = lazy(() => import("./ascend/FriendsSection"));
@@ -138,8 +139,8 @@ const Ascend = () => {
     setDevSubscriptionState,
     handleViewInvoices,
     handleManageSubscription,
-    showSubscriptionSuccess,
-    setShowSubscriptionSuccess,
+    showWelcomeTour,
+    setShowWelcomeTour,
     showDeleteDialog,
     setShowDeleteDialog,
     showDepartureDialog,
@@ -768,8 +769,6 @@ const Ascend = () => {
               handleManageSubscription={handleManageSubscription}
               deletedAccountWarning={deletedAccountWarning}
               handleSubscribe={handleSubscribe}
-              showSubscriptionSuccess={showSubscriptionSuccess}
-              setShowSubscriptionSuccess={setShowSubscriptionSuccess}
               handleLogout={handleLogout}
               showDeleteDialog={showDeleteDialog}
               setShowDeleteDialog={setShowDeleteDialog}
@@ -953,6 +952,14 @@ const Ascend = () => {
           onPlanSelection={handlePlanSelection}
           t={t}
         />
+
+        {showWelcomeTour && (
+          <AscendWelcomeTour
+            t={t}
+            setActiveSection={setActiveSection}
+            onClose={() => setShowWelcomeTour(false)}
+          />
+        )}
       </>
     );
   }

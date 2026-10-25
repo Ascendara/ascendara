@@ -182,11 +182,14 @@ function SoundMeter({ level, playing }) {
   );
 }
 
-function Tour({ onClose }) {
+// Custom `steps` reuse the same spotlight engine for other walkthroughs; each
+// step's `onEnter` runs when it becomes active, `extra` renders below the copy and
+// `nextLabel` overrides the primary button text. `sound` toggles the music build-up.
+function Tour({ onClose, steps: customSteps, onFinish, sound = true }) {
   const { setTourActive } = useTour();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const steps = useMemo(() => getSteps(t), [t]);
+  const steps = useMemo(() => customSteps || getSteps(t), [customSteps, t]);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [direction, setDirection] = useState(1);
@@ -212,7 +215,8 @@ function Tour({ onClose }) {
 
   // Sound build-up over the last 4 steps: three looping layers, then the drop
   const soundStepIndex = steps.length - 4;
-  const soundLevel = currentStep >= soundStepIndex ? currentStep - soundStepIndex + 1 : 0;
+  const soundLevel =
+    sound && currentStep >= soundStepIndex ? currentStep - soundStepIndex + 1 : 0;
 
   const soundMessage = [
     t("tour.sound.almostThere"),
@@ -235,10 +239,10 @@ function Tour({ onClose }) {
       soundService.stop();
       return;
     }
-    const sound = `ascend${soundLevel}`;
+    const layer = `ascend${soundLevel}`;
     // The final step plays the drop once; earlier layers loop
     const loop = soundLevel < 4;
-    soundService.crossfadeTo(sound, loop ? 0.25 : 0.4, loop);
+    soundService.crossfadeTo(layer, loop ? 0.25 : 0.4, loop);
   }, [soundLevel, isMuted]);
 
   const toggleMute = () => {
@@ -296,6 +300,10 @@ function Tour({ onClose }) {
     if (step.navigateTo) navigate(step.navigateTo);
   }, [step.navigateTo, navigate]);
 
+  useEffect(() => {
+    step.onEnter?.();
+  }, [step]);
+
   // Gently pulses the nav bar size to show it can be resized, then restores it
   useEffect(() => {
     if (!step.showResizeHint) return;
@@ -339,8 +347,9 @@ function Tour({ onClose }) {
     }
     finishedRef.current = true;
     onClose();
-    setTimeout(() => navigate("/"), 100);
-  }, [currentStep, steps.length, onClose, navigate]);
+    if (onFinish) onFinish();
+    else setTimeout(() => navigate("/"), 100);
+  }, [currentStep, steps.length, onClose, onFinish, navigate]);
 
   const prevStep = useCallback(() => {
     if (currentStep === 0) return;
@@ -435,7 +444,7 @@ function Tour({ onClose }) {
 
         {/* Liftoff rings behind the final card when the drop hits */}
         <AnimatePresence>
-          {isLastStep && !isMuted && (
+          {isLastStep && sound && !isMuted && (
             <motion.div
               key="liftoff"
               className="pointer-events-none absolute z-[202]"
@@ -535,6 +544,7 @@ function Tour({ onClose }) {
                   className={`pointer-events-auto text-sm leading-relaxed text-muted-foreground ${isHero ? "text-center" : ""}`}
                   html={step.content}
                 />
+                {step.extra}
               </motion.div>
             </AnimatePresence>
 
@@ -603,11 +613,12 @@ function Tour({ onClose }) {
                   whileTap={{ scale: 0.97 }}
                   className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-secondary shadow-sm transition-colors hover:bg-primary/90"
                 >
-                  {currentStep === 0
-                    ? t("tour.start")
-                    : isLastStep
-                      ? t("tour.letsGo")
-                      : t("tour.next")}
+                  {step.nextLabel ||
+                    (currentStep === 0
+                      ? t("tour.start")
+                      : isLastStep
+                        ? t("tour.letsGo")
+                        : t("tour.next"))}
                   {isLastStep ? (
                     <Rocket className="h-4 w-4" />
                   ) : (
