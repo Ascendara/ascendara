@@ -4,7 +4,7 @@ import { applyAscendEntitlements } from "@/utils/ascendAccess";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { getUserAuthHeaders, userAuthenticatedFetch } from "@/utils/authHelper";
 import { retroBackupPlatform } from "@/services/library/retroService";
 import { restoreCloudSave } from "@/services/cloud/restoreCloudSave";
@@ -61,6 +61,7 @@ import { API_URL } from "@/config/api";
 
 export default function useAscendPage({ cloudOnly = false } = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { settings } = useSettings();
   const { t } = useTranslation();
   const {
@@ -90,7 +91,9 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [startFreeTrial, setStartFreeTrial] = useState(false);
   const [showDisplayNamePrompt, setShowDisplayNamePrompt] = useState(false);
   const [googleDisplayName, setGoogleDisplayName] = useState("");
-  const [activeSection, setActiveSection] = useState("home");
+  const [activeSection, setActiveSection] = useState(
+    () => location.state?.section || "home"
+  );
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [accountExistsError, setAccountExistsError] = useState(null); // { email: string | null }
   const [deletedAccountWarning, setDeletedAccountWarning] = useState(false);

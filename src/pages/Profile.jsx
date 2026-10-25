@@ -12,14 +12,23 @@ import {
   getLevelConstants,
 } from "@/services/ascend/levelCalculationService";
 
+import { useNavigate as UseNavigate } from "react-router-dom";
+import { toast } from "sonner";
+
 import UsernameDialog from "@/components/UsernameDialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { EmptyState, Panel, StatStrip } from "@/pages/ascend/primitives";
 
 import { cn as Cn } from "@/lib/utils";
 import {
@@ -30,21 +39,53 @@ import {
 } from "@/services/firebase/firebaseService";
 import {
   Archive,
+  BadgeCheck,
+  CalendarDays,
+  Camera,
+  Check,
+  ChevronDown,
   Clock,
   Cpu,
+  Crown,
   FileDown,
   Gamepad2,
-  HardDrive,
+  Hammer,
+  Lock,
+  LogIn,
   Monitor,
   Music2,
+  NotebookPen,
+  Pencil,
   Smile,
   Sparkles,
+  Star,
   Trash2,
   Trophy,
   Upload,
 } from "lucide-react";
 
 const VUS = ["online", "away", "busy", "invisible"];
+
+const StatusOptions = [
+  { id: "online", dot: "bg-green-500" },
+  { id: "away", dot: "bg-yellow-500" },
+  { id: "busy", dot: "bg-red-500" },
+  { id: "invisible", dot: "bg-gray-400" },
+];
+
+const AvatarModes = ["emoji", "image", "ascend"];
+
+const MaxProfileImageBytes = 8 * 1024 * 1024;
+
+const PanelHeader = ({ icon: Icon, title, meta }) => (
+  <div className="flex items-center justify-between gap-3 border-b border-border/50 px-5 py-4">
+    <h2 className="mb-0 flex items-center gap-2 font-semibold">
+      <Icon className="h-4 w-4 text-primary" />
+      {title}
+    </h2>
+    {meta != null && <span className="text-sm text-muted-foreground">{meta}</span>}
+  </div>
+);
 
 const { XP_RULES: XpRules } = getLevelConstants();
 
@@ -131,7 +172,8 @@ const LinuxSystem = () => {
 
 const Profile = () => {
   const { t: T } = UseLanguage();
-  const { user: User } = UseAuth();
+  const { user: User, userData: UserData } = UseAuth();
+  const Navigate = UseNavigate();
 
   const [JoinDate, SetJoinDate] = UseState("");
   const [GeneralUsername, SetGeneralUsername] = UseState("");
@@ -140,9 +182,8 @@ const Profile = () => {
 
     return UserPrefs.privateNotes || UserPrefs.bio || "";
   });
-  const [IsTypingNotes, SetIsTypingNotes] = UseState(false);
-  const TypingNotesTTTPtr = UseRef(null);
   const LastSyncedProfileStatsPtr = UseRef(null);
+  const FileInputPtr = UseRef(null);
 
   const [DeviceInfo, SetDeviceInfo] = UseState({
     platform: "Unknown",
@@ -156,6 +197,12 @@ const Profile = () => {
     return localStorage.getItem("selectedEmoji") || "😊";
   });
   const [ProfileImage, SetProfileImage] = UseState(null);
+  // null means "pick for me": the Ascend photo when signed in, otherwise the emoji.
+  const [AvatarMode, SetAvatarMode] = UseState(() => {
+    const SavedMode = localStorage.getItem("avatarMode");
+    if (AvatarModes.includes(SavedMode)) return SavedMode;
+    return localStorage.getItem("useEmoji") === "false" ? "image" : null;
+  });
   const [Games, SetGames] = UseState([]);
   const [AchievementsLeaderboard, SetAchievementsLeaderboard] = UseState([]);
   const [IsLoadingAchievementsLeaderboard, SetIsLoadingAchievementsLeaderboard] =
@@ -263,21 +310,11 @@ const Profile = () => {
     },
   ];
   const EmojiTabIcons = {
-    gaming: (
-      <Gamepad2 className="h-4 w-4 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
-    ),
-    faces: (
-      <Smile className="h-4 w-4 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
-    ),
-    tech: (
-      <Cpu className="h-4 w-4 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
-    ),
-    space: (
-      <Sparkles className="h-4 w-4 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
-    ),
-    audio: (
-      <Music2 className="h-4 w-4 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
-    ),
+    gaming: Gamepad2,
+    faces: Smile,
+    tech: Cpu,
+    space: Sparkles,
+    audio: Music2,
   };
   const [GameImages, SetGameImages] = UseState({});
   const [DownloadHistory, SetDownloadHistory] = UseState([]);
@@ -295,9 +332,35 @@ const Profile = () => {
     return Platform.includes("linux") || OS.includes("linux");
   }, [DeviceInfo.os, DeviceInfo.platform]);
 
+  const IsAscendUser = !!User?.uid;
+  const AscendPhoto = User?.photoURL || UserData?.photoURL || null;
+
+  const AvatarSource = UseMemo(() => {
+    if (!IsAscendUser || AvatarMode === "emoji") return "emoji";
+    if (AvatarMode === "image" && ProfileImage) return "image";
+    if (AscendPhoto) return "ascend";
+    return "emoji";
+  }, [IsAscendUser, AvatarMode, ProfileImage, AscendPhoto]);
+
+  const AvatarSrc =
+    AvatarSource === "image"
+      ? ProfileImage
+      : AvatarSource === "ascend"
+        ? AscendPhoto
+        : null;
+
+  const DisplayName =
+    (IsAscendUser && (UserData?.displayName || User?.displayName)) ||
+    GeneralUsername ||
+    "Guest";
+
   UseEffect(() => {
     localStorage.setItem("selectedEmoji", SelectedEmoji);
   }, [SelectedEmoji]);
+
+  UseEffect(() => {
+    if (AvatarMode) localStorage.setItem("avatarMode", AvatarMode);
+  }, [AvatarMode]);
 
   UseEffect(() => {
     let DidCancel = false;
@@ -443,10 +506,6 @@ const Profile = () => {
       nextLevelXp: LevelProgress.nextLevelXp,
       allGames: AllGames,
     };
-  };
-
-  const GetDisplayUsername = () => {
-    return GeneralUsername || "Guest";
   };
 
   UseEffect(() => {
@@ -879,343 +938,360 @@ const Profile = () => {
 
   const HandleImageUpload = async Event => {
     const File = Event.target.files[0];
-    if (File) {
-      try {
-        const Reader = new FileReader();
-        Reader.onload = async Event => {
-          const Base64 = Event.target.result;
-          const Result = await window.electron.uploadProfileImage(Base64);
-          if (Result.success) {
-            SetProfileImage(Base64);
+    Event.target.value = "";
+
+    if (!File || !IsAscendUser) return;
+
+    if (File.size > MaxProfileImageBytes) {
+      toast.error(T("profile.avatar.tooLarge"));
+      return;
+    }
+
+    try {
+      const Reader = new FileReader();
+      Reader.onload = async LoadEvent => {
+        const Base64 = LoadEvent.target.result;
+        const Result = await window.electron.uploadProfileImage(Base64);
+        if (Result.success) {
+          SetProfileImage(Base64);
+          SetAvatarMode("image");
+          try {
             localStorage.setItem("profileImage", Base64);
-            localStorage.setItem("useEmoji", "false");
+          } catch {
+            // Too big to cache; it gets read back from disk next time.
           }
-        };
-        Reader.readAsDataURL(File);
-      } catch (error) {
-        console.error(`[Profile] profile image upload failed`, error);
-      }
+        }
+      };
+      Reader.readAsDataURL(File);
+    } catch (error) {
+      console.error(`[Profile] profile image upload failed`, error);
     }
   };
 
   const SwitchToEmoji = Emoji => {
     SetSelectedEmoji(Emoji);
-    SetProfileImage(null);
-    localStorage.removeItem("profileImage");
-    localStorage.setItem("useEmoji", "true");
+    SetAvatarMode("emoji");
   };
 
   const LoadProfileImage = async () => {
     try {
-      const UseEmoji = localStorage.getItem("useEmoji") !== "false";
-      if (UseEmoji) {
-        SetProfileImage(null);
-        return;
-      }
-
       const SavedImage = localStorage.getItem("profileImage");
       if (SavedImage) {
         SetProfileImage(SavedImage);
-      } else {
-        const Image = await window.electron.getProfileImage();
-        if (Image) {
-          const Base64 = `data:image/png;base64,${Image}`;
-          SetProfileImage(Base64);
-          localStorage.setItem("profileImage", Base64);
-        }
+        return;
+      }
+
+      const Image = await window.electron.getProfileImage();
+      if (Image) {
+        SetProfileImage(`data:image/png;base64,${Image}`);
       }
     } catch (error) {
       console.error(`[Profile] profile image load failed`, error);
     }
   };
 
-  const RenderProfileSection = () => {
-    const IsUsingEmoji = !ProfileImage;
+  const OpenAscend = Section => {
+    Navigate("/ascend", Section ? { state: { section: Section } } : undefined);
+  };
 
-    return (
-      <div className="relative">
-        <div className="text-Left flex items-center justify-start gap-4 p-4">
-          <Popover>
-            <PopoverTrigger asChild>
-              <div
-                className={Cn(
-                  "group/avatar relative flex h-32 w-32 cursor-pointer items-center justify-center rounded-full bg-card text-4xl shadow-sm ring-0 transition-all duration-300 ease-out hover:scale-105 hover:shadow-lg active:scale-95",
-                  UserStatus === "online" && "hover:ring-4 hover:ring-green-500",
-                  UserStatus === "away" && "hover:ring-4 hover:ring-yellow-400",
-                  UserStatus === "busy" && "hover:ring-4 hover:ring-red-500",
-                  UserStatus === "invisible" && "hover:ring-4 hover:ring-gray-400"
-                )}
-                style={
-                  ProfileImage
-                    ? {
-                        backgroundImage: `url(${ProfileImage})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                      }
-                    : {}
-                }
-              >
-                {!ProfileImage && SelectedEmoji}
-                <div className="-Right-1 absolute -bottom-1 flex items-center justify-center rounded-full bg-primary/90 p-1 shadow-sm transition-transform duration-300 ease-out group-hover/avatar:scale-110">
-                  <Smile className="spin-bounce h-6 w-6 text-secondary" />
-                </div>
-              </div>
-            </PopoverTrigger>
-            <PopoverContent
-              className={Cn(
-                "group relative overflow-hidden",
-                "animate-fade-in w-[360px] rounded-2xl",
-                "border border-dashed border-border/60",
-                "bg-background/80 p-6 shadow-sm backdrop-blur-md",
-                "transition-all duration-300 ease-out",
-                "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15"
-              )}
-              align="start"
-              sideOffset={8}
+  const RenderAvatar = (SizeClass, EmojiClass) => (
+    <div
+      className={Cn(
+        "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted",
+        SizeClass
+      )}
+    >
+      {AvatarSrc ? (
+        <img
+          src={AvatarSrc}
+          alt={DisplayName}
+          className="h-full w-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span className={EmojiClass}>{SelectedEmoji}</span>
+      )}
+    </div>
+  );
+
+  const RenderAvatarPicker = () => (
+    <PopoverContent align="start" sideOffset={8} className="w-80 p-0">
+      <div className="border-b border-border/50 px-4 py-3">
+        <p className="text-sm font-medium">{T("profile.avatar.title")}</p>
+      </div>
+
+      <div className="space-y-2 p-3">
+        {IsAscendUser && AscendPhoto && (
+          <button
+            type="button"
+            onClick={() => SetAvatarMode("ascend")}
+            className={Cn(
+              "flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+              AvatarSource === "ascend"
+                ? "border-primary/50 bg-primary/5"
+                : "border-border/50 hover:bg-accent/50"
+            )}
+          >
+            <img
+              src={AscendPhoto}
+              alt=""
+              className="h-8 w-8 rounded-lg object-cover"
+              referrerPolicy="no-referrer"
+            />
+            <span className="flex-1">{T("profile.avatar.useAscendPhoto")}</span>
+            {AvatarSource === "ascend" && <Check className="h-4 w-4 text-primary" />}
+          </button>
+        )}
+
+        {IsAscendUser && ProfileImage && (
+          <button
+            type="button"
+            onClick={() => SetAvatarMode("image")}
+            className={Cn(
+              "flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+              AvatarSource === "image"
+                ? "border-primary/50 bg-primary/5"
+                : "border-border/50 hover:bg-accent/50"
+            )}
+          >
+            <img src={ProfileImage} alt="" className="h-8 w-8 rounded-lg object-cover" />
+            <span className="flex-1">{T("profile.avatar.useUploaded")}</span>
+            {AvatarSource === "image" && <Check className="h-4 w-4 text-primary" />}
+          </button>
+        )}
+
+        <input
+          ref={FileInputPtr}
+          type="file"
+          accept="image/*"
+          onChange={HandleImageUpload}
+          className="hidden"
+        />
+        <Button
+          variant="outline"
+          className="w-full justify-start gap-2"
+          disabled={!IsAscendUser}
+          onClick={() => FileInputPtr.current?.click()}
+        >
+          {IsAscendUser ? <Upload className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+          {T("profile.avatar.upload")}
+        </Button>
+
+        {IsAscendUser ? (
+          <p className="text-xs text-muted-foreground">
+            {T("profile.avatar.uploadHint")}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {T("profile.avatar.signInToUpload")}{" "}
+            <button
+              type="button"
+              onClick={() => OpenAscend()}
+              className="font-medium text-primary hover:underline"
             >
-              <div className="space-y-6">
-                {/* Current Display */}
-                <div
-                  className={Cn(
-                    "group relative overflow-hidden",
-                    "animate-fade-in flex items-center justify-between rounded-xl",
-                    "border border-dashed border-border/60",
-                    "bg-transparent p-4 shadow-sm backdrop-blur-md",
-                    "transition-all duration-300 ease-out",
-                    "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15"
-                  )}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-16 w-16 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-background/60 shadow-sm ring-1 ring-border/60 transition-all duration-300 ease-out active:scale-95">
-                      {ProfileImage ? (
-                        <img
-                          src={ProfileImage}
-                          alt="Profile"
-                          className="h-full w-full object-cover transition-all duration-300 ease-out"
-                        />
-                      ) : (
-                        <span className="text-3xl">{SelectedEmoji}</span>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-base font-semibold text-foreground">
-                        {ProfileImage
-                          ? "Currently Using Custom Image"
-                          : "Currently Using Emoji"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {ProfileImage
-                          ? "Why not express yourself with emojis?"
-                          : "Be stylish with a custom image!"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              {T("profile.signIn")}
+            </button>
+          </p>
+        )}
+      </div>
 
-                {/* User Status Dropdown */}
-                <div className="animate-fade-in mb-2 flex justify-center">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button
-                        className={Cn(
-                          "group flex items-center gap-2 rounded-full",
-                          "border border-dashed border-border/60 bg-transparent",
-                          "px-4 py-2 text-xs font-semibold shadow-sm backdrop-blur-md",
-                          "transition-all duration-300 focus:outline-none",
-                          "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15",
-                          UserStatus === "online" && "ring-green-500",
-                          UserStatus === "away" && "ring-yellow-400",
-                          UserStatus === "busy" && "ring-red-500",
-                          UserStatus === "invisible" && "ring-gray-400",
-                          "active:scale-95"
-                        )}
-                      >
-                        <span
-                          className={Cn(
-                            "transition-transform duration-300",
-                            "group-hover:scale-125 group-active:scale-90"
-                          )}
-                        >
-                          {UserStatus === "online" && (
-                            <span className="text-green-500">🟢</span>
-                          )}
-                          {UserStatus === "away" && (
-                            <span className="text-yellow-400">🟡</span>
-                          )}
-                          {UserStatus === "busy" && (
-                            <span className="text-red-500">🔴</span>
-                          )}
-                          {UserStatus === "invisible" && (
-                            <span className="text-gray-400">⚪</span>
-                          )}
-                        </span>
-                        <span className="capitalize">{UserStatus}</span>
-                        <svg
-                          className="ml-1 h-3 w-3 text-muted-foreground transition-transform duration-300 group-data-[state=open]:-rotate-180"
-                          fill="none"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            d="M6 8l4 4 4-4"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      align="center"
-                      sideOffset={8}
-                      className={Cn(
-                        "group relative overflow-hidden",
-                        "animate-dropdown-in w-44 rounded-xl",
-                        "border border-dashed border-border/60",
-                        "bg-background/80 p-2 shadow-sm backdrop-blur-md",
-                        "transition-all duration-300",
-                        "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15"
-                      )}
-                    >
-                      {[
-                        {
-                          id: "online",
-                          label: "Online",
-                          icon: "🟢",
-                          color: "text-green-500",
-                        },
-                        {
-                          id: "away",
-                          label: "Away",
-                          icon: "🟡",
-                          color: "text-yellow-400",
-                        },
-                        { id: "busy", label: "Busy", icon: "🔴", color: "text-red-500" },
-                      ].map(Status => (
-                        <button
-                          key={Status.id}
-                          className={Cn(
-                            "flex w-full items-center gap-2 rounded-lg",
-                            "border border-transparent px-3 py-2 text-xs font-semibold",
-                            "transition-all duration-200",
-                            "hover:scale-[1.02] hover:border-primary/20 hover:bg-accent/20 active:scale-95",
-                            UserStatus === Status.id
-                              ? "border-primary/30 bg-accent/25 text-primary"
-                              : "text-foreground"
-                          )}
-                          onClick={() => HandleUserStatusChange(Status.id)}
-                          type="button"
-                        >
-                          <span className={Status.color}>{Status.icon}</span>
-                          <span className="capitalize">{Status.label}</span>
-                        </button>
-                      ))}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <Separator className="transition-all duration-300 ease-out" />
-
-                {/* Upload Image */}
-                <div className="animate-fade-in flex flex-col items-center gap-3 rounded-xl border border-dashed border-accent bg-accent/10 p-4 transition-all duration-300 ease-out hover:bg-accent/20">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={HandleImageUpload}
-                    className="hidden"
-                    id="profile-image-upload"
-                  />
-                  <Button
-                    variant="outline"
-                    className="animate-pop-bounce flex h-10 w-full items-center justify-center gap-2 rounded-lg font-semibold transition-all duration-300 ease-out hover:bg-accent/60 active:scale-95"
-                    onClick={() =>
-                      document.getElementById("profile-image-upload").click()
-                    }
-                  >
-                    <Upload className="h-5 w-5 transition-all duration-300 ease-out" />
-                    <span>Upload a profile image</span>
-                  </Button>
-                  <span className="text-xs text-muted-foreground">
-                    PNG, JPG, .GIF, ETC, up to 50MB
-                  </span>
-                </div>
-              </div>
-
-              <div className="my-6">
-                <Separator className="transition-all duration-300 ease-out" />
-              </div>
-
-              {/* Emoji Selection */}
-              <div className="animate-fade-in space-y-4">
-                {/* Icon Tabs */}
-                <div className="mb-2 flex items-center justify-center gap-2">
-                  {EmojiCategories.map(Category => (
-                    <button
-                      key={Category.id}
-                      className={Cn(
-                        "group grid h-8 min-h-8 w-8 min-w-8 place-items-center rounded-full bg-transparent shadow-sm transition-all duration-300 ease-out focus:outline-none",
-                        ActiveEmojiCategoryId === Category.id
-                          ? "animate-pop-bounce scale-110 ring-2 ring-primary"
-                          : "hover:scale-105 hover:bg-accent/20"
-                      )}
-                      onClick={() => SetActiveEmojiCategoryId(Category.id)}
-                      type="button"
-                      aria-label={Category.title}
-                    >
-                      {EmojiTabIcons[Category.id]}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Emoji Grid */}
-                <div className="animate-fade-in">
-                  {EmojiCategories.filter(
-                    Category => Category.id === ActiveEmojiCategoryId
-                  ).map(Category => (
-                    <div key={Category.id} className="space-y-2">
-                      <div className="grid grid-cols-6 gap-2">
-                        {Category.emojis.map((Emoji, Index) => (
-                          <Button
-                            key={`${Category.id}-${Emoji}-${Index}`}
-                            variant={
-                              SelectedEmoji === Emoji && !ProfileImage
-                                ? "secondary"
-                                : "ghost"
-                            }
-                            className={Cn(
-                              "h-10 w-10 rounded-lg text-2xl shadow-sm transition-all duration-300 ease-out",
-                              "hover:scale-110 hover:bg-accent/80 active:scale-95",
-                              SelectedEmoji === Emoji &&
-                                !ProfileImage &&
-                                "animate-pop-bounce ring-2 ring-primary"
-                            )}
-                            onClick={() => SwitchToEmoji(Emoji)}
-                          >
-                            {Emoji}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-          <div className="flex-1">
-            <div className="mt-4 flex flex-col items-start gap-2 px-2">
-              <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-bold leading-none text-primary">
-                  {GetDisplayUsername()}
-                </h2>
-                <UsernameDialog />
-              </div>
-              <span className="mt-2 inline-block rounded-full bg-primary/80 px-4 py-1 text-xs font-semibold text-secondary shadow transition-all">
-                {T("profile.memberSince", { date: JoinDate })}
-              </span>
-            </div>
-          </div>
+      <div className="border-t border-border/50 p-3">
+        <div className="mb-2 flex items-center gap-1">
+          {EmojiCategories.map(Category => {
+            const Icon = EmojiTabIcons[Category.id];
+            return (
+              <button
+                key={Category.id}
+                type="button"
+                onClick={() => SetActiveEmojiCategoryId(Category.id)}
+                aria-label={Category.title}
+                title={Category.title}
+                className={Cn(
+                  "grid h-8 w-8 place-items-center rounded-md transition-colors",
+                  ActiveEmojiCategoryId === Category.id
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            );
+          })}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {EmojiCategories.find(
+            Category => Category.id === ActiveEmojiCategoryId
+          )?.emojis.map((Emoji, Index) => (
+            <button
+              key={`${ActiveEmojiCategoryId}-${Emoji}-${Index}`}
+              type="button"
+              onClick={() => SwitchToEmoji(Emoji)}
+              className={Cn(
+                "grid h-9 w-9 place-items-center rounded-md text-xl transition-colors hover:bg-accent/60",
+                AvatarSource === "emoji" &&
+                  SelectedEmoji === Emoji &&
+                  "bg-primary/10 ring-1 ring-primary/50"
+              )}
+            >
+              {Emoji}
+            </button>
+          ))}
         </div>
       </div>
+    </PopoverContent>
+  );
+
+  const RenderStatusMenu = () => {
+    const Current = StatusOptions.find(Status => Status.id === UserStatus);
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center gap-1.5 rounded-full border border-border/50 px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent/50"
+          >
+            <span className={Cn("h-2 w-2 rounded-full", Current?.dot)} />
+            {T(`profile.status.${UserStatus}`)}
+            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-40">
+          <DropdownMenuRadioGroup
+            value={UserStatus}
+            onValueChange={HandleUserStatusChange}
+          >
+            {StatusOptions.map(Status => (
+              <DropdownMenuRadioItem key={Status.id} value={Status.id} className="gap-2">
+                <span className={Cn("h-2 w-2 rounded-full", Status.dot)} />
+                {T(`profile.status.${Status.id}`)}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
+  const RenderProfileHeader = () => {
+    const CurrentStatus = StatusOptions.find(Status => Status.id === UserStatus);
+
+    return (
+      <Panel className="overflow-hidden">
+        <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center">
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="group relative shrink-0 self-start rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={T("profile.avatar.title")}
+              >
+                {RenderAvatar("h-24 w-24", "text-5xl")}
+                <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Camera className="h-6 w-6 text-white" />
+                </span>
+                {IsAscendUser && (
+                  <span
+                    className={Cn(
+                      "absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-4 border-card",
+                      CurrentStatus?.dot
+                    )}
+                  />
+                )}
+              </button>
+            </PopoverTrigger>
+            {RenderAvatarPicker()}
+          </Popover>
+
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex items-center gap-2">
+              <h1 className="mb-0 truncate text-2xl font-semibold leading-tight tracking-tight">
+                {DisplayName}
+              </h1>
+              {IsAscendUser ? (
+                <>
+                  {UserData?.owner && (
+                    <Crown className="h-5 w-5 shrink-0 text-yellow-500" />
+                  )}
+                  {UserData?.contributor && (
+                    <Hammer className="h-5 w-5 shrink-0 text-orange-500" />
+                  )}
+                  {UserData?.verified && (
+                    <BadgeCheck className="h-5 w-5 shrink-0 text-blue-500" />
+                  )}
+                </>
+              ) : (
+                <UsernameDialog />
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {IsAscendUser ? (
+                <>
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                    {T("profile.ascendAccount")}
+                  </span>
+                  {RenderStatusMenu()}
+                </>
+              ) : (
+                <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                  {T("profile.localProfile")}
+                </span>
+              )}
+            </div>
+
+            {IsAscendUser && UserData?.bio && (
+              <p className="line-clamp-2 max-w-xl text-sm text-foreground/80">
+                {UserData.bio}
+              </p>
+            )}
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              {JoinDate && (
+                <span className="flex items-center gap-1.5">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  {T("profile.memberSince", { date: JoinDate })}
+                </span>
+              )}
+              {IsAscendUser && (
+                <span className="flex items-center gap-1">
+                  <Gamepad2 className="h-3.5 w-3.5" />
+                  {T("profile.inGameName")}:{" "}
+                  <span className="text-foreground">
+                    {GeneralUsername || T("profile.notSet")}
+                  </span>
+                  <UsernameDialog />
+                </span>
+              )}
+            </div>
+          </div>
+
+          {IsAscendUser && (
+            <Button
+              variant="outline"
+              className="shrink-0 gap-2 self-start sm:self-center"
+              onClick={() => OpenAscend("settings")}
+            >
+              <Pencil className="h-4 w-4" />
+              {T("profile.editAscendProfile")}
+            </Button>
+          )}
+        </div>
+
+        {!IsAscendUser && (
+          <div className="flex flex-col gap-3 border-t border-border/50 bg-muted/30 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">{T("profile.signInPrompt")}</p>
+            <Button
+              size="sm"
+              className="shrink-0 gap-2 text-secondary"
+              onClick={() => OpenAscend()}
+            >
+              <LogIn className="h-4 w-4" />
+              {T("profile.signInToAscend")}
+            </Button>
+          </div>
+        )}
+      </Panel>
     );
   };
 
@@ -1293,14 +1369,6 @@ const Profile = () => {
     SaveUserPreferences({ privateNotes: PrivateNotes });
   }, [PrivateNotes]);
 
-  UseEffect(() => {
-    return () => {
-      if (TypingNotesTTTPtr.current) {
-        clearTimeout(TypingNotesTTTPtr.current);
-      }
-    };
-  }, []);
-
   const FormatDate = DateString => {
     const DateValue = new Date(DateString);
     return DateValue.toLocaleDateString(undefined, {
@@ -1350,613 +1418,237 @@ const Profile = () => {
     }
   };
 
+  const DeviceRows = [
+    { label: T("profile.platform"), value: DeviceInfo.platform },
+    { label: T("profile.os"), value: DeviceInfo.os },
+    { label: T("profile.cpu"), value: DeviceInfo.cpu },
+    { label: T("profile.ram"), value: DeviceInfo.ram },
+    { label: T("profile.gpu"), value: DeviceInfo.gpu },
+    {
+      label: AmILinux ? "Renderer" : T("profile.directX"),
+      value: DeviceInfo.directx,
+    },
+  ];
+
   return (
-    <div className="container mx-auto space-y-6 p-4">
-      {/* Profile Header */}
-      <div
-        className={Cn(
-          "group relative mt-8 overflow-hidden rounded-2xl border border-primary/30",
-          "bg-gradient-to-br from-primary/10 via-primary/5 to-violet-500/5",
-          "p-6 transition-all",
-          "animate-fade-in motion-reduce:animate-none",
-          "hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
-        )}
-      >
-        <div className="-Right-8 absolute -top-8 h-24 w-24 rounded-full bg-primary/20 blur-2xl transition-all group-hover:bg-primary/30" />
-        <div className="relative min-h-[13rem]">
-          <div className="absolute inset-0 flex items-center justify-start">
-            {RenderProfileSection()}
-          </div>
-        </div>
-      </div>
+    <div className="container mx-auto max-w-6xl space-y-6 px-4 pb-8 pt-12">
+      {RenderProfileHeader()}
 
-      {/* Widget Card Layout */}
-      {/* TODO: Make a proper widget system with draggable UI Interfaces */}
-      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-        <Card
-          style={{ animationDelay: "60ms" }}
-          className={Cn(
-            "group relative overflow-hidden rounded-xl border border-dashed border-border/60",
-            "bg-transparent",
-            "p-1 transition-all",
-            "animate-fade-in motion-reduce:animate-none",
-            "transition-all duration-300 ease-out",
-            "shadow-sm",
-            "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15",
-            "h-full"
-          )}
-        >
-          <CardHeader className="relative pb-3">
-            <CardTitle className="text-Left group flex w-full items-center justify-start gap-2">
-              <Sparkles className="h-5 w-5 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
-              <span className="transition-colors duration-300 ease-out group-hover:text-primary">
-                {T("profile.stats") || "Stats"}
-              </span>
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent className="relative flex h-full flex-col">
-            <div className="flex flex-1 flex-col gap-4">
-              <div
-                className={Cn(
-                  "group rounded-lg border-2 border-border bg-background/5 p-4 backdrop-blur-md",
-                  "transition-all duration-300 ease-out",
-                  "hover:bg-background/10"
-                )}
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-semibold">
-                      <Sparkles className="h-4 w-4 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
-                      <span className="transition-colors duration-300 ease-out group-hover:text-primary">
-                        {T("profile.level") || "Level"}
-                      </span>
-                    </div>
-                    <div className="text-sm font-bold text-primary">{Stats.level}</div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>
-                        {Math.round(
-                          Math.min(Stats.currentXP, Stats.nextLevelXp)
-                        ).toLocaleString()}{" "}
-                        / {Math.round(Stats.nextLevelXp).toLocaleString()} XP
-                      </span>
-                      <span>{Math.round(LevelProgressPercent)}%</span>
-                    </div>
-                    <Progress value={LevelProgressPercent} className="h-2 bg-muted/40" />
-                  </div>
-
-                  <Separator />
-
-                  <div className="text-Left grid gap-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="group flex items-center gap-2 text-muted-foreground">
-                        <Clock className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />{" "}
-                        {T("profile.totalPlaytime")}
-                      </span>
-                      <span className="font-semibold text-foreground">
-                        {PlaytimeStats
-                          ? FormatPlayTime(PlaytimeStats.totalPlaytime)
-                          : "0h"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="group flex items-center gap-2 text-muted-foreground">
-                        <Trophy className="h-3 w-3 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />{" "}
-                        {T("profile.gamesPlayed")}
-                      </span>
-                      <span className="font-semibold text-foreground">
-                        {Stats.gamesPlayed}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">
-                        {T("profile.mostPlayed")}
-                      </span>
-                      <span className="text-Left max-w-[160px] truncate font-semibold text-foreground">
-                        {PlaytimeStats?.mostPlayed
-                          ? PlaytimeStats.mostPlayed.game || PlaytimeStats.mostPlayed.name
-                          : "-"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="group flex items-center gap-2 text-muted-foreground">
-                        <Cpu className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
-                        XP
-                      </span>
-                      <span className="font-semibold text-foreground">{Stats.xp}</span>
-                    </div>
-                  </div>
-                </div>
+      <StatStrip
+        stats={[
+          {
+            icon: Star,
+            label: T("profile.level"),
+            value: Stats.level,
+            footer: (
+              <div className="mt-2 space-y-1">
+                <Progress value={LevelProgressPercent} className="h-1.5 bg-muted/60" />
+                <p className="text-[11px] tabular-nums text-muted-foreground">
+                  {Math.round(
+                    Math.min(Stats.currentXP, Stats.nextLevelXp)
+                  ).toLocaleString()}{" "}
+                  / {Math.round(Stats.nextLevelXp).toLocaleString()} XP
+                </p>
               </div>
+            ),
+          },
+          {
+            icon: Clock,
+            label: T("profile.totalPlaytime"),
+            value: PlaytimeStats ? FormatPlayTime(PlaytimeStats.totalPlaytime) : "0m",
+          },
+          {
+            icon: Gamepad2,
+            label: T("profile.gamesPlayed"),
+            value: Stats.gamesPlayed,
+          },
+          {
+            icon: Sparkles,
+            label: "XP",
+            value: Stats.xp.toLocaleString(),
+          },
+        ]}
+      />
 
-              <div
-                className={Cn(
-                  "group rounded-lg border-2 border-border bg-background/5 p-4 backdrop-blur-md",
-                  "transition-all duration-300 ease-out",
-                  "hover:bg-background/10"
-                )}
-              >
-                <div className="space-y-2">
-                  <div className="text-Left flex items-center justify-start gap-2 text-sm font-semibold">
-                    <Smile className="h-4 w-4 text-primary transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
-                    <span>{T("profile.privateNotes") || "Private Notes"}</span>
-                  </div>
-
-                  <div
-                    className={Cn(
-                      "relative overflow-hidden rounded-md",
-                      "transition-all duration-300 ease-out",
-                      "hover:ring-1 hover:ring-primary/15",
-                      "focus-within:ring-2 focus-within:ring-primary/30",
-                      IsTypingNotes && "ring-2 ring-primary/30"
-                    )}
-                  >
-                    <div
-                      className={Cn(
-                        "pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-300 ease-out",
-                        IsTypingNotes && "opacity-100"
-                      )}
-                    >
-                      <div className="via-primary/12 absolute inset-0 animate-shine bg-gradient-to-r from-primary/0 to-primary/0 bg-[length:200%_100%] mix-blend-soft-light motion-reduce:animate-none" />
-                    </div>
-
-                    <Textarea
-                      value={PrivateNotes}
-                      onChange={Event => {
-                        const NextValue = Event.target.value;
-                        SetPrivateNotes(NextValue);
-
-                        SetIsTypingNotes(true);
-                        if (TypingNotesTTTPtr.current) {
-                          clearTimeout(TypingNotesTTTPtr.current);
-                        }
-                        TypingNotesTTTPtr.current = setTimeout(() => {
-                          SetIsTypingNotes(false);
-                        }, 350);
-                      }}
-                      placeholder={
-                        T("profile.privateNotesPlaceholder") ||
-                        "Notes for this device (private)..."
-                      }
-                      className={Cn(
-                        "relative z-10 min-h-[110px] resize-none",
-                        "bg-background/50 backdrop-blur",
-                        "cursor-text caret-primary selection:bg-primary/20",
-                        "transition-colors duration-200 ease-out",
-                        "focus-visible:outline-none"
-                      )}
-                    />
-                  </div>
-                  <div className="text-center text-xs text-muted-foreground">
-                    {T("profile.savedLocally") || "Saved locally"}
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-2">
-                    <div className="text-Left flex items-center justify-start gap-2 text-sm font-semibold">
-                      <Monitor className="h-4 w-4 text-primary transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
-                      <span className="transition-colors duration-300 ease-out group-hover:text-primary">
-                        {T("profile.device") || "Device"}
-                      </span>
-                    </div>
-
-                    <div className="text-Left grid gap-2 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="group flex items-center gap-2 text-muted-foreground">
-                          <Monitor className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />{" "}
-                          {T("profile.platform") || "Platform"}
-                        </span>
-                        <span className="text-Right max-w-[180px] truncate font-semibold text-foreground">
-                          {DeviceInfo.platform || "Unknown"}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="group flex items-center gap-2 text-muted-foreground">
-                          <HardDrive className="h-3 w-3 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />{" "}
-                          {T("profile.os") || "OS"}
-                        </span>
-                        <span className="text-Right max-w-[180px] truncate font-semibold text-foreground">
-                          {DeviceInfo.os || "Unknown"}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="group flex items-center gap-2 text-muted-foreground">
-                          <Cpu className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />{" "}
-                          {T("profile.cpu") || "CPU"}
-                        </span>
-                        <span className="text-Right max-w-[180px] truncate font-semibold text-foreground">
-                          {DeviceInfo.cpu || "Unknown"}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="group flex items-center gap-2 text-muted-foreground">
-                          <HardDrive className="h-3 w-3 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />{" "}
-                          {T("profile.ram") || "RAM"}
-                        </span>
-                        <span className="text-Right max-w-[180px] truncate font-semibold text-foreground">
-                          {DeviceInfo.ram || "Unknown"}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="group flex items-center gap-2 text-muted-foreground">
-                          <Monitor className="h-3 w-3 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />{" "}
-                          {T("profile.gpu") || "GPU"}
-                        </span>
-                        <span className="text-Right max-w-[180px] truncate font-semibold text-foreground">
-                          {DeviceInfo.gpu || "Unknown"}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="group flex items-center gap-2 text-muted-foreground">
-                          <Sparkles className="h-3 w-3 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />{" "}
-                          {AmILinux ? "Renderer" : T("profile.directX") || "DirectX"}
-                        </span>
-                        <span className="text-Right max-w-[180px] truncate font-semibold text-foreground">
-                          {AmILinux
-                            ? UnknownDeviceInfo(DeviceInfo.directx)
-                              ? "Renderer"
-                              : DeviceInfo.directx
-                            : DeviceInfo.directx || "Unknown"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                className={Cn(
-                  "group flex flex-col rounded-lg border-2 border-border bg-background/5 p-4 backdrop-blur-md",
-                  "transition-all duration-300 ease-out",
-                  "hover:bg-background/10"
-                )}
-              >
-                <div className="flex flex-col">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-semibold">
-                      <Trophy className="h-4 w-4 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
-                      <span className="transition-colors duration-300 ease-out group-hover:text-primary">
-                        {T("profile.achievements") || "Achievements"}
-                      </span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {IsLoadingAchievementsLeaderboard
-                        ? T("profile.loading") || "Loading..."
-                        : AchievementsLeaderboard.length > 0
-                          ? T("profile.topN", {
-                              count: Math.min(AchievementsLeaderboard.length, 6),
-                            }) || `Top ${Math.min(AchievementsLeaderboard.length, 6)}`
-                          : T("profile.none") || "None"}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-3 items-end gap-3">
-                    {(() => {
-                      const Second = AchievementsLeaderboard[1] || null;
-                      const First = AchievementsLeaderboard[0] || null;
-                      const Third = AchievementsLeaderboard[2] || null;
-
-                      const Runner4 = AchievementsLeaderboard[3] || null;
-                      const Runner5 = AchievementsLeaderboard[4] || null;
-                      const Runner6 = AchievementsLeaderboard[5] || null;
-
-                      const Column = ({
-                        FirstPlace,
-                        TopEntry,
-                        RunnerRank,
-                        RunnerEntry,
-                        Emphasize,
-                      }) => {
-                        const ShowRunner = true;
-
-                        return (
-                          <div
-                            className={Cn(
-                              "flex flex-col overflow-hidden rounded-lg border border-dashed border-border/70",
-                              "bg-transparent",
-                              "transition-all duration-300 ease-out",
-                              "hover:border-primary/30 hover:ring-1 hover:ring-primary/10"
-                            )}
-                          >
-                            <div
-                              className={Cn(
-                                "flex flex-col items-center justify-end px-2 py-2 text-center",
-                                Emphasize ? "h-[92px]" : "h-[76px]"
-                              )}
-                            >
-                              <div
-                                className={Cn(
-                                  "text-xs font-semibold text-muted-foreground",
-                                  Emphasize && "text-sm"
-                                )}
-                              >
-                                #{FirstPlace}
-                              </div>
-                              <div
-                                className={Cn(
-                                  "mt-1 w-full truncate font-semibold text-foreground",
-                                  Emphasize ? "text-sm" : "text-xs"
-                                )}
-                                title={TopEntry?.gameName || ""}
-                              >
-                                {TopEntry?.gameName || "—"}
-                              </div>
-                              <div
-                                className={Cn(
-                                  "mt-1 text-xs text-muted-foreground",
-                                  Emphasize && "text-[0.7rem]"
-                                )}
-                              >
-                                {TopEntry
-                                  ? `${TopEntry.unlocked}/${TopEntry.total}`
-                                  : " "}
-                              </div>
-                            </div>
-
-                            {ShowRunner ? (
-                              <div className="border-T border-dashed border-border/70 px-2 py-2">
-                                <div className="text-[0.7rem] font-semibold text-muted-foreground">
-                                  #{RunnerRank}
-                                </div>
-                                <div
-                                  className="mt-1 truncate text-xs font-semibold text-foreground"
-                                  title={RunnerEntry?.gameName || ""}
-                                >
-                                  {RunnerEntry?.gameName || "—"}
-                                </div>
-                                <div className="mt-1 text-[0.7rem] text-muted-foreground">
-                                  {RunnerEntry
-                                    ? `${RunnerEntry.unlocked}/${RunnerEntry.total}`
-                                    : " "}
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      };
-
-                      return (
-                        <>
-                          <Column
-                            FirstPlace={2}
-                            TopEntry={Second}
-                            RunnerRank={4}
-                            RunnerEntry={Runner4}
-                            Emphasize={false}
-                          />
-                          <Column
-                            FirstPlace={1}
-                            TopEntry={First}
-                            RunnerRank={5}
-                            RunnerEntry={Runner5}
-                            Emphasize={true}
-                          />
-                          <Column
-                            FirstPlace={3}
-                            TopEntry={Third}
-                            RunnerRank={6}
-                            RunnerEntry={Runner6}
-                            Emphasize={false}
-                          />
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Widget Style Cards I guess */}
-        <div className="grid gap-6">
-          <Card
-            style={{ animationDelay: "110ms" }}
-            className={Cn(
-              "group relative overflow-hidden rounded-xl border border-dashed border-border/60",
-              "bg-transparent",
-              "p-1 transition-all",
-              "animate-fade-in motion-reduce:animate-none",
-              "transition-all duration-300 ease-out",
-              "shadow-sm",
-              "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15"
-            )}
-          >
-            <CardHeader className="relative pb-3">
-              <div className="flex items-center justify-between gap-3">
-                <CardTitle className="text-Left group flex items-center justify-start gap-2">
-                  <Gamepad2 className="h-5 w-5 text-primary transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
-                  <span className="transition-colors duration-300 ease-out group-hover:text-primary">
-                    {T("profile.games")}
-                  </span>
-                </CardTitle>
-                <span className="text-sm text-muted-foreground">
-                  {SortedGames.length} {T("profile.gamesPlayed")}
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="relative">
-              <ScrollArea className="h-[360px] pr-4">
-                {SortedGames.length > 0 ? (
-                  <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {SortedGames.map(Game => {
-                      const GameId = Game.game || Game.name;
-                      return (
-                        <div
-                          key={GameId}
-                          className={Cn(
-                            "profile-small-card flex items-center gap-3 rounded-lg border border-border bg-card/50 p-3",
-                            "backdrop-blur",
-                            "transition-all duration-300 ease-out",
-                            "hover:border-primary/20 hover:bg-accent/40 hover:shadow-sm",
-                            "hover:[&_.profile-small-img]:scale-105",
-                            "hover:[&_.profile-small-title]:text-primary",
-                            "hover:[&_.profile-small-icon]:-rotate-6",
-                            "hover:[&_.profile-small-icon]:scale-110"
-                          )}
-                        >
-                          <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md bg-muted/30">
-                            {GameImages[GameId] ? (
-                              <img
-                                src={GameImages[GameId]}
-                                alt={GameId}
-                                className="profile-small-img h-full w-full object-cover transition-transform duration-300"
-                              />
-                            ) : null}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h3 className="profile-small-title text-Left truncate font-medium text-foreground transition-colors duration-300 ease-out">
-                              {GameId}
-                            </h3>
-                            <div className="flex items-center justify-start gap-2 text-xs text-muted-foreground">
-                              <Clock className="profile-small-icon h-3 w-3 transition-transform duration-300 ease-out" />
-                              <span>
-                                {Game.playTime !== undefined
-                                  ? Game.playTime < 120
-                                    ? `1 ${T("library.minute")}`
-                                    : Game.playTime < 3600
-                                      ? `${Math.floor(Game.playTime / 60)} ${T("library.minutes")}`
-                                      : Game.playTime < 7200
-                                        ? `1 ${T("library.hour")}`
-                                        : `${Math.floor(Game.playTime / 3600)} ${T("library.hours")}`
-                                  : T("library.neverPlayed")}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="group flex min-h-[360px] flex-col items-center justify-center text-center">
-                    <Gamepad2 className="relative z-10 mb-2 h-10 w-10 text-muted-foreground/50 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110" />
-                    <h3 className="relative z-10 text-lg font-semibold">
-                      <span className="relative inline-block">
-                        <span className="transition-opacity duration-200 ease-out group-hover:opacity-0">
-                          {T("profile.noGames") || "No Games"}
-                        </span>
-                        <span className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100">
-                          <span className="block bg-gradient-to-r from-primary via-primary/70 to-foreground bg-[length:200%_100%] bg-clip-text text-transparent group-hover:animate-shine">
-                            {T("profile.noGames") || "No Games"}
-                          </span>
-                        </span>
-                      </span>
-                    </h3>
-                    <p className="relative z-10 text-sm text-muted-foreground">
-                      {T("profile.noGamesDesc") || "Play a game to see it here"}
-                    </p>
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-
-          <Card
-            style={{ animationDelay: "160ms" }}
-            className={Cn(
-              "group relative overflow-hidden rounded-xl border border-dashed border-border/60",
-              "bg-transparent",
-              "p-1 transition-all",
-              "animate-fade-in motion-reduce:animate-none",
-              "transition-all duration-300 ease-out",
-              "shadow-sm",
-              "hover:border-primary/40 hover:shadow-lg hover:shadow-primary/15 hover:ring-1 hover:ring-primary/15"
-            )}
-          >
-            <CardHeader className="relative pb-3">
-              <div className="flex items-center justify-between gap-3">
-                <CardTitle className="text-Left group flex items-center justify-start gap-2">
-                  <FileDown className="h-5 w-5 text-primary transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
-                  <span className="transition-colors duration-300 ease-out group-hover:text-primary">
-                    {T("profile.downloadHistory") || "Download History"}
-                  </span>
-                </CardTitle>
-                <span className="text-sm text-muted-foreground">
-                  {DownloadHistory.length}
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="relative">
-              <ScrollArea className="h-[360px] pr-4">
-                <div className="mx-auto w-full max-w-6xl space-y-3">
-                  {DownloadHistory.length > 0 ? (
-                    SortedDownloadHistory.map(Item => (
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="min-w-0 space-y-6">
+          <Panel className="overflow-hidden">
+            <PanelHeader
+              icon={Gamepad2}
+              title={T("profile.games")}
+              meta={SortedGames.length}
+            />
+            {SortedGames.length > 0 ? (
+              <ScrollArea className="h-[340px]">
+                <div className="grid grid-cols-1 gap-2 p-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {SortedGames.map(Game => {
+                    const GameId = Game.game || Game.name;
+                    return (
                       <div
-                        key={`${Item.game}-${Item.timestamp}-${Item.historyIndex}`}
-                        className="download-history-item profile-small-card relative flex items-center gap-3 overflow-hidden rounded-lg border border-border bg-card/50 p-3 backdrop-blur"
+                        key={GameId}
+                        className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/40 p-2.5 transition-colors hover:bg-accent/40"
                       >
-                        <div className="flex min-w-0 flex-1 items-center gap-3 pr-12">
-                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
-                            <FileDown className="h-5 w-5 text-primary" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h3 className="text-Left truncate font-medium text-foreground">
-                              {Item.game}
-                            </h3>
-                            <div className="text-Left text-xs text-muted-foreground">
-                              {FormatDate(Item.timestamp)}
-                            </div>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={Event => {
-                            Event.stopPropagation();
-                            HandleRemoveDownloadHistoryItem(Item.historyIndex);
-                          }}
-                          disabled={RemovingDownloadHistoryIndex === Item.historyIndex}
-                          className={Cn(
-                            "absolute right-3 top-1/2 z-20 mt-8 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full p-0 text-muted-foreground transition-colors hover:text-red-700",
-                            RemovingDownloadHistoryIndex === Item.historyIndex &&
-                              "cursor-wait opacity-60"
+                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+                          {GameImages[GameId] && (
+                            <img
+                              src={GameImages[GameId]}
+                              alt={GameId}
+                              className="h-full w-full object-cover"
+                            />
                           )}
-                          title={`Clear ${Item.game} from history`}
-                          aria-label={`Clear ${Item.game} from history`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{GameId}</p>
+                          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {FormatPlayTime(Game.playTime || 0)}
+                          </p>
+                        </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="group flex min-h-[360px] flex-col items-center justify-center text-center">
-                      <Archive className="relative z-10 mb-2 h-10 w-10 text-muted-foreground/50 transition-transform duration-300 ease-out group-hover:rotate-6 group-hover:scale-110" />
-                      <h3 className="relative z-10 text-lg font-semibold">
-                        <span className="relative inline-block">
-                          <span className="transition-opacity duration-200 ease-out group-hover:opacity-0">
-                            {T("profile.noDownloadHistory") || "No download history yet"}
-                          </span>
-                          <span className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100">
-                            <span className="block bg-gradient-to-r from-primary via-primary/70 to-foreground bg-[length:200%_100%] bg-clip-text text-transparent group-hover:animate-shine">
-                              {T("profile.noDownloadHistory") ||
-                                "No download history yet"}
-                            </span>
-                          </span>
-                        </span>
-                      </h3>
-                      <p className="relative z-10 text-sm text-muted-foreground">
-                        {T("profile.noDownloadHistoryDesc") ||
-                          "Your game download history will appear here"}
-                      </p>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
               </ScrollArea>
-            </CardContent>
-          </Card>
+            ) : (
+              <div className="p-4">
+                <EmptyState
+                  icon={Gamepad2}
+                  title={T("profile.noGames")}
+                  description={T("profile.noGamesDesc")}
+                  className="py-12"
+                />
+              </div>
+            )}
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <PanelHeader
+              icon={FileDown}
+              title={T("profile.downloadHistory")}
+              meta={DownloadHistory.length}
+            />
+            {DownloadHistory.length > 0 ? (
+              <ScrollArea className="h-[340px]">
+                <ul className="divide-y divide-border/50">
+                  {SortedDownloadHistory.map(Item => (
+                    <li
+                      key={`${Item.game}-${Item.timestamp}-${Item.historyIndex}`}
+                      className="group flex items-center gap-3 px-5 py-3"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                        <FileDown className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{Item.game}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {FormatDate(Item.timestamp)}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => HandleRemoveDownloadHistoryItem(Item.historyIndex)}
+                        disabled={RemovingDownloadHistoryIndex === Item.historyIndex}
+                        className="hover:text-destructive h-8 w-8 shrink-0 text-muted-foreground opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                        title={`Clear ${Item.game} from history`}
+                        aria-label={`Clear ${Item.game} from history`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollArea>
+            ) : (
+              <div className="p-4">
+                <EmptyState
+                  icon={Archive}
+                  title={T("profile.noDownloadHistory")}
+                  description={T("profile.noDownloadHistoryDesc")}
+                  className="py-12"
+                />
+              </div>
+            )}
+          </Panel>
+        </div>
+
+        <div className="space-y-6">
+          <Panel className="overflow-hidden">
+            <PanelHeader
+              icon={Trophy}
+              title={T("profile.achievements")}
+              meta={
+                IsLoadingAchievementsLeaderboard
+                  ? T("profile.loading")
+                  : AchievementsLeaderboard.length > 0
+                    ? T("profile.topN", { count: AchievementsLeaderboard.length })
+                    : null
+              }
+            />
+            {AchievementsLeaderboard.length > 0 ? (
+              <ol className="space-y-3 p-5">
+                {AchievementsLeaderboard.map((Entry, Index) => (
+                  <li key={Entry.gameName} className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="w-5 shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
+                        {Index + 1}
+                      </span>
+                      <span
+                        className="min-w-0 flex-1 truncate font-medium"
+                        title={Entry.gameName}
+                      >
+                        {Entry.gameName}
+                      </span>
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {Entry.unlocked}/{Entry.total}
+                      </span>
+                    </div>
+                    <Progress
+                      value={Entry.percentage}
+                      className="ml-7 h-1 w-auto bg-muted/60"
+                    />
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="px-5 py-6 text-center text-sm text-muted-foreground">
+                {IsLoadingAchievementsLeaderboard
+                  ? T("profile.loading")
+                  : T("profile.noAchievements")}
+              </p>
+            )}
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <PanelHeader icon={Monitor} title={T("profile.device")} />
+            <dl className="space-y-2.5 p-5 text-sm">
+              {DeviceRows.map(Row => (
+                <div key={Row.label} className="flex items-center justify-between gap-4">
+                  <dt className="shrink-0 text-muted-foreground">{Row.label}</dt>
+                  <dd className="truncate text-right font-medium" title={Row.value}>
+                    {UnknownDeviceInfo(Row.value) ? "—" : Row.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <PanelHeader
+              icon={NotebookPen}
+              title={T("profile.privateNotes")}
+              meta={<span className="text-xs">{T("profile.savedLocally")}</span>}
+            />
+            <div className="p-4">
+              <Textarea
+                value={PrivateNotes}
+                onChange={Event => SetPrivateNotes(Event.target.value)}
+                placeholder={T("profile.privateNotesPlaceholder")}
+                className="min-h-[120px] resize-none bg-background/50"
+              />
+            </div>
+          </Panel>
         </div>
       </div>
     </div>
