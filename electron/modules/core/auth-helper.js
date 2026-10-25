@@ -23,6 +23,69 @@ const SECRET_SEED =
   process.env.ASCENDARA_SECRET_SEED || productionConfig.SECRET_SEED || null;
 let missingAuthWarningShown = false;
 
+// Server time minus local time, in ms. Users with a wrong system clock would
+// otherwise sign every request with a timestamp the API rejects.
+let serverOffsetMs = 0;
+// Below this the clock is close enough; Date headers only have 1s resolution.
+const MIN_SKEW_MS = 30 * 1000;
+const RESYNC_INTERVAL_MS = 30 * 60 * 1000;
+
+function serverNow() {
+  return Date.now() + serverOffsetMs;
+}
+
+/**
+ * Update the clock offset from an HTTP Date header sent by the API
+ * @param {string} dateHeader - Value of the Date response header
+ */
+function updateServerTimeFromDateHeader(dateHeader) {
+  const serverMs = Date.parse(dateHeader);
+  if (Number.isNaN(serverMs)) return;
+
+  const offset = serverMs - Date.now();
+  const nextOffset = Math.abs(offset) < MIN_SKEW_MS ? 0 : offset;
+  if (Math.abs(nextOffset - serverOffsetMs) >= MIN_SKEW_MS) {
+    console.warn(
+      `[Auth] System clock differs from server by ${Math.round(offset / 1000)}s, correcting`
+    );
+  }
+  serverOffsetMs = nextOffset;
+}
+
+async function syncServerTime() {
+  const { API_URL } = require("./config");
+  try {
+    const response = await fetch(`${API_URL}/health`, { method: "HEAD" });
+    const dateHeader = response.headers.get("date");
+    if (dateHeader) updateServerTimeFromDateHeader(dateHeader);
+  } catch (error) {
+    console.warn("[Auth] Failed to sync server time:", error.message);
+  }
+}
+
+/**
+ * Track the API's clock so signed requests stay valid when the system clock is wrong.
+ * Syncs now and periodically, and learns from every API response the renderer receives.
+ * @param {Electron.Session} session - Session the renderer makes API requests through
+ */
+function startServerTimeSync(session) {
+  const { API_URL } = require("./config");
+  // onHeadersReceived runs before the renderer sees the response, so a retry
+  // after a clock_skew rejection is already signed with the corrected time
+  session.webRequest.onHeadersReceived(
+    { urls: [`${API_URL}/*`] },
+    (details, callback) => {
+      const headers = details.responseHeaders || {};
+      const dateKey = Object.keys(headers).find(key => key.toLowerCase() === "date");
+      if (dateKey) updateServerTimeFromDateHeader(headers[dateKey][0]);
+      callback({});
+    }
+  );
+
+  syncServerTime();
+  setInterval(syncServerTime, RESYNC_INTERVAL_MS).unref?.();
+}
+
 /**
  * Generate time-based authentication headers
  * @returns {Object} Headers with X-Timestamp, X-Signature, and build signature
@@ -41,11 +104,12 @@ function generateAuthHeaders() {
     return buildHeaders;
   }
 
-  // Get current timestamp
-  const timestamp = Math.floor(Date.now() / 1000).toString();
+  // Get current timestamp, corrected to the server's clock
+  const nowSeconds = Math.floor(serverNow() / 1000);
+  const timestamp = nowSeconds.toString();
 
   // Get current hour for rotating secret
-  const currentHour = Math.floor(Date.now() / 1000 / 3600);
+  const currentHour = Math.floor(nowSeconds / 3600);
 
   // Combine secret seed with current hour
   const rotatingSecret = `${SECRET_SEED}:${currentHour}`;
@@ -70,20 +134,35 @@ function generateAuthHeaders() {
  * @returns {Promise<Response>}
  */
 async function authenticatedFetch(url, options = {}) {
-  const authHeaders = generateAuthHeaders();
+  const send = () =>
+    fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        ...generateAuthHeaders(),
+      },
+    });
 
-  const mergedOptions = {
-    ...options,
-    headers: {
-      ...options.headers,
-      ...authHeaders,
-    },
-  };
+  let response = await send();
+  const dateHeader = response.headers.get("date");
+  if (dateHeader) updateServerTimeFromDateHeader(dateHeader);
+  if (response.status === 401 && (await isClockSkewResponse(response))) {
+    response = await send();
+  }
+  return response;
+}
 
-  return fetch(url, mergedOptions);
+async function isClockSkewResponse(response) {
+  try {
+    const data = await response.clone().json();
+    return data?.error === "clock_skew";
+  } catch {
+    return false;
+  }
 }
 
 module.exports = {
   generateAuthHeaders,
   authenticatedFetch,
+  startServerTimeSync,
 };

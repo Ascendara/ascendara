@@ -29,7 +29,15 @@ if (process.platform !== "win32") {
   process.env.PATH = require("./modules/compat/wine-setup").runtimePath();
 }
 
-const { app, BrowserWindow, Tray, Menu, nativeImage, powerMonitor } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  nativeImage,
+  powerMonitor,
+  session,
+} = require("electron");
 const http = require("http");
 const { proxyLocalRequest } = require("./modules/core/local-api-proxy");
 const fs = require("fs-extra");
@@ -514,6 +522,9 @@ async function initializeApp() {
     } else {
       await ensureDevServerRunning();
     }
+
+    // Correct API request signatures for users whose system clock is wrong
+    require("./modules/core/auth-helper").startServerTimeSync(session.defaultSession);
 
     // Register critical IPC handlers first (needed for window to function)
     registerCriticalHandlers();

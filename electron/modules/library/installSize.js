@@ -12,7 +12,6 @@ const path = require("path");
 const authHelper = require("../core/auth-helper");
 const { API_URL } = require("../core/config");
 
-
 const queued = new Set();
 const queue = [];
 let running = false;
@@ -86,9 +85,7 @@ async function measure(gameDirectory, gameInfoPath) {
 }
 
 async function getAuthToken() {
-  const response = await fetch(`${API_URL}/auth/token`, {
-    headers: authHelper.generateAuthHeaders(),
-  });
+  const response = await authHelper.authenticatedFetch(`${API_URL}/auth/token`);
   if (!response.ok) throw new Error(`Failed to get auth token: ${response.status}`);
   return (await response.json()).token;
 }

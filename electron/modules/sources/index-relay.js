@@ -35,9 +35,7 @@ async function getIndexStatus() {
 }
 
 async function getAuthToken() {
-  const response = await fetch(`${API_URL}/auth/token`, {
-    headers: authHelper.generateAuthHeaders(),
-  });
+  const response = await authHelper.authenticatedFetch(`${API_URL}/auth/token`);
   if (!response.ok) {
     throw new Error(`Failed to get auth token: ${response.status}`);
   }

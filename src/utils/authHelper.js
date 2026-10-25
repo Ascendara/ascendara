@@ -47,10 +47,24 @@ export async function userAuthenticatedFetch(user, url, options = {}) {
  */
 export async function getAuthToken() {
   try {
-    const authHeaders = await window.electron.getAuthHeaders();
-    const response = await fetch(`${API_URL}/auth/token`, {
-      headers: { ...authHeaders, ...getClientVersionHeaders() },
-    });
+    const requestToken = async () =>
+      fetch(`${API_URL}/auth/token`, {
+        headers: {
+          ...(await window.electron.getAuthHeaders()),
+          ...getClientVersionHeaders(),
+        },
+      });
+
+    let response = await requestToken();
+    // The main process corrects its clock from this response's Date header,
+    // so a retry is signed with the server's time
+    if (response.status === 401) {
+      const data = await response
+        .clone()
+        .json()
+        .catch(() => null);
+      if (data?.error === "clock_skew") response = await requestToken();
+    }
 
     if (!response.ok) {
       throw new Error("Failed to obtain token");
