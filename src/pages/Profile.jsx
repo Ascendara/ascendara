@@ -49,7 +49,6 @@ import {
   Crown,
   FileDown,
   Gamepad2,
-  Hammer,
   Lock,
   LogIn,
   Monitor,
@@ -63,7 +62,7 @@ import {
   Trophy,
   Upload,
 } from "lucide-react";
-import EarnedBadges from "@/components/EarnedBadges";
+import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
 
 const VUS = ["online", "away", "busy", "invisible"];
 
@@ -1214,9 +1213,7 @@ const Profile = () => {
                   {UserData?.owner && (
                     <Crown className="h-5 w-5 shrink-0 text-yellow-500" />
                   )}
-                  {UserData?.contributor && (
-                    <Hammer className="h-5 w-5 shrink-0 text-orange-500" />
-                  )}
+                  {UserData?.contributor && <ContributorBadge className="h-5 w-5" />}
                   {UserData?.verified && (
                     <BadgeCheck className="h-5 w-5 shrink-0 text-blue-500" />
                   )}

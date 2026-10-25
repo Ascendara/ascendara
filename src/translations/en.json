@@ -330,6 +330,8 @@
     "badges": {
       "bugCatcher": "Bug Catcher",
       "bugCatcherDescription": "Reported a bug that got fixed",
+      "contributor": "Contributor",
+      "contributorDescription": "Helped build Ascendara",
       "gameReviewer": "Game Reviewer",
       "gameReviewerDescription": "Reviewed 3 different games"
     },

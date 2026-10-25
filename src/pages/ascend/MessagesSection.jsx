@@ -7,7 +7,6 @@ import {
   Check,
   CheckCheck,
   Crown,
-  Hammer,
   Loader2,
   MessageCircle,
   MessageSquarePlus,
@@ -16,7 +15,7 @@ import {
   User,
   Users,
 } from "lucide-react";
-import EarnedBadges from "@/components/EarnedBadges";
+import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
 
 const statusColors = {
   online: "bg-emerald-500",
@@ -59,7 +58,7 @@ function PersonName({ person }) {
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="truncate">{person.displayName}</span>
       {person.owner && <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />}
-      {person.contributor && <Hammer className="h-3.5 w-3.5 shrink-0 text-orange-500" />}
+      {person.contributor && <ContributorBadge className="h-3.5 w-3.5" />}
       {person.verified && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-blue-500" />}
       <EarnedBadges user={person} className="h-3.5 w-3.5" />
     </span>

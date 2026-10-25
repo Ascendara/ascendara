@@ -14,10 +14,9 @@ import {
   Sparkle,
   Crown,
   BadgeCheck,
-  Hammer,
   Megaphone,
 } from "lucide-react";
-import EarnedBadges from "@/components/EarnedBadges";
+import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
 
 export default function ProfileSettingsCard({
   t,
@@ -298,9 +297,7 @@ export default function ProfileSettingsCard({
                 {userData?.owner && (
                   <Crown className="mt-1 h-4 w-4 shrink-0 text-yellow-500" />
                 )}
-                {userData?.contributor && (
-                  <Hammer className="mt-1 h-4 w-4 shrink-0 text-orange-500" />
-                )}
+                {userData?.contributor && <ContributorBadge className="mt-1 h-4 w-4" />}
                 {userData?.verified && (
                   <BadgeCheck className="mt-1 h-4 w-4 shrink-0 text-blue-500" />
                 )}

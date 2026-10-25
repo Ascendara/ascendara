@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BadgeCheck, Crown, Hammer, HelpCircle, Star } from "lucide-react";
+import { BadgeCheck, Crown, HelpCircle, Star } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -7,7 +7,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/LanguageContext";
-import EarnedBadges from "@/components/EarnedBadges";
+import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
 
 // "#rrggbb" -> "r g b", the format the theme's color variables use
 const toThemeColor = hex =>
@@ -143,10 +143,7 @@ export default function ReviewCard({ review, username, isGuest }) {
               <Crown className="h-4 w-4 shrink-0 text-yellow-500" style={iconHaloStyle} />
             )}
             {badges.contributor && (
-              <Hammer
-                className="h-4 w-4 shrink-0 text-orange-500"
-                style={iconHaloStyle}
-              />
+              <ContributorBadge className="h-4 w-4" style={iconHaloStyle} />
             )}
             {badges.verified && (
               <BadgeCheck

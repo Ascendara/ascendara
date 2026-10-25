@@ -17,11 +17,10 @@ import {
   Globe,
   Crown,
   BadgeCheck,
-  Hammer,
   UserCheck,
   Inbox,
 } from "lucide-react";
-import EarnedBadges from "@/components/EarnedBadges";
+import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
 
 export default function SearchSection({
   t,
@@ -170,7 +169,7 @@ export default function SearchSection({
                         <Crown className="h-4 w-4 shrink-0 text-yellow-500" />
                       )}
                       {result.contributor && (
-                        <Hammer className="h-4 w-4 shrink-0 text-orange-500" />
+                        <ContributorBadge className="h-4 w-4" />
                       )}
                       {result.verified && (
                         <BadgeCheck className="h-4 w-4 shrink-0 text-blue-500" />

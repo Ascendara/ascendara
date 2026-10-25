@@ -16,9 +16,8 @@ import {
   UserMinus,
   Crown,
   BadgeCheck,
-  Hammer,
 } from "lucide-react";
-import EarnedBadges from "@/components/EarnedBadges";
+import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
 
 const STATUS_DOT = {
   online: "bg-green-500",
@@ -79,7 +78,7 @@ function FriendRow({ friend, status, t, onView, onMessage, onRemove }) {
         >
           {friend.displayName}
           {friend.owner && <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />}
-          {friend.contributor && <Hammer className="h-3.5 w-3.5 shrink-0 text-orange-500" />}
+          {friend.contributor && <ContributorBadge className="h-3.5 w-3.5" />}
           {friend.verified && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-blue-500" />}
           <EarnedBadges user={friend} className="h-3.5 w-3.5" />
         </p>

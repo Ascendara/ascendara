@@ -15,9 +15,8 @@ import {
   Award,
   Crown,
   BadgeCheck,
-  Hammer,
 } from "lucide-react";
-import EarnedBadges from "@/components/EarnedBadges";
+import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
 
 export default function LeaderboardSection({
   leaderboardData,
@@ -146,7 +145,7 @@ export default function LeaderboardSection({
                       <Crown className="h-4 w-4 shrink-0 text-yellow-500" />
                     )}
                     {player.contributor && (
-                      <Hammer className="h-4 w-4 shrink-0 text-orange-500" />
+                      <ContributorBadge className="h-4 w-4" />
                     )}
                     {player.verified && (
                       <BadgeCheck className="h-4 w-4 shrink-0 text-blue-500" />
@@ -228,7 +227,7 @@ export default function LeaderboardSection({
                         <h3 className="truncate text-sm font-semibold">{user.displayName}</h3>
                         {user.owner && <Crown className="h-4 w-4 text-yellow-500" />}
                         {user.contributor && (
-                          <Hammer className="h-4 w-4 text-orange-500" />
+                          <ContributorBadge className="h-4 w-4" />
                         )}
                         {user.verified && (
                           <BadgeCheck className="h-4 w-4 text-blue-500" />

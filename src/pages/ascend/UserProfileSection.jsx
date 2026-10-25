@@ -25,7 +25,6 @@ import {
   BadgeCheck,
   Flag,
   Loader,
-  Hammer,
   Inbox,
 } from "lucide-react";
 import {
@@ -39,7 +38,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import EarnedBadges from "@/components/EarnedBadges";
+import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
 
 export default function UserProfileSection({
   handleBackFromProfile,
@@ -147,7 +146,7 @@ export default function UserProfileSection({
                       <Crown className="mb-2 h-7 w-7 shrink-0 text-yellow-500" />
                     )}
                     {viewingProfile.contributor && (
-                      <Hammer className="mb-2 h-7 w-7 shrink-0 text-orange-500" />
+                      <ContributorBadge className="mb-2 h-7 w-7" />
                     )}
                     {viewingProfile.verified && (
                       <BadgeCheck className="mb-2 h-7 w-7 shrink-0 text-blue-500" />
