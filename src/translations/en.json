@@ -947,6 +947,7 @@
       "reviewCard": {
         "approved": "Live",
         "auraColor": "Aura color",
+        "cancelPending": "Cancel new image",
         "cropFailed": "Couldn't crop that image. Try a different file.",
         "description": "Upload an image or GIF to use as the background of your game reviews, then crop it to fit the card. PNG, JPEG, GIF and WebP work, and GIFs stay animated. Every upload is reviewed before it appears, and it stops showing if your Ascend subscription ends.",
         "discardStyle": "Discard",
@@ -955,8 +956,12 @@
         "loadFailed": "Couldn't load your review card settings.",
         "nav": "Review Card",
         "pending": "Awaiting approval",
+        "pendingCanceled": "New image canceled. Your current background stays.",
         "pendingDescription": "Your background is waiting for approval. Once it's approved, everyone viewing your reviews will see it.",
+        "pendingKeepsCurrent": "Your new image is waiting for approval. Until then, everyone still sees your current background.",
+        "previewCurrent": "Current",
         "previewName": "You",
+        "previewNew": "New (awaiting approval)",
         "previewText": "This is how your reviews will look to other players.",
         "remove": "Remove",
         "removed": "Review card background removed",
@@ -971,6 +976,7 @@
         "tooLarge": "The cropped image is over 8 MB. Try a shorter or smaller GIF.",
         "upload": "Upload image",
         "uploaded": "Uploaded! It will show on your reviews once it's approved.",
+        "uploadedKeepsCurrent": "Uploaded! Your current background stays up until the new one is approved.",
         "useDefault": "Use default",
         "wrongType": "Choose a PNG, JPEG, GIF or WebP image."
       },

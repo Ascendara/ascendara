@@ -8,6 +8,7 @@ import {
   RotateCcw,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -129,7 +130,11 @@ const loadImage = file =>
   });
 
 export default function ReviewCardSettingsCard({ t, user, userData }) {
+  // background is the live image; pending is a new upload awaiting approval,
+  // while the approved one keeps showing to everyone
   const [background, setBackground] = useState(null);
+  const [pending, setPending] = useState(null);
+  const [previewSlot, setPreviewSlot] = useState("pending");
   const [status, setStatus] = useState("loading");
   const [busy, setBusy] = useState(false);
   const [previewDate] = useState(() => new Date().toISOString());
@@ -145,6 +150,7 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
     getReviewCard().then(result => {
       if (cancelled) return;
       setBackground(result.background);
+      setPending(result.pending);
       setSavedStyle(result.style || {});
       setStyle(result.style || {});
       setStatus(result.error ? "error" : "ready");
@@ -205,20 +211,40 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
     }
     setCropFile(null);
     setBackground(result.background);
-    toast.success(t("ascend.settings.reviewCard.uploaded"));
+    setPending(result.pending);
+    setPreviewSlot("pending");
+    toast.success(
+      t(
+        result.background
+          ? "ascend.settings.reviewCard.uploadedKeepsCurrent"
+          : "ascend.settings.reviewCard.uploaded"
+      )
+    );
   };
 
-  const handleRemove = async () => {
+  const handleRemove = async pendingOnly => {
     setBusy(true);
-    const result = await deleteReviewCardBackground();
+    const result = await deleteReviewCardBackground({ pendingOnly });
     setBusy(false);
     if (result.error) {
       toast.error(result.error);
       return;
     }
-    setBackground(null);
-    toast.success(t("ascend.settings.reviewCard.removed"));
+    setPending(null);
+    if (!pendingOnly) setBackground(null);
+    toast.success(
+      t(
+        pendingOnly
+          ? "ascend.settings.reviewCard.pendingCanceled"
+          : "ascend.settings.reviewCard.removed"
+      )
+    );
   };
+
+  const hasImage = Boolean(background || pending);
+  const awaitingApproval = Boolean(pending || (background && !background.passed));
+  const showingPending = Boolean(pending && (previewSlot === "pending" || !background));
+  const previewUrl = showingPending ? pending.url : background?.url;
 
   const styleChanged = STYLE_FIELDS.some(field => style[field] !== savedStyle[field]);
   const setStyleField = (field, value) =>
@@ -258,23 +284,23 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
             {t("ascend.settings.reviewCard.title")}
           </h2>
         </div>
-        {background && (
+        {hasImage && (
           <span
             className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
-              background.passed
-                ? "bg-green-500/10 text-green-500"
-                : "bg-yellow-500/10 text-yellow-500"
+              awaitingApproval
+                ? "bg-yellow-500/10 text-yellow-500"
+                : "bg-green-500/10 text-green-500"
             }`}
           >
-            {background.passed ? (
-              <CheckCircle2 className="h-3.5 w-3.5" />
-            ) : (
+            {awaitingApproval ? (
               <Clock className="h-3.5 w-3.5" />
+            ) : (
+              <CheckCircle2 className="h-3.5 w-3.5" />
             )}
             {t(
-              background.passed
-                ? "ascend.settings.reviewCard.approved"
-                : "ascend.settings.reviewCard.pending"
+              awaitingApproval
+                ? "ascend.settings.reviewCard.pending"
+                : "ascend.settings.reviewCard.approved"
             )}
           </span>
         )}
@@ -288,7 +314,34 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
         </p>
 
         {/* The real review card at its game page width (two per row beside the sidebar) */}
-        <div className="rounded-xl bg-card p-4">
+        <div className="space-y-3 rounded-xl bg-card p-4">
+          {pending && background && (
+            <div
+              role="tablist"
+              className="inline-flex rounded-lg bg-muted p-0.5 text-xs font-medium"
+            >
+              {["live", "pending"].map(slot => (
+                <button
+                  key={slot}
+                  type="button"
+                  role="tab"
+                  aria-selected={previewSlot === slot}
+                  onClick={() => setPreviewSlot(slot)}
+                  className={`rounded-md px-2.5 py-1 transition-colors ${
+                    previewSlot === slot
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t(
+                    slot === "live"
+                      ? "ascend.settings.reviewCard.previewCurrent"
+                      : "ascend.settings.reviewCard.previewNew"
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="max-w-[384px]">
             <ReviewCard
               review={{
@@ -300,7 +353,7 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
                   contributor: userData?.contributor === true,
                   verified: userData?.verified === true,
                 },
-                cardBackground: background?.url,
+                cardBackground: previewUrl,
                 cardStyle: style,
                 createdAt: previewDate,
               }}
@@ -310,9 +363,13 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
           </div>
         </div>
 
-        {background && !background.passed && (
+        {awaitingApproval && (
           <p className="text-sm text-muted-foreground">
-            {t("ascend.settings.reviewCard.pendingDescription")}
+            {t(
+              pending && background?.passed
+                ? "ascend.settings.reviewCard.pendingKeepsCurrent"
+                : "ascend.settings.reviewCard.pendingDescription"
+            )}
           </p>
         )}
         {status === "error" && (
@@ -340,15 +397,26 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
               <Upload className="h-4 w-4" />
             )}
             {t(
-              background
+              hasImage
                 ? "ascend.settings.reviewCard.replace"
                 : "ascend.settings.reviewCard.upload"
             )}
           </Button>
-          {background && (
+          {pending && background && (
             <Button
               variant="outline"
-              onClick={handleRemove}
+              onClick={() => handleRemove(true)}
+              disabled={busy}
+              className="gap-2"
+            >
+              <X className="h-4 w-4" />
+              {t("ascend.settings.reviewCard.cancelPending")}
+            </Button>
+          )}
+          {hasImage && (
+            <Button
+              variant="outline"
+              onClick={() => handleRemove(false)}
               disabled={busy}
               className="gap-2"
             >
@@ -397,13 +465,13 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
               min={MIN_IMAGE_OPACITY}
               max={100}
               step={1}
-              disabled={savingStyle || !background}
+              disabled={savingStyle || !hasImage}
               onValueChange={([value]) =>
                 setStyleField("imageOpacity", value === 100 ? null : value)
               }
               aria-label={t("ascend.settings.reviewCard.imageOpacity")}
             />
-            {!background && (
+            {!hasImage && (
               <p className="text-xs text-muted-foreground">
                 {t("ascend.settings.reviewCard.imageOpacityHint")}
               </p>

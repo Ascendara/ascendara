@@ -3125,18 +3125,22 @@ export const listMyReports = async () => {
  * style (aura/text colors, image opacity), DELETE removes the background.
  * @returns {Promise<{background: object|null, style: object|undefined, error: string|null, code?: string}>}
  */
-const reviewCardRequest = async (method, body, headers) => {
+const reviewCardRequest = async (method, body, headers, query = "") => {
   try {
     const user = auth.currentUser;
     if (!user) {
       return { background: null, error: "Not authenticated" };
     }
 
-    const response = await userAuthenticatedFetch(user, `${API_URL}/ascend/review-card`, {
-      method,
-      body,
-      headers,
-    });
+    const response = await userAuthenticatedFetch(
+      user,
+      `${API_URL}/ascend/review-card${query}`,
+      {
+        method,
+        body,
+        headers,
+      }
+    );
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
@@ -3147,7 +3151,12 @@ const reviewCardRequest = async (method, body, headers) => {
       };
     }
 
-    return { background: data.background || null, style: data.style, error: null };
+    return {
+      background: data.background || null,
+      pending: data.pending || null,
+      style: data.style,
+      error: null,
+    };
   } catch (error) {
     console.error("Review card request error:", error);
     return { background: null, error: error.message };
@@ -3162,7 +3171,12 @@ export const uploadReviewCardBackground = file => {
   return reviewCardRequest("POST", formData);
 };
 
-export const deleteReviewCardBackground = () => reviewCardRequest("DELETE");
+/**
+ * @param {{pendingOnly?: boolean}} options - pendingOnly cancels just the
+ *   upload awaiting approval and keeps the approved background
+ */
+export const deleteReviewCardBackground = ({ pendingOnly = false } = {}) =>
+  reviewCardRequest("DELETE", undefined, undefined, pendingOnly ? "?pending=1" : "");
 
 /**
  * @param {{auraColor?: string|null, textColor?: string|null, imageOpacity?: number|null}} style
