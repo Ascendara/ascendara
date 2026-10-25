@@ -27,6 +27,13 @@ import {
   Smartphone,
   Joystick,
   LibraryBig,
+  CloudUpload,
+  RefreshCw,
+  Save,
+  Star,
+  Flag,
+  Telescope,
+  FlaskConical,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -39,6 +46,29 @@ import {
 } from "@/components/ui/alert-dialog";
 import GoogleIcon from "./GoogleIcon";
 import "./auth.css";
+
+// The smaller features scroll past in two rows so they all fit in the space
+// of two lines. Each row is drawn twice so the loop has no visible seam.
+const MarqueeRowOne = [
+  { icon: UserPlus, name: "friends" },
+  { icon: MessageCircle, name: "chat" },
+  { icon: User, name: "profiles" },
+  { icon: Trophy, name: "leaderboard" },
+  { icon: Star, name: "highlightedReviews" },
+  { icon: Flag, name: "reportTracking" },
+  { icon: LibraryBig, name: "libraryBackups" },
+  { icon: Save, name: "retroSaves" },
+];
+
+const MarqueeRowTwo = [
+  { icon: Joystick, name: "emulatorPresets" },
+  { icon: CloudUpload, name: "cloudBackups" },
+  { icon: ListOrdered, name: "downloadQueues" },
+  { icon: Telescope, name: "updatePreview" },
+  { icon: Puzzle, name: "nexusMods" },
+  { icon: Zap, name: "trainers" },
+  { icon: FlaskConical, name: "experimentalBranch" },
+];
 
 function ConsentCheckbox({ id, checked, onChange, disabled }) {
   return (
@@ -131,16 +161,19 @@ export default function AuthSection({
                 >
                   {t("account.featuresIntro")}
                 </h2>
-                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                <span
+                  className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground"
+                  title={t("account.features.moreComingDesc")}
+                >
                   {t("account.features.moreComing")}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-x-5 gap-y-3">
                 {[
-                  { icon: Cloud, name: "cloudSyncandBackups" },
+                  { icon: Cloud, name: "cloudSync" },
                   { icon: Smartphone, name: "mobileView" },
-                  { icon: Zap, name: "autoUpdate" },
-                  { icon: ListOrdered, name: "downloadQueues" },
+                  { icon: RefreshCw, name: "autoUpdate" },
+                  { icon: InfinityIcon, name: "unlimitedDownloads" },
                 ].map(({ icon: Icon, name }) => (
                   <div key={name} className="relative pl-6">
                     <Icon
@@ -157,28 +190,29 @@ export default function AuthSection({
                   </div>
                 ))}
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-x-3 gap-y-2 border-t border-border/40 pt-3">
-                {[
-                  { icon: User, name: "profiles" },
-                  { icon: UserPlus, name: "friends" },
-                  { icon: MessageCircle, name: "chat" },
-                  { icon: Trophy, name: "leaderboard" },
-                  { icon: LibraryBig, name: "libraryBackups" },
-                  { icon: InfinityIcon, name: "unlimitedDownloads" },
-                  { icon: Puzzle, name: "nexusMods" },
-                  { icon: Zap, name: "trainers" },
-                  { icon: Joystick, name: "emulatorPresets" },
-                ].map(({ icon: Icon, name }) => (
-                  <span
-                    key={name}
-                    className="flex items-center gap-2 text-xs text-muted-foreground"
-                    title={
-                      name === "profiles" ? t("account.features.profilesDesc") : undefined
-                    }
+              <div className="mt-4 space-y-2 border-t border-border/40 pt-3">
+                {[MarqueeRowOne, MarqueeRowTwo].map((Row, RowIndex) => (
+                  <div
+                    key={RowIndex}
+                    className="ascend-marquee"
+                    data-reverse={RowIndex === 1 ? "" : undefined}
                   >
-                    <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                    {t(`account.features.${name}`)}
-                  </span>
+                    <div className="ascend-marquee-track">
+                      {[0, 1].map(Copy =>
+                        Row.map(({ icon: Icon, name }) => (
+                          <span
+                            key={`${Copy}-${name}`}
+                            aria-hidden={Copy === 1 ? true : undefined}
+                            className="ascend-marquee-chip flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 px-2.5 py-1 text-xs text-muted-foreground"
+                            title={t(`account.features.${name}Desc`)}
+                          >
+                            <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {t(`account.features.${name}`)}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             </section>

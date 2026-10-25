@@ -175,12 +175,76 @@
   transform: scale(0.99);
 }
 
+.ascend-marquee {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+
+.ascend-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: ascend-marquee 45s linear infinite;
+}
+
+.ascend-marquee[data-reverse] .ascend-marquee-track {
+  animation-direction: reverse;
+  animation-duration: 40s;
+}
+
+.ascend-marquee:hover .ascend-marquee-track,
+.ascend-marquee:focus-within .ascend-marquee-track {
+  animation-play-state: paused;
+}
+
+/* Margin instead of gap so both copies are the same width and -50% loops cleanly. */
+.ascend-marquee-chip {
+  margin-right: 0.5rem;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.ascend-marquee-chip:hover {
+  color: rgb(var(--color-foreground));
+  border-color: rgb(var(--color-primary) / 0.5);
+}
+
+@keyframes ascend-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ascend-auth *,
   .ascend-auth *::before,
   .ascend-auth *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+  /* No scrolling: show one copy and let people swipe through it instead. */
+  .ascend-auth .ascend-marquee {
+    overflow-x: auto;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .ascend-auth .ascend-marquee-track {
+    animation: none !important;
+  }
+
+  .ascend-auth .ascend-marquee-chip[aria-hidden] {
+    display: none;
   }
 }
 
