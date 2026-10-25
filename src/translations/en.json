@@ -1512,6 +1512,7 @@
       "downloadTorrent": "Download Torrent",
       "downloading": "Downloading",
       "getExtension": "Don't have the extension? Get it for Chrome or Firefox",
+      "gettingDownloadLink": "Getting download link...",
       "handlerInstructions": {
         "step1": "Open the link in your browser and enable the extension",
         "step2": "Complete the CAPTCHA and start the download",
@@ -1527,6 +1528,7 @@
         "step6": "Paste the DDL in the input box and click Download Now"
       },
       "noProviders": "No download providers available for this game.",
+      "openingDownloadPage": "Opening download page...",
       "pasteLink": "Paste your direct download link (DDL) here",
       "seamlessInstructions": {
         "description": "Ascendara will automatically process the download link and convert it to a direct download link",

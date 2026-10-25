@@ -190,9 +190,22 @@ function registerMiscHandlers() {
     if (!isSafeExternalUrl(url)) throw new Error("Only HTTP(S) links are allowed");
     if (options?.referrer) {
       if (!isSafeExternalUrl(options.referrer)) throw new Error("Invalid referrer");
+      // autoDownload keeps the window hidden and starts the download itself,
+      // only showing the window if that doesn't work out (e.g. a captcha).
+      // The returned promise settles with what happened so the renderer can
+      // stop its loading state.
+      const autoDownload = !!options.autoDownload;
+      let settle = () => {};
+      const outcome = new Promise(resolve => {
+        settle = status => {
+          settle = () => {};
+          resolve({ status });
+        };
+      });
       const externalWindow = new BrowserWindow({
         width: 1280,
         height: 800,
+        show: !autoDownload,
         icon: path.join(
           __dirname,
           "../..",
@@ -282,6 +295,8 @@ function registerMiscHandlers() {
         if (blockedHandled) return;
         blockedHandled = true;
         clearTimeout(blankPageTimeout);
+        clearTimeout(revealTimeout);
+        settle("blocked");
         console.log("External provider window appears blocked:", reason);
         try {
           if (sender && !sender.isDestroyed()) {
@@ -392,7 +407,76 @@ function registerMiscHandlers() {
         }
       }, 20000);
 
-      externalWindow.once("closed", () => clearTimeout(blankPageTimeout));
+      // Hand the window to the user when the automatic download can't finish
+      // on its own, so they can click through whatever is in the way.
+      let revealTimeout;
+      const revealWindow = reason => {
+        clearTimeout(revealTimeout);
+        if (
+          blockedHandled ||
+          externalWindow.isDestroyed() ||
+          externalWindow.isVisible()
+        ) {
+          return;
+        }
+        console.log("Showing external provider window:", reason);
+        externalWindow.show();
+        externalWindow.focus();
+        settle("shown");
+      };
+
+      if (autoDownload) {
+        revealTimeout = setTimeout(
+          () => revealWindow("Automatic download took too long"),
+          20000
+        );
+
+        // Do what the download button does: request its htmx endpoint and
+        // follow the HX-Redirect to the file, which will-download then catches.
+        // If the endpoint doesn't answer that way, click the button instead.
+        let downloadTriggered = false;
+        externalWindow.webContents.on("did-finish-load", async () => {
+          if (downloadTriggered || blockedHandled || externalWindow.isDestroyed()) return;
+          try {
+            if (sender && !sender.isDestroyed()) {
+              sender.send("external-window-progress", { url, stage: "resolving" });
+            }
+            const result = await externalWindow.webContents.executeJavaScript(
+              `(async function () {
+                const trigger = document.querySelector('[hx-get*="/download"]');
+                if (!trigger) return "missing";
+                try {
+                  const response = await fetch(trigger.getAttribute("hx-get"), {
+                    headers: { "HX-Request": "true", "HX-Current-URL": location.href },
+                    credentials: "include",
+                    redirect: "manual",
+                  });
+                  const redirect = response.headers.get("HX-Redirect");
+                  if (redirect) {
+                    location.href = new URL(redirect, location.href).href;
+                    return "redirected";
+                  }
+                } catch (error) {}
+                trigger.click();
+                return "clicked";
+              })()`
+            );
+            // A page without the button (e.g. a challenge) may navigate on to
+            // the real one, so try again on the next load
+            if (result !== "missing") downloadTriggered = true;
+            console.log("Automatic external window download:", result);
+          } catch (error) {
+            console.error("Failed to start automatic download:", error);
+            revealWindow("Automatic download failed");
+          }
+        });
+      }
+
+      externalWindow.once("closed", () => {
+        clearTimeout(blankPageTimeout);
+        clearTimeout(revealTimeout);
+        settle("closed");
+      });
 
       externalWindow.loadURL(url, { httpReferrer: options.referrer });
 
@@ -401,6 +485,8 @@ function registerMiscHandlers() {
       const onWillDownload = (event, item, webContents) => {
         if (webContents !== externalWindow.webContents) return;
         event.preventDefault();
+        clearTimeout(revealTimeout);
+        settle("intercepted");
         const downloadUrl = item.getURL();
         console.log("Intercepted download in external window:", downloadUrl);
 
@@ -436,6 +522,7 @@ function registerMiscHandlers() {
       externalWindow.once("closed", () =>
         providerSession.removeListener("will-download", onWillDownload)
       );
+      if (autoDownload) return outcome;
     } else {
       await shell.openExternal(url);
     }

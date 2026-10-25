@@ -159,6 +159,7 @@ export default function DownloadPanel({
   showBrowserDownloadTip,
   onBrowserDownloadTipChange,
   filesUnavailable,
+  linkStage,
 }) {
   const { t } = useLanguage();
   if (filesUnavailable) return <FilesUnavailable />;
@@ -166,6 +167,8 @@ export default function DownloadPanel({
   const usingTorbox = torboxAvailable && !torboxDisabledForSession;
   const opensInBrowser =
     selectedProvider === "buzzheavier" || selectedProvider === "megadb";
+  // Buzzheavier downloads in a hidden window, so only MegaDB needs the click tip
+  const showsBrowserTip = selectedProvider === "megadb";
   const isTorrentMode = mode === "fitgirl" || mode === "torrent";
 
   const header = {
@@ -204,10 +207,21 @@ export default function DownloadPanel({
       : mode === "torrent"
         ? isStartingDownload || !settings.torrentEnabled || !torrentRunning
         : mode === "seamless"
-          ? isStartingDownload
+          ? isStartingDownload || !!linkStage
           : isStartingDownload || !selectedProvider || !inputLink || !isValidLink;
 
-  const downloadLabel = isStartingDownload ? (
+  const linkStageLabel = {
+    opening: t("download.downloadOptions.openingDownloadPage"),
+    resolving: t("download.downloadOptions.gettingDownloadLink"),
+    starting: t("download.downloadOptions.startingDownload"),
+  }[linkStage];
+
+  const downloadLabel = linkStageLabel ? (
+    <>
+      {linkStageLabel}
+      <Loader className="ml-2 h-4 w-4 animate-spin" />
+    </>
+  ) : isStartingDownload ? (
     <>
       {isTorrentMode
         ? t("download.sendingTorrent")
@@ -325,7 +339,7 @@ export default function DownloadPanel({
           {/* Seamless / TorBox flow */}
           {mode === "seamless" && (
             <>
-              {opensInBrowser && (
+              {showsBrowserTip && (
                 <div className="rounded-lg bg-primary/5 p-3 text-sm text-primary">
                   {t("download.downloadOptions.buzzheavierReminder")}
                 </div>

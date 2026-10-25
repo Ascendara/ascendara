@@ -347,6 +347,8 @@ function PublicDownloadPage() {
   const [selectedProvider, setSelectedProvider] = useState("");
   const [inputLink, setInputLink] = useState("");
   const [isStartingDownload, setIsStartingDownload] = useState(false);
+  // Where a hidden-window download is: "opening", "resolving" or "starting"
+  const [linkStage, setLinkStage] = useState(null);
 
   // When provider changes, re-validate the input link
   useEffect(() => {
@@ -1669,6 +1671,7 @@ function PublicDownloadPage() {
             setSelectedProvider(provider);
             setInputLink(cleanUrl);
             setIsValidLink(true);
+            setLinkStage(stage => (stage ? "starting" : stage));
             await whereToDownloadRef.current(cleanUrl);
             return;
           }
@@ -1678,6 +1681,8 @@ function PublicDownloadPage() {
       } catch (error) {
         console.error("Error handling intercepted download URL:", error);
         toast.error(t("download.toast.invalidProtocolUrl"));
+      } finally {
+        setLinkStage(null);
       }
     };
 
@@ -1692,6 +1697,14 @@ function PublicDownloadPage() {
   useEffect(() => {
     const removeListener = window.electron.onExternalWindowBlocked(() => {
       setShowProviderBlockedDialog(true);
+    });
+    return () => removeListener && removeListener();
+  }, []);
+
+  useEffect(() => {
+    const removeListener = window.electron.onExternalWindowProgress(({ stage }) => {
+      // Only while a hidden-window download is still being worked on
+      setLinkStage(current => (current ? stage : current));
     });
     return () => removeListener && removeListener();
   }, []);
@@ -1858,7 +1871,26 @@ function PublicDownloadPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [navigate, location.pathname]);
 
-  const openBrowserLink = ({ link, needsReferrerSpoofing }) => {
+  const openBrowserLink = async ({ link, needsReferrerSpoofing, autoDownload }) => {
+    if (autoDownload) {
+      // The page is handled in a hidden window; only shown if it needs the user
+      setLinkStage("opening");
+      let intercepted = false;
+      try {
+        const result = await window.electron.openURL(link, {
+          referrer: "https://steamrip.com/",
+          autoDownload: true,
+        });
+        intercepted = result?.status === "intercepted";
+        if (result?.status === "shown") {
+          toast.info(t("download.downloadOptions.buzzheavierReminder"));
+        }
+      } finally {
+        // An intercepted link moves on to "starting", cleared once it's handed off
+        if (!intercepted) setLinkStage(null);
+      }
+      return;
+    }
     if (needsReferrerSpoofing) {
       return window.electron.openURL(link, { referrer: "https://steamrip.com/" });
     }
@@ -1901,15 +1933,17 @@ function PublicDownloadPage() {
       ? `https:${downloadLinks[selectedProvider][0]}`
       : downloadLinks[selectedProvider][0];
 
-    const needsReferrerSpoofing =
+    const autoDownload =
       selectedProvider.toLowerCase() === "buzzheavier" ||
+      /bzzhr\.(?:to|co)|buzzheavier|fafda\.to|fuckingfast\.(?:net|co)/i.test(link);
+    const needsReferrerSpoofing =
+      autoDownload ||
       selectedProvider.toLowerCase() === "megadb" ||
-      /bzzhr\.(?:to|co)|buzzheavier|fafda\.to|fuckingfast\.(?:net|co)|megadb\.net/i.test(
-        link
-      );
+      /megadb\.net/i.test(link);
 
-    const browserLink = { link, needsReferrerSpoofing };
-    if (await checkIfNewUser()) {
+    const browserLink = { link, needsReferrerSpoofing, autoDownload };
+    // The guide walks through downloading in a browser, which auto downloads skip
+    if (!autoDownload && (await checkIfNewUser())) {
       pendingBrowserLinkRef.current = browserLink;
       setShowNewUserGuide(true);
     } else {
@@ -2184,6 +2218,7 @@ function PublicDownloadPage() {
               onTorboxDisabledChange={setTorboxDisabledForSession}
               torrentRunning={torrentRunning}
               isStartingDownload={isStartingDownload}
+              linkStage={linkStage}
               isDev={isDev}
               providerLink={providerLink}
               showCopySuccess={showCopySuccess}

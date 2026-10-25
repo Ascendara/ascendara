@@ -701,6 +701,10 @@ contextBridge.exposeInMainWorld("electron", {
     preloadIpc.subscribe("external-window-blocked", callback, {
       selectArgs: args => [args[0]],
     }),
+  onExternalWindowProgress: callback =>
+    preloadIpc.subscribe("external-window-progress", callback, {
+      selectArgs: args => [args[0]],
+    }),
   fetchApiImage: (endpoint, imgID, timestamp, signature) =>
     ipcRenderer.invoke("fetch-api-image", endpoint, imgID, timestamp, signature),
   getSteamGridUrls: gameName => ipcRenderer.invoke("steamgrid-get-urls", gameName),
