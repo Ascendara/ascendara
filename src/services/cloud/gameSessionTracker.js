@@ -25,7 +25,8 @@ import { API_URL } from "@/config/api";
 const SESSION_API = `${API_URL}/v3/playtime/session`;
 
 // Active sessions keyed by gameName -> { baselinePlayTime, baselineLaunchCount,
-// startedAt, isCustom, gameID, sessionId, legacy, timer, missedRunningChecks }
+// startedAt, isCustom, gameID, sessionId, legacy, starting, timer,
+// missedRunningChecks }
 const activeSessions = new Map();
 
 const norm = name => (name || "").trim();
@@ -89,9 +90,12 @@ const readLocalGameSnapshot = async gameName => {
 /**
  * Start (or restart) the server session for a tracked game and keep it alive
  * with heartbeats. Leaves session.sessionId null when the server can't be
- * reached; that session simply earns no server-timed playtime.
+ * reached; the next heartbeat tick tries again, so a blip at launch costs
+ * one tick instead of the whole session.
  */
 const startServerSession = async (name, session) => {
+  if (session.starting) return;
+  session.starting = true;
   try {
     const { ok, status, data } = await callSessionApi("start", {
       game: name,
@@ -115,11 +119,13 @@ const startServerSession = async (name, session) => {
     );
   } catch (e) {
     console.warn("[gameSessionTracker] Session start error:", e?.message || e);
+  } finally {
+    session.starting = false;
   }
 };
 
 const heartbeat = async (name, session) => {
-  if (activeSessions.get(name) !== session || !session.sessionId) return;
+  if (activeSessions.get(name) !== session || session.legacy) return;
 
   // Safety net for a missed `game-closed` event: stop once the game has been
   // gone for two checks in a row.
@@ -134,6 +140,11 @@ const heartbeat = async (name, session) => {
     /* Keep heartbeating if the check itself fails. */
   }
 
+  if (!session.sessionId) {
+    await startServerSession(name, session);
+    return;
+  }
+
   try {
     const { status, data } = await callSessionApi("heartbeat", {
       sessionId: session.sessionId,
@@ -141,7 +152,6 @@ const heartbeat = async (name, session) => {
     if (status === 404 && data?.code === "SESSION_NOT_FOUND") {
       // The server closed it (e.g. we were offline too long): start fresh.
       session.sessionId = null;
-      clearInterval(session.timer);
       startServerSession(name, session);
     }
   } catch (e) {
@@ -170,10 +180,14 @@ export const recordSessionStart = async gameName => {
     gameID: snapshot?.gameID || null,
     sessionId: null,
     legacy: false,
+    starting: false,
     timer: null,
     missedRunningChecks: 0,
   };
   activeSessions.set(name, session);
+  // Ticks until the server answers; a successful start replaces it with one
+  // at the server's heartbeat interval.
+  session.timer = setInterval(() => heartbeat(name, session), 60 * 1000);
   await startServerSession(name, session);
 };
 
