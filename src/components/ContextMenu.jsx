@@ -19,6 +19,8 @@ const ContextMenu = () => {
   const handleContextMenu = e => {
     if (e.defaultPrevented) return;
     e.preventDefault();
+    // The menu would open behind any dialog, so it stays closed while one is up
+    if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
     const folderCard = e.target.closest?.("[data-library-folder]");
     setTargetFolder(folderCard ? getFolderByName(folderCard.dataset.libraryFolder) : null);
     const x = e.clientX;
