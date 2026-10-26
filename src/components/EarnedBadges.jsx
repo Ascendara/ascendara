@@ -137,8 +137,8 @@ function BadgeEmblem({ icon: Icon, colors, className, style }) {
 // Level emblems grow more ornate with each tier, every tier keeping what the
 // ones below it added. Rank 0 is level 10, rank 9 is level 100:
 //   1 facets  2 rim  3 studs  4 wings  5 crest  6 rays  7 aurora  8 sparkles  9 crown
-// Ornaments may spill a little past the emblem's box, about as far as the gap
-// between badges, so the number keeps its full size.
+// Ornaments reach past the hexagon, so the emblem widens to make room for them
+// on each side, keeping the number at full size and clear of the name beside it.
 const HEX_VERTICES = HEXAGON.split(" ").map(point => point.split(",").map(Number));
 const scaleFromCenter = ([x, y], k) => [12 + (x - 12) * k, 12 + (y - 12) * k];
 const RIM_POINTS = HEX_VERTICES.map(vertex => scaleFromCenter(vertex, 1.2));
@@ -159,6 +159,10 @@ const RAYS = Array.from({ length: 12 }, (_, index) => {
   return `${at(10.5, -spread)} ${at(15.8, 0)} ${at(10.5, spread)}`;
 });
 const SPIN_ORIGIN = { transformBox: "view-box", transformOrigin: "12px 12px" };
+
+// How far a rank's ornaments reach past either side of the 24-unit box: the
+// rays from rank 6, the wings from rank 4
+const ornamentSpill = rank => (rank >= 6 ? 3.8 : rank >= 4 ? 2.8 : 0);
 
 // A milestone emblem: the milestone number on the tier's shape, with a light
 // sweep across it, a pop when it appears, and a pulsing glow at the top tier.
@@ -182,6 +186,11 @@ function MilestoneEmblem({
   const { outline, inner, centerY } = MILESTONE_SHAPES[shape];
   const fontSize = String(value).length > 2 ? 7.5 : 9.5;
   const fill = `url(#milestone-fill-${id})`;
+  const spill = ornamentSpill(rank);
+  // The size classes set the height, and the width follows it to fit the spill
+  const boxStyle = spill
+    ? { ...style, width: "auto", aspectRatio: `${24 + spill * 2} / 24` }
+    : style;
 
   return (
     <motion.span
@@ -189,10 +198,10 @@ function MilestoneEmblem({
       style={
         legendary && !animated
           ? {
-              ...style,
+              ...boxStyle,
               filter: [LEGENDARY_GLOW[0], style?.filter].filter(Boolean).join(" "),
             }
-          : style
+          : boxStyle
       }
       animate={
         glow
@@ -208,7 +217,7 @@ function MilestoneEmblem({
       }
     >
       <svg
-        viewBox="0 0 24 24"
+        viewBox={`${-spill} 0 ${24 + spill * 2} 24`}
         className="absolute inset-0 h-full w-full overflow-visible"
         aria-hidden
       >
