@@ -449,7 +449,7 @@
         "submit": "Submit Request",
         "submitting": "Submitting...",
         "success": "Community request submitted! Awaiting admin approval.",
-        "successDescription": "Your request is being reviewed by our team. You'll be notified once it's approved.",
+        "successDescription": "Your request is being reviewed by the lead developer. You'll be notified once it's approved.",
         "title": "Request Community Creation"
       },
       "denied": "Denied",
@@ -615,7 +615,7 @@
       "loadFailed": "Couldn't load your reports",
       "noMatches": "No reports match this filter",
       "refresh": "Refresh",
-      "response": "Response from the team",
+      "response": "Response from tago",
       "retry": "Try again",
       "status": {
         "fixed": "Handled",
@@ -1561,7 +1561,7 @@
       "title": "Fix Artwork",
       "tooltip": "Suggest the correct artwork for this game",
       "verified": "Verified artwork",
-      "verifiedApprovedTooltip": "This artwork was corrected by the community and approved by the Ascendara team",
+      "verifiedApprovedTooltip": "This artwork was corrected by the community",
       "verifiedGameTooltip": "This game is verified, so its details and artwork are correct"
     },
     "ascendFeaturesLocked": "{{gameName}} offers these Ascend features:",
@@ -2005,7 +2005,7 @@
     "downloadsInProgress": "{{count}} download in progress",
     "error": "Error",
     "errorReported": "Issue Reported Successfully",
-    "errorReportedDescription": "Thank you for helping improve Ascendara. Ascendara developer team will investigate this issue.",
+    "errorReportedDescription": "Thank you for helping improve Ascendara. Ascendara lead developer will investigate this issue.",
     "errors": {
       "commandFailed": "Failed to run the command",
       "killFailed": "Failed to kill download",
@@ -4570,7 +4570,7 @@
       "protecting": "Waiting for Windows...",
       "saveFailed": "Couldn't save this download location. Please try again."
     },
-    "logUploadPurpose": "This debug log helps the team assist you with your issue. Your data will be deleted after support is complete.",
+    "logUploadPurpose": "This debug log helps tago assist you with your issue. Your data will be deleted after support is complete.",
     "logUploadWarningDesc": "The logs you're about to upload will contain:",
     "logUploadWarningTitle": "Log Upload Notice",
     "logWarningActivity": "Ascendara Core, Downloader Manager, Notification Helper, and Game Handler activity",
@@ -4771,7 +4771,7 @@
     "startMinimized": "Start Minimized",
     "startMinimizedDescription": "Launch Ascendara in the background on startup instead of opening the main window.",
     "supportCodeDesc": "Enter your 6 digit support code here to upload logs automatically. Need help?",
-    "supportDesc": "Use your support code to connect with Ascendara's support team. Logs upload automatically.",
+    "supportDesc": "Use your support code to connect with Ascendara's servers. Logs upload automatically.",
     "supportError": "Failed to upload logs. Please try again.",
     "themeBy": "by",
     "themeExportFailed": "Failed to export theme",
