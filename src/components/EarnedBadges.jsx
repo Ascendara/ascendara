@@ -74,17 +74,22 @@ const HEXAGON_INNER = "12,3.6 19.7,7.85 19.7,16.15 12,20.4 4.3,16.15 4.3,7.85";
 const toPath = points => `M${points.split(" ").join("L")}Z`;
 
 // Outlines for milestone emblems: hexagons for levels, speech bubbles for
-// reviews, so the two numbers never read as the same badge
+// reviews, so the two numbers never read as the same badge. centerY is the
+// middle of the shape's body, which for the bubble leaves out its tail.
 const MILESTONE_SHAPES = {
-  hexagon: { outline: toPath(HEXAGON), inner: toPath(HEXAGON_INNER), textY: 12.6 },
+  hexagon: { outline: toPath(HEXAGON), inner: toPath(HEXAGON_INNER), centerY: 12 },
   bubble: {
     outline:
       "M6 2.5H18A4 4 0 0 1 22 6.5V14.5A4 4 0 0 1 18 18.5H10.5L6 22V18.5A4 4 0 0 1 2 14.5V6.5A4 4 0 0 1 6 2.5Z",
     inner:
       "M6.4 4.3H17.6A2.6 2.6 0 0 1 20.2 6.9V14.1A2.6 2.6 0 0 1 17.6 16.7H6.4A2.6 2.6 0 0 1 3.8 14.1V6.9A2.6 2.6 0 0 1 6.4 4.3Z",
-    textY: 10.9,
+    centerY: 10.5,
   },
 };
+
+// A centered baseline puts digits a little low, since they have no
+// descenders, so the number is raised by a share of its font size
+const DIGIT_LIFT = 0.036;
 
 // A hexagon emblem with the badge icon on a gradient fill. The size classes
 // passed in size the whole emblem, so it lines up with the other name icons.
@@ -168,7 +173,8 @@ function MilestoneEmblem({
   const reduceMotion = useReducedMotion();
   const animated = !reduceMotion && !still;
   const glow = legendary && animated;
-  const { outline, inner, textY } = MILESTONE_SHAPES[shape];
+  const { outline, inner, centerY } = MILESTONE_SHAPES[shape];
+  const fontSize = String(value).length > 2 ? 7.5 : 9.5;
   const fill = `url(#milestone-fill-${id})`;
 
   return (
@@ -326,10 +332,10 @@ function MilestoneEmblem({
         )}
         <motion.text
           x="12"
-          y={textY}
+          y={centerY - fontSize * DIGIT_LIFT}
           textAnchor="middle"
           dominantBaseline="central"
-          fontSize={String(value).length > 2 ? 7.5 : 9.5}
+          fontSize={fontSize}
           fontWeight="800"
           fill="white"
           stroke={colors[1]}
