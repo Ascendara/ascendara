@@ -1708,7 +1708,9 @@ const Library = () => {
               </div>
               <div className="min-w-0 flex-1 text-left">
                 <p className="truncate text-sm font-semibold leading-none text-foreground">
-                  {username || "Guest"}
+                  {(user?.uid && (userData?.displayName || user?.displayName)) ||
+                    username ||
+                    "Guest"}
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {games.filter(g => !g.isFolder).length +
