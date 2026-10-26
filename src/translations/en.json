@@ -331,12 +331,16 @@
       "bugCatcher": "Bug Catcher",
       "bugCatcherDescription": "Reported a bug that got fixed",
       "catalog": {
+        "allUnlocked": "Every milestone unlocked",
         "description": "Earned by playing, reviewing and helping out across Ascend.",
+        "levelProgress": "Level {{level}}",
         "levels": "Level milestones",
         "levelsDescription": "A new tier every 10 levels",
+        "nextMilestone": "{{remaining}} to go until {{name}}",
         "promoAction": "Try Ascend",
         "promoContent": "Level up, review games and start earning your own.",
         "promoTitle": "Want badges like these?",
+        "reviewProgress": "{{count}} reviewed",
         "reviews": "Review milestones",
         "reviewsDescription": "Review different games to climb the ranks",
         "title": "Badges"

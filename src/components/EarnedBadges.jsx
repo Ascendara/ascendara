@@ -6,6 +6,7 @@ import {
   Bug,
   Crown,
   Hammer,
+  Lock,
   MessageSquareText,
   Sparkles,
 } from "lucide-react";
@@ -58,6 +59,9 @@ const LEVEL_TIERS = [
   { level: 20, tier: "fire", colors: ["#fbbf24", "#ea580c"] },
   { level: 10, tier: "energy", colors: ["#fb7185", "#e11d48"] },
 ];
+
+// How ornate a level tier's emblem is, from 0 at level 10 to 9 at level 100
+const levelRank = tier => LEVEL_TIERS.length - 1 - LEVEL_TIERS.indexOf(tier);
 
 const LEGENDARY_GLOW = [
   "drop-shadow(0 0 1px rgba(250, 204, 21, 0.6))",
@@ -119,16 +123,53 @@ function BadgeEmblem({ icon: Icon, colors, className, style }) {
   );
 }
 
+// Level emblems grow more ornate with each tier, every tier keeping what the
+// ones below it added. Rank 0 is level 10, rank 9 is level 100:
+//   1 facets  2 rim  3 studs  4 wings  5 crest  6 rays  7 aurora  8 sparkles  9 crown
+// Ornaments may spill a little past the emblem's box, about as far as the gap
+// between badges, so the number keeps its full size.
+const HEX_VERTICES = HEXAGON.split(" ").map(point => point.split(",").map(Number));
+const scaleFromCenter = ([x, y], k) => [12 + (x - 12) * k, 12 + (y - 12) * k];
+const RIM_POINTS = HEX_VERTICES.map(vertex => scaleFromCenter(vertex, 1.2));
+const RIM = RIM_POINTS.map(point => point.join(",")).join(" ");
+const FACET_LIGHT = "12,12 2.5,6.75 12,1.5 21.5,6.75";
+const FACET_DARK = "12,12 21.5,17.25 12,22.5 2.5,17.25";
+const WING_RIGHT = "21,8.6 26.8,6.2 25.2,12 26.8,17.8 21,15.4";
+const WING_LEFT = "3,8.6 -2.8,6.2 -1.2,12 -2.8,17.8 3,15.4";
+const CREST =
+  "M12 -3.6L12.9 -1.1L15.4 -0.6L12.9 -0.1L12 2.4L11.1 -0.1L8.6 -0.6L11.1 -1.1Z";
+const CROWN = "M7.6 2.8L6.6 -2.4L9.8 0.2L12 -3.8L14.2 0.2L17.4 -2.4L16.4 2.8Z";
+const SPARKLE = "M0 -1.8L0.45 -0.45L1.8 0L0.45 0.45L0 1.8L-0.45 0.45L-1.8 0L-0.45 -0.45Z";
+const RAYS = Array.from({ length: 12 }, (_, index) => {
+  const angle = (index * 30 * Math.PI) / 180;
+  const spread = (5 * Math.PI) / 180;
+  const at = (radius, offset) =>
+    `${12 + radius * Math.cos(angle + offset)},${12 + radius * Math.sin(angle + offset)}`;
+  return `${at(10.5, -spread)} ${at(15.8, 0)} ${at(10.5, spread)}`;
+});
+const SPIN_ORIGIN = { transformBox: "view-box", transformOrigin: "12px 12px" };
+
 // A milestone emblem: the milestone number on the tier's shape, with a light
 // sweep across it, a pop when it appears, and a pulsing glow at the top tier.
-// All motion is skipped when the system asks for reduced motion, and for still
-// emblems like the locked ones in the catalog.
-function MilestoneEmblem({ value, colors, shape, legendary, still, className, style }) {
+// Level emblems add the ornaments above by rank. All motion is skipped when
+// the system asks for reduced motion, and for still emblems like the locked
+// ones in the catalog.
+function MilestoneEmblem({
+  value,
+  colors,
+  shape,
+  legendary,
+  rank = 0,
+  still,
+  className,
+  style,
+}) {
   const id = useId().replace(/[^a-zA-Z0-9-_]/g, "");
   const reduceMotion = useReducedMotion();
   const animated = !reduceMotion && !still;
   const glow = legendary && animated;
   const { outline, inner, textY } = MILESTONE_SHAPES[shape];
+  const fill = `url(#milestone-fill-${id})`;
 
   return (
     <motion.span
@@ -154,11 +195,38 @@ function MilestoneEmblem({ value, colors, shape, legendary, still, className, st
         glow ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" } : undefined
       }
     >
-      <svg viewBox="0 0 24 24" className="absolute inset-0 h-full w-full" aria-hidden>
+      <svg
+        viewBox="0 0 24 24"
+        className="absolute inset-0 h-full w-full overflow-visible"
+        aria-hidden
+      >
         <defs>
           <linearGradient id={`milestone-fill-${id}`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={colors[0]} />
-            <stop offset="100%" stopColor={colors[1]} />
+            {/* Aurora tiers and up slowly trade their two colors back and forth */}
+            <motion.stop
+              offset="0%"
+              stopColor={colors[0]}
+              animate={
+                animated && rank >= 7
+                  ? { stopColor: [colors[0], colors[1], colors[0]] }
+                  : undefined
+              }
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <motion.stop
+              offset="100%"
+              stopColor={colors[1]}
+              animate={
+                animated && rank >= 7
+                  ? { stopColor: [colors[1], colors[0], colors[1]] }
+                  : undefined
+              }
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </linearGradient>
+          <linearGradient id={`milestone-crown-${id}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fef08a" />
+            <stop offset="100%" stopColor="#f59e0b" />
           </linearGradient>
           <linearGradient id={`milestone-shine-${id}`} x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%" stopColor="white" stopOpacity="0" />
@@ -169,13 +237,63 @@ function MilestoneEmblem({ value, colors, shape, legendary, still, className, st
             <path d={outline} />
           </clipPath>
         </defs>
+        {rank >= 6 && (
+          <motion.g
+            style={SPIN_ORIGIN}
+            animate={animated ? { rotate: 360 } : undefined}
+            transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+          >
+            {RAYS.map(points => (
+              <polygon key={points} points={points} fill={colors[0]} opacity="0.55" />
+            ))}
+          </motion.g>
+        )}
+        {rank >= 4 &&
+          [WING_LEFT, WING_RIGHT].map(points => (
+            <polygon
+              key={points}
+              points={points}
+              fill={fill}
+              stroke={colors[1]}
+              strokeWidth="0.6"
+              strokeLinejoin="round"
+            />
+          ))}
+        {rank >= 2 && (
+          <polygon
+            points={RIM}
+            fill="none"
+            stroke={colors[1]}
+            strokeWidth="1"
+            strokeLinejoin="round"
+            opacity="0.85"
+          />
+        )}
         <path
           d={outline}
-          fill={`url(#milestone-fill-${id})`}
-          stroke={`url(#milestone-fill-${id})`}
+          fill={fill}
+          stroke={fill}
           strokeWidth="2"
           strokeLinejoin="round"
         />
+        {rank >= 1 && (
+          <>
+            <polygon points={FACET_LIGHT} fill="white" opacity="0.16" />
+            <polygon points={FACET_DARK} fill="black" opacity="0.12" />
+          </>
+        )}
+        {rank >= 3 &&
+          RIM_POINTS.map(([x, y]) => (
+            <circle
+              key={`${x},${y}`}
+              cx={x}
+              cy={y}
+              r="1.05"
+              fill="white"
+              stroke={colors[1]}
+              strokeWidth="0.5"
+            />
+          ))}
         <path
           d={inner}
           fill="none"
@@ -198,7 +316,8 @@ function MilestoneEmblem({ value, colors, shape, legendary, still, className, st
                   duration: 1.1,
                   ease: "easeInOut",
                   repeat: Infinity,
-                  repeatDelay: 3.2,
+                  // Higher tiers catch the light more often
+                  repeatDelay: 3.2 - rank * 0.22,
                   delay: 0.6,
                 }}
               />
@@ -224,6 +343,46 @@ function MilestoneEmblem({ value, colors, shape, legendary, still, className, st
         >
           {value}
         </motion.text>
+        {rank >= 9 ? (
+          <path
+            d={CROWN}
+            fill={`url(#milestone-crown-${id})`}
+            stroke="#b45309"
+            strokeWidth="0.55"
+            strokeLinejoin="round"
+          />
+        ) : (
+          rank >= 5 && (
+            <path
+              d={CREST}
+              fill="white"
+              stroke={colors[1]}
+              strokeWidth="0.55"
+              strokeLinejoin="round"
+            />
+          )
+        )}
+        {rank >= 8 && (
+          <motion.g
+            style={SPIN_ORIGIN}
+            animate={animated ? { rotate: -360 } : undefined}
+            transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+          >
+            {[0, 120, 240].map(angle => {
+              const radians = ((angle - 90) * Math.PI) / 180;
+              return (
+                <path
+                  key={angle}
+                  d={SPARKLE}
+                  transform={`translate(${12 + 14.6 * Math.cos(radians)} ${12 + 14.6 * Math.sin(radians)})`}
+                  fill="white"
+                  stroke={colors[0]}
+                  strokeWidth="0.35"
+                />
+              );
+            })}
+          </motion.g>
+        )}
       </svg>
     </motion.span>
   );
@@ -276,35 +435,103 @@ const listItem = {
   show: { opacity: 1, y: 0 },
 };
 
-// One row of milestone emblems, lit up to the user's progress when it's known
-function MilestoneLadder({ steps, shape, progress, highlighted, title, description }) {
+// A ladder of milestone tiles. When the user's progress is known, earned
+// tiles are tinted with their tier color, the current one is ringed, and a bar
+// tracks the way to the next milestone.
+function MilestoneLadder({
+  steps,
+  shape,
+  progress,
+  progressLabel,
+  highlighted,
+  title,
+  description,
+  columns,
+}) {
+  const { t } = useLanguage();
+  const known = progress !== null;
+  const current = known ? steps.findLast(step => progress >= step.value) : undefined;
+  const next = known ? steps.find(step => progress < step.value) : undefined;
+  const previousValue = current?.value ?? 0;
+  const fraction = next
+    ? Math.min(1, Math.max(0, (progress - previousValue) / (next.value - previousValue)))
+    : 1;
+
   return (
     <motion.section
       variants={listItem}
       className={`rounded-xl border p-4 transition-colors ${highlighted ? "border-primary/50 bg-primary/5" : "border-border/60 bg-muted/30"}`}
     >
-      <p className="text-sm font-semibold">{title}</p>
-      <p className="text-xs text-muted-foreground">{description}</p>
-      <div className="mt-3 flex flex-wrap gap-x-2 gap-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+        {known && (
+          <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+            {progressLabel}
+          </span>
+        )}
+      </div>
+
+      {known && (
+        <div className="mt-3">
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <motion.div
+              className="h-full rounded-full"
+              style={{
+                background: `linear-gradient(90deg, ${(next ?? current).colors.join(", ")})`,
+              }}
+              initial={{ width: 0 }}
+              animate={{ width: `${fraction * 100}%` }}
+              transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+            />
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            {next
+              ? t("ascend.badges.catalog.nextMilestone", {
+                  remaining: next.value - progress,
+                  name: next.label,
+                })
+              : t("ascend.badges.catalog.allUnlocked")}
+          </p>
+        </div>
+      )}
+
+      <div className={`mt-3 grid gap-2 ${columns}`}>
         {steps.map(step => {
-          const earned = progress === null || progress >= step.value;
+          const earned = !known || progress >= step.value;
+          const isCurrent = step === current;
           return (
-            <span
+            <div
               key={step.value}
-              className={`flex w-12 flex-col items-center gap-1 ${earned ? "" : "opacity-30 grayscale"}`}
+              className={`relative flex min-w-0 flex-col items-center gap-1.5 rounded-lg border px-1 pb-2 pt-2.5 transition-colors ${isCurrent ? "ring-2 ring-primary/60 ring-offset-1 ring-offset-background" : ""} ${earned ? "border-transparent" : "border-dashed border-border/70"}`}
+              style={
+                earned
+                  ? {
+                      background: `linear-gradient(160deg, ${step.colors[0]}29, ${step.colors[1]}12)`,
+                    }
+                  : undefined
+              }
             >
               <MilestoneEmblem
                 value={step.value}
                 colors={step.colors}
                 shape={shape}
                 legendary={step.legendary}
+                rank={step.rank}
                 still={!earned}
-                className="h-9 w-9"
+                className={`h-10 w-10 ${earned ? "" : "opacity-35 grayscale"}`}
               />
-              <span className="truncate text-[10px] text-muted-foreground">
+              {!earned && (
+                <Lock className="absolute right-1.5 top-1.5 h-3 w-3 text-muted-foreground/70" />
+              )}
+              <span
+                className={`w-full truncate text-center text-[11px] ${earned ? "font-medium text-foreground" : "text-muted-foreground"}`}
+              >
                 {step.label}
               </span>
-            </span>
+            </div>
           );
         })}
       </div>
@@ -330,6 +557,7 @@ function BadgeCatalogDialog({ open, onOpenChange, highlight, user }) {
     value: tier.level,
     colors: tier.colors,
     legendary: tier.tier === "legendary",
+    rank: levelRank(tier),
     label: t(`ascend.badges.levelTiers.${tier.tier}`),
   }));
   const reviewSteps = [...REVIEW_TIERS].reverse().map(tier => ({
@@ -383,6 +611,8 @@ function BadgeCatalogDialog({ open, onOpenChange, highlight, user }) {
             steps={levelSteps}
             shape="hexagon"
             progress={level}
+            progressLabel={t("ascend.badges.catalog.levelProgress", { level })}
+            columns="grid-cols-5"
             highlighted={section === "levels"}
             title={t("ascend.badges.catalog.levels")}
             description={t("ascend.badges.catalog.levelsDescription")}
@@ -391,6 +621,10 @@ function BadgeCatalogDialog({ open, onOpenChange, highlight, user }) {
             steps={reviewSteps}
             shape="bubble"
             progress={reviewProgress}
+            progressLabel={t("ascend.badges.catalog.reviewProgress", {
+              count: reviewProgress,
+            })}
+            columns="grid-cols-3 sm:grid-cols-6"
             highlighted={section === "reviews"}
             title={t("ascend.badges.catalog.reviews")}
             description={t("ascend.badges.catalog.reviewsDescription")}
@@ -527,6 +761,8 @@ function LevelMilestoneBadge({ user, className, style }) {
     <BadgeWithTooltip
       field="levelMilestone"
       user={user}
+      className={className}
+      style={style}
       label={t("ascend.badges.levelMilestone", { tier: tierName })}
       description={t("ascend.badges.levelMilestoneDescription", { level: milestone })}
       renderEmblem={(size, emblemStyle) => (
@@ -535,6 +771,7 @@ function LevelMilestoneBadge({ user, className, style }) {
           colors={tier.colors}
           shape="hexagon"
           legendary={tier.tier === "legendary"}
+          rank={levelRank(tier)}
           className={size}
           style={emblemStyle}
         />
@@ -550,6 +787,8 @@ function ReviewMilestoneBadge({ user, tier, className, style }) {
     <BadgeWithTooltip
       field="reviewMilestone"
       user={user}
+      className={className}
+      style={style}
       label={t("ascend.badges.reviewMilestone", { count: tier.count })}
       description={t("ascend.badges.reviewMilestoneDescription", { count: tier.count })}
       renderEmblem={(size, emblemStyle) => (
