@@ -347,8 +347,6 @@
       },
       "contributor": "Contributor",
       "contributorDescription": "Helped build Ascendara",
-      "gameReviewer": "Game Reviewer",
-      "gameReviewerDescription": "Reviewed 3 different games",
       "levelMilestone": "{{tier}} Milestone",
       "levelMilestoneDescription": "Reached level {{level}}",
       "levelTiers": {

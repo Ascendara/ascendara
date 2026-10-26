@@ -1,15 +1,7 @@
 import { useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import {
-  BadgeCheck,
-  Bug,
-  Crown,
-  Hammer,
-  Lock,
-  MessageSquareText,
-  Sparkles,
-} from "lucide-react";
+import { BadgeCheck, Bug, Crown, Hammer, Lock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,11 +18,10 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 
-// Badges the API grants for activity: reviewing 3 different games, and having
-// a reported bug marked fixed. Shown next to owner/contributor/verified. The
-// reviewer badge is replaced by review milestones once the API sends a count.
+// Badges the API grants for activity: having a reported bug marked fixed.
+// Shown next to owner/contributor/verified. Reviewing games earns the review
+// milestones below instead.
 const EARNED_BADGES = [
-  { field: "gameReviewer", icon: MessageSquareText, colors: ["#f472b6", "#db2777"] },
   { field: "bugCatcher", icon: Bug, colors: ["#4ade80", "#16a34a"] },
 ];
 
@@ -91,6 +82,12 @@ const MILESTONE_SHAPES = {
 // descenders, so the number is raised by a share of its font size
 const DIGIT_LIFT = 0.036;
 
+// The icon covers 52% of the emblem, centered in its 24-unit box
+const ICON_SIZE = 12.5;
+const ICON_OFFSET = (24 - ICON_SIZE) / 2;
+// The crown's solid base makes it look low when centered by its box
+const ICON_LIFT = new Map([[Crown, 0.3]]);
+
 // A hexagon emblem with the badge icon on a gradient fill. The size classes
 // passed in size the whole emblem, so it lines up with the other name icons.
 function BadgeEmblem({ icon: Icon, colors, className, style }) {
@@ -122,8 +119,17 @@ function BadgeEmblem({ icon: Icon, colors, className, style }) {
           strokeWidth="0.75"
           strokeLinejoin="round"
         />
+        {/* Drawn inside the emblem's own coordinates, so the icon stays on the
+            hexagon's center at sizes where a separate element would snap to
+            a different pixel */}
+        <Icon
+          x={ICON_OFFSET}
+          y={ICON_OFFSET - (ICON_LIFT.get(Icon) ?? 0)}
+          size={ICON_SIZE}
+          color="white"
+          strokeWidth={2.75}
+        />
       </svg>
-      <Icon className="relative h-[52%] w-[52%] text-white" strokeWidth={2.75} />
     </span>
   );
 }
@@ -408,12 +414,10 @@ const VERIFIED_BADGE = {
 };
 
 // The special badges the catalog lists. Owner stays out since nobody can earn it.
-const CATALOG_BADGES = [VERIFIED_BADGE, CONTRIBUTOR_BADGE, EARNED_BADGES[1]];
+const CATALOG_BADGES = [VERIFIED_BADGE, CONTRIBUTOR_BADGE, ...EARNED_BADGES];
 
-// Which catalog entry a clicked badge points at. The old reviewer flag points
-// at the review milestones that replace it.
+// Which catalog entry a clicked badge points at
 const CATALOG_SECTIONS = {
-  gameReviewer: "reviews",
   reviewMilestone: "reviews",
   levelMilestone: "levels",
 };
@@ -834,15 +838,10 @@ export function VerifiedBadge(props) {
 }
 
 export default function EarnedBadges({ user, className = "h-4 w-4", style }) {
-  // Until the API sends reviewCount, the old flag still shows the reviewer badge
   const reviewCount = Number(user?.reviewCount);
-  const hasReviewCount = Number.isFinite(reviewCount);
   const reviewTier =
-    hasReviewCount && REVIEW_TIERS.find(tier => reviewCount >= tier.count);
-  const earned = EARNED_BADGES.filter(
-    badge =>
-      user?.[badge.field] === true && !(badge.field === "gameReviewer" && hasReviewCount)
-  );
+    Number.isFinite(reviewCount) && REVIEW_TIERS.find(tier => reviewCount >= tier.count);
+  const earned = EARNED_BADGES.filter(badge => user?.[badge.field] === true);
   const hasLevelMilestone = !user?.private && getLevel(user) >= 10;
   if (!earned.length && !hasLevelMilestone && !reviewTier) return null;
 

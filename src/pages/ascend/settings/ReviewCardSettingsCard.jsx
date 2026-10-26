@@ -352,7 +352,6 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
                   owner: userData?.owner === true,
                   contributor: userData?.contributor === true,
                   verified: userData?.verified === true,
-                  gameReviewer: userData?.gameReviewer === true,
                   bugCatcher: userData?.bugCatcher === true,
                   reviewCount: userData?.reviewCount,
                   level: userData?.profileStats?.level,
