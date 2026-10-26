@@ -1968,9 +1968,10 @@ export const searchUsers = async searchQuery => {
         contributor: data.contributor || false,
         gameReviewer: data.gameReviewer || false,
         bugCatcher: data.bugCatcher || false,
+        reviewCount: data.reviewCount,
         private: isPrivate,
         status: statusMap.get(uid) || "offline",
-        level: isPrivate ? 0 : 1,
+        level: isPrivate ? 0 : data.profileStats?.level || 1,
         totalPlaytime: isPrivate ? 0 : totalPlaytime,
         gamesPlayed: isPrivate ? 0 : games.length,
       });
@@ -2072,6 +2073,7 @@ export const getUserPublicProfile = async userId => {
           contributor: userData.contributor || false,
           gameReviewer: userData.gameReviewer || false,
           bugCatcher: userData.bugCatcher || false,
+          reviewCount: userData.reviewCount,
           isFriend,
           private: true,
         },
@@ -2091,6 +2093,7 @@ export const getUserPublicProfile = async userId => {
         contributor: userData.contributor || false,
         gameReviewer: userData.gameReviewer || false,
         bugCatcher: userData.bugCatcher || false,
+        reviewCount: userData.reviewCount,
         socials: userData.socials || null,
         status,
         level: profileStats.level || 1,
@@ -2500,6 +2503,8 @@ export const getFriendsList = async () => {
           contributor: userData.contributor || false,
           gameReviewer: userData.gameReviewer || false,
           bugCatcher: userData.bugCatcher || false,
+          reviewCount: userData.reviewCount,
+          level: userData.private ? 0 : userData.profileStats?.level || 1,
           verified: userData.verified || false,
         };
       })
@@ -2554,6 +2559,8 @@ export const subscribeToFriendsList = onUpdate => {
             contributor: userData.contributor || false,
             gameReviewer: userData.gameReviewer || false,
             bugCatcher: userData.bugCatcher || false,
+            reviewCount: userData.reviewCount,
+            level: userData.private ? 0 : userData.profileStats?.level || 1,
             verified: userData.verified || false,
           };
         })
@@ -2795,6 +2802,8 @@ export const getConversations = async () => {
           contributor: userData.contributor || false,
           gameReviewer: userData.gameReviewer || false,
           bugCatcher: userData.bugCatcher || false,
+          reviewCount: userData.reviewCount,
+          level: userData.private ? 0 : userData.profileStats?.level || 1,
           verified: userData.verified || false,
         },
         lastMessage: data.lastMessage,
@@ -3380,6 +3389,8 @@ export const subscribeToConversations = onUpdate => {
             contributor: userData.contributor || false,
             gameReviewer: userData.gameReviewer || false,
             bugCatcher: userData.bugCatcher || false,
+            reviewCount: userData.reviewCount,
+            level: userData.private ? 0 : userData.profileStats?.level || 1,
             verified: userData.verified || false,
           },
           lastMessage: data.lastMessage,

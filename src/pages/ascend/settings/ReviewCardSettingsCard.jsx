@@ -354,6 +354,8 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
                   verified: userData?.verified === true,
                   gameReviewer: userData?.gameReviewer === true,
                   bugCatcher: userData?.bugCatcher === true,
+                  reviewCount: userData?.reviewCount,
+                  level: userData?.profileStats?.level,
                 },
                 cardBackground: previewUrl,
                 cardStyle: style,

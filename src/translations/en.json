@@ -330,6 +330,17 @@
     "badges": {
       "bugCatcher": "Bug Catcher",
       "bugCatcherDescription": "Reported a bug that got fixed",
+      "catalog": {
+        "description": "Earned by playing, reviewing and helping out across Ascend.",
+        "levels": "Level milestones",
+        "levelsDescription": "A new tier every 10 levels",
+        "promoAction": "Try Ascend",
+        "promoContent": "Level up, review games and start earning your own.",
+        "promoTitle": "Want badges like these?",
+        "reviews": "Review milestones",
+        "reviewsDescription": "Review different games to climb the ranks",
+        "title": "Badges"
+      },
       "contributor": "Contributor",
       "contributorDescription": "Helped build Ascendara",
       "gameReviewer": "Game Reviewer",
@@ -350,6 +361,8 @@
       },
       "owner": "Owner",
       "ownerDescription": "Created and runs Ascendara",
+      "reviewMilestone": "{{count}} Reviews",
+      "reviewMilestoneDescription": "Reviewed {{count}} different games",
       "verified": "Verified",
       "verifiedDescription": "A verified Ascend member"
     },
