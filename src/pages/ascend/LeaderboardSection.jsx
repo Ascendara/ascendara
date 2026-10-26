@@ -140,7 +140,7 @@ export default function LeaderboardSection({
                     )}
                   </div>
                   <div className="flex w-full min-w-0 items-center justify-center gap-1.5">
-                    <h2 className="truncate text-base font-semibold transition-colors group-hover:text-primary">
+                    <h2 className="mb-0 truncate text-base font-semibold transition-colors group-hover:text-primary">
                       {player.displayName}
                     </h2>
                     {player.owner && <OwnerBadge className="h-4 w-4" />}
@@ -192,7 +192,7 @@ export default function LeaderboardSection({
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: Math.min(index * 0.03, 0.2) }}
                     onClick={() => handleViewProfile(user.uid)}
-                    className="group flex w-full items-center gap-3 border-b border-border/40 px-4 py-3 text-left outline-none transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:gap-4"
+                    className="group flex w-full items-center gap-3 border-b border-border/40 px-4 py-3.5 text-left outline-none transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:gap-4"
                   >
                     {/* Rank */}
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center text-sm font-semibold tabular-nums text-muted-foreground">
@@ -201,7 +201,7 @@ export default function LeaderboardSection({
 
                     {/* Avatar */}
                     <div className="relative shrink-0">
-                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary">
+                      <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-primary">
                         {user.photoURL ? (
                           <img
                             src={user.photoURL}
@@ -219,16 +219,18 @@ export default function LeaderboardSection({
 
                     {/* Info */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1">
-                        <h3 className="truncate text-sm font-semibold">
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate text-[15px] font-semibold">
                           {user.displayName}
                         </h3>
-                        {user.owner && <OwnerBadge className="h-4 w-4" />}
-                        {user.contributor && <ContributorBadge className="h-4 w-4" />}
-                        {user.verified && <VerifiedBadge className="h-4 w-4" />}
-                        <EarnedBadges user={user} className="h-4 w-4" />
+                        {user.owner && <OwnerBadge className="h-[18px] w-[18px]" />}
+                        {user.contributor && (
+                          <ContributorBadge className="h-[18px] w-[18px]" />
+                        )}
+                        {user.verified && <VerifiedBadge className="h-[18px] w-[18px]" />}
+                        <EarnedBadges user={user} className="h-[18px] w-[18px]" />
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Star className="h-3.5 w-3.5" />
                           Level {user.level}
