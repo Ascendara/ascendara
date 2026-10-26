@@ -727,6 +727,107 @@ def get_ludusavi_settings():
         logging.info("[EXIT] get_ludusavi_settings() - Exception")
         return None
 
+def _run_ludusavi_find(ludusavi_path, config_dir, extra_args, game):
+    """
+    Executes `ludusavi find --api --backup ...` and returns the first canonical name
+    found, or None.
+    """
+    cmd = [
+        ludusavi_path,
+        "--config", config_dir,
+        "find",
+        "--api",
+        "--backup",
+        *extra_args,
+        game,
+    ]
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+    except Exception as e:
+        logging.warning(f"[Ludusavi] find failed to execute : {e}")
+        return None
+
+    raw = (result.stdout or "").strip()
+    if not raw:
+        return None
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        logging.debug(f"[Ludusavi] non-JSON output for {cmd}: {raw[:200]}")
+        return None
+
+    games = data.get("games") or {}
+    if isinstance(games, dict) and games:
+        return next(iter(games.keys()))
+    return None
+
+
+def resolve_ludusavi_game_name(game_name, ludusavi_path, ludusavi_config_dir):
+    """
+    Resolves a game name to the exact title expected by the Ludusavi manifest.
+    """
+    if not game_name:
+        return game_name
+
+    # 1. Exact match
+    exact = _run_ludusavi_find(ludusavi_path, ludusavi_config_dir, [], game_name)
+    if exact:
+        logging.info(f'[Ludusavi] Resolved game name "{game_name}" -> "{exact}" (exact)')
+        return exact
+
+    # 2. Normalized match
+    normalized = _run_ludusavi_find(
+        ludusavi_path, ludusavi_config_dir, ["--normalized"], game_name
+    )
+    if normalized:
+        logging.info(
+            f'[Ludusavi] Resolved game name "{game_name}" -> "{normalized}" (normalized)'
+        )
+        return normalized
+
+    # 3. Fuzzy matching, only if score >= 0.9
+    fuzzy_name = _run_ludusavi_find(
+        ludusavi_path,
+        ludusavi_config_dir,
+        ["--normalized", "--fuzzy"],
+        game_name,
+    )
+    if fuzzy_name:
+        cmd = [
+            ludusavi_path,
+            "--config", ludusavi_config_dir,
+            "find", "--api", "--backup",
+            "--normalized", "--fuzzy", game_name,
+        ]
+        try:
+            res = subprocess.run(
+                cmd, capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=30,
+            )
+            data = json.loads(res.stdout or "{}")
+            games = data.get("games") or {}
+            for name, info in games.items():
+                score = (info or {}).get("score", 0)
+                if name == fuzzy_name and score >= 0.9:
+                    logging.info(
+                        f'[Ludusavi] Resolved game name "{game_name}" -> "{name}" '
+                        f"(fuzzy, score {score})"
+                    )
+                    return name
+        except Exception as e:
+            logging.warning(f"[Ludusavi] unable to read the fuzzy score : {e}")
+
+    # No reliable match: returning the original name
+    return game_name
+
 def run_ludusavi_backup(game_name, wine_prefix=None):
     """
     Run Ludusavi backup for a specific game
@@ -798,7 +899,7 @@ def run_ludusavi_backup(game_name, wine_prefix=None):
                 f.write(yaml_content)
             logging.info(f"Created new Ludusavi config with redirects at: {config_file_path}")
 
-
+        resolved_game_name = resolve_ludusavi_game_name(game_name, ludusavi_path, ludusavi_config_dir)
         backup_location = ludusavi_settings.get('backupLocation')
         backup_format = ludusavi_settings.get('backupFormat', 'zip')
         backups_to_keep = ludusavi_settings.get('backupOptions', {}).get('backupsToKeep', 5)
@@ -816,8 +917,7 @@ def run_ludusavi_backup(game_name, wine_prefix=None):
             cmd.append("--no-manifest-update")
             
         cmd.extend([
-            "backup",
-            game_name,
+            "backup", resolved_game_name,
             "--path", backup_location,
             "--format", backup_format,
             "--full-limit", str(backups_to_keep),
