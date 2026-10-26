@@ -1,11 +1,13 @@
-// outline draws the logo as a stroke so it matches lucide icons in the nav
+// outline draws the logo as a stroke so it matches lucide icons in the nav;
+// the glyph spans the full 24 units wide, so the outline viewBox is padded
+// to keep the stroke from being clipped at the edges
 const DiscordIcon = ({ className, outline = false }) => (
   <svg
     className={className}
-    viewBox="0 0 24 24"
+    viewBox={outline ? "-1 -1 26 26" : "0 0 24 24"}
     fill={outline ? "none" : "currentColor"}
     stroke={outline ? "currentColor" : "none"}
-    strokeWidth={outline ? 1.75 : undefined}
+    strokeWidth={outline ? 1.9 : undefined}
     strokeLinejoin="round"
     aria-hidden
   >
