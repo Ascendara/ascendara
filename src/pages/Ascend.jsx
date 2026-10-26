@@ -4,6 +4,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import AscendNavBar from "@/components/AscendNavBar";
 import SubscriptionPlanDialog from "@/components/SubscriptionPlanDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
   User,
@@ -141,6 +151,8 @@ const Ascend = () => {
     handleManageSubscription,
     showWelcomeTour,
     setShowWelcomeTour,
+    showWelcomeTourPrompt,
+    answerWelcomeTourPrompt,
     showDeleteDialog,
     setShowDeleteDialog,
     showDepartureDialog,
@@ -952,6 +964,31 @@ const Ascend = () => {
           onPlanSelection={handlePlanSelection}
           t={t}
         />
+
+        <AlertDialog
+          open={showWelcomeTourPrompt}
+          onOpenChange={open => !open && answerWelcomeTourPrompt(false)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("ascendTour.prompt.title")}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("ascendTour.prompt.content")}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => answerWelcomeTourPrompt(false)}>
+                {t("ascendTour.prompt.decline")}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="text-secondary"
+                onClick={() => answerWelcomeTourPrompt(true)}
+              >
+                {t("ascendTour.prompt.accept")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {showWelcomeTour && (
           <AscendWelcomeTour

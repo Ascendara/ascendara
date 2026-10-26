@@ -59,6 +59,24 @@ import {
 import { syncFavoritesNow } from "@/services/cloud/favoritesCloudSync";
 import { API_URL } from "@/config/api";
 
+// Per account, so a second account on this PC still gets offered the tour
+const welcomeTourSeenKey = uid => `ascendara:ascendTourSeen:${uid}`;
+
+const hasSeenWelcomeTour = uid => {
+  try {
+    return localStorage.getItem(welcomeTourSeenKey(uid)) === "true";
+  } catch {
+    return true;
+  }
+};
+
+const markWelcomeTourSeen = uid => {
+  if (!uid) return;
+  try {
+    localStorage.setItem(welcomeTourSeenKey(uid), "true");
+  } catch {}
+};
+
 export default function useAscendPage({ cloudOnly = false } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -153,6 +171,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const accessRequestRef = useRef(0);
   const [verifyingAccess, setVerifyingAccess] = useState(true);
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
+  const [showWelcomeTourPrompt, setShowWelcomeTourPrompt] = useState(false);
   // Subscription tier info from API (more reliable than Firestore data)
   const [subscriptionTierInfo, setSubscriptionTierInfo] = useState(null);
 
@@ -2099,9 +2118,40 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   // Clearing it keeps a back/forward navigation from replaying the tour.
   useEffect(() => {
     if (!location.state?.ascendWelcome) return;
+    markWelcomeTourSeen(user?.uid);
+    setShowWelcomeTourPrompt(false);
     setShowWelcomeTour(true);
     navigate(location.pathname, { replace: true, state: {} });
   }, [location.state?.ascendWelcome]);
+
+  // Subscribers from before the tour existed never got it after checkout, so
+  // offer it once. The delay lets a checkout return claim the tour first.
+  useEffect(() => {
+    if (
+      !user?.uid ||
+      verifyingAccess ||
+      !ascendAccess.isSubscribed ||
+      showWelcomeTour ||
+      location.state?.ascendWelcome ||
+      hasSeenWelcomeTour(user.uid)
+    ) {
+      return;
+    }
+    const timer = setTimeout(() => setShowWelcomeTourPrompt(true), 1500);
+    return () => clearTimeout(timer);
+  }, [
+    user?.uid,
+    verifyingAccess,
+    ascendAccess.isSubscribed,
+    showWelcomeTour,
+    location.state?.ascendWelcome,
+  ]);
+
+  const answerWelcomeTourPrompt = accepted => {
+    markWelcomeTourSeen(user?.uid);
+    setShowWelcomeTourPrompt(false);
+    if (accepted) setShowWelcomeTour(true);
+  };
 
   // Check email verification every 5 seconds
   useEffect(() => {
@@ -2849,6 +2899,8 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     handleManageSubscription,
     showWelcomeTour,
     setShowWelcomeTour,
+    showWelcomeTourPrompt,
+    answerWelcomeTourPrompt,
     showDeleteDialog,
     setShowDeleteDialog,
     showDepartureDialog,

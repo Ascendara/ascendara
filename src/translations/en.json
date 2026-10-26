@@ -334,6 +334,20 @@
       "contributorDescription": "Helped build Ascendara",
       "gameReviewer": "Game Reviewer",
       "gameReviewerDescription": "Reviewed 3 different games",
+      "levelMilestone": "{{tier}} Milestone",
+      "levelMilestoneDescription": "Reached level {{level}}",
+      "levelTiers": {
+        "aurora": "Aurora",
+        "cosmic": "Cosmic",
+        "crystal": "Crystal",
+        "energy": "Energy",
+        "fire": "Fire",
+        "legendary": "Legendary",
+        "nature": "Nature",
+        "nebula": "Nebula",
+        "ocean": "Ocean",
+        "solar": "Solar"
+      },
       "owner": "Owner",
       "ownerDescription": "Created and runs Ascendara",
       "verified": "Verified",
@@ -1254,6 +1268,12 @@
     "overview": {
       "content": "Your Ascend home base. See your friends, your synced library and your account at a glance.",
       "title": "Overview"
+    },
+    "prompt": {
+      "accept": "Take the tour",
+      "content": "We put together a quick tour of everything your Ascend subscription unlocks. Want to take a look?",
+      "decline": "No thanks",
+      "title": "New: Ascend Tour"
     },
     "start": "Show me around",
     "upcoming": {
