@@ -39,14 +39,12 @@ import {
 } from "@/services/firebase/firebaseService";
 import {
   Archive,
-  BadgeCheck,
   CalendarDays,
   Camera,
   Check,
   ChevronDown,
   Clock,
   Cpu,
-  Crown,
   FileDown,
   Gamepad2,
   Lock,
@@ -62,7 +60,11 @@ import {
   Trophy,
   Upload,
 } from "lucide-react";
-import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
+import EarnedBadges, {
+  ContributorBadge,
+  OwnerBadge,
+  VerifiedBadge,
+} from "@/components/EarnedBadges";
 
 const VUS = ["online", "away", "busy", "invisible"];
 
@@ -1210,13 +1212,9 @@ const Profile = () => {
               </h1>
               {IsAscendUser ? (
                 <>
-                  {UserData?.owner && (
-                    <Crown className="h-5 w-5 shrink-0 text-yellow-500" />
-                  )}
+                  {UserData?.owner && <OwnerBadge className="h-5 w-5" />}
                   {UserData?.contributor && <ContributorBadge className="h-5 w-5" />}
-                  {UserData?.verified && (
-                    <BadgeCheck className="h-5 w-5 shrink-0 text-blue-500" />
-                  )}
+                  {UserData?.verified && <VerifiedBadge className="h-5 w-5" />}
                   <EarnedBadges user={UserData} className="h-5 w-5" />
                 </>
               ) : (

@@ -21,8 +21,6 @@ import {
   LockIcon,
   Globe,
   Github,
-  Crown,
-  BadgeCheck,
   Flag,
   Loader,
   Inbox,
@@ -38,7 +36,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
+import EarnedBadges, {
+  ContributorBadge,
+  OwnerBadge,
+  VerifiedBadge,
+} from "@/components/EarnedBadges";
 
 export default function UserProfileSection({
   handleBackFromProfile,
@@ -142,14 +144,12 @@ export default function UserProfileSection({
                     <h1 className="truncate text-3xl font-bold">
                       {viewingProfile.displayName}
                     </h1>
-                    {viewingProfile.owner && (
-                      <Crown className="mb-2 h-7 w-7 shrink-0 text-yellow-500" />
-                    )}
+                    {viewingProfile.owner && <OwnerBadge className="mb-2 h-7 w-7" />}
                     {viewingProfile.contributor && (
                       <ContributorBadge className="mb-2 h-7 w-7" />
                     )}
                     {viewingProfile.verified && (
-                      <BadgeCheck className="mb-2 h-7 w-7 shrink-0 text-blue-500" />
+                      <VerifiedBadge className="mb-2 h-7 w-7" />
                     )}
                     <EarnedBadges user={viewingProfile} className="mb-2 h-7 w-7" />
                   </div>

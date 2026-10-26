@@ -333,7 +333,11 @@
       "contributor": "Contributor",
       "contributorDescription": "Helped build Ascendara",
       "gameReviewer": "Game Reviewer",
-      "gameReviewerDescription": "Reviewed 3 different games"
+      "gameReviewerDescription": "Reviewed 3 different games",
+      "owner": "Owner",
+      "ownerDescription": "Created and runs Ascendara",
+      "verified": "Verified",
+      "verifiedDescription": "A verified Ascend member"
     },
     "checkingVersion": "Checking version...",
     "cloudBackups": {

@@ -16,7 +16,6 @@ import {
   Rocket,
   Gamepad2,
   HardDrive,
-  Megaphone,
   ChevronDown,
   Check,
 } from "lucide-react";
@@ -32,7 +31,11 @@ import { subscribeToUserStatus } from "@/services/firebase/firebaseService";
 import { setUserOnlineStatus } from "@/services/ascend/ascendStatusService";
 import { toast } from "sonner";
 import DiscordIcon from "@/pages/ascend/DiscordIcon";
-import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
+import EarnedBadges, {
+  ContributorBadge,
+  OwnerBadge,
+  VerifiedBadge,
+} from "@/components/EarnedBadges";
 
 const DiscordOutlineIcon = props => <DiscordIcon {...props} outline />;
 
@@ -274,17 +277,10 @@ const AscendNavBar = ({
               <DropdownMenuLabel className="font-normal">
                 <p className="flex items-center gap-1 truncate text-sm font-semibold">
                   {user?.displayName || "User"}
-                  {userData?.owner && (
-                    <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
-                  )}
+                  {userData?.owner && <OwnerBadge className="h-3.5 w-3.5" />}
                   {userData?.contributor && <ContributorBadge className="h-3.5 w-3.5" />}
-                  {userData?.verified && (
-                    <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-                  )}
+                  {userData?.verified && <VerifiedBadge className="h-3.5 w-3.5" />}
                   <EarnedBadges user={userData} className="h-3.5 w-3.5" />
-                  {userData?.adUser && (
-                    <Megaphone className="h-3.5 w-3.5 shrink-0 text-purple-500" />
-                  )}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">{planTitle}</p>
               </DropdownMenuLabel>

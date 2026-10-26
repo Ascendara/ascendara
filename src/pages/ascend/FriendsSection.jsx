@@ -14,10 +14,12 @@ import {
   MessageCircle,
   UserPlus,
   UserMinus,
-  Crown,
-  BadgeCheck,
 } from "lucide-react";
-import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
+import EarnedBadges, {
+  ContributorBadge,
+  OwnerBadge,
+  VerifiedBadge,
+} from "@/components/EarnedBadges";
 
 const STATUS_DOT = {
   online: "bg-green-500",
@@ -77,9 +79,9 @@ function FriendRow({ friend, status, t, onView, onMessage, onRemove }) {
           }`}
         >
           {friend.displayName}
-          {friend.owner && <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />}
+          {friend.owner && <OwnerBadge className="h-3.5 w-3.5" />}
           {friend.contributor && <ContributorBadge className="h-3.5 w-3.5" />}
-          {friend.verified && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-blue-500" />}
+          {friend.verified && <VerifiedBadge className="h-3.5 w-3.5" />}
           <EarnedBadges user={friend} className="h-3.5 w-3.5" />
         </p>
         <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
@@ -165,10 +167,22 @@ export default function FriendsSection({
         <>
           <StatStrip
             stats={[
-              { icon: Users, label: t("ascend.friends.totalFriends"), value: friends.length },
-              { icon: Circle, label: t("ascend.friends.online"), value: onlineFriends.length },
+              {
+                icon: Users,
+                label: t("ascend.friends.totalFriends"),
+                value: friends.length,
+              },
+              {
+                icon: Circle,
+                label: t("ascend.friends.online"),
+                value: onlineFriends.length,
+              },
               { icon: Moon, label: t("ascend.friends.away"), value: awayFriends.length },
-              { icon: EyeOff, label: t("ascend.friends.offline"), value: offlineFriends.length },
+              {
+                icon: EyeOff,
+                label: t("ascend.friends.offline"),
+                value: offlineFriends.length,
+              },
             ]}
           />
 

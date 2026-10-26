@@ -13,10 +13,12 @@ import {
   RefreshCw,
   Star,
   Award,
-  Crown,
-  BadgeCheck,
 } from "lucide-react";
-import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
+import EarnedBadges, {
+  ContributorBadge,
+  OwnerBadge,
+  VerifiedBadge,
+} from "@/components/EarnedBadges";
 
 export default function LeaderboardSection({
   leaderboardData,
@@ -141,15 +143,9 @@ export default function LeaderboardSection({
                     <h2 className="truncate text-base font-semibold transition-colors group-hover:text-primary">
                       {player.displayName}
                     </h2>
-                    {player.owner && (
-                      <Crown className="h-4 w-4 shrink-0 text-yellow-500" />
-                    )}
-                    {player.contributor && (
-                      <ContributorBadge className="h-4 w-4" />
-                    )}
-                    {player.verified && (
-                      <BadgeCheck className="h-4 w-4 shrink-0 text-blue-500" />
-                    )}
+                    {player.owner && <OwnerBadge className="h-4 w-4" />}
+                    {player.contributor && <ContributorBadge className="h-4 w-4" />}
+                    {player.verified && <VerifiedBadge className="h-4 w-4" />}
                     <EarnedBadges user={player} className="h-4 w-4" />
                   </div>
                   <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
@@ -224,14 +220,12 @@ export default function LeaderboardSection({
                     {/* Info */}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1">
-                        <h3 className="truncate text-sm font-semibold">{user.displayName}</h3>
-                        {user.owner && <Crown className="h-4 w-4 text-yellow-500" />}
-                        {user.contributor && (
-                          <ContributorBadge className="h-4 w-4" />
-                        )}
-                        {user.verified && (
-                          <BadgeCheck className="h-4 w-4 text-blue-500" />
-                        )}
+                        <h3 className="truncate text-sm font-semibold">
+                          {user.displayName}
+                        </h3>
+                        {user.owner && <OwnerBadge className="h-4 w-4" />}
+                        {user.contributor && <ContributorBadge className="h-4 w-4" />}
+                        {user.verified && <VerifiedBadge className="h-4 w-4" />}
                         <EarnedBadges user={user} className="h-4 w-4" />
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -271,7 +265,10 @@ export default function LeaderboardSection({
           title={t("ascend.leaderboard.empty")}
           description={t("ascend.leaderboard.emptyDescription")}
           action={
-            <Button onClick={() => setActiveSection("home")} className="gap-2 text-secondary">
+            <Button
+              onClick={() => setActiveSection("home")}
+              className="gap-2 text-secondary"
+            >
               <CloudUpload className="h-4 w-4" />
               {t("ascend.leaderboard.syncProfile")}
             </Button>

@@ -3,10 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   ArrowLeft,
-  BadgeCheck,
   Check,
   CheckCheck,
-  Crown,
   Loader2,
   MessageCircle,
   MessageSquarePlus,
@@ -15,7 +13,11 @@ import {
   User,
   Users,
 } from "lucide-react";
-import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
+import EarnedBadges, {
+  ContributorBadge,
+  OwnerBadge,
+  VerifiedBadge,
+} from "@/components/EarnedBadges";
 
 const statusColors = {
   online: "bg-emerald-500",
@@ -57,9 +59,9 @@ function PersonName({ person }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="truncate">{person.displayName}</span>
-      {person.owner && <Crown className="h-3.5 w-3.5 shrink-0 text-yellow-500" />}
+      {person.owner && <OwnerBadge className="h-3.5 w-3.5" />}
       {person.contributor && <ContributorBadge className="h-3.5 w-3.5" />}
-      {person.verified && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-blue-500" />}
+      {person.verified && <VerifiedBadge className="h-3.5 w-3.5" />}
       <EarnedBadges user={person} className="h-3.5 w-3.5" />
     </span>
   );
@@ -106,7 +108,7 @@ export default function MessagesSection({
               <h1 className="text-xl font-semibold tracking-tight">
                 {t("ascend.messages.title")}
               </h1>
-              <span className="rounded-md bg-primary/10 px-2 py-0.5 mb-3 text-xs font-medium tabular-nums text-primary">
+              <span className="mb-3 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium tabular-nums text-primary">
                 {conversations.length}
               </span>
             </div>

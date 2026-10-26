@@ -15,12 +15,14 @@ import {
   Gamepad2,
   LockIcon,
   Globe,
-  Crown,
-  BadgeCheck,
   UserCheck,
   Inbox,
 } from "lucide-react";
-import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
+import EarnedBadges, {
+  ContributorBadge,
+  OwnerBadge,
+  VerifiedBadge,
+} from "@/components/EarnedBadges";
 
 export default function SearchSection({
   t,
@@ -101,208 +103,202 @@ export default function SearchSection({
             {t("ascend.search.resultsCount", { count: searchResults.length })}
           </p>
           <Panel as="ul" className="divide-y divide-border/40 overflow-hidden">
-          {searchResults.map((result, index) => (
-            <motion.li
-              key={result.uid}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(index * 0.03, 0.2) }}
-              className="group relative transition-colors hover:bg-muted/30 focus-within:bg-muted/30"
-            >
-              <div className="relative w-full px-4 py-3 text-left">
-                <div className="relative flex flex-wrap items-center gap-4">
-                  {/* Avatar with status */}
-                  <div className="relative shrink-0">
-                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary">
-                      {result.photoURL ? (
-                        <>
-                          <img
-                            src={result.photoURL}
-                            alt={result.displayName}
-                            onError={event => {
-                              event.currentTarget.style.display = "none";
-                              event.currentTarget.nextElementSibling?.classList.remove(
-                                "hidden"
-                              );
-                            }}
-                            className="h-full w-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
+            {searchResults.map((result, index) => (
+              <motion.li
+                key={result.uid}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(index * 0.03, 0.2) }}
+                className="group relative transition-colors focus-within:bg-muted/30 hover:bg-muted/30"
+              >
+                <div className="relative w-full px-4 py-3 text-left">
+                  <div className="relative flex flex-wrap items-center gap-4">
+                    {/* Avatar with status */}
+                    <div className="relative shrink-0">
+                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary">
+                        {result.photoURL ? (
+                          <>
+                            <img
+                              src={result.photoURL}
+                              alt={result.displayName}
+                              onError={event => {
+                                event.currentTarget.style.display = "none";
+                                event.currentTarget.nextElementSibling?.classList.remove(
+                                  "hidden"
+                                );
+                              }}
+                              className="h-full w-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                            <User
+                              className="text-primary-foreground hidden h-6 w-6"
+                              aria-hidden="true"
+                            />
+                          </>
+                        ) : (
                           <User
-                            className="hidden h-6 w-6 text-primary-foreground"
+                            className="text-primary-foreground h-6 w-6"
                             aria-hidden="true"
                           />
-                        </>
-                      ) : (
-                        <User
-                          className="h-6 w-6 text-primary-foreground"
-                          aria-hidden="true"
-                        />
-                      )}
-                    </div>
-                    <div
-                      className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${
-                        result.status === "online"
-                          ? "bg-green-500"
-                          : result.status === "away"
-                            ? "bg-yellow-500"
-                            : result.status === "busy"
-                              ? "bg-red-500"
-                              : "bg-gray-500"
-                      }`}
-                    />
-                  </div>
-
-                  {/* User Info */}
-                  <div className="min-w-0 flex-1 basis-40">
-                    <div className="mb-1 flex items-center gap-2">
-                      <h3 className="min-w-0 truncate text-sm font-semibold">
-                        <button
-                          type="button"
-                          onClick={() => handleViewProfile(result.uid)}
-                          className="text-left outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-primary"
-                        >
-                          {result.displayName}
-                        </button>
-                      </h3>
-                      {result.owner && (
-                        <Crown className="h-4 w-4 shrink-0 text-yellow-500" />
-                      )}
-                      {result.contributor && (
-                        <ContributorBadge className="h-4 w-4" />
-                      )}
-                      {result.verified && (
-                        <BadgeCheck className="h-4 w-4 shrink-0 text-blue-500" />
-                      )}
-                      <EarnedBadges user={result} className="h-4 w-4" />
-                      {!result.private && result.level > 1 && (
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                          Lv. {result.level}
-                        </span>
-                      )}
-                      {result.private && (
-                        <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                          <LockIcon className="h-3 w-3" />
-                          {t("ascend.profile.private") || "Private"}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Bio */}
-                    {!result.private && result.bio && (
-                      <p className="mb-1 line-clamp-1 text-xs text-muted-foreground">
-                        {result.bio}
-                      </p>
-                    )}
-
-                    {/* Stats Row */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <div
-                          className={`h-2 w-2 rounded-full ${
-                            result.status === "online"
-                              ? "bg-green-500"
-                              : result.status === "away"
-                                ? "bg-yellow-500"
-                                : result.status === "busy"
-                                  ? "bg-red-500"
-                                  : "bg-gray-500"
-                          }`}
-                        />
-                        <span className="capitalize">
-                          {result.status === "online"
-                            ? t("ascend.status.online")
-                            : result.status === "away"
-                              ? t("ascend.status.away")
-                              : result.status === "busy"
-                                ? t("ascend.status.busy")
-                                : t("ascend.status.offline")}
-                        </span>
+                        )}
                       </div>
-                      {!result.private && result.totalPlaytime > 0 && (
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5" />
-                          <span>{Math.floor(result.totalPlaytime / 3600)}h played</span>
-                        </div>
-                      )}
-                      {!result.private && result.gamesPlayed > 0 && (
-                        <div className="flex items-center gap-1.5">
-                          <Gamepad2 className="h-3.5 w-3.5" />
-                          <span>{result.gamesPlayed} games</span>
-                        </div>
-                      )}
-                      {!result.private && result.country && (
-                        <div className="flex items-center gap-1.5">
-                          <Globe className="h-3.5 w-3.5" />
-                          <span>{result.country}</span>
-                        </div>
-                      )}
+                      <div
+                        className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${
+                          result.status === "online"
+                            ? "bg-green-500"
+                            : result.status === "away"
+                              ? "bg-yellow-500"
+                              : result.status === "busy"
+                                ? "bg-red-500"
+                                : "bg-gray-500"
+                        }`}
+                      />
                     </div>
-                  </div>
 
-                  {/* Action Buttons */}
-                  <div className="relative z-10 flex shrink-0 items-center gap-2">
-                    {(() => {
-                      const status = getRelationshipStatus(result.uid);
-                      if (status === "friend") {
-                        return (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="rounded-xl"
-                            disabled
+                    {/* User Info */}
+                    <div className="min-w-0 flex-1 basis-40">
+                      <div className="mb-1 flex items-center gap-2">
+                        <h3 className="min-w-0 truncate text-sm font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => handleViewProfile(result.uid)}
+                            className="text-left outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-primary"
                           >
-                            <UserCheck className="mr-2 h-4 w-4" />
-                            {t("ascend.friends.friends") || "Friends"}
-                          </Button>
-                        );
-                      } else if (status === "requestSent") {
-                        return (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="rounded-xl"
-                            disabled
-                          >
-                            <Clock className="mr-2 h-4 w-4" />
-                            {t("ascend.friends.requestPending") || "Pending"}
-                          </Button>
-                        );
-                      } else if (status === "requestReceived") {
-                        return (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="rounded-xl"
-                            disabled
-                          >
-                            <Inbox className="mr-2 h-4 w-4" />
-                            {t("ascend.friends.requestReceived") || "Request Received"}
-                          </Button>
-                        );
-                      } else {
-                        return (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="rounded-xl"
-                            onClick={e => {
-                              e.stopPropagation();
-                              handleSendRequest(result.uid);
-                            }}
-                          >
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            {t("ascend.friends.addFriend")}
-                          </Button>
-                        );
-                      }
-                    })()}
-                    <ChevronRight className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
+                            {result.displayName}
+                          </button>
+                        </h3>
+                        {result.owner && <OwnerBadge className="h-4 w-4" />}
+                        {result.contributor && <ContributorBadge className="h-4 w-4" />}
+                        {result.verified && <VerifiedBadge className="h-4 w-4" />}
+                        <EarnedBadges user={result} className="h-4 w-4" />
+                        {!result.private && result.level > 1 && (
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                            Lv. {result.level}
+                          </span>
+                        )}
+                        {result.private && (
+                          <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            <LockIcon className="h-3 w-3" />
+                            {t("ascend.profile.private") || "Private"}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Bio */}
+                      {!result.private && result.bio && (
+                        <p className="mb-1 line-clamp-1 text-xs text-muted-foreground">
+                          {result.bio}
+                        </p>
+                      )}
+
+                      {/* Stats Row */}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <div
+                            className={`h-2 w-2 rounded-full ${
+                              result.status === "online"
+                                ? "bg-green-500"
+                                : result.status === "away"
+                                  ? "bg-yellow-500"
+                                  : result.status === "busy"
+                                    ? "bg-red-500"
+                                    : "bg-gray-500"
+                            }`}
+                          />
+                          <span className="capitalize">
+                            {result.status === "online"
+                              ? t("ascend.status.online")
+                              : result.status === "away"
+                                ? t("ascend.status.away")
+                                : result.status === "busy"
+                                  ? t("ascend.status.busy")
+                                  : t("ascend.status.offline")}
+                          </span>
+                        </div>
+                        {!result.private && result.totalPlaytime > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>{Math.floor(result.totalPlaytime / 3600)}h played</span>
+                          </div>
+                        )}
+                        {!result.private && result.gamesPlayed > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <Gamepad2 className="h-3.5 w-3.5" />
+                            <span>{result.gamesPlayed} games</span>
+                          </div>
+                        )}
+                        {!result.private && result.country && (
+                          <div className="flex items-center gap-1.5">
+                            <Globe className="h-3.5 w-3.5" />
+                            <span>{result.country}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="relative z-10 flex shrink-0 items-center gap-2">
+                      {(() => {
+                        const status = getRelationshipStatus(result.uid);
+                        if (status === "friend") {
+                          return (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-xl"
+                              disabled
+                            >
+                              <UserCheck className="mr-2 h-4 w-4" />
+                              {t("ascend.friends.friends") || "Friends"}
+                            </Button>
+                          );
+                        } else if (status === "requestSent") {
+                          return (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-xl"
+                              disabled
+                            >
+                              <Clock className="mr-2 h-4 w-4" />
+                              {t("ascend.friends.requestPending") || "Pending"}
+                            </Button>
+                          );
+                        } else if (status === "requestReceived") {
+                          return (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-xl"
+                              disabled
+                            >
+                              <Inbox className="mr-2 h-4 w-4" />
+                              {t("ascend.friends.requestReceived") || "Request Received"}
+                            </Button>
+                          );
+                        } else {
+                          return (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-xl"
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleSendRequest(result.uid);
+                              }}
+                            >
+                              <UserPlus className="mr-2 h-4 w-4" />
+                              {t("ascend.friends.addFriend")}
+                            </Button>
+                          );
+                        }
+                      })()}
+                      <ChevronRight className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.li>
-          ))}
+              </motion.li>
+            ))}
           </Panel>
         </div>
       ) : submittedQuery !== null ? (

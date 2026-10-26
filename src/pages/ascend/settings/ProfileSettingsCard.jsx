@@ -12,11 +12,12 @@ import {
   Github,
   Link2,
   Sparkle,
-  Crown,
-  BadgeCheck,
-  Megaphone,
 } from "lucide-react";
-import EarnedBadges, { ContributorBadge } from "@/components/EarnedBadges";
+import EarnedBadges, {
+  ContributorBadge,
+  OwnerBadge,
+  VerifiedBadge,
+} from "@/components/EarnedBadges";
 
 export default function ProfileSettingsCard({
   t,
@@ -294,17 +295,10 @@ export default function ProfileSettingsCard({
             <div className="min-w-0 flex-1">
               <h3 className="flex items-center gap-1 truncate text-xl font-semibold">
                 {user.displayName}
-                {userData?.owner && (
-                  <Crown className="mt-1 h-4 w-4 shrink-0 text-yellow-500" />
-                )}
+                {userData?.owner && <OwnerBadge className="mt-1 h-4 w-4" />}
                 {userData?.contributor && <ContributorBadge className="mt-1 h-4 w-4" />}
-                {userData?.verified && (
-                  <BadgeCheck className="mt-1 h-4 w-4 shrink-0 text-blue-500" />
-                )}
+                {userData?.verified && <VerifiedBadge className="mt-1 h-4 w-4" />}
                 <EarnedBadges user={userData} className="mt-1 h-4 w-4" />
-                {userData?.adUser && (
-                  <Megaphone className="mt-1 h-4 w-4 shrink-0 text-purple-500" />
-                )}
               </h3>
               <p className="truncate text-sm text-muted-foreground">{user.email}</p>
 
