@@ -51,6 +51,15 @@ def format_downloads(assets, repo, tag):
     return lines + ['', '</details>', '']
 
 
+def format_item(item):
+    """A changelog item is either plain text or {'change', 'contributor'}."""
+    if isinstance(item, str):
+        return item
+    # Contributors are GitHub logins, so the mention links them and lists them under the release
+    contributor = item.get('contributor')
+    return f"{item['change']} (by @{contributor})" if contributor else item['change']
+
+
 def format_entry(entry, tag_order=(), assets=(), repo=None, tag=None, previous_tag=None):
     date = datetime.date.fromisoformat(entry['date'])
     lines = [f"# {entry['title']}", '',
@@ -67,7 +76,7 @@ def format_entry(entry, tag_order=(), assets=(), repo=None, tag=None, previous_t
         groups.sort(key=lambda group: tag_order.index(group[0]) if group[0] in tag_order else len(tag_order))
         lines += [f'### {heading}', '']
         for area, items in groups:
-            lines += [f'**{area}**'] + [f'- {item}' for item in items] + ['']
+            lines += [f'**{area}**'] + [f'- {format_item(item)}' for item in items] + ['']
 
     if repo and tag and previous_tag and previous_tag != tag:
         lines += ['---', '', f'**Full list of code changes:** '
