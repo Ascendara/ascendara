@@ -657,6 +657,7 @@
         "AscendaraApp": "App issue",
         "GameBrowsing": "Game report",
         "GameDownload": "Download error",
+        "Playtime": "Playtime flag",
         "UserReport": "User report"
       }
     },
@@ -686,6 +687,33 @@
       "empty": "No notifications",
       "emptyDescription": "You're all caught up! Check back later for new updates.",
       "loading": "Loading notifications...",
+      "playtime": {
+        "author": "Ascend",
+        "cancel": "Cancel",
+        "daily": "{{hours}} of play in one day was flagged",
+        "dialogDescription": "Tell me what happened. Reports go straight to the lead developer of Ascendara.",
+        "dialogTitle": "Something wrong with this flag?",
+        "failed": "Couldn't send your report",
+        "ledger": "{{hours}} of playtime wasn't counted",
+        "placeholder": "How and when did you play?",
+        "reasons": {
+          "dailyCap": "It went over the 24 hour daily limit",
+          "dailyHigh": "That is an unusually long day of play",
+          "importCap": "It was over the limit for a newly added game",
+          "tooFast": "It grew faster than real time",
+          "untimed": "Ascend didn't time it while the game ran"
+        },
+        "report": "Something wrong?",
+        "response": "Response from tago",
+        "sending": "Sending...",
+        "sent": "Report sent to the lead developer",
+        "status": {
+          "cleared": "Reviewed, counted",
+          "disputed": "Reported, in review",
+          "upheld": "Reviewed, not counted"
+        },
+        "submit": "Send Report"
+      },
       "subtitle": "Stay updated with important announcements and updates",
       "title": "Notifications"
     },

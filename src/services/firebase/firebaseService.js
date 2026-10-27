@@ -3135,6 +3135,73 @@ export const listMyReports = async () => {
 };
 
 /**
+ * The signed-in member's playtime flags (time the server didn't count), newest first
+ * @returns {Promise<{flags: Array, error: string|null}>}
+ */
+export const listPlaytimeFlags = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { flags: [], error: "Not authenticated" };
+    }
+
+    const response = await userAuthenticatedFetch(
+      user,
+      `${API_URL}/ascend/playtime-flags`,
+      {
+        method: "GET",
+      }
+    );
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return { flags: [], error: data.error || "Failed to load playtime flags" };
+    }
+
+    return { flags: data.flags || [], error: null };
+  } catch (error) {
+    console.error("List playtime flags error:", error);
+    return { flags: [], error: error.message };
+  }
+};
+
+/**
+ * Tell the lead developer a playtime flag was wrong
+ * @param {string} flagId
+ * @param {string} reason - realPlay | otherDevice | clock | other
+ * @param {string} details
+ * @returns {Promise<{flag: object|null, error: string|null}>}
+ */
+export const disputePlaytimeFlag = async (flagId, reason, details) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { flag: null, error: "Not authenticated" };
+    }
+
+    const response = await userAuthenticatedFetch(
+      user,
+      `${API_URL}/ascend/playtime-flags/${encodeURIComponent(flagId)}/dispute`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason, details }),
+      }
+    );
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return { flag: null, error: data.error || "Failed to send report" };
+    }
+
+    return { flag: data.flag, error: null };
+  } catch (error) {
+    console.error("Dispute playtime flag error:", error);
+    return { flag: null, error: error.message };
+  }
+};
+
+/**
  * Send a review card customization request. GET reads the background and
  * style, POST uploads a background (waits for approval), PATCH changes the
  * style (aura/text colors, image opacity), DELETE removes the background.
