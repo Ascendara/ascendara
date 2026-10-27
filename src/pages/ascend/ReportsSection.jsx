@@ -7,24 +7,33 @@ import { Button } from "@/components/ui/button";
 import {
   CheckCircle2,
   CircleDot,
+  CircleSlash,
   Flag,
   MessageSquareReply,
   RefreshCw,
 } from "lucide-react";
 import { listMyReports } from "@/services/firebase/firebaseService";
 
-const FILTERS = ["all", "open", "fixed"];
+const FILTERS = ["all", "open", "fixed", "closed"];
 
-function StatusBadge({ t, fixed }) {
-  const Icon = fixed ? CheckCircle2 : CircleDot;
+const STATUSES = {
+  open: { icon: CircleDot, className: "bg-yellow-500/10 text-yellow-500" },
+  fixed: { icon: CheckCircle2, className: "bg-green-500/10 text-green-500" },
+  closed: { icon: CircleSlash, className: "bg-muted text-muted-foreground" },
+};
+
+// Reports from before the status field only have the fixed flag
+const reportStatus = report =>
+  STATUSES[report.status] ? report.status : report.fixed ? "fixed" : "open";
+
+function StatusBadge({ t, status }) {
+  const { icon: Icon, className } = STATUSES[status];
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
-        fixed ? "bg-green-500/10 text-green-500" : "bg-yellow-500/10 text-yellow-500"
-      }`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${className}`}
     >
       <Icon className="h-3.5 w-3.5" />
-      {t(fixed ? "ascend.myReports.status.fixed" : "ascend.myReports.status.open")}
+      {t(`ascend.myReports.status.${status}`)}
     </span>
   );
 }
@@ -56,7 +65,7 @@ function ReportCard({ t, report, index }) {
               <p className="truncate text-sm text-muted-foreground">{report.reason}</p>
             )}
           </div>
-          <StatusBadge t={t} fixed={report.fixed} />
+          <StatusBadge t={t} status={reportStatus(report)} />
         </div>
 
         {report.details && (
@@ -110,9 +119,10 @@ export default function ReportsSection({ t }) {
     loadReports();
   }, []);
 
-  const fixedCount = reports.filter(report => report.fixed).length;
+  const countOf = status =>
+    reports.filter(report => reportStatus(report) === status).length;
   const visible = reports.filter(
-    report => filter === "all" || (filter === "fixed") === report.fixed
+    report => filter === "all" || reportStatus(report) === filter
   );
 
   return (
@@ -151,23 +161,17 @@ export default function ReportsSection({ t }) {
       ) : (
         <>
           <StatStrip
-            className="sm:grid-cols-3"
             stats={[
               {
                 icon: Flag,
                 label: t("ascend.myReports.filters.all"),
                 value: reports.length,
               },
-              {
-                icon: CircleDot,
-                label: t("ascend.myReports.filters.open"),
-                value: reports.length - fixedCount,
-              },
-              {
-                icon: CheckCircle2,
-                label: t("ascend.myReports.filters.fixed"),
-                value: fixedCount,
-              },
+              ...Object.entries(STATUSES).map(([status, { icon }]) => ({
+                icon,
+                label: t(`ascend.myReports.filters.${status}`),
+                value: countOf(status),
+              })),
             ]}
           />
 

@@ -638,7 +638,8 @@
       "emptyDescription": "Reports you send while signed in show up here, so you can see when they've been handled.",
       "filters": {
         "all": "All",
-        "fixed": "Handled",
+        "closed": "Closed",
+        "fixed": "Fixed",
         "open": "Open"
       },
       "loadFailed": "Couldn't load your reports",
@@ -647,7 +648,8 @@
       "response": "Response from tago",
       "retry": "Try again",
       "status": {
-        "fixed": "Handled",
+        "closed": "Closed",
+        "fixed": "Fixed",
         "open": "Open"
       },
       "subtitle": "Track the issues and game reports you've sent and see which ones have been handled",
