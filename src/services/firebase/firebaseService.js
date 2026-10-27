@@ -1634,40 +1634,6 @@ export const registerHardwareId = async (hardwareId, userId) => {
 };
 
 /**
- * Update user's Ascend subscription status in Firestore
- * @param {object} subscriptionData - Subscription data from Stripe
- * @returns {Promise<{success: boolean, error: string|null}>}
- */
-export const updateAscendSubscription = async subscriptionData => {
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      return { success: false, error: "Not authenticated" };
-    }
-
-    const userRef = doc(db, "users", user.uid);
-
-    await updateDoc(userRef, {
-      ascendSubscription: {
-        active: true,
-        subscriptionId: subscriptionData.subscriptionId,
-        customerId: subscriptionData.customerId,
-        expiresAt: Timestamp.fromMillis(subscriptionData.currentPeriodEnd * 1000),
-        cancelAtPeriodEnd: subscriptionData.cancelAtPeriodEnd || false,
-        intervalCount: subscriptionData.intervalCount || 1,
-        lifetime: subscriptionData.lifetime === true,
-        updatedAt: serverTimestamp(),
-      },
-    });
-
-    return { success: true, error: null };
-  } catch (error) {
-    console.error("Update Ascend subscription error:", error);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
  * Verify user's Ascend access (subscription only - trial removed)
  * This checks server-side data that can't be manipulated client-side
  * @param {string} hardwareId - Optional hardware ID (kept for compatibility)
@@ -2163,8 +2129,9 @@ export const sendFriendRequest = async toUid => {
     const toUserDoc = await getDoc(doc(db, "users", toUid));
     const toDisplayName = toUserDoc.data()?.displayName || "Unknown";
 
-    // Create friend request
-    await addDoc(collection(db, "friendRequests"), {
+    // Create friend request. The rules require this "<from>_<to>" ID so the
+    // same pair can't stack duplicate requests.
+    await setDoc(doc(db, "friendRequests", `${currentUser.uid}_${toUid}`), {
       fromUid: currentUser.uid,
       fromDisplayName,
       toUid,
@@ -2255,33 +2222,48 @@ export const acceptFriendRequest = async (requestId, fromUid) => {
       return { success: false, error: "No user logged in" };
     }
 
-    // Add to both users' friends lists
-    const myFriendsRef = doc(db, "friends", currentUser.uid);
-    const theirFriendsRef = doc(db, "friends", fromUid);
-
-    // Get or create friends documents
-    const myFriendsDoc = await getDoc(myFriendsRef);
-    const theirFriendsDoc = await getDoc(theirFriendsRef);
-
-    if (myFriendsDoc.exists()) {
-      await updateDoc(myFriendsRef, { list: arrayUnion(fromUid) });
-    } else {
-      await setDoc(myFriendsRef, { list: [fromUid] });
-    }
-
-    if (theirFriendsDoc.exists()) {
-      await updateDoc(theirFriendsRef, { list: arrayUnion(currentUser.uid) });
-    } else {
-      await setDoc(theirFriendsRef, { list: [currentUser.uid] });
-    }
-
-    // Delete the friend request
-    await deleteDoc(doc(db, "friendRequests", requestId));
+    // Mark it accepted, then add the sender to our own list. We can't write
+    // the sender's list; their client claims the accepted request (see
+    // claimAcceptedFriendRequests) and deletes it.
+    await updateDoc(doc(db, "friendRequests", requestId), { status: "accepted" });
+    await setDoc(
+      doc(db, "friends", currentUser.uid),
+      { list: arrayUnion(fromUid) },
+      { merge: true }
+    );
 
     return { success: true, error: null };
   } catch (error) {
     console.error("Accept friend request error:", error);
     return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Add everyone who accepted our outgoing friend requests to our own friends
+ * list, then delete those requests. Only the owner can add to a friends list,
+ * so the sender finishes the friendship after the receiver accepts.
+ * @param {string} uid - Current user ID
+ */
+const claimAcceptedFriendRequests = async uid => {
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(db, "friendRequests"),
+        where("fromUid", "==", uid),
+        where("status", "==", "accepted")
+      )
+    );
+    if (snapshot.empty) return;
+
+    await setDoc(
+      doc(db, "friends", uid),
+      { list: arrayUnion(...snapshot.docs.map(d => d.data().toUid)) },
+      { merge: true }
+    );
+    await Promise.all(snapshot.docs.map(d => deleteDoc(d.ref)));
+  } catch (error) {
+    console.warn("Claim accepted friend requests error:", error);
   }
 };
 
@@ -2472,6 +2454,8 @@ export const getFriendsList = async () => {
       return { friends: [], error: "No user logged in" };
     }
 
+    await claimAcceptedFriendRequests(currentUser.uid);
+
     const friendsDoc = await getDoc(doc(db, "friends", currentUser.uid));
     if (!friendsDoc.exists() || !friendsDoc.data().list?.length) {
       return { friends: [], error: null };
@@ -2523,6 +2507,7 @@ export const subscribeToFriendsList = onUpdate => {
   if (!currentUser) return () => {};
 
   const friendsRef = doc(db, "friends", currentUser.uid);
+  claimAcceptedFriendRequests(currentUser.uid);
 
   return onSnapshot(
     friendsRef,
@@ -2651,7 +2636,12 @@ export const removeFriend = async friendUid => {
     const theirFriendsRef = doc(db, "friends", friendUid);
 
     await updateDoc(myFriendsRef, { list: arrayRemove(friendUid) });
-    await updateDoc(theirFriendsRef, { list: arrayRemove(currentUser.uid) });
+    // The rules only let us remove ourselves, and only if we're on their list.
+    try {
+      await updateDoc(theirFriendsRef, { list: arrayRemove(currentUser.uid) });
+    } catch (error) {
+      console.warn("Remove from friend's list skipped:", error.code || error);
+    }
 
     return { success: true, error: null };
   } catch (error) {
