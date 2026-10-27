@@ -201,7 +201,7 @@ const DEPENDENCY_REGISTRY_PATHS = {
 // ============================================================================
 
 const appBranch = "live";
-const appVersion = "11.7.2";
+const appVersion = "11.7.3";
 const testingVersion = "";
 
 // The Ascendara API every main-process request goes to. VITE_API_URL points
