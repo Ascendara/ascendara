@@ -6,10 +6,20 @@
 const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
-const { spawn } = require("child_process");
+const { spawn, execFile } = require("child_process");
 const { ipcMain, BrowserWindow } = require("electron");
-const { isWindows, TIMESTAMP_FILE } = require("../core/config");
+const { isWindows, isMac, TIMESTAMP_FILE } = require("../core/config");
 const { updateTimestampFile } = require("../core/utils");
+
+const STEAMCMD_DIR = path.join(os.homedir(), "ascendaraSteamcmd");
+const STEAMCMD_EXECUTABLE = path.join(
+  STEAMCMD_DIR,
+  isWindows ? "steamcmd.exe" : "steamcmd.sh"
+);
+// Official Valve builds for Linux and macOS
+const STEAMCMD_UNIX_URL = isMac
+  ? "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_osx.tar.gz"
+  : "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz";
 
 let electronDl = null;
 
@@ -53,34 +63,74 @@ async function fetchWorkshopItemDetails(itemId) {
 }
 
 /**
+ * Download and extract the official SteamCMD tarball (Linux/macOS)
+ * @param {Function} sendProgress - Progress message callback
+ */
+async function downloadUnixSteamCMD(sendProgress) {
+  sendProgress("Downloading SteamCMD from Valve...");
+  const response = await fetch(STEAMCMD_UNIX_URL);
+  if (!response.ok) {
+    throw new Error(`SteamCMD download failed: ${response.status}`);
+  }
+  const archivePath = path.join(STEAMCMD_DIR, path.basename(STEAMCMD_UNIX_URL));
+  await fs.promises.writeFile(archivePath, Buffer.from(await response.arrayBuffer()));
+
+  sendProgress("Extracting SteamCMD...");
+  await new Promise((resolve, reject) => {
+    execFile("tar", ["-xzf", archivePath, "-C", STEAMCMD_DIR], error =>
+      error
+        ? reject(new Error(`Failed to extract SteamCMD: ${error.message}`))
+        : resolve()
+    );
+  });
+  await fs.promises.rm(archivePath, { force: true });
+  await fs.promises.chmod(STEAMCMD_EXECUTABLE, 0o755);
+}
+
+/**
+ * Translate common Linux/macOS SteamCMD startup failures into actionable hints
+ * @param {string} output - Combined SteamCMD output
+ * @param {number} code - Exit code
+ * @returns {string|null} - Hint message, if a known failure was detected
+ */
+function getUnixSteamCMDHint(output, code) {
+  if (isWindows) return null;
+  if (isMac && /bad cpu type/i.test(output)) {
+    return "SteamCMD requires Rosetta 2 on Apple Silicon. Install it with: softwareupdate --install-rosetta";
+  }
+  if (
+    !isMac &&
+    (code === 127 || /linux32\/steamcmd: (No such file|cannot execute)/i.test(output))
+  ) {
+    return "SteamCMD needs 32-bit libraries. Install lib32gcc-s1 (Debian/Ubuntu), glibc.i686 libstdc++.i686 (Fedora) or lib32-gcc-libs (Arch), then try again.";
+  }
+  return null;
+}
+
+/**
  * Register SteamCMD-related IPC handlers
  */
 function registerSteamCMDHandlers() {
   // Check if steamCMD is installed from timestamp file
   ipcMain.handle("is-steamcmd-installed", async () => {
-    if (isWindows) {
-      try {
-        if (!fs.existsSync(TIMESTAMP_FILE)) {
-          return false;
-        }
-        const timestampData = await fs.promises.readFile(TIMESTAMP_FILE, "utf8");
-        const data = JSON.parse(timestampData);
-        return data.steamCMD === true;
-      } catch (error) {
-        console.error("Error checking steamCMD installation:", error);
+    try {
+      if (!fs.existsSync(TIMESTAMP_FILE)) {
         return false;
       }
-    } else {
-      return { message: `not_on_windows` };
+      const timestampData = await fs.promises.readFile(TIMESTAMP_FILE, "utf8");
+      const data = JSON.parse(timestampData);
+      return data.steamCMD === true && fs.existsSync(STEAMCMD_EXECUTABLE);
+    } catch (error) {
+      console.error("Error checking steamCMD installation:", error);
+      return false;
     }
   });
 
-  // Install steamcmd.exe from Ascendara CDN
+  // Install SteamCMD (Ascendara CDN on Windows, Valve tarball on Linux/macOS)
   ipcMain.handle("install-steamcmd", async event => {
-    if (!isWindows) return { success: false, error: "This feature requires Windows." };
     try {
       const steamCMDUrl = "https://cdn.ascendara.app/files/steamcmd.exe";
-      const steamCMDDir = path.join(os.homedir(), "ascendaraSteamcmd");
+      const steamCMDDir = STEAMCMD_DIR;
 
       event.sender.send("install-progress", {
         message: "Creating installation directory...",
@@ -89,27 +139,34 @@ function registerSteamCMDHandlers() {
       // Ensure the directory exists
       await fs.promises.mkdir(steamCMDDir, { recursive: true });
 
-      event.sender.send("install-progress", {
-        message: "Downloading SteamCMD from CDN...",
-      });
+      if (isWindows) {
+        event.sender.send("install-progress", {
+          message: "Downloading SteamCMD from CDN...",
+        });
 
-      // Download steamcmd.exe
-      await electronDl.download(BrowserWindow.getFocusedWindow(), steamCMDUrl, {
-        directory: steamCMDDir,
-        filename: "steamcmd.exe",
-      });
+        // Download steamcmd.exe
+        await electronDl.download(BrowserWindow.getFocusedWindow(), steamCMDUrl, {
+          directory: steamCMDDir,
+          filename: "steamcmd.exe",
+        });
+      } else {
+        await downloadUnixSteamCMD(message =>
+          event.sender.send("install-progress", { message })
+        );
+      }
 
       event.sender.send("install-progress", {
         message: "Download complete. Initializing SteamCMD...",
       });
 
-      // Run steamcmd.exe to create initial files
-      const steamCMDPath = path.join(steamCMDDir, "steamcmd.exe");
+      // Run SteamCMD once so it can self-update and create its initial files
       await new Promise((resolve, reject) => {
-        const steamCmd = spawn(steamCMDPath, ["+quit"]);
+        const steamCmd = spawn(STEAMCMD_EXECUTABLE, ["+quit"], { cwd: steamCMDDir });
+        let output = "";
 
         steamCmd.stdout.on("data", data => {
           const text = data.toString().trim();
+          output += text + "\n";
           if (text) {
             event.sender.send("install-progress", { message: text });
           }
@@ -117,6 +174,7 @@ function registerSteamCMDHandlers() {
 
         steamCmd.stderr.on("data", data => {
           const text = data.toString().trim();
+          output += text + "\n";
           if (text) {
             event.sender.send("install-progress", { message: text });
           }
@@ -131,7 +189,12 @@ function registerSteamCMDHandlers() {
           if (code === 0 || code === 7) {
             resolve();
           } else {
-            reject(new Error(`SteamCMD exited with unexpected code ${code}`));
+            reject(
+              new Error(
+                getUnixSteamCMDHint(output, code) ||
+                  `SteamCMD exited with unexpected code ${code}`
+              )
+            );
           }
         });
       });
@@ -162,7 +225,6 @@ function registerSteamCMDHandlers() {
 
   // Download item with steamcmd
   ipcMain.handle("download-item", async (event, url) => {
-    if (!isWindows) return { success: false, error: "This feature requires Windows." };
     try {
       // Extract the item ID from the URL
       const itemId = url.match(/id=(\d+)/)?.[1];
@@ -179,18 +241,24 @@ function registerSteamCMDHandlers() {
       }
 
       // Construct the SteamCMD command
-      const steamCMDDir = path.join(os.homedir(), "ascendaraSteamcmd");
-      const steamCMDPath = path.join(steamCMDDir, "steamcmd.exe");
+      const steamCMDDir = STEAMCMD_DIR;
+      // Linux/macOS builds otherwise default to ~/Steam or ~/Library/Application Support/Steam
+      const installDirArgs = isWindows ? [] : ["+force_install_dir", steamCMDDir];
 
       return new Promise((resolve, reject) => {
-        const steamProcess = spawn(steamCMDPath, [
-          "+login",
-          "anonymous",
-          "+workshop_download_item",
-          appId,
-          itemId,
-          "+quit",
-        ]);
+        const steamProcess = spawn(
+          STEAMCMD_EXECUTABLE,
+          [
+            ...installDirArgs,
+            "+login",
+            "anonymous",
+            "+workshop_download_item",
+            appId,
+            itemId,
+            "+quit",
+          ],
+          { cwd: steamCMDDir }
+        );
 
         let output = "";
         let errorOutput = "";
@@ -231,7 +299,8 @@ function registerSteamCMDHandlers() {
           } else {
             const errorMsg = hasDownloadFailure
               ? "Workshop item download failed. The item may be private, restricted, or unavailable."
-              : `SteamCMD process exited with code ${code}. Error: ${errorOutput}`;
+              : getUnixSteamCMDHint(output + errorOutput, code) ||
+                `SteamCMD process exited with code ${code}. Error: ${errorOutput}`;
 
             // Clean up the workshop item directory if it exists
             try {
