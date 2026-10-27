@@ -71,13 +71,6 @@ export default function SubscriptionSettingsCard({
               VERIFIED
             </span>
           </div>
-        ) : ascendAccess.isSubscribed ? (
-          <div className="flex items-center gap-1.5 rounded-full bg-yellow-500/10 px-3 py-1">
-            <Sparkle className="h-3.5 w-3.5 text-yellow-500" />
-            <span className="text-xs font-medium text-yellow-600 dark:text-yellow-400">
-              PRO
-            </span>
-          </div>
         ) : null}
       </div>
 
