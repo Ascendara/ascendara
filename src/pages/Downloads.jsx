@@ -253,6 +253,21 @@ const Downloads = () => {
           processedCommandsRef.current.add(commandKey);
           commandTimestampsRef.current.set(commandKey, Date.now());
 
+          // Remote commands may only touch a download shown in this list.
+          // "stop" deletes files, so a companion session must never be able to
+          // aim it at an installed game by sending that game's name.
+          if (
+            !["pause", "resume", "stop", "cancel", "kill"].includes(command) ||
+            !downloadingGamesRef.current.some(g => g.game === downloadId)
+          ) {
+            await acknowledgeCommand(
+              downloadId,
+              "failed",
+              "This download is no longer active"
+            );
+            continue;
+          }
+
           console.log(
             "[Downloads] Executing command:",
             command,

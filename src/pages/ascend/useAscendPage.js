@@ -2620,7 +2620,8 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         const statusPollTimer = setInterval(async () => {
           try {
             const statusResponse = await fetch(
-              `https://monitor.ascendara.app/connection-status/${data.code}`
+              `https://monitor.ascendara.app/connection-status/${data.code}`,
+              { headers: { Authorization: `Bearer ${await user.getIdToken()}` } }
             );
             const statusData = await statusResponse.json();
 
