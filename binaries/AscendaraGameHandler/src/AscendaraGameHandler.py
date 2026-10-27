@@ -645,6 +645,84 @@ def get_running_processes_in_dir(game_dir, exclude_pids=None):
             continue
     return matches
 
+ERROR_CANCELLED = 1223
+
+class ElevatedProcess:
+    """Popen-like handle for a process started through the UAC 'runas' verb.
+
+    ShellExecuteW gives no process handle, which left elevated games untracked
+    (no play time, isRunning never cleared). ShellExecuteExW with
+    SEE_MASK_NOCLOSEPROCESS does, so the normal monitoring loop can wait on it.
+    """
+
+    def __init__(self, exe_path, params=None, cwd=None):
+        from ctypes import wintypes
+
+        class SHELLEXECUTEINFOW(ctypes.Structure):
+            _fields_ = [
+                ("cbSize", wintypes.DWORD),
+                ("fMask", ctypes.c_ulong),
+                ("hwnd", wintypes.HWND),
+                ("lpVerb", wintypes.LPCWSTR),
+                ("lpFile", wintypes.LPCWSTR),
+                ("lpParameters", wintypes.LPCWSTR),
+                ("lpDirectory", wintypes.LPCWSTR),
+                ("nShow", ctypes.c_int),
+                ("hInstApp", wintypes.HINSTANCE),
+                ("lpIDList", ctypes.c_void_p),
+                ("lpClass", wintypes.LPCWSTR),
+                ("hkeyClass", wintypes.HKEY),
+                ("dwHotKey", wintypes.DWORD),
+                ("hIconOrMonitor", wintypes.HANDLE),
+                ("hProcess", wintypes.HANDLE),
+            ]
+
+        shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+        shell32.ShellExecuteExW.argtypes = [ctypes.POINTER(SHELLEXECUTEINFOW)]
+        shell32.ShellExecuteExW.restype = wintypes.BOOL
+        self._kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        self._kernel32.GetProcessId.argtypes = [wintypes.HANDLE]
+        self._kernel32.GetProcessId.restype = wintypes.DWORD
+        self._kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        self._kernel32.WaitForSingleObject.restype = wintypes.DWORD
+        self._kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        self._kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+        self._kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+
+        info = SHELLEXECUTEINFOW()
+        info.cbSize = ctypes.sizeof(SHELLEXECUTEINFOW)
+        info.fMask = 0x00000040 | 0x00000100  # SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC
+        info.lpVerb = "runas"
+        info.lpFile = exe_path
+        info.lpParameters = params
+        info.lpDirectory = cwd
+        info.nShow = 1  # SW_SHOWNORMAL
+        if not shell32.ShellExecuteExW(ctypes.byref(info)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        if not info.hProcess:
+            raise OSError(f"Elevated launch of {exe_path} returned no process handle")
+        self._handle = info.hProcess
+        self.pid = self._kernel32.GetProcessId(self._handle)
+        self.returncode = None
+
+    def _wait(self, timeout_ms):
+        if self.returncode is not None:
+            return self.returncode
+        if self._kernel32.WaitForSingleObject(self._handle, timeout_ms) != 0:  # WAIT_OBJECT_0
+            return None
+        from ctypes import wintypes
+        exit_code = wintypes.DWORD()
+        self._kernel32.GetExitCodeProcess(self._handle, ctypes.byref(exit_code))
+        self._kernel32.CloseHandle(self._handle)
+        self.returncode = exit_code.value
+        return self.returncode
+
+    def poll(self):
+        return self._wait(0)
+
+    def wait(self):
+        return self._wait(0xFFFFFFFF)  # INFINITE
+
 def is_abnormal_exit(return_code):
     """True when the exit code means the game crashed rather than quit normally."""
     if return_code is None:
@@ -1215,33 +1293,16 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             if admin:
                 logging.info(f"Launching with admin privileges: {exe_path}")
                 try:
-                    # Use ShellExecute with 'runas' verb to prompt for admin
-                    exe_dir = os.path.dirname(exe_path)
-                    exe_file = os.path.basename(exe_path)
-                    # Build parameters string for ShellExecute if custom launch command provided
-                    shell_params = game_launch_cmd if game_launch_cmd else None
-                    
-                    ctypes.windll.shell32.ShellExecuteW(
-                        None,  # hwnd
-                        "runas",  # operation (runas = run as administrator)
-                        exe_path,  # file
-                        shell_params,  # parameters
-                        exe_dir,  # directory
-                        1  # show command (1 = normal window)
+                    process = ElevatedProcess(
+                        exe_path,
+                        game_launch_cmd if game_launch_cmd else None,
+                        os.path.dirname(exe_path)
                     )
-                    # Create a dummy process that we can monitor
-                    # This is needed because ShellExecute doesn't return a process handle
-                    process = subprocess.Popen(["cmd", "/c", "echo Admin launch initiated"], 
-                                            stdout=subprocess.PIPE, 
-                                            stderr=subprocess.PIPE)
-                    # Wait a moment for the admin process to start
-                    time.sleep(1)
-                    # Return early since we can't monitor the admin process
-                    logging.info("Admin process launched, handler will exit after brief delay")
-                    # Allow a short time for the game to start before exiting
-                    time.sleep(3)
-                    return
+                    logging.info(f"Admin process launched with pid {process.pid}")
                 except Exception as e:
+                    if getattr(e, "winerror", None) == ERROR_CANCELLED:
+                        logging.info("Admin launch cancelled at the UAC prompt")
+                        raise
                     logging.error(f"Failed to launch with admin privileges: {e}", exc_info=True)
                     # Fall back to regular launch
                     logging.info("Falling back to regular launch")
@@ -1255,10 +1316,8 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                         if getattr(e, "winerror", None) == 740:
                             logging.warning(f"Elevation required to launch {exe_path}. Attempting to relaunch with UAC prompt.")
                             try:
-                                os.startfile(exe_path, "runas")
-                                logging.info("Game launched with elevation via UAC. No process handle will be tracked.")
-                                time.sleep(3)
-                                return
+                                process = ElevatedProcess(exe_path, game_launch_cmd or None, os.path.dirname(exe_path))
+                                logging.info(f"Game launched with elevation via UAC (pid {process.pid})")
                             except Exception as elev_err:
                                 logging.error(f"Failed to launch with elevation: {elev_err}")
                                 raise
@@ -1275,10 +1334,8 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     if getattr(e, "winerror", None) == 740:
                         logging.warning(f"Elevation required to launch {exe_path}. Attempting to relaunch with UAC prompt.")
                         try:
-                            os.startfile(exe_path, "runas")
-                            logging.info("Game launched with elevation via UAC. No process handle will be tracked.")
-                            time.sleep(3)
-                            return
+                            process = ElevatedProcess(exe_path, game_launch_cmd or None, os.path.dirname(exe_path))
+                            logging.info(f"Game launched with elevation via UAC (pid {process.pid})")
                         except Exception as elev_err:
                             logging.error(f"Failed to launch with elevation: {elev_err}")
                             raise
@@ -1585,7 +1642,8 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             data["isRunning"] = False
             logging.info(f"Set isRunning=False for game {exe_path} due to exception")
             atomic_write_json(json_file_path, data, indent=4)
-        atexit.register(launch_crash_reporter, 1, str(e))
+        if getattr(e, "winerror", None) != ERROR_CANCELLED:
+            atexit.register(launch_crash_reporter, 1, str(e))
         logging.info(f"[EXIT] execute due to exception for game: {exe_path}")
 
 if __name__ == "__main__":

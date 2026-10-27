@@ -81,18 +81,18 @@ module.exports.getFolders = async userDir_file => {
     const potentialDirs = [
       {
         dir: path.join(process.env["Public"], "Documents/Steam/CODEX"),
-        options: { recursive: true, filter: /.*/, file: [files.achievement[0]] },
+        options: { recursive: true, filter: /.*/, file: ["achievements.ini"] },
       },
       {
         dir: path.join(process.env["APPDATA"], "Steam/CODEX"),
-        options: { recursive: true, filter: /.*/, file: [files.achievement[0]] },
+        options: { recursive: true, filter: /.*/, file: ["achievements.ini"] },
       },
       {
         dir: path.join(process.env["APPDATA"], "Goldberg SteamEmu Saves"),
         options: {
           recursive: true,
           filter: /([0-9]+)/,
-          file: [files.achievement[1], files.achievement[0]],
+          file: ["achievements.json", "achievements.ini"],
         },
       },
       {
@@ -100,7 +100,7 @@ module.exports.getFolders = async userDir_file => {
         options: {
           recursive: true,
           filter: /([0-9]+)/,
-          file: [files.achievement[2]],
+          file: ["achievements.json"],
         },
       },
       {
@@ -108,7 +108,7 @@ module.exports.getFolders = async userDir_file => {
         options: {
           recursive: true,
           filter: /([0-9]+)[\\/]remote[\\/]([0-9]+)/,
-          file: [files.achievement[1]],
+          file: ["achievements.json"],
         },
       },
       {
@@ -116,19 +116,19 @@ module.exports.getFolders = async userDir_file => {
         options: {
           recursive: true,
           filter: /([0-9]+)[\\/]remote[\\/]([0-9]+)/,
-          file: [files.achievement[1]],
+          file: ["achievements.json"],
         },
       },
       {
         dir: path.join(process.env["Public"], "Documents/Steam/RUNE"),
-        options: { recursive: true, filter: /.*/, file: [files.achievement[0]] },
+        options: { recursive: true, filter: /.*/, file: ["achievements.ini"] },
       },
       {
         dir: path.join(process.env["Public"], "Documents/OnlineFix"),
         options: {
           recursive: true,
           filter: /([0-9]+)[\\/]Stats/i,
-          file: [files.achievement[0], files.achievement[1]],
+          file: ["achievements.ini"],
         },
       },
       {
@@ -138,16 +138,16 @@ module.exports.getFolders = async userDir_file => {
           disableCheckTimestamp: true,
           recursive: true,
           filter: /([0-9]+)[\\/]stats/i,
-          file: [files.achievement[0], files.achievement[1]],
+          file: ["achievements.ini"],
         },
       },
       {
         dir: path.join(process.env["LOCALAPPDATA"], "SKIDROW"),
-        options: { recursive: true, filter: /([0-9]+)/, file: [files.achievement[5]] },
+        options: { recursive: true, filter: /([0-9]+)/, file: ["achieve.dat"] },
       },
       {
         dir: path.join(process.env["APPDATA"], "SmartSteamEmu"),
-        options: { recursive: true, filter: /([0-9]+)/, file: [files.achievement[7]] },
+        options: { recursive: true, filter: /([0-9]+)/, file: ["stats.bin"] },
       },
     ];
 
@@ -191,60 +191,60 @@ module.exports.getFolders = async userDir_file => {
             // Public/Documents
             {
               path: "users/Public/Documents/Steam/CODEX",
-              file: [files.achievement[0]],
+              file: ["achievements.ini"],
               filter: /.*/,
             },
             {
               path: "users/Public/Documents/EMPRESS",
-              file: [files.achievement[1]],
+              file: ["achievements.json"],
               filter: /([0-9]+)[\\/]remote[\\/]([0-9]+)/,
             },
             {
               path: "users/Public/Documents/Steam/RUNE",
-              file: [files.achievement[0]],
+              file: ["achievements.ini"],
               filter: /.*/,
             },
             {
               path: "users/Public/Documents/OnlineFix",
-              file: [files.achievement[0], files.achievement[1]],
+              file: ["achievements.ini"],
               filter: /([0-9]+)[\\/]Stats/i,
             },
             // AppData/Roaming
             {
               path: "users/steamuser/AppData/Roaming/Steam/CODEX",
-              file: [files.achievement[0]],
+              file: ["achievements.ini"],
               filter: /.*/,
             },
             {
               path: "users/steamuser/AppData/Roaming/Goldberg SteamEmu Saves",
-              file: [files.achievement[1], files.achievement[0]],
+              file: ["achievements.json", "achievements.ini"],
               filter: /([0-9]+)/,
             },
             {
               path: "users/steamuser/AppData/Roaming/GSE Saves",
-              file: [files.achievement[2]],
+              file: ["achievements.json"],
               filter: /([0-9]+)/,
             },
             {
               path: "users/steamuser/AppData/Roaming/EMPRESS",
-              file: [files.achievement[1]],
+              file: ["achievements.json"],
               filter: /([0-9]+)[\\/]remote[\\/]([0-9]+)/,
             },
             {
               path: "users/steamuser/AppData/Roaming/SmartSteamEmu",
-              file: [files.achievement[7]],
+              file: ["stats.bin"],
               filter: /([0-9]+)/,
             },
             // LocalAppData
             {
               path: "users/steamuser/AppData/Local/SKIDROW",
-              file: [files.achievement[5]],
+              file: ["achieve.dat"],
               filter: /([0-9]+)/,
             },
             // ProgramData
             {
               path: "ProgramData/Steam",
-              file: [files.achievement[0], files.achievement[1]],
+              file: ["achievements.ini"],
               filter: /([0-9]+)[\\/]stats/i,
               options: {
                 disableCheckIfProcessIsRunning: true,
@@ -298,7 +298,7 @@ module.exports.getFolders = async userDir_file => {
       steamEmu = steamEmu.concat([
         {
           dir: path.join(mydocs, "SKIDROW"),
-          options: { recursive: true, filter: /([0-9]+)/, file: [files.achievement[5]] },
+          options: { recursive: true, filter: /([0-9]+)/, file: ["achieve.dat"] },
         },
       ]);
     }
@@ -354,7 +354,7 @@ module.exports.getFolders = async userDir_file => {
                     options: {
                       appid: info.Settings.AppID,
                       recursive: false,
-                      file: [files.achievement[4]],
+                      file: ["Achievements.Bin"],
                     },
                   });
               } else if (
@@ -371,7 +371,7 @@ module.exports.getFolders = async userDir_file => {
                     options: {
                       appid: info.Settings.AppID,
                       recursive: false,
-                      file: [files.achievement[4]],
+                      file: ["Achievements.Bin"],
                     },
                   });
               } else if (info.Settings.AppID && !info.Settings.SaveType) {
@@ -391,7 +391,7 @@ module.exports.getFolders = async userDir_file => {
                     options: {
                       appid: info.Settings.AppID,
                       recursive: false,
-                      file: [files.achievement[4]],
+                      file: ["Achievements.Bin"],
                     },
                   });
               }
@@ -420,7 +420,7 @@ module.exports.getFolders = async userDir_file => {
                     options: {
                       appid: info.GameSettings.AppId,
                       recursive: false,
-                      file: [files.achievement[2]],
+                      file: ["achiev.ini"],
                     },
                   });
                 } else {
@@ -438,7 +438,7 @@ module.exports.getFolders = async userDir_file => {
                       options: {
                         appid: info.GameSettings.AppId,
                         recursive: false,
-                        file: [files.achievement[3]],
+                        file: ["stats.ini"],
                       },
                     });
                   } else if (file === files.steamEmu[2]) {
@@ -465,7 +465,7 @@ module.exports.getFolders = async userDir_file => {
                           disableCheckIfProcessIsRunning: true,
                           disableCheckTimestamp: true,
                           recursive: false,
-                          file: [files.achievement[4]],
+                          file: ["Achievements.Bin"],
                         },
                       });
                     }
@@ -485,13 +485,18 @@ module.exports.getFolders = async userDir_file => {
                     "SteamEmu"
                   );
 
-                  if (await fs.exists(path.join(dirpath, "UserStats/achiev.ini"))) {
+                  if (
+                    await fs
+                      .access(path.join(dirpath, "UserStats/achiev.ini"))
+                      .then(() => true)
+                      .catch(() => false)
+                  ) {
                     steamEmu.push({
                       dir: path.join(dirpath, "UserStats"),
                       options: {
                         appid: info.GameSettings.AppId,
                         recursive: false,
-                        file: [files.achievement[2]],
+                        file: ["achiev.ini"],
                       },
                     });
                   } else {
@@ -500,7 +505,7 @@ module.exports.getFolders = async userDir_file => {
                       options: {
                         appid: info.GameSettings.AppId,
                         recursive: false,
-                        file: [files.achievement[3]],
+                        file: ["stats.ini"],
                       },
                     });
                   }
@@ -525,7 +530,7 @@ module.exports.getFolders = async userDir_file => {
                     options: {
                       appid: info.Settings.AppId,
                       recursive: false,
-                      file: [files.achievement[6]],
+                      file: ["Achievements.ini"],
                     },
                   });
               }
@@ -533,7 +538,13 @@ module.exports.getFolders = async userDir_file => {
           } else {
             steamEmu.push({
               dir: dir.path,
-              options: { recursive: true, filter: /([0-9]+)/, file: files.achievement },
+              options: {
+                appid: dir.appid,
+                recursive: true,
+                // A known appid means the save path doesn't need to contain one
+                filter: dir.appid ? /.*/ : /([0-9]+)/,
+                file: files.achievement,
+              },
             });
           }
         } catch (err) {
@@ -581,7 +592,7 @@ module.exports.parse = async filePath => {
       let convert = {};
       for (let i in local.State) {
         if (Object.prototype.hasOwnProperty.call(local.State, i)) {
-          if (local.local.State[i] == "0101") {
+          if (local.State[i] == "0101") {
             convert[`${i}`] = {
               Achieved: "1",
               UnlockTime:
@@ -654,11 +665,6 @@ module.exports.parse = async filePath => {
               local[achievement].earned_time ||
               0,
           };
-
-          // Always set UnlockTime to current time if achieved
-          if (result.Achieved) {
-            result.UnlockTime = Math.floor(Date.now() / 1000);
-          }
 
           // Normalize UnlockTime to always be a UNIX timestamp in seconds
           if (result.UnlockTime && result.UnlockTime > 1000000000000) {

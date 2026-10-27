@@ -11,6 +11,7 @@ const steam = require("./steam.js");
 const steamLangDefs = require("./steam.json");
 const track = require("./track.js");
 const crc32 = require("./crc32.js");
+const library = require("./library.js");
 const { getSettings } = require("./userConfig.js");
 const { spawn } = require("child_process");
 
@@ -20,13 +21,22 @@ const timestampFilePath =
   process.platform === "win32"
     ? path.join(homeDir, "timestamp.ascendara.json")
     : path.join(homeDir, ".ascendara", "timestamp.ascendara.json");
+const pendingFilePath = path.join(
+  process.env["APPDATA"] || path.join(homeDir, ".config"),
+  "Achievement Watcher/steam_cache/pending.json"
+);
 let watchdogRunning = false;
 
 // Resource optimization constants
-const MAX_WATCHERS = 50; // Limit total number of file watchers
+// Linux has no native recursive watching, so every subfolder costs an inotify watch
+const MAX_WATCHERS = process.platform === "linux" ? 100 : 500;
 const MAX_CACHE_SIZE = 20; // Limit number of cached game schemas
 const FILE_EVENT_DEBOUNCE_MS = 500; // Debounce file events
 const CACHE_CLEANUP_INTERVAL_MS = 300000; // Clean cache every 5 minutes
+const RESCAN_INTERVAL_MS = 60000; // Look for new save folders every minute
+const CATCH_UP_NOTIFY_WINDOW_MS = 2 * RESCAN_INTERVAL_MS; // Toast missed unlocks this recent
+const CATCH_UP_MAX_DEPTH = 5;
+const CATCH_UP_MAX_ENTRIES = 5000;
 
 // Debounce tracking
 const fileEventTimers = new Map();
@@ -133,471 +143,320 @@ let sendNotification = async opts => {
   }
 };
 
-// Extracted file event processing logic
-async function processFileEvent(name, options, self) {
-  try {
-    const currentTime = Date.now();
-    const fileLastModified = (await fs.stat(name)).mtimeMs || 0;
-    console.log(
-      `File last modified: ${fileLastModified}, current time: ${currentTime}, difference: ${currentTime - fileLastModified}ms`
-    );
-    if (currentTime - fileLastModified > 1000) {
-      console.log(`Skipping event: file modified more than 1s ago.`);
-      return;
-    }
+const fileMatches = (options, name) =>
+  (options.file || []).some(
+    file => file.toLowerCase() === path.basename(name).toLowerCase()
+  );
 
-    let filePath = path.parse(name);
-    console.log(`Checking if file is in watch list: ${filePath.base}`);
-    if (!options.file.some(file => file == filePath.base)) {
-      console.log(`File ${filePath.base} not in options.file, skipping.`);
-      return;
-    }
+function getAppIdForFile(filePath, options) {
+  if (options.appid) return String(options.appid);
+  const parts = filePath.dir.split(/[\\/]/);
+  const onlineFixIdx = parts.findIndex(p => p.toLowerCase() === "onlinefix");
+  if (onlineFixIdx !== -1 && parts.length > onlineFixIdx + 1) {
+    return parts[onlineFixIdx + 1];
+  }
+  // Use a separator-agnostic pattern so this works on both
+  // Windows ("\\") and Linux/Proton ("/") paths.
+  const match = filePath.dir
+    .replace(/([\\/]stats$)|([\\/]SteamEmu$)|([\\/]SteamEmu[\\/]UserStats$)/gi, "")
+    .match(/([0-9]+$)/);
+  if (!match) throw `Unable to find game's appID in ${filePath.dir}`;
+  return match[0];
+}
 
-    console.log(`Achievement file change detected: ${name}`);
+// Achievement files are handled one at a time so two watchers firing for the
+// same file can't both read the cache before either saves it (double toasts).
+let queue = Promise.resolve();
+function enqueue(task) {
+  queue = queue.then(task).catch(err => console.warn(err));
+  return queue;
+}
 
-    if (moment().diff(moment(self.tick)) <= self.options.notification_advanced.tick) {
-      console.log(`Spamming protection active, skipping notification.`);
-      throw "Spamming protection is enabled > SKIPPING";
-    }
-    self.tick = moment().valueOf();
-
-    let appID;
+// AppIDs whose unlocks couldn't be written to a game yet (game folder unknown),
+// retried on every rescan so they still show up in Ascendara later.
+let pendingSync = null;
+async function loadPending() {
+  if (!pendingSync) {
     try {
-      if (options.appid) {
-        appID = options.appid;
-      } else {
-        const parts = filePath.dir.split(path.sep);
-        const onlineFixIdx = parts.findIndex(p => p.toLowerCase() === "onlinefix");
-        if (onlineFixIdx !== -1 && parts.length > onlineFixIdx + 1) {
-          appID = parts[onlineFixIdx + 1];
-        } else {
-          // Use a separator-agnostic pattern so this works on both
-          // Windows ("\\") and Linux/Proton ("/") paths.
-          appID = filePath.dir
-            .replace(
-              /([\\/]stats$)|([\\/]SteamEmu$)|([\\/]SteamEmu[\\/]UserStats$)/gi,
-              ""
-            )
-            .match(/([0-9]+$)/g)[0];
-        }
-      }
-      console.log(`Detected appID: ${appID}`);
-    } catch (err) {
-      console.log(`Failed to extract appID from path: ${filePath.dir}`);
-      throw "Unable to find game's appID";
+      pendingSync = new Set(JSON.parse(await fs.readFile(pendingFilePath, "utf8")));
+    } catch (e) {
+      pendingSync = new Set();
     }
+  }
+  return pendingSync;
+}
 
-    let game = await self.load(appID);
+async function savePending() {
+  await fs.mkdir(path.dirname(pendingFilePath), { recursive: true });
+  await fs.writeFile(pendingFilePath, JSON.stringify([...pendingSync]), "utf8");
+}
 
-    // NOTE: `notification_advanced.checkIfProcessIsRunning` is never enabled
-    // anywhere in this app, so we always fall through to "assume running".
-    // (A previous cross-platform process-running check referenced an
-    // undefined `tasklist`/`isFullscreenAppRunning` and was removed.)
-    let isRunning = true;
+async function syncAchievements(appID, game, cache) {
+  const pending = await loadPending();
+  const target = await library.resolveGame(appID, game.name);
+  if (!target) {
+    console.warn(`No installed game matches appid ${appID} (${game.name}), will retry`);
+    if (!pending.has(appID)) {
+      pending.add(appID);
+      await savePending();
+    }
+    return false;
+  }
+  await writeAchievementsJson(target, game, cache);
+  if (pending.delete(appID)) await savePending();
+  return true;
+}
 
-    if (isRunning) {
-      let achievements = await monitor.parse(name);
+async function processAchievementFile(name, options, { notify = true } = {}) {
+  const filePath = path.parse(name);
+  if (!fileMatches(options, filePath.base)) return;
 
-      if (achievements.length > 0) {
-        let cache = await track.load(appID);
+  console.log(`Achievement file change detected: ${name}`);
+  const appID = getAppIdForFile(filePath, options);
+  console.log(`Detected appID: ${appID}`);
 
-        let j = 0;
-        for (let i in achievements) {
-          if (Object.prototype.hasOwnProperty.call(achievements, i)) {
-            try {
-              let ach = game.achievement.list.find(achievement => {
-                if (achievements[i].crc) {
-                  return achievements[i].crc.includes(
-                    crc32(achievement.name).toString(16)
-                  );
-                } else {
-                  return (
-                    achievement.name == achievements[i].name ||
-                    achievement.name.toUpperCase() == achievements[i].name.toUpperCase()
-                  );
-                }
-              });
-              if (!ach) throw "ACH_NOT_FOUND_IN_SCHEMA";
+  const game = await app.load(appID);
+  const achievements = await monitor.parse(name);
+  if (achievements.length === 0) return;
 
-              if (achievements[i].crc) {
-                achievements[i].name = ach.name;
-                delete achievements[i].crc;
-              }
+  const cache = await track.load(appID);
+  let changed = false;
 
-              let previous = cache.find(achievement => achievement.name === ach.name) || {
-                Achieved: false,
-                CurProgress: 0,
-                MaxProgress: 0,
-                UnlockTime: 0,
-              };
-
-              if (!previous.Achieved && achievements[i].Achieved && !previous.Notified) {
-                if (!achievements[i].UnlockTime || achievements[i].UnlockTime == 0)
-                  achievements[i].UnlockTime = moment().unix();
-                console.log("Unlocked:" + ach.displayName);
-                console.log("Sending notification with payload:", {
-                  title: "Achievement Unlocked!",
-                  message: ach.displayName,
-                  icon: ach.icon || "",
-                  appid: game.appid,
-                  game: game.name,
-                  achievement: ach.name,
-                  description: ach.description || "",
-                  unlockTime: achievements[i].UnlockTime,
-                });
-                try {
-                  await sendNotification({
-                    title: "Achievement Unlocked!",
-                    message: ach.displayName,
-                    icon: ach.icon || "",
-                    appid: game.appid,
-                    game: game.name,
-                    achievement: ach.name,
-                    description: ach.description || "",
-                    unlockTime: achievements[i].UnlockTime,
-                  });
-                  console.log("Notification sent successfully.");
-                  achievements[i].Notified = true;
-                  const cacheIdx = cache.findIndex(a => a.name === ach.name);
-                  if (cacheIdx !== -1) {
-                    cache[cacheIdx].Notified = true;
-                    cache[cacheIdx].Achieved = true;
-                    cache[cacheIdx].UnlockTime = achievements[i].UnlockTime;
-                  } else {
-                    cache.push({
-                      name: ach.name,
-                      Notified: true,
-                      Achieved: true,
-                      UnlockTime: achievements[i].UnlockTime,
-                    });
-                  }
-                  await track.save(appID, cache);
-                  try {
-                    await updateAchievementsJsonForRunningGame(game, cache);
-                  } catch (err) {
-                    console.error("Failed to update achievements.ascendara.json:", err);
-                  }
-                } catch (err) {
-                  console.error("Failed to send notification:", err);
-                }
-              } else if (previous.Achieved && achievements[i].Achieved) {
-                console.log("Already unlocked:" + ach.displayName);
-                if (
-                  previous.UnlockTime > 0 &&
-                  previous.UnlockTime != achievements[i].UnlockTime
-                )
-                  achievements[i].UnlockTime = previous.UnlockTime;
-              }
-            } catch (err) {
-              if (err === "ACH_NOT_FOUND_IN_SCHEMA") {
-                console.warn(
-                  `${achievements[i].crc ? `${achievements[i].crc} (CRC32)` : `${achievements[i].name}`} not found in game schema data ?! ... Achievement was probably deleted or renamed over time > SKIPPING`
-                );
-              } else {
-                console.error(
-                  `Unexpected Error for achievement "${achievements[i].name}": ${err}`
-                );
-              }
-            }
-          }
-        }
-        await track.save(appID, cache);
+  for (const unlocked of achievements) {
+    const ach = game.achievement.list.find(achievement => {
+      if (unlocked.crc) {
+        return unlocked.crc.includes(crc32(achievement.name).toString(16));
       }
+      return achievement.name.toUpperCase() == String(unlocked.name).toUpperCase();
+    });
+    if (!ach) {
+      console.warn(
+        `${unlocked.crc ? `${unlocked.crc} (CRC32)` : unlocked.name} not found in game schema data ?! ... Achievement was probably deleted or renamed over time > SKIPPING`
+      );
+      continue;
+    }
+    if (!unlocked.Achieved) continue;
+
+    const previous = cache.find(achievement => achievement.name === ach.name);
+    if (previous && previous.Achieved) continue;
+
+    const unlockTime = unlocked.UnlockTime || moment().unix();
+    if (notify) {
+      console.log("Unlocked:" + ach.displayName);
+      await sendNotification({
+        title: "Achievement Unlocked!",
+        message: ach.displayName,
+        icon: ach.icon || "",
+        appid: game.appid,
+        game: game.name,
+        achievement: ach.name,
+        description: ach.description || "",
+        unlockTime,
+      });
     } else {
-      console.warn(`game's process "${game.binary}" not running`);
+      console.log("Recorded earlier unlock:" + ach.displayName);
     }
-  } catch (err) {
-    console.warn(err);
+
+    const entry = {
+      name: ach.name,
+      Notified: true,
+      Achieved: true,
+      UnlockTime: unlockTime,
+    };
+    if (previous) Object.assign(previous, entry);
+    else cache.push(entry);
+    changed = true;
+  }
+
+  if (changed) await track.save(appID, cache);
+  // Always resync: earlier unlocks may never have reached the game's file
+  if (cache.some(achievement => achievement.Achieved)) {
+    await syncAchievements(appID, game, cache);
   }
 }
 
-var app = {
-  isRecording: false,
-  cache: [],
-  options: {
-    notification_advanced: {
-      tick: 2000,
-    },
-  },
-  watcher: [],
-  tick: 0,
-  toastID: "Microsoft.XboxApp_8wekyb3d8bbwe!Microsoft.XboxApp",
-  start: async function () {
+async function findAchievementFiles(dir, options) {
+  const found = [];
+  const stack = [{ dir, depth: 0 }];
+  const maxDepth = options.recursive ? CATCH_UP_MAX_DEPTH : 0;
+  let seen = 0;
+  while (stack.length && seen < CATCH_UP_MAX_ENTRIES) {
+    const current = stack.pop();
+    let entries;
     try {
-      let self = this;
-      self.cache = [];
-      console.log("Achievement Watchdog starting ...");
+      entries = await fs.readdir(current.dir, { withFileTypes: true });
+    } catch (e) {
+      continue;
+    }
+    for (const entry of entries) {
+      seen++;
+      const full = path.join(current.dir, entry.name);
+      if (entry.isDirectory()) {
+        if (current.depth < maxDepth) stack.push({ dir: full, depth: current.depth + 1 });
+      } else if (
+        fileMatches(options, entry.name) &&
+        (!options.filter || options.filter.test(full))
+      ) {
+        found.push(full);
+      }
+    }
+  }
+  return found;
+}
 
-      const settings = await getSettings();
-      const downloadDir = settings.downloadDirectory;
-      const gameDirList = [];
+var app = {
+  cache: [],
+  watched: new Map(),
+  start: async function () {
+    console.log("Achievement Watchdog starting ...");
+    await this.refresh({ initial: true });
+    logMemoryUsage();
 
-      if (downloadDir) {
-        try {
-          const gameFolders = await fs.readdir(downloadDir, { withFileTypes: true });
-          const emuConfigFiles = [
-            "ALI213.ini",
-            "valve.ini",
-            "hlm.ini",
-            "ds.ini",
-            "steam_api.ini",
-            "SteamConfig.ini",
-          ];
+    // Pick up save folders and games that appear after startup
+    setInterval(() => {
+      this.refresh().catch(err => console.warn("Rescan failed:", err));
+    }, RESCAN_INTERVAL_MS);
 
-          for (const dirent of gameFolders) {
-            if (dirent.isDirectory()) {
-              const gameFolderPath = path.join(downloadDir, dirent.name);
-              let shouldMonitor = false;
-
-              // Check if this folder has any emulator config
-              for (const configFile of emuConfigFiles) {
-                try {
-                  await fs.access(path.join(gameFolderPath, configFile));
-                  shouldMonitor = true;
-                  console.log(
-                    `[Watcher] Adding ${dirent.name} - found emulator config: ${configFile}`
-                  );
-                  break;
-                } catch (e) {
-                  // Config file doesn't exist, continue
-                }
-              }
-
-              // Also monitor if folder has .ascendara.json (installed through Ascendara)
-              if (!shouldMonitor) {
-                try {
-                  const ascendaraJsonPath = path.join(
-                    gameFolderPath,
-                    `${dirent.name}.ascendara.json`
-                  );
-                  await fs.access(ascendaraJsonPath);
-                  shouldMonitor = true;
-                  console.log(`[Watcher] Adding ${dirent.name} - found .ascendara.json`);
-                } catch (e) {
-                  // .ascendara.json doesn't exist
-                }
-              }
-
-              // Also monitor if folder has achievements.ascendara.json (previously tracked)
-              if (!shouldMonitor) {
-                try {
-                  const achievementsPath = path.join(
-                    gameFolderPath,
-                    "achievements.ascendara.json"
-                  );
-                  await fs.access(achievementsPath);
-                  shouldMonitor = true;
-                  console.log(
-                    `[Watcher] Adding ${dirent.name} - found existing achievements.ascendara.json`
-                  );
-                } catch (e) {
-                  // achievements file doesn't exist
-                }
-              }
-
-              if (shouldMonitor) {
-                gameDirList.push({
-                  path: gameFolderPath,
-                  notify: true,
-                });
-              }
-            }
-          }
-          console.log(`Found ${gameDirList.length} game directories to monitor`);
-        } catch (err) {
-          console.warn("Failed to scan download directory:", err);
-        }
+    // Cache cleanup and memory monitoring interval
+    setInterval(() => {
+      if (this.cache.length > MAX_CACHE_SIZE) {
+        console.log(`Cleaning cache (size: ${this.cache.length})`);
+        this.cache = this.cache.slice(-MAX_CACHE_SIZE);
       }
 
-      const tempFile = path.join(
-        process.env.TEMP || process.env.TMP || "/tmp",
-        "ascendara_game_dirs.json"
-      );
-      await fs.writeFile(tempFile, JSON.stringify(gameDirList), "utf8");
-
-      const folders = await monitor.getFolders(tempFile);
-      console.log(`monitor.getFolders() returned ${folders.length} folders`);
-
-      const foldersToWatch = folders.slice(0, MAX_WATCHERS);
-      if (folders.length > MAX_WATCHERS) {
-        console.warn(
-          `Limiting watchers to ${MAX_WATCHERS} (found ${folders.length} potential folders)`
-        );
-      }
-
-      let watcherCount = 0;
-      for (let folder of foldersToWatch) {
-        try {
-          await fs.access(folder.dir);
-          self.watch(watcherCount, folder.dir, folder.options);
-          watcherCount++;
-        } catch (err) {}
-      }
-
-      console.log(`Started ${watcherCount} file watchers`);
-
-      // Log initial memory usage
+      // Log memory usage periodically
       logMemoryUsage();
 
-      // Cache cleanup and memory monitoring interval
-      setInterval(() => {
-        if (self.cache.length > MAX_CACHE_SIZE) {
-          console.log(`Cleaning cache (size: ${self.cache.length})`);
-          self.cache = self.cache.slice(-MAX_CACHE_SIZE);
-        }
+      // Clean up old debounce timers (shouldn't happen, but just in case)
+      if (fileEventTimers.size > 100) {
+        console.warn(
+          `WARNING: Large number of pending file events: ${fileEventTimers.size}`
+        );
+      }
+    }, CACHE_CLEANUP_INTERVAL_MS);
+  },
+  discover: async function () {
+    const gameDirList = [];
+    for (const game of await library.listGames()) {
+      if (game.kind !== "ascendara") continue;
+      if (!game.installed && !game.hasEmuConfig && !game.hasAchievements) continue;
+      gameDirList.push({
+        path: game.folder,
+        notify: true,
+        appid: await library.getAppId(game.folder),
+      });
+    }
 
-        // Log memory usage periodically
-        logMemoryUsage();
+    const tempFile = path.join(
+      process.env.TEMP || process.env.TMP || "/tmp",
+      "ascendara_game_dirs.json"
+    );
+    await fs.writeFile(tempFile, JSON.stringify(gameDirList), "utf8");
+    return monitor.getFolders(tempFile);
+  },
+  refresh: async function ({ initial = false } = {}) {
+    const folders = await this.discover();
+    const added = [];
+    for (const folder of folders) {
+      if (this.watched.has(folder.dir)) continue;
+      if (this.watched.size >= MAX_WATCHERS) {
+        console.warn(
+          `Watcher limit (${MAX_WATCHERS}) reached, not watching ${folder.dir}`
+        );
+        continue;
+      }
+      try {
+        await fs.access(folder.dir);
+      } catch (err) {
+        continue;
+      }
+      this.watch(folder.dir, folder.options);
+      added.push(folder);
+    }
+    if (added.length > 0) {
+      console.log(`Started ${added.length} file watchers (${this.watched.size} total)`);
+    }
 
-        // Clean up old debounce timers (shouldn't happen, but just in case)
-        if (fileEventTimers.size > 100) {
-          console.warn(
-            `WARNING: Large number of pending file events: ${fileEventTimers.size}`
-          );
-        }
-      }, CACHE_CLEANUP_INTERVAL_MS);
-    } catch (err) {
-      console.log(err);
-      instance.unlock();
-      await updateWatchdogStatus(false);
-      process.exit();
+    // Unlocks made while a folder wasn't watched (Ascendara closed, folder
+    // created mid-session) are recorded too, but only recent ones get a toast.
+    for (const folder of added) {
+      for (const file of await findAchievementFiles(folder.dir, folder.options)) {
+        await enqueue(async () => {
+          const age = Date.now() - (await fs.stat(file)).mtimeMs;
+          await processAchievementFile(file, folder.options, {
+            notify: !initial && age < CATCH_UP_NOTIFY_WINDOW_MS,
+          });
+        });
+      }
+    }
+
+    for (const appID of [...(await loadPending())]) {
+      await enqueue(async () => {
+        const cache = await track.load(appID);
+        if (cache.length > 0)
+          await syncAchievements(appID, await this.load(appID), cache);
+      });
     }
   },
-  watch: function (i, dir, options) {
-    let self = this;
+  watch: function (dir, options) {
     console.log(
-      `Monitoring achievement changes in directory: "${dir}" with options:`,
-      options
+      `Monitoring achievement changes in "${dir}" for ${JSON.stringify(options.file)}`
     );
-    if (options.file && options.file.length > 0) {
-      console.log(
-        `Watching files in ${dir}: ${JSON.stringify(options.file)} with filter: ${options.filter}`
-      );
-    } else {
-      console.warn(
-        `WARNING: No files specified to watch in ${dir}. options.file is:`,
-        options.file
-      );
-    }
 
-    self.watcher[i] = watch(
+    const watcher = watch(
       dir,
-      { recursive: options.recursive, filter: options.filter },
-      async function (evt, name) {
-        console.log(`File event: ${evt} on file: ${name}`);
-        try {
-          if (evt !== "update") {
-            console.log(`Ignoring event: ${evt} (only processing 'update' events)`);
-            return;
-          }
+      {
+        recursive: options.recursive,
+        // Returning false (not skip) for a folder still recurses into it
+        filter: f =>
+          fileMatches(options, f) && (!options.filter || options.filter.test(f)),
+      },
+      (evt, name) => {
+        if (evt !== "update") return;
 
-          const debounceKey = `${dir}:${name}`;
-          if (fileEventTimers.has(debounceKey)) {
-            clearTimeout(fileEventTimers.get(debounceKey));
-          }
-
-          const timerId = setTimeout(async () => {
-            fileEventTimers.delete(debounceKey);
-            await processFileEvent(name, options, self);
-          }, FILE_EVENT_DEBOUNCE_MS);
-
-          fileEventTimers.set(debounceKey, timerId);
-        } catch (err) {
-          console.warn(err);
+        const debounceKey = `${dir}:${name}`;
+        if (fileEventTimers.has(debounceKey)) {
+          clearTimeout(fileEventTimers.get(debounceKey));
         }
+        const timerId = setTimeout(() => {
+          fileEventTimers.delete(debounceKey);
+          enqueue(() => processAchievementFile(name, options));
+        }, FILE_EVENT_DEBOUNCE_MS);
+        fileEventTimers.set(debounceKey, timerId);
       }
     );
+    // A watched folder that gets deleted is picked up again by the next rescan
+    watcher.on("error", err => {
+      console.warn(`Watcher error on ${dir}:`, err);
+      watcher.close();
+      this.watched.delete(dir);
+    });
+    this.watched.set(dir, watcher);
   },
   load: async function (appID) {
-    {
-      let self = this;
+    console.log(`loading steam schema for ${appID}`);
 
-      console.log(`loading steam schema for ${appID}`);
-
-      let search = self.cache.find(game => game.appid == appID);
-      let game;
-      if (search) {
-        game = search;
-        console.log("from memory cache");
-      } else {
-        const lang = await getSteamApiLang();
-        game = await steam.loadSteamData(appID, lang);
-        self.cache.push(game);
-        console.log("from file cache or remote");
-      }
-      return game;
+    let game = this.cache.find(game => game.appid == appID);
+    if (game) {
+      console.log("from memory cache");
+    } else {
+      const lang = await getSteamApiLang();
+      game = await steam.loadSteamData(appID, lang);
+      this.cache.push(game);
+      console.log("from file cache or remote");
     }
+    return game;
   },
 };
 
-// Helper to update achievements.ascendara.json for the running game
-async function updateAchievementsJsonForRunningGame(game, achievedCache) {
-  // 1. Get settings
-  const settings = await getSettings();
-  const downloadDir = settings.downloadDirectory;
-  if (!downloadDir) throw new Error("downloadDirectory not set in settings");
-
-  const fsPath = require("path");
-  const fsPromises = require("fs").promises;
-
-  // 2. List subfolders in downloadDir
-  const gameFolders = await fsPromises.readdir(downloadDir, { withFileTypes: true });
-  let found = null;
-  // Check standard Ascendara-installed games
-  for (const dirent of gameFolders) {
-    if (!dirent.isDirectory()) continue;
-    const gameFolderPath = fsPath.join(downloadDir, dirent.name);
-    // Look for {gamename}.ascendara.json in this folder
-    const jsonPath = fsPath.join(gameFolderPath, `${dirent.name}.ascendara.json`);
-    try {
-      const data = await fsPromises.readFile(jsonPath, "utf8");
-      const parsed = JSON.parse(data);
-      if (parsed.isRunning === true) {
-        found = { folder: gameFolderPath, json: parsed, jsonPath };
-        break;
-      }
-    } catch (e) {
-      // ignore missing or invalid files
-    }
-  }
-  // If not found, check games.json for custom games
-  if (!found) {
-    const gamesJsonPath = fsPath.join(downloadDir, "games.json");
-    try {
-      const gamesData = await fsPromises.readFile(gamesJsonPath, "utf8");
-      const gamesObj = JSON.parse(gamesData);
-      if (Array.isArray(gamesObj.games)) {
-        for (const g of gamesObj.games) {
-          if (
-            g.isRunning === true &&
-            typeof g.executable === "string" &&
-            g.executable.length > 0
-          ) {
-            // Get folder from executable path
-            const folder = fsPath.dirname(g.executable);
-            found = { folder, json: g, jsonPath: gamesJsonPath };
-            break;
-          }
-        }
-      }
-    } catch (e) {
-      // ignore if games.json doesn't exist or is invalid
-    }
-  }
-  if (!found) {
-    throw new Error(
-      "No running game folder found with isRunning: true (checked both Ascendara-installed and custom games)"
-    );
-  }
-  // 3. Build achievements data in the new format
+// Writes the game's full achievement list where Ascendara reads it from
+async function writeAchievementsJson(target, game, achievedCache) {
   const allAchievements = Array.isArray(game.achievement?.list)
     ? game.achievement.list
     : [];
   const achievedMap = {};
-  if (Array.isArray(achievedCache)) {
-    for (const a of achievedCache) {
-      achievedMap[a.name] = a;
-    }
+  for (const a of achievedCache) {
+    achievedMap[a.name] = a;
   }
   const achievementsJson = allAchievements.map(a => {
     const achieved = achievedMap[a.name];
@@ -613,67 +472,34 @@ async function updateAchievementsJsonForRunningGame(game, achievedCache) {
       description: a.description || "",
     };
   });
-  // 4. Write achievements data
   const now = new Date().toISOString();
-  if (found.jsonPath && found.jsonPath.endsWith("games.json")) {
+
+  if (target.kind === "custom") {
     // Custom game: update achievementWatcher key in games.json
-    try {
-      const gamesData = await fsPromises.readFile(found.jsonPath, "utf8");
-      const gamesObj = JSON.parse(gamesData);
-      if (Array.isArray(gamesObj.games)) {
-        // Find the correct game object by executable path (robust, normalized)
-        function normalizePath(p) {
-          return String(p || "")
-            .replace(/\\/g, "/")
-            .trim()
-            .toLowerCase();
-        }
-        const targetExe = normalizePath(
-          found.json && found.json.executable
-            ? found.json.executable
-            : game.binaryPath || game.executable || game.binary
-        );
-        const matchIdx = gamesObj.games.findIndex(
-          g => normalizePath(g.executable) === targetExe
-        );
-        if (matchIdx !== -1) {
-          gamesObj.games[matchIdx].achievementWatcher = {
-            achievements: achievementsJson,
-            lastUpdated: now,
-          };
-          await fsPromises.writeFile(
-            found.jsonPath,
-            JSON.stringify(gamesObj, null, 2),
-            "utf8"
-          );
-        } else {
-          // Log available executables for debugging
-          const available = gamesObj.games.map(g => g.executable);
-          console.error(
-            "Could not find matching game in games.json to update achievements. Tried to match:",
-            targetExe,
-            "Available:",
-            available
-          );
-          throw new Error(
-            "Could not find matching game in games.json to update achievements"
-          );
-        }
-      } else {
-        throw new Error("games.json does not contain a games array");
-      }
-    } catch (e) {
-      throw new Error("Failed to update achievementWatcher in games.json: " + e);
+    const gamesObj = JSON.parse(await fs.readFile(target.gamesJsonPath, "utf8"));
+    if (!Array.isArray(gamesObj.games)) {
+      throw new Error("games.json does not contain a games array");
     }
+    const targetExe = library.normalizePath(target.executable);
+    const matchIdx = gamesObj.games.findIndex(
+      g => library.normalizePath(g.executable) === targetExe
+    );
+    if (matchIdx === -1) {
+      throw new Error(`Could not find ${target.executable} in games.json`);
+    }
+    gamesObj.games[matchIdx].achievementWatcher = {
+      achievements: achievementsJson,
+      lastUpdated: now,
+    };
+    await fs.writeFile(target.gamesJsonPath, JSON.stringify(gamesObj, null, 2), "utf8");
   } else {
-    // Standard game: write to achievements.ascendara.json as before
-    const outPath = fsPath.join(found.folder, "achievements.ascendara.json");
-    await fsPromises.writeFile(
-      outPath,
+    await fs.writeFile(
+      path.join(target.folder, "achievements.ascendara.json"),
       JSON.stringify({ achievements: achievementsJson, lastUpdated: now }, null, 2),
       "utf8"
     );
   }
+  console.log(`Wrote ${game.name} achievements to ${target.name}`);
 }
 
 console.log("About to acquire single-instance lock...");
