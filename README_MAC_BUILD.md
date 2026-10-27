@@ -69,7 +69,8 @@ No Wine engine is bundled. The first Windows game launch, or **Settings › Comp
 To upgrade Highball, update `VERSION` and `COMMIT` in `scripts/build_highball.py`. A new manifest moves existing bottles onto the new engine on the next launch. Intel builds do not include Highball and keep using system Wine.
 
 - Ludusavi is detected at `~/.ascendara/ludusavi` or on PATH on macOS. Install a native macOS Ludusavi binary; the Linux CDN binary is not used on Mac.
-- Steam Workshop's existing SteamCMD installer, Windows dependency installers, Defender exclusions, and the Windows uninstaller do not run on macOS. Launcher discovery supports Steam on Mac; other launcher integrations still depend on Windows metadata.
+- The Steam Workshop downloader installs Valve's official macOS SteamCMD into `~/ascendaraSteamcmd`. The binary is x86_64, so Apple Silicon needs Rosetta 2.
+- Windows dependency installers, Defender exclusions, and the Windows uninstaller do not run on macOS. Launcher discovery supports Steam on Mac; other launcher integrations still depend on Windows metadata.
 - Live branch updates download the matching `mac-arm64.zip` or `mac-x64.zip` from the GitHub release, replace the installed app after quit, and reopen it. The app must be installed in a writable location. Testing branch switches still require a manual installation.
 - Torrent downloads still require qBittorrent with its Web UI configured, as in the existing implementation.
 

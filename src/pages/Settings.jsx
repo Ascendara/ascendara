@@ -4255,28 +4255,12 @@ function Settings() {
                           {t("settings.ascendaraWorkshopDownloaderEnable")}
                         </Label>
                       </div>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div>
-                              <Switch
-                                checked={settings.viewWorkshopPage}
-                                disabled={!isOnWindows}
-                                onCheckedChange={value => {
-                                  handleSettingChange("viewWorkshopPage", value);
-                                }}
-                              />
-                            </div>
-                          </TooltipTrigger>
-                          {!isOnWindows && (
-                            <TooltipContent>
-                              <p className="text-secondary">
-                                {t("settings.onlyWindowsSupported2")}
-                              </p>
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Switch
+                        checked={settings.viewWorkshopPage}
+                        onCheckedChange={value => {
+                          handleSettingChange("viewWorkshopPage", value);
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
