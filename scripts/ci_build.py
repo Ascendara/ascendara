@@ -13,9 +13,10 @@ from build_support import ROOT, validate_native_binary
 
 TARGETS = {'windows-x64': ('win', ['.exe']), 'linux-x64': ('linux', ['.AppImage']),
            'mac-arm64': ('mac', ['.dmg', '.zip']), 'mac-x64': ('mac', ['.dmg', '.zip'])}
-CONFIG_FIELDS = {'ASCENDARA_SECRET_SEED': 'SECRET_SEED', 'REACT_APP_AUTHORIZATION': 'AUTHORIZATION',
-                 'REACT_APP_ASCENDARA_API_KEY': 'ASCENDARA_API_KEY',
-                 'REACT_APP_IMAGE_KEY': 'IMAGE_KEY', 'REACT_APP_DISCKEY': 'DISCKEY'}
+# Everything here ships readable inside the app, so only values that are meant
+# to be public belong in it. The old AUTHORIZATION, ASCENDARA_API_KEY and
+# IMAGE_KEY entries were unused by the app and leaked server keys.
+CONFIG_FIELDS = {'ASCENDARA_SECRET_SEED': 'SECRET_SEED', 'REACT_APP_DISCKEY': 'DISCKEY'}
 
 
 def version():

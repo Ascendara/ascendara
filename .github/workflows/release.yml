@@ -113,9 +113,6 @@ jobs:
         env:
           RELEASE_MODE: ${{ needs.prepare.outputs.release }}
           ASCENDARA_SECRET_SEED: ${{ secrets.ASCENDARA_SECRET_SEED }}
-          REACT_APP_AUTHORIZATION: ${{ secrets.REACT_APP_AUTHORIZATION }}
-          REACT_APP_ASCENDARA_API_KEY: ${{ secrets.REACT_APP_ASCENDARA_API_KEY }}
-          REACT_APP_IMAGE_KEY: ${{ secrets.REACT_APP_IMAGE_KEY }}
           REACT_APP_DISCKEY: ${{ vars.REACT_APP_DISCKEY }}
         run: python scripts/ci_build.py configure
       - name: Set up Mac extraction tools
