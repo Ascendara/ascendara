@@ -191,7 +191,7 @@ export default function SubscriptionSettingsCard({
                     defaultValue: "Keep Ascend forever with a one-time payment. Your current subscription will stop renewing after your lifetime purchase succeeds.",
                   })}
                 </p>
-                <Button onClick={handleSubscribe} disabled={deletedAccountWarning} className="gap-2">
+                <Button onClick={handleSubscribe} disabled={deletedAccountWarning} className="gap-2 text-secondary">
                   <InfinityIcon className="h-4 w-4" />
                   {t("ascend.settings.upgradeToLifetime", { defaultValue: "Upgrade to Lifetime" })}
                 </Button>
