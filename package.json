@@ -160,8 +160,14 @@
         ]
       }
     ],
+    "portable": {
+      "artifactName": "Ascendara-Portable-${version}.${ext}"
+    },
     "win": {
-      "target": "nsis",
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "extraResources": [
         {
           "from": "readme/logo/ico/ascendara_64x.ico",

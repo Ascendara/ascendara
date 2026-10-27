@@ -31,8 +31,9 @@ def select_installer(release, tag):
         raise ValueError('Expected a stable version tag such as 11.3.3')
     if release['tag_name'] != tag or release['draft'] or release['prerelease']:
         raise ValueError('WinGet requires a published stable release matching the tag')
-    assets = [a for a in release['assets'] if a['name'].lower().endswith('.exe')]
-    if len(assets) != 1 or assets[0]['name'] != f'Ascendara.Setup.{tag}.exe':
+    # The release also carries a portable .exe; WinGet only takes the installer.
+    assets = [a for a in release['assets'] if a['name'] == f'Ascendara.Setup.{tag}.exe']
+    if len(assets) != 1:
         raise ValueError('Expected exactly one Ascendara.Setup.<version>.exe asset; review installer layout')
     asset = assets[0]
     expected = f'https://github.com/{REPOSITORY}/releases/download/{tag}/{asset["name"]}'

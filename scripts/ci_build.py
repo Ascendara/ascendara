@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """CI configuration, artifact verification, and release gates. Never load local .env."""
 import argparse
+from fnmatch import fnmatchcase
 import hashlib
 import json
 import os
@@ -11,8 +12,11 @@ import subprocess
 import sys
 from build_support import ROOT, validate_native_binary
 
-TARGETS = {'windows-x64': ('win', ['.exe']), 'linux-x64': ('linux', ['.AppImage']),
-           'mac-arm64': ('mac', ['.dmg', '.zip']), 'mac-x64': ('mac', ['.dmg', '.zip'])}
+# Filename patterns each target must produce exactly one of. Windows ships the
+# installer and a portable build side by side, so they are told apart by name.
+TARGETS = {'windows-x64': ('win', ['* Setup *.exe', 'Ascendara-Portable-*.exe']),
+           'linux-x64': ('linux', ['*.AppImage']),
+           'mac-arm64': ('mac', ['*.dmg', '*.zip']), 'mac-x64': ('mac', ['*.dmg', '*.zip'])}
 # Everything here ships readable inside the app, so only values that are meant
 # to be public belong in it. The old AUTHORIZATION, ASCENDARA_API_KEY and
 # IMAGE_KEY entries were unused by the app and leaked server keys.
@@ -49,7 +53,7 @@ def configure():
 
 
 def collect(target):
-    platform, suffixes = TARGETS[target]
+    platform, patterns = TARGETS[target]
     config = json.loads((ROOT / 'package.json').read_text())['build']
     expected_signature = json.loads((ROOT / 'electron/build-signature.json').read_text())
     if expected_signature['version'] != version():
@@ -83,10 +87,11 @@ def collect(target):
     output = ROOT / 'release-artifacts' / target
     output.mkdir(parents=True, exist_ok=False)
     artifacts = []
-    for suffix in suffixes:
-        matches = list((ROOT / 'dist').glob('*' + suffix))
+    for pattern in patterns:
+        matches = list((ROOT / 'dist').glob(pattern))
         if len(matches) != 1 or matches[0].stat().st_size == 0:
-            raise RuntimeError(f'Expected one nonempty {suffix} installer')
+            raise RuntimeError(f'Expected one nonempty {pattern} installer')
+        suffix = pattern.lstrip('*')
         artifact = matches[0]
         if version() not in artifact.name:
             raise RuntimeError('Installer filename does not contain package version')
@@ -107,7 +112,7 @@ def verify(directory):
     manifests = []
     seen = set()
     ids = set()
-    for target, (_, suffixes) in TARGETS.items():
+    for target, (_, patterns) in TARGETS.items():
         folder = directory / target
         manifest = json.loads((folder / 'manifest.json').read_text())
         if manifest['target'] != target or manifest['version'] != version() or manifest['commit'] != os.environ['GITHUB_SHA']:
@@ -125,9 +130,10 @@ def verify(directory):
             artifact = folder / name
             if artifact.stat().st_size != item['size'] or item['size'] <= 0 or digest(artifact) != item['sha256']:
                 raise RuntimeError('Artifact checksum/size mismatch')
-        for suffix in suffixes:
-            if sum(name.endswith(suffix) for name in names) != 1:
-                raise RuntimeError(f'Missing or duplicate {target} installer: {suffix}')
+        for pattern in patterns:
+            # GitHub turns spaces into dots, but these are the local artifact names.
+            if sum(fnmatchcase(name, pattern) for name in names) != 1:
+                raise RuntimeError(f'Missing or duplicate {target} installer: {pattern}')
         manifests.append(manifest)
     return manifests
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build a release description from the published Ascendara changelog."""
 import datetime
+from fnmatch import fnmatchcase
 import json
 import sys
 import urllib.request
@@ -10,8 +11,9 @@ SECTIONS = (('additions', '➕ Added'), ('improvements', '🛠 Improved'),
             ('fixes', '🐛 Fixed'), ('removals', '❌ Removed'))
 # Installers people pick from, in the order they are listed. Anything else
 # attached to the release (updater archives, blockmaps) goes under "All files".
-INSTALLERS = (('.exe', 'Windows', '64-bit'), ('-mac-arm64.dmg', 'macOS', 'Apple Silicon'),
-              ('-mac-x64.dmg', 'macOS', 'Intel'), ('.AppImage', 'Linux', '64-bit'))
+INSTALLERS = (('*Setup*.exe', 'Windows', '64-bit'), ('Ascendara-Portable-*.exe', 'Windows', '64-bit portable'),
+              ('*-mac-arm64.dmg', 'macOS', 'Apple Silicon'), ('*-mac-x64.dmg', 'macOS', 'Intel'),
+              ('*.AppImage', 'Linux', '64-bit'))
 
 
 def fetch_entry(version):
@@ -33,9 +35,9 @@ def format_downloads(assets, repo, tag):
     # Built from the tag, not the asset's own link: a draft's links change when it is published
     link = lambda name: f'https://github.com/{repo}/releases/download/{tag}/{name}'
     rows = []
-    for suffix, platform, detail in INSTALLERS:
+    for pattern, platform, detail in INSTALLERS:
         for asset in assets:
-            if asset['name'].endswith(suffix):
+            if fnmatchcase(asset['name'], pattern):
                 rows.append(f"| **{platform}** | {detail} | [{asset['name']}]({link(asset['name'])}) "
                             f"| {size_label(asset['size'])} |")
     if not rows:

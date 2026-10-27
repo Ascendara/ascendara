@@ -10,7 +10,7 @@ const axios = require("axios");
 const { pipeline } = require("stream/promises");
 const installUpdate = require("./install-update");
 const { downloadDifferentialUpdate } = require("./differential-update");
-const { ipcMain, BrowserWindow, app, powerSaveBlocker } = require("electron");
+const { ipcMain, BrowserWindow, app, powerSaveBlocker, shell } = require("electron");
 const {
   API_URL,
   appVersion,
@@ -18,6 +18,7 @@ const {
   testingVersion,
   isDev,
   isWindows,
+  isPortable,
   isLinux,
   TIMESTAMP_FILE,
   LANG_DIR,
@@ -34,6 +35,9 @@ let isBrokenVersion = false;
 let languageCheckInProgress = false;
 let translationUpdateInProgress = false;
 let availableVersion = null;
+
+// Portable copies update by downloading the new portable build from the release.
+const PORTABLE_RELEASES_URL = "https://github.com/Ascendara/ascendara/releases/latest";
 
 // A stalled connection is retried from where it stopped; the timeout is for
 // inactivity, not for the whole download
@@ -157,6 +161,7 @@ async function checkVersionAndUpdate() {
     if (!isLatest) {
       if (
         settings.autoUpdate &&
+        !isPortable &&
         (process.platform !== "darwin" || currentBranch === "live") &&
         !updateDownloadInProgress &&
         !updateDownloaded
@@ -165,6 +170,7 @@ async function checkVersionAndUpdate() {
         downloadUpdatePromise = downloadUpdateInBackground();
       } else if (
         (!settings.autoUpdate ||
+          isPortable ||
           (process.platform === "darwin" && currentBranch !== "live")) &&
         !notificationShown
       ) {
@@ -473,8 +479,14 @@ function registerUpdateHandlers() {
     }
   });
 
+  ipcMain.handle("is-portable", () => isPortable);
+
   ipcMain.handle("download-update", async () => {
     if (isLatest) return;
+    if (isPortable) {
+      await shell.openExternal(PORTABLE_RELEASES_URL);
+      return;
+    }
     if (updateDownloaded) return; // Already downloaded
 
     try {
@@ -504,6 +516,8 @@ function registerUpdateHandlers() {
   ipcMain.handle("update-ascendara", async () => {
     try {
       if (isLatest) throw new Error("No update is available.");
+      if (isPortable)
+        throw new Error("Download the new portable version from the release page.");
       if (!updateDownloaded) {
         if (!downloadUpdatePromise) {
           downloadUpdatePromise = downloadUpdateInBackground();
@@ -540,6 +554,11 @@ function registerUpdateHandlers() {
   });
 
   ipcMain.handle("switch-branch", async (_, branch) => {
+    if (isPortable)
+      return {
+        success: false,
+        error: "Branch switching needs the installed version of Ascendara.",
+      };
     if (process.platform === "darwin")
       return {
         success: false,

@@ -11,6 +11,9 @@ const { app } = require("electron");
 // Environment detection
 const isDev = !app.isPackaged;
 const isWindows = os.platform().startsWith("win");
+// electron-builder's portable target sets this before starting the app. Portable
+// copies can't run the Setup installer to update, so updates go via the release page.
+const isPortable = isWindows && Boolean(process.env.PORTABLE_EXECUTABLE_FILE);
 const isMac = process.platform === "darwin";
 const isLinux = process.platform === "linux";
 
@@ -212,6 +215,7 @@ module.exports = {
   testingVersion,
   isDev,
   isWindows,
+  isPortable,
   TIMESTAMP_FILE,
   LANG_DIR,
   appDirectory,

@@ -1635,11 +1635,13 @@ const AppRoutes = () => {
         const settings = await window.electron.getSettings();
         const isLatestVersion = await checkForUpdates();
         const branch = await window.electron.getBranch();
+        // Portable copies never auto-update, so they always get the prompt.
+        const isPortable = await window.electron.isPortable();
 
         if (
           !isLatestVersion &&
           !hasShownUpdateNotification.current &&
-          !settings.autoUpdate
+          (!settings.autoUpdate || isPortable)
         ) {
           hasShownUpdateNotification.current = true;
 
