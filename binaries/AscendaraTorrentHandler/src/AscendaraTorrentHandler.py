@@ -26,6 +26,7 @@ import logging
 import qbittorrentapi
 import argparse
 import subprocess
+import base64
 from typing import Dict, Any, Optional, List, Tuple
 
 def _launch_crash_reporter_on_exit(error_code, error_message):
@@ -59,6 +60,19 @@ def resource_path(relative_path):
 def sanitize_folder_name(name: str) -> str:
     valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
     return ''.join(c for c in name if c in valid_chars)
+
+def magnet_info_hash(magnet_link: str) -> Optional[str]:
+    """qBittorrent reports v1 hashes as lowercase hex; magnets may carry base32."""
+    match = re.search(r'xt=urn:btih:([a-zA-Z0-9]+)', magnet_link, re.IGNORECASE)
+    if not match:
+        return None
+    value = match.group(1)
+    if len(value) == 32:
+        try:
+            return base64.b32decode(value.upper()).hex()
+        except Exception:
+            return None
+    return value.lower()
 
 def read_size(size: int, decimal_places: int = 2) -> str:
     if size == 0:
@@ -283,12 +297,30 @@ class TorrentManager:
             ) from e
     
     def ensure_connected(self):
+        # Connect on the calling thread: an exception raised in a worker thread
+        # was lost, so login and connection errors reached the user as a vague
+        # failure from the first API call instead
         if self.qbt_client is None:
-            self.connect_thread = threading.Thread(target=self._connect_qbittorrent)
-            self.connect_thread.start()
-        
+            self._connect_qbittorrent()
+
+    def release_torrent(self, torrent_hash: str):
+        """Remove the finished torrent from qBittorrent but keep its files, so
+        seeding doesn't lock archives that extraction deletes afterwards."""
+        try:
+            self.qbt_client.torrents_delete(delete_files=False, torrent_hashes=torrent_hash)
+            for _ in range(20):
+                if not self.qbt_client.torrents_info(torrent_hashes=torrent_hash):
+                    break
+                time.sleep(0.5)
+            self.current_torrent_hash = None
+            logging.info(f"[TorrentHandler] Removed finished torrent {torrent_hash} from qBittorrent")
+        except Exception as e:
+            logging.warning(f"[TorrentHandler] Could not remove finished torrent from qBittorrent: {e}")
+
     def download_torrent(self, magnet_link, game, online, dlc, isVr, updateFlow, version, size, download_dir, theme=None):
         self.notification_theme = theme
+        # Match the folder and JSON names Electron looks up (AscendaraDownloader does the same)
+        game = sanitize_folder_name(game)
         logging.info(f"Starting torrent download for game: {game}")
         logging.debug(f"Download parameters: magnet={magnet_link}, online={online}, dlc={dlc}, "
                      f"isVr={isVr}, updateFlow={updateFlow}, version={version}, size={size}, "
@@ -297,21 +329,8 @@ class TorrentManager:
         if theme:
             _launch_notification(theme, "Download Started", f"Starting torrent download for {game}")
 
-        # Start connection process immediately
-        self.ensure_connected()
-        
-        # Create game-specific directory in a separate thread
-        def setup_directories():
-            game_dir = os.path.join(download_dir, game)
-            os.makedirs(game_dir, exist_ok=True)
-            return game_dir
-            
-        dir_thread = threading.Thread(target=setup_directories)
-        dir_thread.start()
-        
-        # Wait for directory creation
-        dir_thread.join()
         game_dir = os.path.join(download_dir, game)
+        os.makedirs(game_dir, exist_ok=True)
         
         game_info_path = os.path.join(game_dir, f"{game}.ascendara.json")
         
@@ -367,22 +386,41 @@ class TorrentManager:
                 except Exception as e:
                     logging.warning(f"[TorrentHandler] Could not parse size for disk check: {e}")
 
-            # Wait for qBittorrent connection if not ready
-            if self.connect_thread and self.connect_thread.is_alive():
-                self.connect_thread.join()
-            
-            # Add the torrent to qBittorrent
-            self.qbt_client.torrents_add(
-                urls=magnet_link,
-                save_path=game_dir,  # Save to game-specific directory
-                use_auto_torrent_management=False,
-                sequential_download=True
+            self.ensure_connected()
+
+            torrent_hash = magnet_info_hash(magnet_link)
+            if not torrent_hash:
+                raise Exception("Could not read the torrent hash. Only magnet links with a BitTorrent v1 hash are supported.")
+
+            # qBittorrent ignores an add for a torrent it already has and keeps the
+            # old save path, so Ascendara would watch files somewhere else
+            existing = self.qbt_client.torrents_info(torrent_hashes=torrent_hash)
+            same_path = existing and (
+                os.path.normcase(os.path.normpath(existing[0].save_path or ""))
+                == os.path.normcase(os.path.normpath(game_dir))
             )
-            logging.info(f"Added torrent to qBittorrent for game: {game}")
-            
-            # Get the torrent hash from the magnet link (btih can be hex or base32, case-insensitive)
-            btih_match = re.search(r'btih:([a-zA-Z0-9]+)', magnet_link)
-            torrent_hash = btih_match.group(1).lower() if btih_match else magnet_link.split('&')[0].split(':')[-1].lower()
+            if existing and not same_path:
+                raise Exception(
+                    f"This torrent is already in qBittorrent (saving to {existing[0].save_path}). "
+                    "Remove it from qBittorrent, then start the download again."
+                )
+
+            if existing:
+                logging.info(f"Torrent already in qBittorrent for {game}, resuming it")
+                try:
+                    self.qbt_client.torrents_start(torrent_hashes=torrent_hash)
+                except Exception:
+                    self.qbt_client.torrents_resume(torrent_hashes=torrent_hash)
+            else:
+                result = self.qbt_client.torrents_add(
+                    urls=magnet_link,
+                    save_path=game_dir,  # Save to game-specific directory
+                    use_auto_torrent_management=False,
+                    sequential_download=True
+                )
+                if str(result).strip() != "Ok.":
+                    raise Exception(f"qBittorrent rejected the torrent ({result})")
+                logging.info(f"Added torrent to qBittorrent for game: {game}")
             self.current_torrent_hash = torrent_hash
 
             # Wait for qBittorrent to register the torrent before polling its info
@@ -415,16 +453,29 @@ class TorrentManager:
             # Register cleanup on exit
             atexit.register(self.cleanup)
             
+            missing_polls = 0
             while True:
                 # Get torrent info
                 torrents = self.qbt_client.torrents_info(torrent_hashes=torrent_hash)
                 if not torrents:
+                    # Removed in qBittorrent: stop instead of sitting at 0% forever,
+                    # which also held the queue for every other download
+                    missing_polls += 1
+                    if missing_polls >= 15:
+                        self.current_torrent_hash = None
+                        raise Exception("The torrent was removed from qBittorrent")
                     time.sleep(1)
                     continue
+                missing_polls = 0
                 torrent = torrents[0]
-                
+
                 if torrent.state_enum.is_complete:
                     break
+                if torrent.state in ("error", "missingFiles"):
+                    raise Exception(
+                        f"qBittorrent reported '{torrent.state}' for this torrent. "
+                        "Check that the download folder is writable and has free space."
+                    )
                 
                 # Update progress
                 progress = torrent.progress * 100
@@ -480,7 +531,8 @@ class TorrentManager:
             # completion, which holds OS-level file locks. Wait for it to settle
             # before touching any files, otherwise we hit WinError 32.
             self._wait_for_qbt_release(torrent_hash, game)
-            
+            self.release_torrent(torrent_hash)
+
             # The torrent content lands inside a folder named after the torrent
             torrent_folder = os.path.join(game_dir, torrent.name)
             if not os.path.isdir(torrent_folder):

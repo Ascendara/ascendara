@@ -69,8 +69,9 @@ async function qbtRemoveTorrentsForDirectory(settings, gameDirectory, deleteFile
       }
     );
 
-    const cookie = loginRes.headers?.["set-cookie"]?.[0];
-    if (!cookie || loginRes.data !== "Ok.") {
+    // No cookie comes back when qBittorrent bypasses auth for localhost
+    const cookie = loginRes.headers?.["set-cookie"]?.[0]?.split(";")[0] || "";
+    if (loginRes.data !== "Ok.") {
       console.warn("[qBittorrent] Could not authenticate with WebUI to clean up torrent");
       throw new Error("Could not authenticate with qBittorrent.");
     }
@@ -1167,11 +1168,22 @@ function registerDownloadHandlers() {
               downloadProcesses.delete(sanitizedGame);
               retryDownloadProcesses.delete(sanitizedGame);
               if (torrentDownload) {
-                await qbtRemoveTorrentsForDirectory(
-                  settings,
-                  gameDirectory,
-                  deleteContents && !protectedUpdate
-                );
+                try {
+                  await qbtRemoveTorrentsForDirectory(
+                    settings,
+                    gameDirectory,
+                    deleteContents && !protectedUpdate
+                  );
+                } catch (qbtError) {
+                  // qBittorrent closed or its WebUI unreachable: nothing is
+                  // transferring, so a kill must still go through instead of
+                  // leaving a download the user can never remove
+                  const unreachable = qbtError.code && !qbtError.response;
+                  if (!isKill || !unreachable) throw qbtError;
+                  console.warn(
+                    `[qBittorrent] Unreachable while killing ${sanitizedGame}, removing it anyway`
+                  );
+                }
               }
 
               if (protectedUpdate && (isKill || deleteContents)) {
