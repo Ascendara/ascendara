@@ -61,6 +61,42 @@ async function throttledGet(url, headers) {
   }
 }
 
+// A zero-byte or half-written file from an interrupted download counts as
+// missing, otherwise it would block the asset from ever being fetched again
+function findAsset(gameDir, baseName) {
+  for (const ext of [".jpg", ".jpeg", ".png"]) {
+    const file = path.join(gameDir, baseName + ext);
+    try {
+      if (fs.statSync(file).size > 0) return file;
+      fs.unlinkSync(file);
+    } catch {
+      /* not there */
+    }
+  }
+  return null;
+}
+
+// Writes to a temp file first so a failed or stalled download never leaves a
+// broken image behind
+async function downloadAsset(url, finalFilePath) {
+  const tempPath = `${finalFilePath}.part`;
+  try {
+    const response = await axios({
+      url,
+      method: "GET",
+      responseType: "arraybuffer",
+      timeout: 30000,
+    });
+    const buffer = Buffer.from(response.data);
+    if (!buffer.length) throw new Error("Empty image response");
+    await fs.promises.writeFile(tempPath, buffer);
+    await fs.promises.rename(tempPath, finalFilePath);
+  } catch (error) {
+    await fs.promises.unlink(tempPath).catch(() => {});
+    throw error;
+  }
+}
+
 async function fetchGameAssets(gameName, gameDir, selectedGameId, selectedLogoId) {
   if (
     selectedGameId != null &&
@@ -74,61 +110,24 @@ async function fetchGameAssets(gameName, gameDir, selectedGameId, selectedLogoId
   ) {
     throw new Error("Invalid artwork logo selection");
   }
-  // Check if we already have all the new assets
-  const expectedFiles = [
-    "grid.ascendara.jpg",
-    "hero.ascendara.jpg",
-    "logo.ascendara.png",
-  ];
-
-  // Verify if all files already exist
-  const allExist = expectedFiles.every(file => {
-    const base = file.split(".")[0]; // 'grid', 'hero', 'logo'
-    return (
-      fs.existsSync(path.join(gameDir, base + ".ascendara.jpg")) ||
-      fs.existsSync(path.join(gameDir, base + ".ascendara.png")) ||
-      fs.existsSync(path.join(gameDir, base + ".ascendara.jpeg"))
-    );
-  });
-
-  if (allExist) {
+  const baseNames = ["grid.ascendara", "hero.ascendara", "logo.ascendara"];
+  if (baseNames.every(baseName => findAsset(gameDir, baseName))) {
     return true;
   }
 
-  // Check if game has legacy header.ascendara image
-  const hasLegacyHeader =
-    fs.existsSync(path.join(gameDir, "header.ascendara.jpg")) ||
-    fs.existsSync(path.join(gameDir, "header.ascendara.png")) ||
-    fs.existsSync(path.join(gameDir, "header.ascendara.jpeg"));
-
-  if (hasLegacyHeader) {
+  if (findAsset(gameDir, "header.ascendara")) {
     console.log(
       `[SteamGrid] Found legacy header for "${gameName}", downloading missing assets`
     );
   }
   const authHeaders = authHelper.generateAuthHeaders();
-  let gameId = selectedGameId ?? null;
 
   try {
-    if (!gameId) {
-      const cleanName = gameName
-        .replace(/ v[\d.]+.*$/i, "")
-        .replace(/ premium edition/i, "")
-        .trim();
-      console.log(`[SteamGrid] Searching for: "${cleanName}"`);
-
-      const searchRes = await axios.get(
-        `${PROXY_BASE_URL}/search/autocomplete/${encodeURIComponent(cleanName)}`,
-        { headers: authHeaders }
-      );
-
-      if (searchRes.data.success && searchRes.data.data.length > 0) {
-        gameId = searchRes.data.data[0].id;
-        console.log(`[SteamGrid] Found GameID ${gameId}`);
-      }
-    }
-
+    // Shared, throttled search so a library full of imported games doesn't
+    // burst the proxy into rate limiting
+    const gameId = selectedGameId ?? (await resolveGameId(gameName, authHeaders, true));
     if (!gameId) return false;
+    console.log(`[SteamGrid] Found GameID ${gameId} for "${gameName}"`);
 
     // Definition of types (without extension in the filename for now)
     const downloads = [
@@ -148,24 +147,14 @@ async function fetchGameAssets(gameName, gameDir, selectedGameId, selectedLogoId
     ];
 
     for (const item of downloads) {
-      // 1. Check if the file already exists (with any extension)
-      const extensions = [".jpg", ".jpeg", ".png"];
-      let alreadyExists = false;
-      for (const ext of extensions) {
-        if (fs.existsSync(path.join(gameDir, item.baseName + ext))) {
-          alreadyExists = true;
-          break;
-        }
-      }
-      if (alreadyExists) continue;
+      if (findAsset(gameDir, item.baseName)) continue;
 
-      // 2. Craft the request
       let url = `${PROXY_BASE_URL}/${item.type}/game/${gameId}?styles=${item.styles}&sort=score`;
       if (item.dimensions) url += `&dimensions=${item.dimensions.join(",")}`;
       if (item.type !== "logos") url += `&mimes=image/jpeg,image/png`;
 
       try {
-        const res = await axios.get(url, { headers: authHeaders });
+        const res = await throttledGet(url, authHeaders);
         let assets = res.data?.success && Array.isArray(res.data.data) ? res.data.data : [];
 
         // Prefer English logos even when the white-style results contain other languages.
@@ -174,9 +163,9 @@ async function fetchGameAssets(gameName, gameDir, selectedGameId, selectedLogoId
           (selectedLogoId || !assets.some(asset => asset.language === "en"))
         ) {
           try {
-            const official = await axios.get(
+            const official = await throttledGet(
               `${PROXY_BASE_URL}/${item.type}/game/${gameId}?styles=official&sort=score`,
-              { headers: authHeaders }
+              authHeaders
             );
             if (official.data?.success && Array.isArray(official.data.data)) {
               assets = [...assets, ...official.data.data];
@@ -193,36 +182,19 @@ async function fetchGameAssets(gameName, gameDir, selectedGameId, selectedLogoId
             assets[0]
           : assets[0];
         if (selected?.url) {
-          const imageUrl = selected.url;
-
-          // 3. Detect extension and craft final name
-          let ext = path.extname(imageUrl).split("?")[0];
+          let ext = path.extname(selected.url).split("?")[0];
           if (!ext) ext = ".jpg"; // Fallback
 
           const finalFileName = item.baseName + ext;
-          const finalFilePath = path.join(gameDir, finalFileName);
-
-          // 4. Download
-          const writer = fs.createWriteStream(finalFilePath);
-          const response = await axios({
-            url: imageUrl,
-            method: "GET",
-            responseType: "stream",
-          });
-
-          response.data.pipe(writer);
-
-          await new Promise((resolve, reject) => {
-            writer.on("finish", resolve);
-            writer.on("error", reject);
-          });
+          await downloadAsset(selected.url, path.join(gameDir, finalFileName));
           console.log(`[SteamGrid] Downloaded ${finalFileName}`);
         }
       } catch (e) {
         console.warn(`[SteamGrid] Failed to get ${item.type}: ${e.message}`);
+        if (e.response?.status === 429) break; // retried on the next visit
       }
     }
-    return true;
+    return baseNames.some(baseName => findAsset(gameDir, baseName));
   } catch (error) {
     console.error(`[SteamGrid] Error:`, error.message);
     return false;
@@ -238,7 +210,8 @@ async function fetchGameAssets(gameName, gameDir, selectedGameId, selectedLogoId
  */
 function cleanGameName(gameName) {
   return gameName
-    .replace(/ v[\d.]+.*$/i, "")
+    .replace(/\[[^\]]*\]/g, "") // repack tags like [FitGirl Repack]
+    .replace(/[\s,]+v\d[\d.]*.*$/i, "") // "Title v1.2" and FitGirl's "Title, v1.2 + DLCs"
     .replace(/ premium edition/i, "")
     .replace(/\(\s*\)/g, "") // strip empty parentheses from mangled Hydra titles
     .replace(/\s{2,}/g, " ")
@@ -283,7 +256,13 @@ async function resolveGameId(gameName, authHeaders, reportErrors = false) {
 async function getHeaderUrl(gameName) {
   if (!gameName || typeof gameName !== "string") return { gameId: null, url: null };
   const authHeaders = authHelper.generateAuthHeaders();
-  const gameId = await resolveGameId(gameName, authHeaders);
+  let gameId;
+  try {
+    gameId = await resolveGameId(gameName, authHeaders, true);
+  } catch {
+    // Flagged so the renderer doesn't cache a rate limit as "no artwork"
+    return { gameId: null, url: null, failed: true };
+  }
   if (!gameId) return { gameId: null, url: null };
 
   // 460x215 header-style grid matches Steam's header image aspect ratio.
@@ -300,8 +279,8 @@ async function getHeaderUrl(gameName) {
         return { gameId, url: res.data.data[0].url || null };
       }
     } catch (e) {
-      // Stop early on rate-limit; caller will retry later via frontend cache expiry
-      if (e.response?.status === 429) break;
+      // Stop early on rate-limit; caller will retry later
+      if (e.response?.status === 429) return { gameId, url: null, failed: true };
     }
   }
   return { gameId, url: null };

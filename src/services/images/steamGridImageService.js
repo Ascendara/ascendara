@@ -165,7 +165,10 @@ class SteamGridImageService {
       try {
         if (window.electron?.getSteamGridHeader) {
           const res = await window.electron.getSteamGridHeader(name);
-          if (res && typeof res === "object") {
+          // Rate limited or offline: return empty without caching so the
+          // cover is retried instead of hidden for a day
+          if (!res || res.failed) return assets;
+          if (typeof res === "object") {
             assets = {
               gameId: res.gameId ?? null,
               grid: res.url ?? null,
@@ -177,6 +180,7 @@ class SteamGridImageService {
         }
       } catch (e) {
         console.warn("[SteamGridImage] header IPC lookup failed for", name, e);
+        return assets;
       }
       this.memoryCache.set(key, assets);
       this._writeLS(name, assets);
