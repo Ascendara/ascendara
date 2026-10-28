@@ -112,6 +112,10 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [activeSection, setActiveSection] = useState(
     () => location.state?.section || "home"
   );
+  // Links into a section (e.g. a wishlist alert) can arrive while Ascend is open
+  useEffect(() => {
+    if (location.state?.section) setActiveSection(location.state.section);
+  }, [location.key]);
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [accountExistsError, setAccountExistsError] = useState(null); // { email: string | null }
   const [deletedAccountWarning, setDeletedAccountWarning] = useState(false);
@@ -1685,10 +1689,11 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   };
 
   // View a user's public profile
-  const handleViewProfile = async (userId, returnSection = "search") => {
+  const handleViewProfile = async (userId, returnSection = activeSection) => {
     setLoadingProfile(true);
     setProfileError(null);
-    setProfileReturnSection(returnSection);
+    // Opening a profile from a profile keeps the original way back
+    if (returnSection !== "userProfile") setProfileReturnSection(returnSection);
     setActiveSection("userProfile");
 
     const result = await getUserPublicProfile(userId);
