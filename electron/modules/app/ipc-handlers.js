@@ -81,6 +81,12 @@ async function findFolderExecutables(folderPath) {
 function registerMiscHandlers() {
   const settingsManager = getSettingsManager();
 
+  ipcMain.handle("khinsider-request", (_, path) => {
+    const { session } = require("electron");
+    const { requestKhinsider } = require("../library/khinsider");
+    return requestKhinsider(path, session.fromPartition("persist:khinsider"));
+  });
+
   // Reload app
   ipcMain.handle("reload", () => {
     app.relaunch();

@@ -239,6 +239,7 @@ contextBridge.exposeInMainWorld("electron", {
   // Steam API (bypasses CORS)
   //===========================================================================
   steamRequest: url => ipcRenderer.invoke("steam-request", { url }),
+  khinsiderRequest: path => ipcRenderer.invoke("khinsider-request", path),
 
   switchRPC: state => ipcRenderer.invoke("switch-rpc", state),
 

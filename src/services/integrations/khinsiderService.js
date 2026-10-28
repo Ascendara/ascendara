@@ -35,8 +35,29 @@ export function trackDownload(downloadPromise) {
   });
 }
 
-// Always use proxy to avoid CORS issues (works in both dev and production)
+// Electron uses browser networking over IPC; the proxy supports browser-only development.
 const BASE_URL = "/api/khinsider";
+
+async function fetchPage(url) {
+  let data;
+  if (window.electron?.khinsiderRequest) {
+    const result = await window.electron.khinsiderRequest(url.replace(BASE_URL, ""));
+    if (!result.success) {
+      const error = new Error(result.error || "Soundtrack request failed");
+      error.status = result.status;
+      throw error;
+    }
+    data = result.data;
+  } else {
+    data = (await axios.get(url, { timeout: 30000 })).data;
+  }
+  if (/Attention Required!|Just a moment\.\.\.|cf-chl-/i.test(data)) {
+    const error = new Error("KHInsider access blocked");
+    error.status = 403;
+    throw error;
+  }
+  return cheerio.load(data);
+}
 
 /**
  * Search for albums by keyword (returns array of {id, name})
@@ -45,8 +66,7 @@ const BASE_URL = "/api/khinsider";
  */
 export async function searchAlbums(term) {
   const url = `${BASE_URL}/search?search=${encodeURIComponent(term)}`;
-  const res = await axios.get(url);
-  const $ = cheerio.load(res.data);
+  const $ = await fetchPage(url);
   const tables = $("table.albumList");
   if (!tables.length) return [];
   // Album results are in the first table
@@ -75,8 +95,7 @@ export async function searchAlbums(term) {
  */
 export async function getAlbumTracks(albumId, onConfirmFetch) {
   const url = `${BASE_URL}/game-soundtracks/album/${albumId}`;
-  const res = await axios.get(url);
-  const $ = cheerio.load(res.data);
+  const $ = await fetchPage(url);
   const table = $("#songlist");
   const headerTds = table.find("tr").first().find("th, td");
   let titleColIdx = -1;
@@ -115,13 +134,13 @@ export async function getAlbumTracks(albumId, onConfirmFetch) {
     // For each track, fetch the download URL (mp3)
     for (let track of tracks) {
       try {
-        const pageRes = await axios.get(track.page);
-        const $track = cheerio.load(pageRes.data);
+        const $track = await fetchPage(track.page);
         // The download link is in <a href="...mp3"> in the center tag
         const mp3Link = $track('a[href$=".mp3"]').attr("href");
         if (mp3Link)
           track.url = mp3Link.startsWith("http") ? mp3Link : BASE_URL + mp3Link;
       } catch (e) {
+        if ([403, 429].includes(e.status || e.response?.status)) throw e;
         track.url = null;
       }
       delete track.page;

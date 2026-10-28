@@ -1285,6 +1285,7 @@ function InstalledGameScreen() {
   const [showSteamNotRunningWarning, setShowSteamNotRunningWarning] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [soundtrack, setSoundtrack] = useState([]);
+  const [soundtrackError, setSoundtrackError] = useState(null);
   const [loadingSoundtrack, setLoadingSoundtrack] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [hasRated, setHasRated] = useState(true);
@@ -1907,7 +1908,8 @@ function InstalledGameScreen() {
 
   // Fetch Khinsider soundtrack when user clicks on soundtrack tab
   const fetchSoundtrack = () => {
-    if (!game || soundtrack.length > 0) return;
+    if (!game || soundtrack.length > 0 || loadingSoundtrack) return;
+    setSoundtrackError(null);
     const gameName = game.game || game.name;
     const storageKey = `khinsider-soundtrack-${gameName}`;
     const cached = localStorage.getItem(storageKey);
@@ -1931,6 +1933,12 @@ function InstalledGameScreen() {
           if (tracks.length > 0) {
             localStorage.setItem(storageKey, JSON.stringify(tracks));
           }
+        })
+        .catch(error => {
+          const status = error.status || error.response?.status;
+          setSoundtrackError(
+            [403, 429].includes(status) ? "soundtrackBlocked" : "soundtrackFailed"
+          );
         })
         .finally(() => setLoadingSoundtrack(false));
     }
@@ -2915,6 +2923,8 @@ function InstalledGameScreen() {
               gameName={game.game}
               soundtrack={soundtrack}
               loading={loadingSoundtrack}
+              error={soundtrackError}
+              onRetry={fetchSoundtrack}
               page={currentPage}
               onPageChange={setCurrentPage}
               onPlayTrack={track => {

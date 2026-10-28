@@ -10,6 +10,8 @@ export default function SoundtrackTab({
   gameName,
   soundtrack,
   loading,
+  error,
+  onRetry,
   page,
   onPageChange,
   onPlayTrack,
@@ -49,6 +51,20 @@ export default function SoundtrackTab({
         <p className="animate-pulse text-sm font-medium text-primary/70">
           {t("gameScreen.loadingSoundtrack")}
         </p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border/40 bg-card px-6 py-16 text-center">
+        <HeadphoneOff className="h-10 w-10 text-muted-foreground" />
+        <p className="max-w-md text-sm text-muted-foreground">
+          {t(`gameScreen.${error}`)}
+        </p>
+        <Button variant="outline" onClick={onRetry}>
+          {t("gameScreen.soundtrackRetry")}
+        </Button>
       </section>
     );
   }
