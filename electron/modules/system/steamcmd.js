@@ -7,7 +7,8 @@ const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
 const { spawn, execFile } = require("child_process");
-const { ipcMain, BrowserWindow } = require("electron");
+const { ipcMain } = require("electron");
+const { downloadFile } = require("../core/download-file");
 const { isWindows, isMac, TIMESTAMP_FILE } = require("../core/config");
 const { updateTimestampFile } = require("../core/utils");
 
@@ -20,13 +21,6 @@ const STEAMCMD_EXECUTABLE = path.join(
 const STEAMCMD_UNIX_URL = isMac
   ? "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_osx.tar.gz"
   : "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz";
-
-let electronDl = null;
-
-// Initialize electron-dl
-(async () => {
-  electronDl = await import("electron-dl");
-})();
 
 /**
  * Fetch Steam Workshop item details
@@ -145,7 +139,7 @@ function registerSteamCMDHandlers() {
         });
 
         // Download steamcmd.exe
-        await electronDl.download(BrowserWindow.getFocusedWindow(), steamCMDUrl, {
+        await downloadFile(steamCMDUrl, {
           directory: steamCMDDir,
           filename: "steamcmd.exe",
         });

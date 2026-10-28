@@ -1,7 +1,7 @@
 {
   "name": "ascendara",
   "version": "11.7.3",
-  "main": "electron/app.js",
+  "main": "electrobun/main.js",
   "description": "Skip extracting files, navigating setup processes, or any unnecessary hassles.",
   "repository": {
     "type": "git",
@@ -13,7 +13,7 @@
   "readmeFilename": "README.md",
   "author": "tagoWorks",
   "keywords": [
-    "electron",
+    "electrobun",
     "vite",
     "setup",
     "installer",
@@ -32,15 +32,13 @@
   "scripts": {
     "test": "node --test tests/*.test.cjs",
     "audit:code": "node scripts/audit-code.cjs",
-    "lint": "eslint src electron binaries/AscendaraAchievementWatcher/src scripts/*.cjs tests/*.cjs",
+    "lint": "eslint src electron electrobun binaries/AscendaraAchievementWatcher/src scripts/*.cjs tests/*.cjs",
     "dev": "vite --mode development",
     "build": "vite build",
-    "build-react": "vite build && electron-builder --config.extraMetadata.main=electron/app.js",
-    "electron": "electron ./electron/app.js --no-sandbox",
-    "start": "concurrently \"vite\" \"wait-on tcp:5173 && electron ./electron/app.js --no-sandbox\"",
+    "start": "npx --yes electrobun@2.0.5 prepare && node scripts/electrobun/stage-app.cjs --env=dev && npx --yes electrobun@2.0.5 dev",
     "dist": "python3 ./scripts/build_ascendara.py",
+    "package": "yarn build && node scripts/electrobun/stage-app.cjs --env=stable --allow-missing && npx --yes electrobun@2.0.5 build --env=stable",
     "dist-linux": "python3 ./scripts/build_ascendara_linux.py",
-    "buildwithelectron": "electron-builder --config.extraMetadata.main=electron/app.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
@@ -50,8 +48,7 @@
     "setup-highball": "python3 ./scripts/build_highball.py",
     "test-mac-extraction": "python3 -m unittest discover -s tests -p 'test_macos*.py'",
     "dist-mac-arm64": "python3 ./scripts/build_ascendara_mac.py --arch arm64",
-    "dist-mac-intel": "python3 ./scripts/build_ascendara_mac.py --arch x64",
-    "dist-mac-all": "python3 ./scripts/build_ascendara_mac.py --arch both"
+    "dist-mac-intel": "python3 ./scripts/build_ascendara_mac.py --arch x64"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.3",
@@ -80,7 +77,6 @@
     "discord-rpc": "^4.0.1",
     "dompurify": "^3.4.15",
     "dotenv": "^17.3.1",
-    "electron-dl": "^4.0.0",
     "firebase": "^12.9.0",
     "framer-motion": "^12.34.3",
     "fs-extra": "^11.3.3",
@@ -114,9 +110,6 @@
     "autoprefixer": "^10.4.24",
     "baseline-browser-mapping": "^2.11.21",
     "caniuse-lite": "^1.0.30001810",
-    "concurrently": "^9.2.1",
-    "electron": "^40.6.0",
-    "electron-builder": "^26.8.1",
     "eslint": "9",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
@@ -131,203 +124,7 @@
     "prettier-plugin-sort-json": "4.1.1",
     "prettier-plugin-tailwindcss": "^0.6.14",
     "tailwindcss": "^3.4.19",
-    "vite": "^7.3.1",
-    "wait-on": "^9.0.5"
-  },
-  "build": {
-    "asar": true,
-    "appId": "com.tagoworks.ascendara",
-    "files": [
-      "build/**/*",
-      "electron/**/*",
-      "node_modules/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "src/public",
-        "to": "public"
-      }
-    ],
-    "extraMetadata": {
-      "main": "electron/app.js"
-    },
-    "protocols": [
-      {
-        "name": "Ascendara",
-        "schemes": [
-          "ascendara"
-        ]
-      }
-    ],
-    "portable": {
-      "artifactName": "Ascendara-Portable-${version}.${ext}"
-    },
-    "win": {
-      "target": [
-        "nsis",
-        "portable"
-      ],
-      "extraResources": [
-        {
-          "from": "readme/logo/ico/ascendara_64x.ico",
-          "to": "icon.ico"
-        },
-        {
-          "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader.exe",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraGameHandler/dist/AscendaraGameHandler.exe",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter.exe",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper.exe",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher.exe",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler.exe",
-          "to": "."
-        }
-      ]
-    },
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "category": "public.app-category.utilities",
-      "icon": "readme/logo/icns/icon.icns",
-      "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
-      "extraResources": [
-        {
-          "from": "readme/logo/png/ascendara_512x.png",
-          "to": "icon.png"
-        },
-        {
-          "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraGameHandler/dist/AscendaraGameHandler",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher",
-          "to": "."
-        }
-      ],
-      "protocols": [
-        {
-          "name": "Ascendara",
-          "schemes": [
-            "ascendara"
-          ]
-        }
-      ],
-      "hardenedRuntime": true
-    },
-    "dmg": {
-      "background": "readme/logo/png/dmg-background.png",
-      "window": {
-        "width": 640,
-        "height": 400
-      },
-      "iconSize": 96,
-      "iconTextSize": 13,
-      "contents": [
-        {
-          "x": 170,
-          "y": 250,
-          "type": "file"
-        },
-        {
-          "x": 470,
-          "y": 250,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
-    },
-    "linux": {
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "readme/logo/png/ascendara_512x.png",
-      "category": "Utility",
-      "maintainer": "tagoWorks",
-      "vendor": "tagoWorks",
-      "synopsis": "Skip extracting files, navigating setup processes, or any unnecessary hassles.",
-      "description": "Ascendara is a desktop application that helps you skip extracting files, navigating setup processes, or any unnecessary hassles when installing software.",
-      "extraResources": [
-        {
-          "from": "readme/logo/png/ascendara_512x.png",
-          "to": "icon.png"
-        },
-        {
-          "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraGameHandler/dist/AscendaraGameHandler",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher",
-          "to": "."
-        }
-      ]
-    },
-    "productName": "Ascendara",
-    "directories": {
-      "output": "dist",
-      "buildResources": "build"
-    }
+    "vite": "^7.3.1"
   },
   "lint-staged": {
     "*.{js,jsx,json,md,html,css}": [

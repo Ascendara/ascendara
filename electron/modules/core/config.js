@@ -99,7 +99,8 @@ const LANG_DIR = isWindows
     ? path.join(os.homedir(), "Library/Application Support/ascendara/languages")
     : path.join(os.homedir(), ".ascendara", "languages");
 
-const appDirectory = path.join(path.dirname(app.getPath("exe")));
+// Install root whose resources/ holds the helper binaries.
+const appDirectory = path.dirname(process.resourcesPath);
 
 // Load production config
 let config;
@@ -206,7 +207,10 @@ const testingVersion = "";
 
 // The Ascendara API every main-process request goes to. VITE_API_URL points
 // both this and the renderer (src/config/api.js) at another server.
-const API_URL = (process.env.VITE_API_URL || "https://api.ascendara.app").replace(/\/+$/, "");
+const API_URL = (process.env.VITE_API_URL || "https://api.ascendara.app").replace(
+  /\/+$/,
+  ""
+);
 
 module.exports = {
   API_URL,

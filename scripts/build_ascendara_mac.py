@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Build macOS DMG/ZIP artifacts for arm64, x64, or both architectures."""
+"""Build the macOS DMG and update bundle for this Mac's architecture (arm64 or x64)."""
 import argparse
-import json
 import os
 from pathlib import Path
 import platform
 import shutil
 import subprocess
 import sys
-from build_support import register_after_build, validate_resources
+from build_support import register_after_build, run_electrobun_build
 from setup_macos_tools import TOOL_DIR, validate_tool
 import setup_hatchzip
 import build_highball
@@ -103,7 +102,6 @@ def main():
                         help='CPU target; both produces separate Apple Silicon and Intel artifacts')
     parser.add_argument('--skip-registration', action='store_true', help='Defer backend registration')
     parser.add_argument('--check', action='store_true', help='Only check prerequisites')
-    parser.add_argument('--dir', action='store_true', help='Build an unpacked .app')
     parser.add_argument('--release', action='store_true', help='Require signing and notarization credentials')
     args = parser.parse_args()
     arches = selected_arches(args.arch)
@@ -150,6 +148,9 @@ def main():
 
 def build_arch(arch, args, identity):
     print(f'Building macOS {arch}...', flush=True)
+    # Electrobun packages for the machine it runs on.
+    if MACH_ARCH[arch] != platform.machine():
+        raise RuntimeError(f'Electrobun can only package {platform.machine()} apps here; build {arch} on a matching Mac.')
     staging = ROOT / 'dist' / f'mac-helpers-{arch}'
     staging.mkdir(parents=True, exist_ok=True)
     venv = ROOT / '.build_venv_mac' / arch
@@ -195,34 +196,15 @@ def build_arch(arch, args, identity):
         binary.chmod(0o755)
     # Highball supports Apple Silicon only; Intel builds keep the system Wine fallback.
     highball = build_highball.build(staging / 'Highball') if arch == 'arm64' else None
-    config = json.loads((ROOT / 'package.json').read_text())['build']
-    config['mac']['extraResources'] = [
+    resources = [
         {'from': 'readme/logo/png/ascendara_512x.png', 'to': 'icon.png'},
         {'from': str(TOOL_DIR / 'License.txt'), 'to': 'licenses/7zip/License.txt'},
         {'from': str(TOOL_DIR / 'readme.txt'), 'to': 'licenses/7zip/readme.txt'},
         *({'from': str(staging / name), 'to': name} for name in names),
-        *({'from': str(highball / name), 'to': f'Highball/{name}'}
-          for name in (build_highball.STAGED_FILES if highball else ())),
     ]
-    config['mac']['binaries'] = [f'Contents/Resources/{name}' for name in names]
-    if highball:
-        config['mac']['binaries'].append('Contents/Resources/Highball/highball')
-    # Without a Developer ID, ad-hoc sign so the bundle seal is valid instead of
-    # shipping Electron's stale linker signatures, which macOS reports as damaged.
-    config['mac']['identity'] = identity or '-'
     if not identity:
-        # Hardened runtime adds nothing without notarization and needs extra entitlements ad-hoc.
-        config['mac']['hardenedRuntime'] = False
-    config['mac']['notarize'] = args.release
-    config['forceCodeSigning'] = args.release
-    validate_resources('mac', config)
-    config_path = staging / 'builder.json'
-    config_path.write_text(json.dumps(config, indent=2))
-    command = ['yarn', 'electron-builder', '--config', config_path, '--mac', f'--{arch}', '--publish', 'never']
-    if args.dir:
-        command += ['--dir']
-    run(command)
-
+        print('No ASCENDARA_MAC_SIGN_IDENTITY set; the app will be unsigned.', flush=True)
+    run_electrobun_build('mac', resources, highball=highball, sign=bool(identity))
 
 if __name__ == '__main__':
     try:

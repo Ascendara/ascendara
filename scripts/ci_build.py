@@ -12,11 +12,16 @@ import subprocess
 import sys
 from build_support import ROOT, validate_native_binary
 
-# Filename patterns each target must produce exactly one of. Windows ships the
-# installer and a portable build side by side, so they are told apart by name.
-TARGETS = {'windows-x64': ('win', ['* Setup *.exe', 'Ascendara-Portable-*.exe']),
-           'linux-x64': ('linux', ['*.AppImage']),
-           'mac-arm64': ('mac', ['*.dmg', '*.zip']), 'mac-x64': ('mac', ['*.dmg', '*.zip'])}
+# Electrobun artifacts each target must produce exactly one of: the installer
+# (renamed below to carry the version) and the update bundle and manifest the
+# in-app updater fetches from release.baseUrl under their original names.
+TARGETS = {'windows-x64': ('win', 'win-x64', ['*-Setup.zip']),
+           'linux-x64': ('linux', 'linux-x64', ['*Setup*.tar.gz']),
+           'mac-arm64': ('mac', 'macos-arm64', ['*.dmg']),
+           'mac-x64': ('mac', 'macos-x64', ['*.dmg'])}
+UPDATE_PATTERNS = ['*-update.json', '*.tar.zst']
+ARTIFACTS = ROOT / '.electrobun' / 'artifacts'
+STAGE = ROOT / '.electrobun' / 'stage'
 # Everything here ships readable inside the app, so only values that are meant
 # to be public belong in it. The old AUTHORIZATION, ASCENDARA_API_KEY and
 # IMAGE_KEY entries were unused by the app and leaked server keys.
@@ -45,7 +50,7 @@ def preflight():
 
 def configure():
     # This file is already the application's production configuration interface.
-    # These values are necessarily recoverable from a distributed Electron app.
+    # These values are necessarily recoverable from a distributed desktop app.
     if os.environ.get('RELEASE_MODE') == 'true' and not os.environ.get('ASCENDARA_SECRET_SEED'):
         raise RuntimeError('ASCENDARA_SECRET_SEED is required for production API authentication')
     config = {field: os.environ[key] for key, field in CONFIG_FIELDS.items() if os.environ.get(key)}
@@ -53,29 +58,20 @@ def configure():
 
 
 def collect(target):
-    platform, patterns = TARGETS[target]
-    config = json.loads((ROOT / 'package.json').read_text())['build']
+    platform, label, patterns = TARGETS[target]
     expected_signature = json.loads((ROOT / 'electron/build-signature.json').read_text())
     if expected_signature['version'] != version():
         raise RuntimeError('Signature version mismatch')
-    resources = {'win': ROOT / 'dist/win-unpacked/resources',
-                 'linux': ROOT / 'dist/linux-unpacked/resources'}
-    if platform == 'mac':
-        apps = list((ROOT / 'dist').glob('mac*/*.app/Contents/Resources'))
-        if len(apps) != 1:
-            raise RuntimeError('Expected exactly one packaged macOS application')
-        resource = apps[0]
-    else:
-        resource = resources[platform]
-    # Read the actual packaged ASAR, not just the signature left in the checkout.
-    script = "const a=require('@electron/asar'); process.stdout.write(a.extractFile(process.argv[1], 'electron/build-signature.json'));"
-    actual = json.loads(subprocess.check_output(['node', '-e', script, str(resource / 'app.asar')], cwd=ROOT))
+    # Electrobun copies the stage folder into the app verbatim.
+    actual = json.loads((STAGE / 'electron/build-signature.json').read_text())
     if actual != expected_signature:
         raise RuntimeError('Packaged signature differs from registration signature')
-    for item in config[platform]['extraResources']:
+    resources = STAGE / 'resources'
+    lists = json.loads((ROOT / 'electrobun/resources.json').read_text())
+    for item in lists[platform]:
         source = Path(item['from'])
         if source.name.startswith('Ascendara'):
-            helper = resource / source.name
+            helper = resources / source.name
             if not helper.is_file() or helper.stat().st_size == 0:
                 raise RuntimeError(f'Packaged helper missing: {helper.name}')
             validate_native_binary(helper, platform)
@@ -87,22 +83,26 @@ def collect(target):
     output = ROOT / 'release-artifacts' / target
     output.mkdir(parents=True, exist_ok=False)
     artifacts = []
-    for pattern in patterns:
-        matches = list((ROOT / 'dist').glob(pattern))
-        if len(matches) != 1 or matches[0].stat().st_size == 0:
-            raise RuntimeError(f'Expected one nonempty {pattern} installer')
-        suffix = pattern.lstrip('*')
+
+    def add(source, name):
+        if source.stat().st_size == 0:
+            raise RuntimeError(f'Empty artifact: {source.name}')
+        shutil.copy2(source, output / name)
+        artifacts.append({'name': name, 'sha256': digest(source), 'size': source.stat().st_size})
+
+    for pattern in patterns + UPDATE_PATTERNS:
+        matches = [path for path in ARTIFACTS.glob(pattern) if label in path.name]
+        if len(matches) != 1:
+            raise RuntimeError(f'Expected one {label} {pattern} artifact, found {len(matches)}')
         artifact = matches[0]
-        if version() not in artifact.name:
-            raise RuntimeError('Installer filename does not contain package version')
-        if platform == 'mac' and not artifact.name.endswith(f'-{target[4:]}{suffix}'):
-            raise RuntimeError('Wrong macOS artifact architecture')
-        shutil.copy2(artifact, output / artifact.name)
-        artifacts.append({'name': artifact.name, 'sha256': digest(artifact), 'size': artifact.stat().st_size})
-    # Retain Windows differential update metadata where electron-builder emits it.
-    for artifact in (ROOT / 'dist').glob('*.blockmap'):
-        shutil.copy2(artifact, output / artifact.name)
-        artifacts.append({'name': artifact.name, 'sha256': digest(artifact), 'size': artifact.stat().st_size})
+        if pattern in UPDATE_PATTERNS:
+            add(artifact, artifact.name)
+        else:
+            suffix = ''.join(artifact.suffixes[-2:]) if artifact.name.endswith('.tar.gz') else artifact.suffix
+            add(artifact, f'Ascendara-{version()}-{target}{"-Setup" if platform != "mac" else ""}{suffix}')
+    # Delta patches let existing installs update without the full bundle.
+    for artifact in ARTIFACTS.glob(f'*{label}*.patch'):
+        add(artifact, artifact.name)
     (output / 'manifest.json').write_text(json.dumps({'target': target, 'version': version(),
         'commit': os.environ['GITHUB_SHA'], 'signature': actual, 'artifacts': artifacts}, indent=2))
     print(f'Validated {target}: packaged signature, helpers, and {len(artifacts)} artifacts')
@@ -112,7 +112,7 @@ def verify(directory):
     manifests = []
     seen = set()
     ids = set()
-    for target, (_, patterns) in TARGETS.items():
+    for target, (_, label, _) in TARGETS.items():
         folder = directory / target
         manifest = json.loads((folder / 'manifest.json').read_text())
         if manifest['target'] != target or manifest['version'] != version() or manifest['commit'] != os.environ['GITHUB_SHA']:
@@ -130,10 +130,12 @@ def verify(directory):
             artifact = folder / name
             if artifact.stat().st_size != item['size'] or item['size'] <= 0 or digest(artifact) != item['sha256']:
                 raise RuntimeError('Artifact checksum/size mismatch')
-        for pattern in patterns:
-            # GitHub turns spaces into dots, but these are the local artifact names.
-            if sum(fnmatchcase(name, pattern) for name in names) != 1:
-                raise RuntimeError(f'Missing or duplicate {target} installer: {pattern}')
+        installer = f'Ascendara-{version()}-{target}*'
+        if sum(fnmatchcase(name, installer) for name in names) != 1:
+            raise RuntimeError(f'Missing or duplicate {target} installer')
+        for pattern in UPDATE_PATTERNS:
+            if sum(fnmatchcase(name, pattern) and label in name for name in names) != 1:
+                raise RuntimeError(f'Missing or duplicate {target} update file: {pattern}')
         manifests.append(manifest)
     return manifests
 

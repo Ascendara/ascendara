@@ -10,7 +10,14 @@ const axios = require("axios");
 const { pipeline } = require("stream/promises");
 const installUpdate = require("./install-update");
 const { downloadDifferentialUpdate } = require("./differential-update");
-const { ipcMain, BrowserWindow, app, powerSaveBlocker, shell } = require("electron");
+const {
+  ipcMain,
+  BrowserWindow,
+  app,
+  powerSaveBlocker,
+  shell,
+  electrobunUpdater,
+} = require("electron");
 const {
   API_URL,
   appVersion,
@@ -43,6 +50,36 @@ const PORTABLE_RELEASES_URL = "https://github.com/Ascendara/ascendara/releases/l
 // inactivity, not for the whole download
 const UPDATE_STALL_TIMEOUT = 30000;
 const UPDATE_DOWNLOAD_ATTEMPTS = 5;
+
+/**
+ * Electrobun builds update in place from release.baseUrl (bsdiff patches with a
+ * full-bundle fallback) instead of running a downloaded installer.
+ */
+async function usesElectrobunUpdates() {
+  return Boolean(electrobunUpdater && (await electrobunUpdater.localInfo.baseUrl()));
+}
+
+async function downloadElectrobunUpdate(onProgress) {
+  electrobunUpdater.onStatusChange(entry => {
+    if (
+      entry.status === "download-progress" &&
+      Number.isFinite(entry.details?.progress)
+    ) {
+      onProgress(Math.round(entry.details.progress));
+    }
+  });
+  try {
+    const info = await electrobunUpdater.checkForUpdate();
+    if (info.error) throw new Error(info.error);
+    if (!info.updateAvailable) throw new Error("No update is available.");
+    await electrobunUpdater.downloadUpdate();
+    const result = electrobunUpdater.updateInfo();
+    if (!result.updateReady)
+      throw new Error(result.error || "The update could not be downloaded.");
+  } finally {
+    electrobunUpdater.onStatusChange(null);
+  }
+}
 
 function macUpdateName(version) {
   const arch = process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "x64" : null;
@@ -363,6 +400,22 @@ async function downloadUpdateInBackground() {
           : "linux",
     };
 
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    const reportProgress = progress =>
+      mainWindow?.webContents.send("update-download-progress", progress);
+
+    if (await usesElectrobunUpdates()) {
+      blockerId = powerSaveBlocker.start("prevent-app-suspension");
+      await downloadElectrobunUpdate(reportProgress);
+      updateDownloaded = true;
+      updateDownloadInProgress = false;
+      updateTimestampFile({ downloadingUpdate: false });
+      BrowserWindow.getAllWindows().forEach(window => {
+        window.webContents.send("update-ready");
+      });
+      return;
+    }
+
     // Determine update URL based on branch
     let updateUrl;
     if (process.platform === "darwin") {
@@ -390,7 +443,6 @@ async function downloadUpdateInBackground() {
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir);
     }
-    const mainWindow = BrowserWindow.getAllWindows()[0];
 
     // Keep macOS from suspending the app while it downloads in the background
     blockerId = powerSaveBlocker.start("prevent-app-suspension");
@@ -409,7 +461,7 @@ async function downloadUpdateInBackground() {
           appVersion,
           availableVersion,
           installerPath,
-          progress => mainWindow?.webContents.send("update-download-progress", progress)
+          reportProgress
         );
         rebuilt = true;
       } catch (error) {
@@ -421,9 +473,7 @@ async function downloadUpdateInBackground() {
     }
 
     if (!rebuilt) {
-      await downloadUpdateFile(updateUrl, installerPath, headers, progress =>
-        mainWindow?.webContents.send("update-download-progress", progress)
-      );
+      await downloadUpdateFile(updateUrl, installerPath, headers, reportProgress);
     }
     if (process.platform === "darwin" && !(await isCompleteZip(installerPath))) {
       await fs.remove(installerPath);
@@ -526,6 +576,12 @@ function registerUpdateHandlers() {
       }
       if (!updateDownloaded)
         throw new Error("The update could not be downloaded. Please retry.");
+
+      if (await usesElectrobunUpdates()) {
+        // Quits, swaps the bundle and relaunches.
+        await electrobunUpdater.applyUpdate();
+        return { success: true };
+      }
 
       const installerPath = path.join(
         os.tmpdir(),

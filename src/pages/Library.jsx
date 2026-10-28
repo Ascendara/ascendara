@@ -491,9 +491,10 @@ const Library = () => {
       }
 
       try {
+        // System webviews may not reveal a dropped file's path; open the dialog
+        // anyway so the executable can be picked there.
         const filePath = window.electron.getPathForFile(file);
-        if (!filePath) return;
-        setDroppedExecutablePath(filePath);
+        if (filePath) setDroppedExecutablePath(filePath);
         setIsAddGameOpen(true);
       } catch (error) {
         console.error("Failed to resolve dropped file path:", error);

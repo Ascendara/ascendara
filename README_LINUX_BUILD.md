@@ -1,17 +1,17 @@
-# Building Ascendara for Linux (AppImage)
+# Building Ascendara for Linux
 
-This guide explains how to build Ascendara as an AppImage for Linux distribution.
+This guide explains how to build the Linux package of Ascendara with [Electrobun](https://electrobun.dev).
 
 ## Prerequisites
 
 - Node.js (v16 or higher)
 - Yarn package manager
 - Python 3
-- Linux operating system (for building AppImage)
+- Linux x64 (Electrobun packages for the machine it runs on)
 
 ## Quick Build
 
-To build the Linux AppImage, simply run:
+To build the Linux package, simply run:
 
 ```bash
 yarn dist-linux
@@ -23,7 +23,7 @@ This will:
 2. ✅ Build the AscendaraAchievementWatcher Node.js binary for Linux
 3. ✅ Copy all Linux Python scripts to debian directories
 4. ✅ Build the React application with environment variables
-5. ✅ Package everything into an AppImage
+5. ✅ Package everything with Electrobun (bundling Chromium/CEF, since GTK WebKit cannot layer webviews reliably)
 
 ## What Gets Built
 
@@ -41,11 +41,10 @@ The build process creates several Linux-specific components:
 - Copied to debian directories for Linux compatibility
 - Includes: Downloader, GameHandler, CrashReporter, etc.
 
-### AppImage Package
+### Electrobun Package
 
-- Self-contained Linux application
-- Works on most Linux distributions
-- No installation required - just make executable and run
+- Self-extracting `*Setup*.tar.gz` installer
+- `stable-linux-x64-Ascendara.tar.zst` and `stable-linux-x64-update.json` for in-app updates
 
 ## Manual Build Steps
 
@@ -83,19 +82,21 @@ python3 scripts/copy_debian_scripts.py
 yarn build
 ```
 
-### 5. Build AppImage
+### 5. Package
 
 ```bash
-yarn electron-builder --linux --config.extraMetadata.main=electron/app.js
+node scripts/electrobun/stage-app.cjs --env=stable
+npx --yes electrobun@2.0.5 build --env=stable
 ```
 
 ## Output Files
 
 The build will create one or more of the following:
 
-- `dist/Ascendara-x.x.x.AppImage` - Main AppImage file
-- `dist/linux-unpacked/` - Unpacked Linux application (fallback)
-- `dist/Ascendara-x.x.x-linux-x64.tar.gz` - Compressed archive (fallback)
+- `.electrobun/artifacts/*Setup*.tar.gz` - Self-extracting installer
+- `.electrobun/artifacts/stable-linux-x64-Ascendara.tar.zst` - Update bundle
+- `.electrobun/artifacts/stable-linux-x64-update.json` - Update manifest
+- `.electrobun/build/stable-linux-x64/` - Built application
 
 ## Troubleshooting
 
@@ -119,34 +120,13 @@ python3 --version
 1. Clean the build artifacts and try again:
 
    ```bash
-   rm -rf build dist electron/assets electron/index.html
+   rm -rf build dist .electrobun electron/assets electron/index.html
    yarn dist-linux
    ```
 
 2. Check that all binaries are properly built:
    ```bash
    ls -la binaries/*/dist/
-   ```
-
-### Low Disk Space
-
-The build script includes automatic fallbacks:
-
-- If AppImage creation fails due to disk space, it creates an unpacked version
-- If unpacked build succeeds, it also creates a tar.gz archive
-- Both alternatives work as Linux distributions
-
-### AppImage Not Working
-
-1. Make the AppImage executable:
-
-   ```bash
-   chmod +x dist/Ascendara-*.AppImage
-   ```
-
-2. Run the AppImage:
-   ```bash
-   ./dist/Ascendara-*.AppImage
    ```
 
 ## Environment Variables
@@ -161,6 +141,4 @@ Make sure your `.env` file contains all necessary environment variables:
 
 - The Linux build includes Python scripts for all Ascendara binaries except AscendaraAchievementWatcher
 - AscendaraAchievementWatcher is built as a standalone Node.js binary using `pkg`
-- The AppImage is self-contained and should work on most Linux distributions
-- The build process automatically handles asset path corrections for the Electron app
-- Fallback mechanisms ensure you get a working Linux build even with limited disk space
+- The build process automatically handles asset path corrections for the bundled UI

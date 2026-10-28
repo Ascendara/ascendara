@@ -4,12 +4,26 @@ import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 
 export default [
-  { ignores: ["node_modules/**", "build/**", "dist/**", ".cache/**", "binaries/**/dist/**", "binaries/**/node_modules/**", "electron/config.prod.js"] },
+  {
+    ignores: [
+      "node_modules/**",
+      "build/**",
+      "dist/**",
+      ".cache/**",
+      "binaries/**/dist/**",
+      "binaries/**/node_modules/**",
+      "electron/config.prod.js",
+    ],
+  },
   {
     files: ["src/**/*.{js,jsx}"],
     languageOptions: {
       ecmaVersion: "latest",
-      globals: { ...globals.browser, __APP_VERSION__: "readonly", __APP_REVISION__: "readonly" },
+      globals: {
+        ...globals.browser,
+        __APP_VERSION__: "readonly",
+        __APP_REVISION__: "readonly",
+      },
       parserOptions: {
         ecmaVersion: "latest",
         ecmaFeatures: { jsx: true },
@@ -27,13 +41,25 @@ export default [
       "react/jsx-no-undef": "error",
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
-      "no-unused-vars": ["warn", { args: "none", caughtErrors: "none", varsIgnorePattern: "^React$" }],
+      "no-unused-vars": [
+        "warn",
+        { args: "none", caughtErrors: "none", varsIgnorePattern: "^React$" },
+      ],
       "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
   {
-    files: ["electron/**/*.js", "binaries/AscendaraAchievementWatcher/src/**/*.js", "scripts/**/*.cjs", "tests/**/*.cjs"],
-    languageOptions: { ecmaVersion: "latest", sourceType: "commonjs", globals: globals.node },
+    files: [
+      "electron/**/*.js",
+      "binaries/AscendaraAchievementWatcher/src/**/*.js",
+      "scripts/**/*.cjs",
+      "tests/**/*.cjs",
+    ],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "commonjs",
+      globals: globals.node,
+    },
     rules: {
       ...js.configs.recommended.rules,
       "no-unused-vars": ["warn", { args: "none", caughtErrors: "none" }],
@@ -41,4 +67,21 @@ export default [
     },
   },
   { files: ["electron/preload.js"], languageOptions: { globals: globals.browser } },
+  {
+    files: ["electrobun/**/*.js"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: { ...globals.node, Bun: "readonly" },
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      "no-unused-vars": ["warn", { args: "none", caughtErrors: "none" }],
+      "no-empty": ["error", { allowEmptyCatch: true }],
+    },
+  },
+  {
+    files: ["electrobun/renderer/**/*.js", "electrobun/shared/**/*.js"],
+    languageOptions: { globals: globals.browser },
+  },
 ];

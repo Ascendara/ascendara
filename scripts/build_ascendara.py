@@ -6,7 +6,7 @@ import shutil
 import re
 import sys
 from pathlib import Path
-from build_support import register_after_build, validate_resources
+from build_support import register_after_build, run_electrobun_build
 
 def run_yarn_build():
     print("Running yarn build...")
@@ -32,17 +32,14 @@ def generate_build_signature():
         print(f"Build signature generation failed with error: {e}")
         return False
 
-def run_electron_builder():
-    validate_resources("win")
-    print("Running electron-builder...")
+def run_app_build():
+    print("Packaging with Electrobun...")
     try:
-        yarn_cmd = 'yarn.cmd' if os.name == 'nt' else 'yarn'
-        # Use electron-builder directly with the correct configuration
-        subprocess.run([yarn_cmd, 'electron-builder', '--config.extraMetadata.main=electron/app.js', '--win', '--x64', '--publish', 'never'], check=True, cwd=os.getcwd())
-        print("Electron build completed successfully")
+        run_electrobun_build("win")
+        print("Electrobun build completed successfully")
         return True
-    except subprocess.CalledProcessError as e:
-        print(f"Electron build failed with error: {e}")
+    except (subprocess.CalledProcessError, RuntimeError) as e:
+        print(f"Electrobun build failed with error: {e}")
         return False
 
 def move_files():
@@ -221,8 +218,8 @@ def modify_index_html():
 def build_react_app():
     return run_yarn_build()
 
-def package_electron_app():
-    return run_electron_builder()
+def package_app():
+    return run_app_build()
 
 def main():
     print("Starting Ascendara build process...")
@@ -252,9 +249,9 @@ def main():
         print("Build process failed at signature generation stage")
         return 1
     
-    # Step 6: Package the Electron app
-    if not package_electron_app():
-        print("Failed to package Electron app. Exiting.")
+    # Step 6: Package the app
+    if not package_app():
+        print("Failed to package the app. Exiting.")
         return 1
     
     # Step 7: Clean up temporary files after build

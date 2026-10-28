@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-# This script is used to build Ascendara for Linux distribution as AppImage
+# This script is used to build Ascendara for Linux distribution
 
 import os
 import subprocess
 import shutil
 import sys
 import json
-from build_support import register_after_build, validate_resources
+from build_support import register_after_build, run_electrobun_build
 
 def run_command(command, cwd=None):
     """Run a command and return success status"""
@@ -369,32 +369,15 @@ def generate_build_signature():
         print(f"Build signature generation failed with error: {e}")
         return False
 
-def build_appimage():
-    """Build the AppImage using electron-builder"""
-    validate_resources("linux")
-    print("Building AppImage...")
-    
-    # Build specifically for Linux AppImage
-    command = [
-        'yarn', 'electron-builder', 
-        '--linux', 
-        '--config.extraMetadata.main=electron/app.js', '--publish', 'never'
-    ]
-    
-    return run_command(command)
-
-def build_linux_unpacked():
-    """Build Linux unpacked version (fallback for low disk space)"""
-    print("Building Linux unpacked version...")
-    
-    command = [
-        'yarn', 'electron-builder', 
-        '--linux', 
-        '--dir',
-        '--config.extraMetadata.main=electron/app.js', '--publish', 'never'
-    ]
-    
-    return run_command(command)
+def build_linux_package():
+    """Package the app with Electrobun (self-extracting tar.gz plus update bundle)"""
+    print("Packaging with Electrobun...")
+    try:
+        run_electrobun_build("linux")
+        return True
+    except (subprocess.CalledProcessError, RuntimeError) as e:
+        print(f"Electrobun build failed: {e}")
+        return False
 
 def cleanup_build_artifacts():
     """Clean up build artifacts before starting"""
@@ -432,42 +415,9 @@ def cleanup_after_build():
     
     return True
 
-def create_tar_archive():
-    """Create a tar.gz archive as fallback"""
-    print("Creating tar.gz archive...")
-    
-    unpacked_dir = 'dist/linux-unpacked'
-    if not os.path.exists(unpacked_dir):
-        print("Error: linux-unpacked directory not found")
-        return False
-    
-    version = get_app_version() or 'unknown'
-    archive_name = f'dist/Ascendara-{version}-linux-x64.tar.gz'
-    
-    try:
-        import tarfile
-        with tarfile.open(archive_name, 'w:gz') as tar:
-            tar.add(unpacked_dir, arcname='Ascendara')
-        print(f"Created archive: {archive_name}")
-        return True
-    except Exception as e:
-        print(f"Failed to create archive: {e}")
-        return False
-
-def get_app_version():
-    """Read app version from package.json"""
-    try:
-        with open('package.json', 'r') as f:
-            pkg = json.load(f)
-        return pkg['version']
-    except Exception as e:
-        print(f"Warning: Could not read version from package.json: {e}")
-        return None
-
-
 def main():
-    """Main build process for Linux AppImage"""
-    print("Starting Ascendara Linux AppImage build process...")
+    """Main build process for Linux"""
+    print("Starting Ascendara Linux build process...")
     
     # Check if we're on Linux
     if os.name != 'posix':
@@ -518,19 +468,10 @@ def main():
         print("Failed to generate build signature. Exiting.")
         return 1
     
-    # Step 10: Try to build the AppImage, fallback to unpacked if it fails
-    if not build_appimage():
-        if os.environ.get("CI"):
-            return 1
-        print("AppImage build failed, trying unpacked build...")
-        if not build_linux_unpacked():
-            print("Failed to build Linux unpacked version. Exiting.")
-            return 1
-        
-        # Create tar.gz archive as alternative
-        if not create_tar_archive():
-            print("Failed to create tar.gz archive, but unpacked version is available.")
-    
+    # Step 10: Package the app
+    if not build_linux_package():
+        return 1
+
     # Step 11: Clean up temporary files after build
     if not cleanup_after_build():
         print("Failed to clean up after build. Exiting.")
@@ -538,17 +479,8 @@ def main():
     
     register_after_build()
 
-    # Check what was created
-    version = get_app_version() or 'unknown'
-    appimage_path = f'dist/Ascendara-{version}.AppImage'
-    tar_path = f'dist/Ascendara-{version}-linux-x64.tar.gz'
-    if os.path.exists(appimage_path):
-        print(f"✅ AppImage created: {appimage_path}")
-    elif os.path.exists('dist/linux-unpacked'):
-        print("✅ Linux unpacked version created: dist/linux-unpacked/")
-        if os.path.exists(tar_path):
-            print(f"✅ Tar archive created: {tar_path}")
-    
+    print("✅ Linux build created in .electrobun/artifacts/")
+
     return 0
 
 if __name__ == "__main__":

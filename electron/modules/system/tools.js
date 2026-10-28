@@ -8,7 +8,8 @@ const path = require("path");
 const axios = require("axios");
 const { randomUUID } = require("crypto");
 const { pipeline } = require("stream/promises");
-const { ipcMain, BrowserWindow } = require("electron");
+const { ipcMain } = require("electron");
+const { downloadFile } = require("../core/download-file");
 const {
   isDev,
   isWindows,
@@ -21,12 +22,6 @@ const {
 const { updateTimestampFile } = require("../core/utils");
 
 let installedTools = [];
-let electronDl = null;
-
-// Initialize electron-dl
-(async () => {
-  electronDl = await import("electron-dl");
-})();
 
 /**
  * Check which tools are installed
@@ -184,7 +179,7 @@ function registerToolHandlers() {
     const toolPath = path.join(toolDirectory, toolExecutable);
 
     try {
-      await electronDl.download(BrowserWindow.getFocusedWindow(), toolUrls[tool], {
+      await downloadFile(toolUrls[tool], {
         directory: toolDirectory,
         filename: toolExecutable,
         onProgress: progress => {

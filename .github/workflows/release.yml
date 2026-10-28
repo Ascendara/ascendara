@@ -177,8 +177,6 @@ jobs:
           fi
           if [ "$SIGN_MAC" = true ]; then
             export ASCENDARA_MAC_SIGN_IDENTITY="$MAC_IDENTITY"
-          elif [ "$RUNNER_OS" = macOS ]; then
-            export CSC_IDENTITY_AUTO_DISCOVERY=false
           fi
           args=(--skip-registration)
           if [ "$NOTARIZE" = true ]; then args+=(--release); fi

@@ -20,6 +20,8 @@ package-lock.json
 
 # Build outputs
 /build/
+/.electrobun/
+/.hutch/
 /binaries/*/build
 /binaries/*/target
 .build_venv

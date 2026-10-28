@@ -1,0 +1,106 @@
+{
+  "common": [
+    {
+      "from": "src/public",
+      "to": "public"
+    }
+  ],
+  "win": [
+    {
+      "from": "readme/logo/ico/ascendara_64x.ico",
+      "to": "icon.ico"
+    },
+    {
+      "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader.exe",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraGameHandler/dist/AscendaraGameHandler.exe",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter.exe",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper.exe",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher.exe",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler.exe",
+      "to": "."
+    }
+  ],
+  "mac": [
+    {
+      "from": "readme/logo/png/ascendara_512x.png",
+      "to": "icon.png"
+    },
+    {
+      "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraGameHandler/dist/AscendaraGameHandler",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher",
+      "to": "."
+    }
+  ],
+  "linux": [
+    {
+      "from": "readme/logo/png/ascendara_512x.png",
+      "to": "icon.png"
+    },
+    {
+      "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraGameHandler/dist/AscendaraGameHandler",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraCrashReporter/target/release/AscendaraCrashReporter",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler",
+      "to": "."
+    },
+    {
+      "from": "binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher",
+      "to": "."
+    }
+  ]
+}

@@ -174,15 +174,20 @@ function createWindow() {
     }
   );
 
+  // Electrobun cannot keep a popup's opener, so Firebase falls back to its
+  // redirect sign-in, which passes through the auth hosts in this window.
+  const redirectAuth = Boolean(process.versions.electrobun);
   const guardNavigation = (event, url) => {
-    if (!isAllowedAppNavigation(url)) event.preventDefault();
+    if (!isAllowedAppNavigation(url) && !(redirectAuth && isAllowedAuthPopup(url))) {
+      event.preventDefault();
+    }
   };
   mainWindow.webContents.on("will-navigate", guardNavigation);
   mainWindow.webContents.on("will-redirect", guardNavigation);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     // Allow Firebase/Google auth popups
-    if (isAllowedAuthPopup(url)) {
+    if (isAllowedAuthPopup(url) && !redirectAuth) {
       return {
         action: "allow",
         overrideBrowserWindowOptions: {
@@ -197,7 +202,7 @@ function createWindow() {
       };
     }
     // Open other external links in system browser
-    if (isSafeExternalUrl(url)) {
+    if (isSafeExternalUrl(url) && !isAllowedAuthPopup(url)) {
       require("electron")
         .shell.openExternal(url)
         .catch(error => console.warn("Unable to open link:", error.message));

@@ -1,6 +1,6 @@
 # macOS builds
 
-Use `yarn dist-mac` on a Mac. The script builds native Python helpers, the Rust crash reporter, the achievement watcher, the production renderer, and then a DMG and ZIP in `dist/`. `yarn dist` remains the Windows build and `yarn dist-linux` remains the Linux build.
+Use `yarn dist-mac` on a Mac. The script builds native Python helpers, the Rust crash reporter, the achievement watcher, the production renderer, and then packages the app with [Electrobun](https://electrobun.dev) into `.electrobun/artifacts/`: a DMG plus the update bundle (`stable-macos-<arch>-Ascendara.app.tar.zst`) and `stable-macos-<arch>-update.json` used by the in-app updater. `yarn dist` remains the Windows build and `yarn dist-linux` remains the Linux build.
 
 ## Prerequisites
 
@@ -14,19 +14,19 @@ brew install rust   # developer build dependency; includes Cargo
 yarn setup-mac      # official 7zz with RAR support and notices
 yarn setup-highball # Highball CLI for running Windows games in development
 yarn dist-mac --check
-yarn dist-mac --dir  # local unpacked .app
-yarn dist-mac        # DMG and ZIP
+yarn dist-mac        # DMG and update bundle
+yarn package         # quick local package without rebuilding helpers
 ```
 
 Choose the target explicitly:
 
 ```sh
-yarn dist-mac-arm64              # Apple Silicon DMG + ZIP
-yarn dist-mac-intel              # Intel DMG + ZIP
-yarn dist-mac-all                # both sets of artifacts
-# Equivalent: yarn dist-mac --arch arm64|x64|both
-yarn dist-mac --arch both --check
+yarn dist-mac-arm64              # Apple Silicon (on an Apple Silicon Mac)
+yarn dist-mac-intel              # Intel (on an Intel Mac)
+# Equivalent: yarn dist-mac --arch arm64|x64
 ```
+
+Electrobun packages for the architecture of the Mac it runs on, so each target is built on a matching machine (CI uses `macos-15` and `macos-15-intel`). `--arch both` still runs the preflight for both targets but stops at the packaging step of the foreign one.
 
 `yarn dist-mac` defaults to the running host architecture. `--arch both` produces **separate** arm64 and x64 applications/installers with architecture-specific filenames. It builds the renderer and signature once, then builds and validates every helper for each target. Python environments and PyInstaller caches are isolated per architecture, and Rust receives an explicit Apple target triple. The shared official `7zz` contains both CPU slices; PyInstaller bundles the matching slice. No arm64 helper is reused inside the Intel app.
 
@@ -45,7 +45,7 @@ To build both targets on an Apple Silicon Mac:
 
 The build detects rustup, including its keg-only Homebrew installation, and uses the stable toolchain. `ASCENDARA_MAC_RUST_TOOLCHAIN` can select another installed rustup toolchain. A native-only build can still use Homebrew Rust without rustup. On an Intel build machine, use `--arch x64`; building arm64 helpers requires an environment capable of running arm64 Python. The preflight checks all requested targets before compiling anything.
 
-Outputs are `dist/Ascendara-<version>-mac-arm64.{dmg,zip}` and `dist/Ascendara-<version>-mac-x64.{dmg,zip}`. `--dir` and `--release` work with each target and with `--arch both`.
+Outputs land in `.electrobun/artifacts/`. `scripts/ci_build.py collect` renames the DMG to `Ascendara-<version>-mac-<arch>.dmg` for the release and keeps the update files' names, which the updater looks up under `release.baseUrl`.
 
 For a distribution release, install your Developer ID Application certificate in the keychain, set `ASCENDARA_MAC_SIGN_IDENTITY`, and provide either `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`, or `APPLE_API_KEY`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. Then run:
 
@@ -53,7 +53,7 @@ For a distribution release, install your Developer ID Application certificate in
 yarn dist-mac --release
 ```
 
-Release mode requires signing and notarization credentials and enables forced code signing. The identity is also passed to PyInstaller to sign embedded onefile payloads. Local builds do not request notarization. See the [electron-builder v26 macOS options](https://www.electron.build/v26/docs/mac/) and [PyInstaller macOS signing documentation](https://pyinstaller.org/en/v6.6.0/feature-notes.html#macos-binary-code-signing).
+Release mode requires signing and notarization credentials. `scripts/build_support.py` maps these variables onto Hutch's `ELECTROBUN_DEVELOPER_ID`, `ELECTROBUN_APPLEID`, `ELECTROBUN_APPLEIDPASS`, `ELECTROBUN_TEAMID` and `ELECTROBUN_APPLEAPI*` names. The identity is also passed to PyInstaller to sign embedded onefile payloads. Builds without an identity are unsigned. See the [PyInstaller macOS signing documentation](https://pyinstaller.org/en/v6.6.0/feature-notes.html#macos-binary-code-signing).
 
 ## Runtime support and remaining limits
 
@@ -71,7 +71,7 @@ To upgrade Highball, update `VERSION` and `COMMIT` in `scripts/build_highball.py
 - Ludusavi is detected at `~/.ascendara/ludusavi` or on PATH on macOS. Install a native macOS Ludusavi binary; the Linux CDN binary is not used on Mac.
 - The Steam Workshop downloader installs Valve's official macOS SteamCMD into `~/ascendaraSteamcmd`. The binary is x86_64, so Apple Silicon needs Rosetta 2.
 - Windows dependency installers, Defender exclusions, and the Windows uninstaller do not run on macOS. Launcher discovery supports Steam on Mac; other launcher integrations still depend on Windows metadata.
-- Live branch updates download the matching `mac-arm64.zip` or `mac-x64.zip` from the GitHub release, replace the installed app after quit, and reopen it. The app must be installed in a writable location. Testing branch switches still require a manual installation.
+- Live updates use Electrobun's updater: it fetches `stable-macos-<arch>-update.json` from the latest GitHub release, downloads a bsdiff patch (or the full bundle), swaps the app after quit and reopens it. Testing branch switches still require a manual installation.
 - Torrent downloads still require qBittorrent with its Web UI configured, as in the existing implementation.
 
 ## Validation
