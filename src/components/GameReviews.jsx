@@ -1,8 +1,20 @@
 import { useEffect, useState } from "react";
-import { MessageSquare } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { Heart, MessageSquare, Palette, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import ReviewCard from "@/components/ReviewCard";
+import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { getLikedReviews, likeReview } from "@/services/firebase/firebaseService";
 import { API_URL } from "@/config/api";
 
 const guestNames = [
@@ -29,11 +41,118 @@ const isGuestReview = review => {
   );
 };
 
+// Shown when someone without an Ascend account, or whose trial or
+// subscription has ended, tries to like a review
+function LikeUpsellDialog({ t, review, username, expired, onClose }) {
+  const navigate = useNavigate();
+  const perks = [
+    { icon: Heart, key: "like" },
+    { icon: Palette, key: "cards" },
+    ...(expired ? [] : [{ icon: Sparkles, key: "trial" }]),
+  ];
+  return (
+    <Dialog open={!!review} onOpenChange={open => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-foreground">
+            <Heart className="h-5 w-5 fill-red-500 text-red-500" aria-hidden="true" />
+            {t("download.reviews.likeUpsell.title")}
+          </DialogTitle>
+          <DialogDescription>
+            {t(
+              expired
+                ? "download.reviews.likeUpsell.expiredDescription"
+                : "download.reviews.likeUpsell.description"
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        {review && (
+          <div className="pointer-events-none select-none">
+            <ReviewCard review={review} username={username} isGuest={false} />
+          </div>
+        )}
+        <ul className="space-y-2">
+          {perks.map(({ icon: Icon, key }) => (
+            <li key={key} className="flex items-center gap-2 text-sm text-foreground">
+              <Icon className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              {t(`download.reviews.likeUpsell.perks.${key}`)}
+            </li>
+          ))}
+        </ul>
+        <DialogFooter>
+          <Button variant="outline" className="text-primary" onClick={onClose}>
+            {t("download.reviews.likeUpsell.later")}
+          </Button>
+          <Button className="text-secondary" onClick={() => navigate("/ascend")}>
+            {t(
+              expired
+                ? "download.reviews.likeUpsell.expiredCta"
+                : "download.reviews.likeUpsell.cta"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function GameReviews({ gameID, onRating, onReviewCount, sectionRef }) {
   const { t } = useLanguage();
+  const { isAuthenticated } = useAuth();
   const [reviews, setReviews] = useState([]);
   const [status, setStatus] = useState("loading");
   const [attempt, setAttempt] = useState(0);
+  const [likedIds, setLikedIds] = useState(() => new Set());
+  const [upsell, setUpsell] = useState(null);
+
+  useEffect(() => {
+    setLikedIds(new Set());
+    if (!gameID || !isAuthenticated) return;
+    let cancelled = false;
+    getLikedReviews(gameID).then(result => {
+      if (!cancelled && !result.error) setLikedIds(new Set(result.liked));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameID, isAuthenticated]);
+
+  const setLikeCount = (reviewId, likeCount) =>
+    setReviews(current =>
+      current.map(review => (review.id === reviewId ? { ...review, likeCount } : review))
+    );
+
+  const setLiked = (reviewId, liked) =>
+    setLikedIds(current => {
+      const next = new Set(current);
+      if (liked) next.add(reviewId);
+      else next.delete(reviewId);
+      return next;
+    });
+
+  const handleLike = async (review, username) => {
+    if (!isAuthenticated) {
+      setUpsell({ review, username });
+      return;
+    }
+    const liked = !likedIds.has(review.id);
+    const previousCount = Number(review.likeCount) || 0;
+    setLiked(review.id, liked);
+    setLikeCount(review.id, Math.max(0, previousCount + (liked ? 1 : -1)));
+    const result = await likeReview(gameID, review.id, liked);
+    if (result.error) {
+      setLiked(review.id, !liked);
+      setLikeCount(review.id, previousCount);
+      if (result.code === "ASCEND_REQUIRED") {
+        setUpsell({ review, username, expired: true });
+        return;
+      }
+      toast.error(t("download.reviews.likeFailed"), { description: result.error });
+      return;
+    }
+    setLiked(review.id, result.liked);
+    setLikeCount(review.id, result.likeCount);
+  };
 
   useEffect(() => {
     if (!gameID) return;
@@ -144,10 +263,24 @@ export default function GameReviews({ gameID, onRating, onReviewCount, sectionRe
               review={review}
               username={username}
               isGuest={isGuest}
+              liked={likedIds.has(review.id)}
+              onLike={
+                // Only member reviews can be liked: guests have nobody to credit
+                review.id && review.isAscendAccount === true && !isGuest
+                  ? () => handleLike(review, username)
+                  : undefined
+              }
             />
           );
         })}
       </div>
+      <LikeUpsellDialog
+        t={t}
+        review={upsell?.review}
+        username={upsell?.username}
+        expired={upsell?.expired}
+        onClose={() => setUpsell(null)}
+      />
     </section>
   );
 }

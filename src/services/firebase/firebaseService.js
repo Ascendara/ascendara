@@ -3125,6 +3125,104 @@ export const listMyReports = async () => {
 };
 
 /**
+ * The signed-in member's personal notifications (review likes, ...), newest first
+ * @returns {Promise<{notifications: Array, error: string|null}>}
+ */
+export const listMemberNotifications = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { notifications: [], error: "Not authenticated" };
+    }
+
+    const response = await userAuthenticatedFetch(
+      user,
+      `${API_URL}/ascend/member-notifications`,
+      { method: "GET" }
+    );
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        notifications: [],
+        error: data.error || "Failed to load notifications",
+      };
+    }
+
+    return { notifications: data.notifications || [], error: null };
+  } catch (error) {
+    console.error("List member notifications error:", error);
+    return { notifications: [], error: error.message };
+  }
+};
+
+/**
+ * IDs of a game's reviews the signed-in member has liked
+ * @param {string} gameID
+ * @returns {Promise<{liked: string[], error: string|null}>}
+ */
+export const getLikedReviews = async gameID => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { liked: [], error: "Not authenticated" };
+    }
+
+    const response = await userAuthenticatedFetch(
+      user,
+      `${API_URL}/app/v2/gamerating/${encodeURIComponent(gameID)}/likes`,
+      { method: "GET" }
+    );
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return { liked: [], error: data.error || "Failed to load liked reviews" };
+    }
+
+    return { liked: data.liked || [], error: null };
+  } catch (error) {
+    console.error("Get liked reviews error:", error);
+    return { liked: [], error: error.message };
+  }
+};
+
+/**
+ * Like or unlike a review
+ * @param {string} gameID
+ * @param {string} reviewId
+ * @param {boolean} liked
+ * @returns {Promise<{liked: boolean, likeCount: number, error: string|null}>}
+ */
+export const likeReview = async (gameID, reviewId, liked) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { error: "Not authenticated" };
+    }
+
+    const response = await userAuthenticatedFetch(
+      user,
+      `${API_URL}/app/v2/gamerating/${encodeURIComponent(gameID)}/reviews/${encodeURIComponent(reviewId)}/like`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ liked }),
+      }
+    );
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return { error: data.error || "Failed to like review", code: data.code };
+    }
+
+    return { liked: data.liked, likeCount: data.likeCount, error: null };
+  } catch (error) {
+    console.error("Like review error:", error);
+    return { error: error.message };
+  }
+};
+
+/**
  * The signed-in member's playtime flags (time the server didn't count), newest first
  * @returns {Promise<{flags: Array, error: string|null}>}
  */

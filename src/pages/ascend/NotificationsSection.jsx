@@ -3,7 +3,7 @@ import SectionHeader from "./SectionHeader";
 import { EmptyState } from "./primitives";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Bell, Loader, MessageSquareReply, Timer } from "lucide-react";
+import { Bell, Heart, Loader, MessageSquareReply, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,6 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   disputePlaytimeFlag,
+  listMemberNotifications,
   listPlaytimeFlags,
 } from "@/services/firebase/firebaseService";
 
@@ -81,6 +82,31 @@ function PlaytimeFlagCard({ t, flag, onReport }) {
               </Button>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReviewLikeCard({ t, notification }) {
+  return (
+    <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6">
+      <div className="flex items-start gap-3">
+        <Heart className="mt-0.5 h-4 w-4 shrink-0 fill-red-500 text-red-500" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium leading-relaxed">
+            {t(
+              notification.gameName
+                ? "ascend.notifications.reviewLike.message"
+                : "ascend.notifications.reviewLike.messageNoGame",
+              { name: notification.liker, game: notification.gameName }
+            )}
+          </p>
+          {notification.createdAt && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              {new Date(notification.createdAt).toLocaleDateString()}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -165,10 +191,14 @@ function ReportFlagDialog({ t, flag, onClose, onReported }) {
 
 export default function NotificationsSection({ t, loadingNotifications, notifications }) {
   const [flags, setFlags] = useState([]);
+  const [memberNotifications, setMemberNotifications] = useState([]);
   const [reporting, setReporting] = useState(null);
 
   useEffect(() => {
     listPlaytimeFlags().then(result => setFlags(result.flags));
+    listMemberNotifications().then(result =>
+      setMemberNotifications(result.notifications)
+    );
   }, []);
 
   const handleReported = updated => {
@@ -196,7 +226,9 @@ export default function NotificationsSection({ t, loadingNotifications, notifica
             {t("ascend.notifications.loading") || "Loading notifications..."}
           </p>
         </div>
-      ) : notifications.length === 0 && flags.length === 0 ? (
+      ) : notifications.length === 0 &&
+        flags.length === 0 &&
+        memberNotifications.length === 0 ? (
         <EmptyState
           icon={Bell}
           title={t("ascend.notifications.empty")}
@@ -207,6 +239,11 @@ export default function NotificationsSection({ t, loadingNotifications, notifica
           {flags.map(flag => (
             <PlaytimeFlagCard key={flag.id} t={t} flag={flag} onReport={setReporting} />
           ))}
+          {memberNotifications
+            .filter(notification => notification.kind === "reviewLike")
+            .map(notification => (
+              <ReviewLikeCard key={notification.id} t={t} notification={notification} />
+            ))}
           {notifications.map((notification, index) => (
             <motion.div
               key={notification.id}

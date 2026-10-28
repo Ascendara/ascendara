@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { HelpCircle, Star } from "lucide-react";
+import { Heart, HelpCircle, Star } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -30,8 +30,9 @@ const haloColor = textColor => {
 };
 
 // One review on the game page. Also rendered as the live preview in Ascend's
-// review card settings, so both always look the same.
-export default function ReviewCard({ review, username, isGuest }) {
+// review card settings, so both always look the same. The like button only
+// shows when onLike is passed.
+export default function ReviewCard({ review, username, isGuest, liked, onLike }) {
   const { t, language } = useLanguage();
   const [guestInfoOpen, setGuestInfoOpen] = useState(false);
   const photoURL = !isGuest && review.photoURL;
@@ -199,13 +200,34 @@ export default function ReviewCard({ review, username, isGuest }) {
       <p className="relative whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
         {review.comments}
       </p>
-      {formattedDate && (
-        <time
-          dateTime={date.toISOString()}
-          className={`relative mt-3 block text-xs ${metaTextClass}`}
-        >
-          {formattedDate}
-        </time>
+      {(formattedDate || onLike) && (
+        <div className="relative mt-3 flex items-center justify-between gap-3">
+          {formattedDate ? (
+            <time dateTime={date.toISOString()} className={`text-xs ${metaTextClass}`}>
+              {formattedDate}
+            </time>
+          ) : (
+            <span />
+          )}
+          {onLike && (
+            <button
+              type="button"
+              onClick={onLike}
+              aria-pressed={!!liked}
+              aria-label={t(liked ? "download.reviews.unlike" : "download.reviews.like")}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                liked ? "text-red-500" : metaTextClass
+              }`}
+              style={iconHaloStyle}
+            >
+              <Heart
+                aria-hidden="true"
+                className={`h-3.5 w-3.5 transition-transform ${liked ? "scale-110 fill-red-500" : ""}`}
+              />
+              {Number(review.likeCount) > 0 && <span>{review.likeCount}</span>}
+            </button>
+          )}
+        </div>
       )}
     </article>
   );

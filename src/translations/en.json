@@ -716,6 +716,10 @@
         },
         "submit": "Send Report"
       },
+      "reviewLike": {
+        "message": "{{name}} liked your review of {{game}}",
+        "messageNoGame": "{{name}} liked your review"
+      },
       "subtitle": "Stay updated with important announcements and updates",
       "title": "Notifications"
     },
@@ -1885,11 +1889,27 @@
         "starryBadger": "StarryBadger",
         "turboPenguin": "TurboPenguin"
       },
+      "like": "Like this review",
+      "likeFailed": "Couldn't update your like",
+      "likeUpsell": {
+        "cta": "Start 7-day free trial",
+        "description": "Sign in to Ascend to like reviews and show reviewers some love. Members also get review cards that stand out, just like this one.",
+        "expiredCta": "Get Ascend",
+        "expiredDescription": "Your Ascend trial or subscription has ended. Renew to keep liking reviews. The likes you already gave still count.",
+        "later": "Maybe later",
+        "perks": {
+          "cards": "Custom review cards with backgrounds, aura colors and badges",
+          "like": "Like reviews and let reviewers know they helped",
+          "trial": "Try everything free for 7 days"
+        },
+        "title": "Like reviews with Ascend"
+      },
       "loading": "Loading reviews…",
       "rating": "{{rating}}/5",
       "retry": "Try again",
       "stars": "{{rating}} out of 5 stars",
-      "title": "Community reviews"
+      "title": "Community reviews",
+      "unlike": "Unlike this review"
     },
     "screenshots": "Screenshots",
     "scrollToViewMore": "Scroll to view more game details",
