@@ -871,50 +871,69 @@ function registerMiscHandlers() {
     }
   });
 
+  // Native notifications go through the themed helper on Windows and the
+  // system notifier elsewhere, and respect the notifications setting
+  const showNotification = (title, message) => {
+    const settings = settingsManager.getSettings();
+    if (!settings.notifications) {
+      return { success: false, error: "Notifications are disabled in settings" };
+    }
+
+    if (isWindows) {
+      const notificationHelperPath = isDev
+        ? "./binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper.exe"
+        : path.join(appDirectory, "/resources/AscendaraNotificationHelper.exe");
+
+      const args = [
+        "--theme",
+        settings.theme || "purple",
+        "--title",
+        title,
+        "--message",
+        message,
+      ];
+
+      const process = spawn(notificationHelperPath, args, {
+        detached: true,
+        stdio: "ignore",
+      });
+      process.unref();
+    } else {
+      const notification = new Notification({
+        title,
+        body: message,
+        silent: false,
+        timeoutType: "default",
+        urgency: "normal",
+        icon: path.join(app.getAppPath(), "build", "icon.png"),
+      });
+      notification.show();
+    }
+
+    return { success: true };
+  };
+
   // Show test notification
   ipcMain.handle("show-test-notification", async () => {
     try {
-      const settings = settingsManager.getSettings();
-      const theme = settings.theme || "purple";
-
-      if (!settings.notifications) {
-        return { success: false, error: "Notifications are disabled in settings" };
-      }
-
-      if (isWindows) {
-        const notificationHelperPath = isDev
-          ? "./binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper.exe"
-          : path.join(appDirectory, "/resources/AscendaraNotificationHelper.exe");
-
-        const args = [
-          "--theme",
-          theme,
-          "--title",
-          "Test Notification",
-          "--message",
-          "This is a test notification from Ascendara!",
-        ];
-
-        const process = spawn(notificationHelperPath, args, {
-          detached: true,
-          stdio: "ignore",
-        });
-        process.unref();
-      } else {
-        const notification = new Notification({
-          title: "Test Notification",
-          body: "This is a test notification from Ascendara!",
-          silent: false,
-          timeoutType: "default",
-          urgency: "normal",
-          icon: path.join(app.getAppPath(), "build", "icon.png"),
-        });
-        notification.show();
-      }
-
-      return { success: true };
+      return showNotification(
+        "Test Notification",
+        "This is a test notification from Ascendara!"
+      );
     } catch (error) {
       console.error("Error showing test notification:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle("show-notification", async (_, title, message) => {
+    try {
+      if (typeof title !== "string" || typeof message !== "string") {
+        return { success: false, error: "Invalid notification" };
+      }
+      return showNotification(title.slice(0, 120), message.slice(0, 400));
+    } catch (error) {
+      console.error("Error showing notification:", error);
       return { success: false, error: error.message };
     }
   });

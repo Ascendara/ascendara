@@ -689,6 +689,8 @@ contextBridge.exposeInMainWorld("electron", {
   switchBuild: buildType => ipcRenderer.invoke("switch-build", buildType),
   getBranch: () => ipcRenderer.invoke("get-branch"),
   showTestNotification: () => ipcRenderer.invoke("show-test-notification"),
+  showNotification: (title, message) =>
+    ipcRenderer.invoke("show-notification", title, message),
 
   //===========================================================================
   // API & NETWORKING

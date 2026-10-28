@@ -14,6 +14,7 @@ import {
   CircleArrowDown,
   AtSign,
 } from "lucide-react";
+import { useAscendNotificationCount } from "@/services/ascend/ascendNotificationBadgeService";
 
 const Navigation = memo(({ items }) => {
   const { t } = useLanguage();
@@ -25,6 +26,7 @@ const Navigation = memo(({ items }) => {
     return savedSize ? parseFloat(savedSize) : 100;
   });
   const [downloadCount, setDownloadCount] = useState(0);
+  const ascendNotificationCount = useAscendNotificationCount();
   const [dockVisible, setDockVisible] = useState(true);
   const downloadCountRef = useRef(0);
   const pointerYRef = useRef(Number.NEGATIVE_INFINITY);
@@ -72,12 +74,9 @@ const Navigation = memo(({ items }) => {
       }
       if (
         path === "/settings" &&
-        [
-          "/settings",
-          "/extralanguages",
-          "/sidecaranddependencies",
-          "/sources",
-        ].includes(location.pathname)
+        ["/settings", "/extralanguages", "/sidecaranddependencies", "/sources"].includes(
+          location.pathname
+        )
       ) {
         return true;
       }
@@ -391,6 +390,11 @@ const Navigation = memo(({ items }) => {
                     {item.icon === CircleArrowDown && downloadCount > 0 && (
                       <div className="text-primary-foreground absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/30 bg-primary/90 px-1 text-[10px] font-semibold shadow-lg shadow-primary/25 backdrop-blur-sm">
                         {downloadCount}
+                      </div>
+                    )}
+                    {item.path === "/ascend" && ascendNotificationCount > 0 && (
+                      <div className="text-primary-foreground absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/30 bg-primary/90 px-1 text-[10px] font-semibold shadow-lg shadow-primary/25 backdrop-blur-sm">
+                        {ascendNotificationCount > 99 ? "99+" : ascendNotificationCount}
                       </div>
                     )}
                   </div>

@@ -33,6 +33,7 @@ import useAscendPage from "./ascend/useAscendPage";
 import SectionLoading from "./ascend/SectionLoading";
 import CommunityTabs, { COMMUNITY_SECTIONS } from "./ascend/CommunityTabs";
 import AscendWelcomeTour from "./ascend/AscendWelcomeTour";
+import { useAscendNotificationCount } from "@/services/ascend/ascendNotificationBadgeService";
 const HomeSection = lazy(() => import("./ascend/HomeSection"));
 const SearchSection = lazy(() => import("./ascend/SearchSection"));
 const FriendsSection = lazy(() => import("./ascend/FriendsSection"));
@@ -51,6 +52,7 @@ const DiscordSection = lazy(() => import("./ascend/DiscordSection"));
 const AuthSection = lazy(() => import("./ascend/AuthSection"));
 
 const Ascend = () => {
+  const ascendNotificationCount = useAscendNotificationCount();
   const {
     checkingVersion,
     t,
@@ -915,6 +917,7 @@ const Ascend = () => {
             badges={{
               requests: incomingRequests.length,
               messages: conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0),
+              notifications: ascendNotificationCount,
             }}
           />
 

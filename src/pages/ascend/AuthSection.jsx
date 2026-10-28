@@ -34,6 +34,7 @@ import {
   Flag,
   Telescope,
   FlaskConical,
+  Bookmark,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -65,6 +66,7 @@ const MarqueeRowTwo = [
   { icon: CloudUpload, name: "cloudBackups" },
   { icon: ListOrdered, name: "downloadQueues" },
   { icon: Telescope, name: "updatePreview" },
+  { icon: Bookmark, name: "wishlistAlerts" },
   { icon: Puzzle, name: "nexusMods" },
   { icon: Zap, name: "trainers" },
   { icon: FlaskConical, name: "experimentalBranch" },

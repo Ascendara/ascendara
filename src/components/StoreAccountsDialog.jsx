@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   ArrowRight,
   ExternalLink,
+  Bookmark,
 } from "lucide-react";
 import {
   Dialog,
@@ -20,6 +21,11 @@ import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
 import { storeGameKey, storeNames } from "@/lib/storeLibrary";
+import { verifyAscendAccess } from "@/services/firebase/firebaseService";
+import {
+  isWishlistAlertsEnabled,
+  setWishlistAlertsEnabled,
+} from "@/services/ascend/wishlistWatchService";
 
 // Each store gets a recognisable monogram instead of a generic icon
 const storeMarks = { steam: "S", epic: "E", gog: "G" };
@@ -38,6 +44,8 @@ export default function StoreAccountsDialog({
   const [pending, setPending] = useState({});
   const [error, setError] = useState("");
   const [saveError, setSaveError] = useState(false);
+  const [hasAscend, setHasAscend] = useState(false);
+  const [wishlistAlerts, setWishlistAlerts] = useState(isWishlistAlertsEnabled);
   const mounted = useRef(false);
   const locks = useRef(new Set());
 
@@ -62,6 +70,16 @@ export default function StoreAccountsDialog({
       )
     );
   }, [open, refresh, t]);
+
+  useEffect(() => {
+    if (!open) return;
+    verifyAscendAccess()
+      .then(access => {
+        if (mounted.current)
+          setHasAscend(Boolean(access.hasAccess || access.isSubscribed || access.isVerified));
+      })
+      .catch(() => {});
+  }, [open]);
 
   const act = async (action, store) => {
     if (locks.current.has(store) && !["cancel", "disconnect"].includes(action)) return;
@@ -102,6 +120,7 @@ export default function StoreAccountsDialog({
   const hiddenEntries = connected.flatMap(account => account.games
     .filter(game => hiddenGames.has(storeGameKey(account.store, game.id)))
     .map(game => ({ ...game, store: account.store })));
+  const steam = connected.find(account => account.store === "steam");
   const visibleCount = connected
     .filter(account => preferences.stores.includes(account.store))
     .reduce((sum, account) => sum + account.games.filter(game =>
@@ -344,6 +363,51 @@ export default function StoreAccountsDialog({
                 );
               })}
             </ul>
+          )}
+
+          {/* Ascend: alerts when Steam wishlist games show up in the index */}
+          {steam && (
+            <div className="flex items-center gap-4 rounded-xl border border-border/60 bg-card p-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Bookmark className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <label
+                  htmlFor="wishlist-alerts"
+                  className="flex cursor-pointer items-center gap-2 text-sm font-semibold"
+                >
+                  {t("storeAccounts.wishlist.title", "Steam wishlist alerts")}
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                    Ascend
+                  </span>
+                </label>
+                <p
+                  id="wishlist-alerts-description"
+                  className="mt-0.5 text-xs leading-relaxed text-muted-foreground"
+                >
+                  {hasAscend
+                    ? t("storeAccounts.wishlist.description", {
+                        defaultValue:
+                          "Get notified when a game on your wishlist is added to Ascendara. Watching {{count}} games.",
+                        count: steam.wishlist?.length || 0,
+                      })
+                    : t(
+                        "storeAccounts.wishlist.requiresAscend",
+                        "Get notified when a game on your Steam wishlist is added to Ascendara. Requires Ascend."
+                      )}
+                </p>
+              </div>
+              <Switch
+                id="wishlist-alerts"
+                aria-describedby="wishlist-alerts-description"
+                checked={hasAscend && wishlistAlerts}
+                disabled={!hasAscend}
+                onCheckedChange={enabled => {
+                  if (setWishlistAlertsEnabled(enabled)) setWishlistAlerts(enabled);
+                  else setSaveError(true);
+                }}
+              />
+            </div>
           )}
 
           <div className="space-y-2 text-xs leading-relaxed text-muted-foreground">

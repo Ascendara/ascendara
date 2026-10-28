@@ -17,7 +17,8 @@ function createAccountManager({ vault, makeSession, authenticate, openExternal, 
           const played = playtime?.get(`${store}:${id}`);
           return { id, name, store, ...(played && { playTime: played.playTime,
             launchCount: played.launchCount, lastPlayed: played.lastPlayed }) };
-        }) };
+        }),
+        ...(store === "steam" && { wishlist: (record?.wishlist || []).map(({ id, name, addedAt }) => ({ id, name, addedAt })) }) };
     }) };
   }
   async function run(store, connect) {
@@ -47,6 +48,7 @@ function createAccountManager({ vault, makeSession, authenticate, openExternal, 
       if (controller.signal.aborted) throw new Error("Account operation cancelled.");
       vault.write(store, { accountId: result.accountId, displayName: result.displayName,
         games: [...new Map(result.games.map(item => [item.id, item])).values()],
+        ...(store === "steam" && { wishlist: result.wishlist || record?.wishlist || [] }),
         lastSync: new Date().toISOString(), cookies: store === "epic" ? [] : cookies,
         credential: result.credential || credential || null });
     } catch (error) {

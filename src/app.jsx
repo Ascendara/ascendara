@@ -51,6 +51,11 @@ import {
   stopFavoritesSync,
 } from "@/services/cloud/favoritesCloudSync";
 import {
+  initializeWishlistWatch,
+  stopWishlistWatch,
+  WISHLIST_MATCHES_EVENT,
+} from "@/services/ascend/wishlistWatchService";
+import {
   getUnreadMessageCount,
   verifyAscendAccess,
 } from "@/services/firebase/firebaseService";
@@ -935,6 +940,64 @@ const AscendStatusInitializer = () => {
   return null;
 };
 
+// Announce Steam wishlist games that just showed up in the index. The first
+// check only reports what was already available, as one summary.
+const WishlistAlertNotifier = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const openGame = async gameID => {
+      const game = await gameService.findGameByGameID(gameID);
+      if (!game) {
+        navigate("/ascend", { state: { section: "notifications" } });
+        return;
+      }
+      navigate("/download", {
+        state: { gameData: { ...game, download_links: game.download_links || {} } },
+      });
+    };
+
+    const handleMatches = event => {
+      const { matches = [], initial } = event.detail || {};
+      if (!matches.length) return;
+
+      if (initial || matches.length > 1) {
+        const message = i18n.t(
+          initial ? "ascend.wishlist.alreadyAvailable" : "ascend.wishlist.newGames",
+          { count: matches.length }
+        );
+        toast.success(message, {
+          duration: 10000,
+          action: {
+            label: i18n.t("ascend.wishlist.view"),
+            onClick: () => navigate("/ascend", { state: { section: "notifications" } }),
+          },
+        });
+        if (!initial) {
+          window.electron?.showNotification?.(i18n.t("ascend.wishlist.title"), message);
+        }
+        return;
+      }
+
+      const [match] = matches;
+      const message = i18n.t("ascend.wishlist.nowAvailable", { game: match.name });
+      toast.success(message, {
+        duration: 10000,
+        action: {
+          label: i18n.t("ascend.wishlist.view"),
+          onClick: () => openGame(match.gameID),
+        },
+      });
+      window.electron?.showNotification?.(i18n.t("ascend.wishlist.title"), message);
+    };
+
+    window.addEventListener(WISHLIST_MATCHES_EVENT, handleMatches);
+    return () => window.removeEventListener(WISHLIST_MATCHES_EVENT, handleMatches);
+  }, [navigate]);
+
+  return null;
+};
+
 // Warn wherever the user is when a running download stops making progress.
 const DownloadStallNotifier = () => {
   const navigate = useNavigate();
@@ -989,14 +1052,17 @@ const DownloadSyncInitializer = () => {
           );
           initializeDownloadSync(user, hasAccess);
           initializeFavoritesSync(user, hasAccess);
+          initializeWishlistWatch(user, hasAccess);
         } catch (error) {
           console.error("[App] Error checking Ascend access:", error);
           stopDownloadSync();
           stopFavoritesSync();
+          stopWishlistWatch();
         }
       } else {
         stopDownloadSync();
         stopFavoritesSync();
+        stopWishlistWatch();
       }
     };
 
@@ -1006,6 +1072,7 @@ const DownloadSyncInitializer = () => {
       stopDesktopLibrarySync();
       stopDownloadSync();
       stopFavoritesSync();
+      stopWishlistWatch();
     };
   }, [isAuthenticated, user]);
 
@@ -2118,6 +2185,7 @@ function App() {
                     <AscendStatusInitializer />
                     <DownloadSyncInitializer />
                     <DownloadStallNotifier />
+                    <WishlistAlertNotifier />
                     <DiscordRPCTracker />
                     <UserActivityTracker />
                     <MessageNotificationChecker />

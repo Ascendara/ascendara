@@ -100,6 +100,31 @@ async function epicToken(fetcher, credentials, signal) {
   };
 }
 
+// The wishlist only carries app ids, so names come from the store's item lookup.
+// It is best-effort: a private or failed wishlist returns null and the caller
+// keeps the last one it saw, so library syncs never fail because of it.
+async function steamWishlist(json, identity) {
+  try {
+    const params = new URLSearchParams({ access_token: identity.token, steamid: identity.id });
+    const items = (await json(`https://api.steampowered.com/IWishlistService/GetWishlist/v1/?${params}`)).response?.items;
+    if (!Array.isArray(items)) return null;
+    const wishlist = items.slice(0, 5000).map(item => ({ id: safeId(item.appid),
+      addedAt: Number(item.date_added) > 0 ? new Date(item.date_added * 1000).toISOString() : null }));
+    const names = new Map();
+    for (let start = 0; start < wishlist.length; start += 100) {
+      const input = { ids: wishlist.slice(start, start + 100).map(item => ({ appid: Number(item.id) })),
+        context: { language: "english", country_code: "US" }, data_request: {} };
+      const data = await json(`https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?${new URLSearchParams({ input_json: JSON.stringify(input) })}`);
+      for (const item of data.response?.store_items || [])
+        if (item.appid && item.name) names.set(String(item.appid), String(item.name).slice(0, 300));
+    }
+    return wishlist.filter(item => names.has(item.id)).map(item => ({ ...item, name: names.get(item.id) }));
+  } catch (error) {
+    if (error.message === "Account operation cancelled.") throw error;
+    return null;
+  }
+}
+
 async function syncLibrary(store, session, credential, signal, saveCredential = () => {}) {
   const fetcher = session.fetch.bind(session);
   const json = (url, options) => request(fetcher, url, options, signal);
@@ -111,7 +136,9 @@ async function syncLibrary(store, session, credential, signal, saveCredential = 
     const data = (await json(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?${params}`)).response;
     if (!data || (!Array.isArray(data.games) && data.game_count !== 0))
       throw new Error("Steam did not return your library. Reconnect and check your game-details privacy settings.");
-    return { accountId: identity.id, displayName: `Steam ${identity.id}`, games: (data.games || []).map(item => game(store, item.appid, item.name)) };
+    return { accountId: identity.id, displayName: `Steam ${identity.id}`,
+      games: (data.games || []).map(item => game(store, item.appid, item.name)),
+      wishlist: await steamWishlist(json, identity) };
   }
   if (store === "gog") {
     const profile = await json("https://embed.gog.com/userData.json");

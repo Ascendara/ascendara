@@ -37,12 +37,7 @@ const DiscordOutlineIcon = props => <DiscordIcon {...props} outline />;
 
 // Friends (with their requests), people search and the leaderboard share one
 // tabbed Community page, so they count as a single destination here
-const COMMUNITY_SECTIONS = [
-  "friends",
-  "search",
-  "leaderboard",
-  "userProfile",
-];
+const COMMUNITY_SECTIONS = ["friends", "search", "leaderboard", "userProfile"];
 
 const AscendNavBar = ({
   activeSection,
@@ -119,7 +114,12 @@ const AscendNavBar = ({
 
   const menuItems = [
     { id: "premium", icon: Crown, label: t("ascend.nav.premium") },
-    { id: "notifications", icon: Bell, label: t("ascend.nav.notifications") },
+    {
+      id: "notifications",
+      icon: Bell,
+      label: t("ascend.nav.notifications"),
+      badge: badges.notifications,
+    },
     { id: "reports", icon: Flag, label: t("ascend.nav.reports") },
     { id: "settings", icon: Settings, label: t("ascend.nav.settings") },
   ];
@@ -264,6 +264,17 @@ const AscendNavBar = ({
                   <span
                     className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${currentStatusOption.color}`}
                   />
+                  {/* Notifications live in this menu, so the avatar carries their count */}
+                  {badges.notifications > 0 && (
+                    <span
+                      className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-card bg-primary px-1 text-[9px] font-bold leading-none text-secondary"
+                      aria-label={t("ascend.notifications.unread", {
+                        count: badges.notifications,
+                      })}
+                    >
+                      {badges.notifications > 99 ? "99+" : badges.notifications}
+                    </span>
+                  )}
                 </span>
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
               </button>
@@ -299,7 +310,12 @@ const AscendNavBar = ({
                   className="gap-3"
                 >
                   <item.icon className="h-4 w-4 text-muted-foreground" />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge > 0 && (
+                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-secondary">
+                      {item.badge > 99 ? "99+" : item.badge}
+                    </span>
+                  )}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

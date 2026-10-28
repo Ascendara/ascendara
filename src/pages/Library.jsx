@@ -125,6 +125,7 @@ import { normalizeDriveTotals } from "@/services/app/systemHealthService";
 
 import ImportGamesDialog from "@/components/ImportGamesDialog";
 import StoreAccountsDialog from "@/components/StoreAccountsDialog";
+import WishlistTab from "@/components/WishlistTab";
 import ImportFromLaunchersDialog from "@/components/ImportFromLaunchersDialog";
 import StoreOwnedGameCard from "@/components/StoreOwnedGameCard";
 import DeferredLibraryCard from "@/components/DeferredLibraryCard";
@@ -377,6 +378,9 @@ const Library = () => {
   const [restoringGame, setRestoringGame] = useState(null);
   const [deletingCloudGame, setDeletingCloudGame] = useState(null);
   const [cloudGameImages, setCloudGameImages] = useState({});
+  const [wishlistTabHidden, setWishlistTabHidden] = useState(
+    () => localStorage.getItem("library-wishlist-hidden") === "true"
+  );
   // Play Later games state
   const [playLaterGames, setPlayLaterGames] = useState([]);
   // History (deleted games with preserved stats) state
@@ -399,22 +403,27 @@ const Library = () => {
     const saved = localStorage.getItem("library-tab-order");
     const order = saved
       ? JSON.parse(saved)
-      : ["all", "favoritesGallery", "cloud", "playLater", "history"];
+      : ["all", "favoritesGallery", "cloud", "wishlist", "playLater", "history"];
     if (!order.includes("hiddenFolders"))
       order.splice(Math.max(0, order.indexOf("all") + 1), 0, "hiddenFolders");
+    // Saved orders from before the wishlist tab get it next to the cloud tab
+    if (!order.includes("wishlist")) {
+      const after = order.indexOf("cloud") + 1 || order.indexOf("favoritesGallery") + 1;
+      order.splice(after || order.length, 0, "wishlist");
+    }
     return order;
   });
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem("library-tab-order");
     const order = saved
       ? JSON.parse(saved)
-      : ["all", "favoritesGallery", "cloud", "playLater", "history"];
+      : ["all", "favoritesGallery", "cloud", "wishlist", "playLater", "history"];
     return (
       order.find(
         id => id !== "hiddenFolders" || loadFolders().some(folder => folder.hidden)
       ) || "all"
     );
-  }); // "all" | "favoritesGallery" | "cloud" | "playLater" | "history"
+  }); // "all" | "favoritesGallery" | "cloud" | "wishlist" | "playLater" | "history"
 
   // Multiselect is only supported on the "All Games" tab, so leaving it
   // should clear any in-progress selection instead of leaving it stuck on.
@@ -1609,6 +1618,13 @@ const Library = () => {
       ? filteredGames.filter(g => !g.isFolder && favorites.includes(g.game || g.name))
       : filteredGames;
 
+  const hasAscend = Boolean(
+    ascendAccess.hasAccess || ascendAccess.isSubscribed || ascendAccess.isVerified
+  );
+  const steamAccount = storeLibrary.accounts.find(
+    account => account.store === "steam" && account.connected
+  );
+
   const sidebarTabs = [
     {
       id: "all",
@@ -1638,6 +1654,14 @@ const Library = () => {
       icon: <Cloud className="h-4 w-4" />,
       count: cloudOnlyGames.length,
       hidden: !user,
+    },
+    {
+      id: "wishlist",
+      label: t("library.wishlist.title"),
+      icon: <Bookmark className="h-4 w-4" />,
+      count: hasAscend ? steamAccount?.wishlist?.length || 0 : 0,
+      // Members without Ascend can dismiss the pitch; getting Ascend brings it back
+      hidden: !hasAscend && wishlistTabHidden,
     },
     {
       id: "playLater",
@@ -1673,10 +1697,13 @@ const Library = () => {
   return (
     <div
       className="fixed inset-0 top-[60px] flex overflow-hidden bg-background"
-      onDragEnter={handleLibraryDragEnter}
-      onDragOver={handleLibraryDragOver}
-      onDragLeave={handleLibraryDragLeave}
-      onDrop={handleLibraryDrop}
+      // The wishlist only lists Steam games, so dropping a game there means nothing
+      {...(activeTab !== "wishlist" && {
+        onDragEnter: handleLibraryDragEnter,
+        onDragOver: handleLibraryDragOver,
+        onDragLeave: handleLibraryDragLeave,
+        onDrop: handleLibraryDrop,
+      })}
     >
       {gameToMove && (
         <MoveToFolderDialog
@@ -3003,6 +3030,20 @@ const Library = () => {
             </>
           )}
 
+          {/* ── Steam wishlist tab (Ascend) ── */}
+          {activeTab === "wishlist" && (
+            <WishlistTab
+              hasAscend={hasAscend}
+              steamAccount={steamAccount}
+              onConnectSteam={() => setIsStoreAccountsOpen(true)}
+              onHide={() => {
+                safeSetItem("library-wishlist-hidden", "true");
+                setWishlistTabHidden(true);
+                setActiveTab("all");
+              }}
+            />
+          )}
+
           {/* ── Play Later tab ── */}
           {activeTab === "playLater" && (
             <>
@@ -3586,7 +3627,7 @@ const Library = () => {
 
       {/* ── Drag & drop overlay: dropping an .exe adds it as a custom game ── */}
       <AnimatePresence>
-        {isDraggingExeFile && (
+        {isDraggingExeFile && activeTab !== "wishlist" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -4425,6 +4466,13 @@ const InstalledGameCard = memo(
       // Add event listener for cover updates
       window.addEventListener("game-cover-updated", handleCoverUpdate);
 
+      // Artwork downloaded elsewhere (game page, another card's retry)
+      const unsubscribeAssets = window.electron.onGameAssetsUpdated(
+        ({ game: updatedGame }) => {
+          if (updatedGame === gameId && !gameImageCache.get(gameId)) loadGameImage();
+        }
+      );
+
       // Initial load
       loadGameImage();
 
@@ -4432,6 +4480,7 @@ const InstalledGameCard = memo(
         isMounted = false;
         // Clean up event listener
         window.removeEventListener("game-cover-updated", handleCoverUpdate);
+        unsubscribeAssets();
       };
     }, [game.game, game.name]); // Only depend on game ID properties
 
@@ -5438,6 +5487,11 @@ const InstalledGameCard = memo(
                     src={imageData}
                     alt={game.game}
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    onError={() => {
+                      // Corrupt file on disk: show the placeholder instead of a blank card
+                      gameImageCache.delete(game.game || game.name);
+                      setImageData(null);
+                    }}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-muted">
