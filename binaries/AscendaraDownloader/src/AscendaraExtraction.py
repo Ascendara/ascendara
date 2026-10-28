@@ -716,7 +716,9 @@ def _link_output(output, destination, names, cancelled):
     """Hard-link in-place output into the stage, keeping the output as the retained source."""
     for name in names:
         cancelled()
-        target = _member_path(destination, name)
+        # Another archive's worker may have linked the same name (each release's
+        # Read_Me, for example); that link is removed below, never written through.
+        target = _member_path(destination, name, replacing=True)
         # The retained output is ours and may still be linked from an earlier stage.
         source = os.path.join(_extended_path(output), *name.split('/'))
         os.makedirs(os.path.dirname(target), exist_ok=True)
@@ -891,6 +893,32 @@ def _discard_inplace(output, state_path):
 def _volume_fingerprint(layout):
     return [[os.path.basename(path), info.st_size, info.st_mtime_ns]
             for path, info in ((path, os.stat(path)) for path in layout.volumes)]
+
+
+def _fits_beside(kind, archive, destination, listing_path, cancelled, report):
+    """True when the whole output fits next to the archive, so none of it must be released.
+
+    A kept archive stays the recovery source for files lost after extraction.
+    """
+    if kind == 'zip':
+        with zipfile.ZipFile(archive) as source:
+            needed = sum(item.file_size for item in source.infolist())
+    elif kind == 'rar':
+        from AscendaraRarSpace import RarLayoutError, read_layout
+        try:
+            needed = sum(entry.size for entry in read_layout(archive).entries if not entry.directory)
+        except (RarLayoutError, OSError):
+            return False
+    elif kind == '7z':
+        tool = _find_7z()
+        if not tool:
+            return False
+        needed = sum(info['size'] for info in _7z_files(
+            tool, archive, destination, listing_path, cancelled, lambda text: report(),
+            wanted=lambda name: True).values())
+    else:
+        return False
+    return needed + KEEP_FREE <= shutil.disk_usage(destination).free
 
 
 def rar_inplace_layout(archive):
@@ -1372,6 +1400,9 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
                                    'required to resume it. Reinstall Ascendara')
         else:
             source_kind, _ = detect_file_type(archive, cancelled)
+            if allow_inplace and not rar_saved and _fits_beside(
+                    source_kind, archive, destination, manifest_path + '.listing', cancelled, report):
+                allow_inplace, hatchzip = False, None
             # A hard-linked archive shares its bytes with another retained copy,
             # which truncation would destroy.
             kind = ('inplace' if hatchzip and source_kind in ('zip', '7z')

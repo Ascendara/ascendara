@@ -113,6 +113,22 @@ def install_staged_file(source, target, check_cancelled=lambda: None):
             cleanup_temporary(temporary, os.path.dirname(target))
 
 
+def consumed_first_volume(part):
+    """The first RAR volume of `part`'s set when in-place extraction already deleted it.
+
+    Without sparse files, in-place RAR extraction deletes each volume it has
+    passed, the first one first; its state file is what remains of it.
+    """
+    from AscendaraDownloadRecovery import archive_sources
+    folder = os.path.dirname(os.path.abspath(part))
+    states = {}
+    for name in os.listdir(folder):
+        match = re.fullmatch(r'\.ascendara-inplace-(.+\.part0*1\.rar)\.json', name, re.I)
+        if match and not os.path.exists(os.path.join(folder, match[1])):
+            states[os.path.join(folder, match[1])] = None
+    return next(iter(archive_sources(part, states)), None)
+
+
 def cleanup_temporary(path, root, empty_only=False):
     """Remove an owned temporary path, retrying Windows locks/read-only files."""
     path, root = os.path.abspath(path), os.path.abspath(root)
@@ -1406,12 +1422,16 @@ class AscendaraDownloader:
                     [os.path.join(self.download_dir, name) for name in os.listdir(self.download_dir)
                      if name.lower().endswith(('.zip', '.rar', '.7z'))])
         from AscendaraDownloadRecovery import archive_sources
+        first_parts = {p: None for p in archives if re.search(r'\.part0*1\.rar$', p, re.I)}
         for part in archives:
-            if re.search(r'\.part(?!0*1\.)\d+\.rar$', part, re.I):
-                first_parts = {p: None for p in archives if re.search(r'\.part0*1\.rar$', p, re.I)}
-                if not archive_sources(part, first_parts):
+            if re.search(r'\.part(?!0*1\.)\d+\.rar$', part, re.I) and not archive_sources(part, first_parts):
+                # The extraction worker resumes or relinks a set whose first volume it consumed.
+                first = consumed_first_volume(part)
+                if first is None:
                     raise RuntimeError(f'Missing first RAR volume for {os.path.basename(part)}')
+                first_parts[first] = None
         archives = [p for p in archives if not re.search(r'\.part(?!0*1\.)\d+\.rar$', p, re.I)]
+        archives += [p for p in first_parts if p not in archives]
         if not archives and not loose_files:
             raise RuntimeError('No archive found to extract')
         data = self.game_info['downloadingData']
@@ -1803,7 +1823,9 @@ def retry_local_extraction(metadata_path):
             target = _member_path(worker.download_dir, name)
             _check_path(worker.download_dir, target)
             # An archive consumed by in-place extraction is retained as its output.
-            if not os.path.isfile(target) and not (archive and inplace_retained(target)):
+            if not os.path.isfile(target) and not (archive and (
+                    inplace_retained(target) or re.search(r'\.part\d+\.rar$', target, re.I)
+                    and consumed_first_volume(target))):
                 raise FileNotFoundError(f'Retained source is missing: {name}')
             return target
         if plan:

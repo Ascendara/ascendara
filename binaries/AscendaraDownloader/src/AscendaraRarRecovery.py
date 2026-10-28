@@ -69,8 +69,10 @@ def trust_link(path):
     _trusted_links.add((info.st_dev, info.st_ino))
 
 
-def _check_path(root, target):
+def _check_path(root, target, replacing=False):
     # Native extraction and Python inspection must resolve the same long paths.
+    # `replacing` callers remove the target rather than write through it, so a
+    # hard link there cannot reach its other names.
     root, target = _extended_path(root), _extended_path(target)
     if os.path.commonpath([root, target]) != root:
         raise ValueError(f'Archive path escapes destination: {target!r}')
@@ -80,7 +82,7 @@ def _check_path(root, target):
             info = os.lstat(current)
             if stat.S_ISLNK(info.st_mode) or getattr(info, 'st_file_attributes', 0) & 0x400:
                 raise ValueError(f'Refusing symlink or reparse-point path: {current!r}')
-            if (current == target and not stat.S_ISDIR(info.st_mode) and info.st_nlink > 1
+            if (current == target and not replacing and not stat.S_ISDIR(info.st_mode) and info.st_nlink > 1
                     and (info.st_dev, info.st_ino) not in _trusted_links):
                 raise ValueError(f'Refusing hard-linked output: {current!r}')
         # Ancestors of the chosen destination may be user-managed symlinks
@@ -96,7 +98,7 @@ def _check_path(root, target):
         raise ValueError(f'Archive path resolves outside destination: {target!r}')
 
 
-def _member_path(root, name):
+def _member_path(root, name, replacing=False):
     normalized = name.replace('\\', '/')
     if not normalized or normalized.startswith('/') or ntpath.splitdrive(normalized)[0]:
         raise ValueError(f'Unsafe archive member name: {name!r}')
@@ -110,7 +112,7 @@ def _member_path(root, name):
                             for digit in '123456789¹²³'}):
             raise ValueError(f'Unsafe archive member name: {name!r}')
     target = os.path.join(root, *parts)
-    _check_path(root, target)
+    _check_path(root, target, replacing)
     return target
 
 
