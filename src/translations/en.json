@@ -4804,8 +4804,6 @@
     "noLudusaviTool": "Ludusavi Sidecar is Required",
     "noLudusaviToolDesc": "Ludusavi is required to use the backup/restore feature on Ascendara. Clicking continue will install Ludusavi automatically.",
     "noPublicThemes": "No community themes available yet.",
-    "noTorrentTool": "Torrrent Sidecar is Required",
-    "noTorrentToolDesc": "The torrent sidecar is required to use the torrent feature on Ascendara. Clicking continue will install the Torrent Sidecar automatically.",
     "notifications": "Desktop Notifications",
     "notificationsDescription": "Send desktop notifications for downloads and index refreshing.",
     "onlyWindowsSupported": "Only Windows is supported for now",

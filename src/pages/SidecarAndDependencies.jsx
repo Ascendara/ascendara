@@ -53,6 +53,7 @@ const ALL_SIDECARS = [
     id: "torrent",
     name: "Torrent Handler",
     description: "Download and manage torrents",
+    builtIn: true,
     source:
       "https://github.com/Ascendara/ascendara/tree/main/binaries/AscendaraTorrentHandler/src",
   },

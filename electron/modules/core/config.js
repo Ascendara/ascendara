@@ -142,7 +142,6 @@ function getLudusaviPath() {
 
 // Tool executables mapping
 const toolExecutables = {
-  torrent: isWindows ? "AscendaraTorrentHandler.exe" : "AscendaraTorrentHandler",
   translator: isWindows
     ? "AscendaraLanguageTranslation.exe"
     : "AscendaraLanguageTranslation",

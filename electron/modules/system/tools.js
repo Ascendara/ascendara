@@ -40,7 +40,10 @@ function checkInstalledTools() {
 
     if (fs.existsSync(TIMESTAMP_FILE)) {
       const timestampData = JSON.parse(fs.readFileSync(TIMESTAMP_FILE, "utf8"));
-      installedTools = timestampData.installedTools || [];
+      // "torrent" may still be recorded from before the handler was bundled
+      installedTools = (timestampData.installedTools || []).filter(tool =>
+        Object.hasOwn(toolExecutables, tool)
+      );
       console.log("Installed tools:", installedTools);
 
       const missingTools = installedTools.filter(
@@ -80,7 +83,6 @@ async function installTool(tool) {
   }
   console.log(`Installing ${tool}`);
   const toolUrls = {
-    torrent: "https://cdn.ascendara.app/files/AscendaraTorrentHandler.exe",
     translator: "https://cdn.ascendara.app/files/AscendaraLanguageTranslation.exe",
     ludusavi: isWindows
       ? "https://cdn.ascendara.app/files/ludusavi.exe"
@@ -127,18 +129,27 @@ async function installTool(tool) {
  * @returns {string[]} - Array of installed tool names
  */
 function getInstalledTools() {
+  // The torrent handler ships with the app, so it is never downloaded as a tool
+  const tools = listInstalledTools();
+  if (isDev || fs.existsSync(getHelperPath("AscendaraTorrentHandler"))) {
+    tools.push("torrent");
+  }
+  return tools;
+}
+
+function listInstalledTools() {
   if (isMac) {
-    const tools = ["translator", "torrent"].filter(tool =>
+    const tools = ["translator"].filter(tool =>
       fs.existsSync(getHelperPath(toolExecutables[tool]))
     );
     if (require("../core/config").getLudusaviPath()) tools.push("ludusavi");
     return tools;
   }
   if (isWindows && !isDev) {
-    return installedTools;
+    return [...installedTools];
   } else if (!isWindows) {
     const { unixConfigDir: linuxConfigDir } = require("../core/config");
-    const tools = ["translator", "torrent"];
+    const tools = ["translator"];
 
     // verify ludusavi
     if (fs.existsSync(path.join(linuxConfigDir, "ludusavi"))) {
@@ -146,7 +157,7 @@ function getInstalledTools() {
     }
     return tools;
   } else {
-    return ["translator", "torrent", "ludusavi"];
+    return ["translator", "ludusavi"];
   }
 }
 
@@ -163,7 +174,6 @@ function registerToolHandlers() {
     console.log(`Installing ${tool}`);
 
     const toolUrls = {
-      torrent: "https://cdn.ascendara.app/files/AscendaraTorrentHandler.exe",
       translator: "https://cdn.ascendara.app/files/AscendaraLanguageTranslation.exe",
       ludusavi: isWindows
         ? "https://cdn.ascendara.app/files/ludusavi.exe"
