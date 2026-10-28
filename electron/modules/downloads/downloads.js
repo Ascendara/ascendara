@@ -12,7 +12,6 @@ const {
   isDev,
   isWindows,
   TIMESTAMP_FILE,
-  appDirectory,
   getPythonPath,
   getHelperPath,
 } = require("../core/config");
@@ -469,11 +468,28 @@ function registerDownloadHandlers() {
         const settings = settingsManager.getSettings();
         let targetDirectory;
         let gameDirectory;
+        let createdGameDirectory = false;
         const sanitizedGame = sanitizeGameName(sanitizeText(game));
         if (!sanitizedGame || sanitizedGame === "." || sanitizedGame === "..") {
           throw new Error("Invalid game name.");
         }
         console.log(`Sanitized game name: ${sanitizedGame}`);
+
+        const linkStr = typeof link === "string" ? link.trim().toLowerCase() : "";
+        const isMagnetLink = linkStr.startsWith("magnet:");
+        const isDotTorrentFile = linkStr.split("?")[0].endsWith(".torrent");
+        const isTorrentLink = isMagnetLink || isDotTorrentFile;
+
+        // Check the helper before touching the download folder. Antivirus often
+        // quarantines it, and starting anyway leaves a folder holding only artwork.
+        const helperPath = getHelperPath(
+          isTorrentLink ? "AscendaraTorrentHandler" : "AscendaraDownloader"
+        );
+        if (!isDev && !fs.existsSync(helperPath)) {
+          const error = `${path.basename(helperPath)} is missing from ${path.dirname(helperPath)}. Your antivirus may have quarantined it; restore it or reinstall Ascendara.`;
+          console.error(error);
+          return { success: false, error, code: "HELPER_MISSING" };
+        }
 
         // If it's an update flow, search for existing game directory
         if (updateFlow) {
@@ -544,13 +560,9 @@ function registerDownloadHandlers() {
             }
           }
 
+          createdGameDirectory = !fs.existsSync(gameDirectory);
           await fs.promises.mkdir(gameDirectory, { recursive: true });
         }
-
-        const linkStr = typeof link === "string" ? link.trim().toLowerCase() : "";
-        const isMagnetLink = linkStr.startsWith("magnet:");
-        const isDotTorrentFile = linkStr.split("?")[0].endsWith(".torrent");
-        const isTorrentLink = isMagnetLink || isDotTorrentFile;
 
         let updatePrepared = false;
         let previousGameInfo = null;
@@ -653,18 +665,7 @@ function registerDownloadHandlers() {
           let spawnCommand;
 
           if (isWindows) {
-            executablePath = isDev
-              ? path.join(
-                  isTorrentLink
-                    ? "./binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler.exe"
-                    : "./binaries/AscendaraDownloader/dist/AscendaraDownloader.exe"
-                )
-              : path.join(
-                  appDirectory,
-                  isTorrentLink
-                    ? "/resources/AscendaraTorrentHandler.exe"
-                    : "/resources/AscendaraDownloader.exe"
-                );
+            executablePath = helperPath;
 
             spawnCommand = isTorrentLink
               ? [
@@ -725,10 +726,7 @@ function registerDownloadHandlers() {
                     gameID || "",
                   ];
             } else {
-              executablePath = path.join(
-                process.resourcesPath,
-                isTorrentLink ? "AscendaraTorrentHandler" : "AscendaraDownloader"
-              );
+              executablePath = helperPath;
               spawnCommand = isTorrentLink
                 ? [
                     link,
@@ -889,6 +887,15 @@ function registerDownloadHandlers() {
                   "Could not reset update after startup failure:",
                   restoreError
                 )
+              );
+          }
+          // A folder this attempt created holds nothing but artwork, so it would
+          // only show up as a broken game.
+          if (createdGameDirectory && !downloadProcesses.has(sanitizedGame)) {
+            await fs
+              .remove(gameDirectory)
+              .catch(removeError =>
+                console.error("Could not remove unused game folder:", removeError)
               );
           }
           console.error("Error in download-file handler:", error);
@@ -1438,9 +1445,7 @@ function registerDownloadHandlers() {
     try {
       const { metadata, info } = await extractionTarget(game);
       let executable = isWindows
-        ? isDev
-          ? path.resolve("binaries/AscendaraDownloader/dist/AscendaraDownloader.exe")
-          : path.join(appDirectory, "resources/AscendaraDownloader.exe")
+        ? getHelperPath("AscendaraDownloader")
         : isDev
           ? getPythonPath()
           : path.join(process.resourcesPath, "AscendaraDownloader");

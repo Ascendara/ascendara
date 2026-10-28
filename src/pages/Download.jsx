@@ -1526,7 +1526,7 @@ function PublicDownloadPage() {
     try {
       const isVrGame = gameData.category?.includes("Virtual Reality");
 
-      await window.electron.downloadFile(
+      const result = await window.electron.downloadFile(
         urlToUse,
         sanitizedGameName,
         gameData.online || false,
@@ -1541,6 +1541,17 @@ function PublicDownloadPage() {
         downloadProvider === "direct",
         gameData.browserAssetGameId
       );
+      if (result?.success === false) {
+        console.error("[Download] Download did not start:", result.error);
+        toast.error(
+          result.code === "HELPER_MISSING"
+            ? t("download.toast.downloaderMissing")
+            : `${t("download.toast.downloadFailed")}: ${result.error}`
+        );
+        setIsStartingDownload(false);
+        clearDownloadLock();
+        return;
+      }
 
       // Notify webapp that download started immediately
       console.log("[Download] Download initiated! Calling notifyDownloadStart");
