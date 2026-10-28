@@ -36,11 +36,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import EarnedBadges, {
-  ContributorBadge,
-  OwnerBadge,
-  VerifiedBadge,
-} from "@/components/EarnedBadges";
+import EarnedBadges from "@/components/EarnedBadges";
 
 export default function UserProfileSection({
   handleBackFromProfile,
@@ -144,13 +140,6 @@ export default function UserProfileSection({
                     <h1 className="truncate text-3xl font-bold">
                       {viewingProfile.displayName}
                     </h1>
-                    {viewingProfile.owner && <OwnerBadge className="mb-2 h-7 w-7" />}
-                    {viewingProfile.contributor && (
-                      <ContributorBadge className="mb-2 h-7 w-7" />
-                    )}
-                    {viewingProfile.verified && (
-                      <VerifiedBadge className="mb-2 h-7 w-7" />
-                    )}
                     <EarnedBadges user={viewingProfile} className="mb-2 h-7 w-7" />
                   </div>
 

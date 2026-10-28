@@ -354,6 +354,7 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
                   verified: userData?.verified === true,
                   bugCatcher: userData?.bugCatcher === true,
                   reviewCount: userData?.reviewCount,
+                  discordLinked: Boolean(userData?.socials?.linkedDiscord),
                   level: userData?.profileStats?.level,
                 },
                 cardBackground: previewUrl,

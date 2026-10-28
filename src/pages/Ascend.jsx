@@ -36,7 +36,6 @@ import AscendWelcomeTour from "./ascend/AscendWelcomeTour";
 const HomeSection = lazy(() => import("./ascend/HomeSection"));
 const SearchSection = lazy(() => import("./ascend/SearchSection"));
 const FriendsSection = lazy(() => import("./ascend/FriendsSection"));
-const RequestsSection = lazy(() => import("./ascend/RequestsSection"));
 const MessagesSection = lazy(() => import("./ascend/MessagesSection"));
 const NotificationsSection = lazy(() => import("./ascend/NotificationsSection"));
 const ReportsSection = lazy(() => import("./ascend/ReportsSection"));
@@ -676,14 +675,6 @@ const Ascend = () => {
               handleViewProfile={handleViewProfile}
               handleStartConversation={handleStartConversation}
               handleRemoveFriend={handleRemoveFriend}
-            />
-          );
-
-        case "requests":
-          return (
-            <RequestsSection
-              t={t}
-              setActiveSection={setActiveSection}
               incomingRequests={incomingRequests}
               outgoingRequests={outgoingRequests}
               loadingRequests={loadingRequests}

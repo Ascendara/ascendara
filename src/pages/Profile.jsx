@@ -60,11 +60,7 @@ import {
   Trophy,
   Upload,
 } from "lucide-react";
-import EarnedBadges, {
-  ContributorBadge,
-  OwnerBadge,
-  VerifiedBadge,
-} from "@/components/EarnedBadges";
+import EarnedBadges from "@/components/EarnedBadges";
 
 const VUS = ["online", "away", "busy", "invisible"];
 
@@ -1212,9 +1208,6 @@ const Profile = () => {
               </h1>
               {IsAscendUser ? (
                 <>
-                  {UserData?.owner && <OwnerBadge className="h-5 w-5" />}
-                  {UserData?.contributor && <ContributorBadge className="h-5 w-5" />}
-                  {UserData?.verified && <VerifiedBadge className="h-5 w-5" />}
                   <EarnedBadges user={UserData} className="h-5 w-5" />
                 </>
               ) : (

@@ -1,4 +1,3 @@
-import SectionHeader from "./SectionHeader";
 import { EmptyState } from "./primitives";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -14,11 +13,7 @@ import {
   Star,
   Award,
 } from "lucide-react";
-import EarnedBadges, {
-  ContributorBadge,
-  OwnerBadge,
-  VerifiedBadge,
-} from "@/components/EarnedBadges";
+import EarnedBadges from "@/components/EarnedBadges";
 
 export default function LeaderboardSection({
   leaderboardData,
@@ -39,27 +34,23 @@ export default function LeaderboardSection({
   };
   return (
     <div className="mb-12 space-y-6">
-      <SectionHeader
-        icon={Trophy}
-        title={t("ascend.leaderboard.title")}
-        description={t("ascend.leaderboard.subtitle", {
-          defaultValue: "Top players in the Ascendara community",
-        })}
-        actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadLeaderboard}
-            disabled={loadingLeaderboard}
-            className="gap-2 rounded-xl"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${loadingLeaderboard ? "animate-spin" : ""}`}
-            />
-            {t("ascend.leaderboard.refresh", { defaultValue: "Refresh" })}
-          </Button>
-        }
-      />
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-muted-foreground">
+          {t("ascend.leaderboard.subtitle", {
+            defaultValue: "Top players in the Ascendara community",
+          })}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={loadLeaderboard}
+          disabled={loadingLeaderboard}
+          className="shrink-0 gap-2 rounded-xl"
+        >
+          <RefreshCw className={`h-4 w-4 ${loadingLeaderboard ? "animate-spin" : ""}`} />
+          {t("ascend.leaderboard.refresh", { defaultValue: "Refresh" })}
+        </Button>
+      </div>
 
       {loadingLeaderboard ? (
         <div className="flex flex-col items-center justify-center py-20">
@@ -143,9 +134,6 @@ export default function LeaderboardSection({
                     <h2 className="mb-0 truncate text-base font-semibold transition-colors group-hover:text-primary">
                       {player.displayName}
                     </h2>
-                    {player.owner && <OwnerBadge className="h-4 w-4" />}
-                    {player.contributor && <ContributorBadge className="h-4 w-4" />}
-                    {player.verified && <VerifiedBadge className="h-4 w-4" />}
                     <EarnedBadges user={player} className="h-4 w-4" />
                   </div>
                   <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
@@ -223,11 +211,6 @@ export default function LeaderboardSection({
                         <h3 className="truncate text-[15px] font-semibold">
                           {user.displayName}
                         </h3>
-                        {user.owner && <OwnerBadge className="h-[18px] w-[18px]" />}
-                        {user.contributor && (
-                          <ContributorBadge className="h-[18px] w-[18px]" />
-                        )}
-                        {user.verified && <VerifiedBadge className="h-[18px] w-[18px]" />}
                         <EarnedBadges user={user} className="h-[18px] w-[18px]" />
                       </div>
                       <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">

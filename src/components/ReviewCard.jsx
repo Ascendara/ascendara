@@ -7,11 +7,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/LanguageContext";
-import EarnedBadges, {
-  ContributorBadge,
-  OwnerBadge,
-  VerifiedBadge,
-} from "@/components/EarnedBadges";
+import EarnedBadges from "@/components/EarnedBadges";
 
 // "#rrggbb" -> "r g b", the format the theme's color variables use
 const toThemeColor = hex =>
@@ -144,13 +140,6 @@ export default function ReviewCard({ review, username, isGuest, liked, onLike })
             <p className="break-words text-sm font-semibold text-foreground">
               {username}
             </p>
-            {badges.owner && <OwnerBadge className="h-4 w-4" style={iconHaloStyle} />}
-            {badges.contributor && (
-              <ContributorBadge className="h-4 w-4" style={iconHaloStyle} />
-            )}
-            {badges.verified && (
-              <VerifiedBadge className="h-4 w-4" style={iconHaloStyle} />
-            )}
             <EarnedBadges user={badges} className="h-4 w-4" style={iconHaloStyle} />
             {isGuest && (
               <TooltipProvider>

@@ -347,6 +347,8 @@
       },
       "contributor": "Contributor",
       "contributorDescription": "Helped build Ascendara",
+      "discord": "Discord Linked",
+      "discordDescription": "Connected a Discord account to Ascend",
       "levelMilestone": "{{tier}} Milestone",
       "levelMilestoneDescription": "Reached level {{level}}",
       "levelTiers": {
@@ -501,7 +503,8 @@
       },
       "search": "Search communities...",
       "title": "Communities",
-      "yourCommunities": "Your Communities"
+      "yourCommunities": "Your Communities",
+      "description": "Your friends, new people to meet, and the top players"
     },
     "companion": {
       "activeNow": "Active now",
@@ -601,7 +604,10 @@
       "requestSent": "Friend request sent!",
       "subtitle": "Connect and play with your friends",
       "title": "Friends",
-      "totalFriends": "Total Friends"
+      "totalFriends": "Total Friends",
+      "filterAll": "All",
+      "filterPlaceholder": "Filter friends...",
+      "noMatches": "No friends match this filter"
     },
     "homeSubtitle": "Here's what's happening in your network",
     "leaderboard": {
@@ -929,7 +935,9 @@
       "outgoing": "Sent Requests",
       "pending": "Pending",
       "title": "Friend Requests",
-      "wantsToAdd": "wants to be your friend"
+      "wantsToAdd": "wants to be your friend",
+      "sentCount_one": "{{count}} sent request pending",
+      "sentCount_other": "{{count}} sent requests pending"
     },
     "search": {
       "hint": "Search for users by their display name to view their profile, add them as friends, or start a conversation.",

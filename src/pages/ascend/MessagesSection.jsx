@@ -13,11 +13,7 @@ import {
   User,
   Users,
 } from "lucide-react";
-import EarnedBadges, {
-  ContributorBadge,
-  OwnerBadge,
-  VerifiedBadge,
-} from "@/components/EarnedBadges";
+import EarnedBadges from "@/components/EarnedBadges";
 
 const statusColors = {
   online: "bg-emerald-500",
@@ -59,9 +55,6 @@ function PersonName({ person }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="truncate">{person.displayName}</span>
-      {person.owner && <OwnerBadge className="h-3.5 w-3.5" />}
-      {person.contributor && <ContributorBadge className="h-3.5 w-3.5" />}
-      {person.verified && <VerifiedBadge className="h-3.5 w-3.5" />}
       <EarnedBadges user={person} className="h-3.5 w-3.5" />
     </span>
   );

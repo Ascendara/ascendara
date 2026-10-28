@@ -409,6 +409,66 @@ function MilestoneEmblem({
   );
 }
 
+// A Discord-linked account gets the same hexagon as the other badges, in soft
+// blurple, with a small Discord mark and a link pip in the corner so it reads
+// as "account linked" rather than as the bare logo
+const DISCORD_GLYPH =
+  "M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z";
+
+function DiscordEmblem({ className, style }) {
+  const gradientId = `discord-${useId().replace(/[^a-zA-Z0-9-_]/g, "")}`;
+  return (
+    <span
+      className={`${className} relative inline-flex shrink-0 items-center justify-center`}
+      style={style}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className="absolute inset-0 h-full w-full overflow-visible"
+        aria-hidden
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#a5b4fc" />
+            <stop offset="100%" stopColor="#5865f2" />
+          </linearGradient>
+        </defs>
+        <polygon
+          points={HEXAGON}
+          fill={`url(#${gradientId})`}
+          stroke={`url(#${gradientId})`}
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+        <polygon
+          points={HEXAGON_INNER}
+          fill="none"
+          stroke="white"
+          strokeOpacity="0.35"
+          strokeWidth="0.75"
+          strokeLinejoin="round"
+        />
+        {/* The glyph's own 24-unit box, shrunk onto the hexagon's center */}
+        <svg x="6.25" y="6" width="11.5" height="11.5" viewBox="0 0 24 24">
+          <path d={DISCORD_GLYPH} fill="white" />
+        </svg>
+        {/* Link pip: two chain loops on a white disc at the lower right */}
+        <circle cx="19" cy="18.5" r="4" fill="white" stroke="#5865f2" strokeWidth="0.8" />
+        <g
+          fill="none"
+          stroke="#5865f2"
+          strokeWidth="1.1"
+          strokeLinecap="round"
+          transform="rotate(-45 19 18.5)"
+        >
+          <rect x="15.9" y="17.3" width="3.6" height="2.4" rx="1.2" />
+          <rect x="18.5" y="17.3" width="3.6" height="2.4" rx="1.2" />
+        </g>
+      </svg>
+    </span>
+  );
+}
+
 // Badges given out by hand, with the colors their emblems share everywhere
 const OWNER_BADGE = { field: "owner", icon: Crown, colors: ["#facc15", "#ca8a04"] };
 const CONTRIBUTOR_BADGE = {
@@ -422,8 +482,19 @@ const VERIFIED_BADGE = {
   colors: ["#60a5fa", "#2563eb"],
 };
 
+const DISCORD_BADGE = { field: "discord", emblem: DiscordEmblem };
+
+// Lists hand over a discordLinked flag; full user docs keep the linked name
+const hasDiscordLinked = user =>
+  Boolean(user?.discordLinked || user?.socials?.linkedDiscord);
+
 // The special badges the catalog lists. Owner stays out since nobody can earn it.
-const CATALOG_BADGES = [VERIFIED_BADGE, CONTRIBUTOR_BADGE, ...EARNED_BADGES];
+const CATALOG_BADGES = [
+  VERIFIED_BADGE,
+  CONTRIBUTOR_BADGE,
+  DISCORD_BADGE,
+  ...EARNED_BADGES,
+];
 
 // Which catalog entry a clicked badge points at
 const CATALOG_SECTIONS = {
@@ -604,18 +675,22 @@ function BadgeCatalogDialog({ open, onOpenChange, highlight, user }) {
           initial={reduceMotion ? false : "hidden"}
           animate="show"
         >
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {CATALOG_BADGES.map(badge => (
               <motion.div
                 key={badge.field}
                 variants={listItem}
                 className={`flex flex-col items-center rounded-xl border p-4 text-center transition-colors ${section === badge.field ? "border-primary/50 bg-primary/5" : "border-border/60 bg-muted/30"}`}
               >
-                <BadgeEmblem
-                  icon={badge.icon}
-                  colors={badge.colors}
-                  className="h-11 w-11"
-                />
+                {badge.emblem ? (
+                  <badge.emblem className="h-11 w-11" />
+                ) : (
+                  <BadgeEmblem
+                    icon={badge.icon}
+                    colors={badge.colors}
+                    className="h-11 w-11"
+                  />
+                )}
                 <p className="mt-2 text-sm font-semibold">
                   {t(`ascend.badges.${badge.field}`)}
                 </p>
@@ -687,6 +762,7 @@ function BadgeWithTooltip({
   field,
   icon,
   colors,
+  emblem: Emblem,
   className,
   style,
   label,
@@ -700,6 +776,8 @@ function BadgeWithTooltip({
   const opensCatalog = field !== "owner";
   const emblem = renderEmblem ? (
     renderEmblem(className, style)
+  ) : Emblem ? (
+    <Emblem className={className} style={style} />
   ) : (
     <BadgeEmblem icon={icon} colors={colors} className={className} style={style} />
   );
@@ -824,56 +902,45 @@ function ReviewMilestoneBadge({ user, tier, className, style }) {
   );
 }
 
-// Badges granted by hand rather than earned, rendered where the caller checks
-// the user's flag
-function StandaloneBadge({ className = "h-4 w-4", ...badge }) {
-  return (
-    <TooltipProvider delayDuration={200}>
-      <BadgeWithTooltip {...badge} className={className} />
-    </TooltipProvider>
-  );
-}
-
-export function OwnerBadge(props) {
-  return <StandaloneBadge {...OWNER_BADGE} {...props} />;
-}
-
-export function ContributorBadge(props) {
-  return <StandaloneBadge {...CONTRIBUTOR_BADGE} {...props} />;
-}
-
-export function VerifiedBadge(props) {
-  return <StandaloneBadge {...VERIFIED_BADGE} {...props} />;
-}
-
+// Every badge a user has, in one fixed order: owner and verified first, then
+// their level, then contributor, Discord, and the earned ones
 export default function EarnedBadges({ user, className = "h-4 w-4", style }) {
   const reviewCount = Number(user?.reviewCount);
   const reviewTier =
     Number.isFinite(reviewCount) && REVIEW_TIERS.find(tier => reviewCount >= tier.count);
+  const leading = [OWNER_BADGE, VERIFIED_BADGE].filter(badge => user?.[badge.field]);
+  const handGiven = [CONTRIBUTOR_BADGE].filter(badge => user?.[badge.field]);
+  const linked = hasDiscordLinked(user) ? [DISCORD_BADGE] : [];
   const earned = EARNED_BADGES.filter(badge => user?.[badge.field] === true);
   const hasLevelMilestone = !user?.private && getLevel(user) >= 10;
-  if (!earned.length && !hasLevelMilestone && !reviewTier) return null;
+  if (
+    !leading.length &&
+    !hasLevelMilestone &&
+    !handGiven.length &&
+    !linked.length &&
+    !reviewTier &&
+    !earned.length
+  ) {
+    return null;
+  }
 
+  const badgeProps = { user, className, style };
   return (
     <TooltipProvider delayDuration={200}>
-      <LevelMilestoneBadge user={user} className={className} style={style} />
-      {reviewTier && (
-        <ReviewMilestoneBadge
-          user={user}
-          tier={reviewTier}
-          className={className}
-          style={style}
-        />
-      )}
-      {earned.map(badge => (
-        <BadgeWithTooltip
-          key={badge.field}
-          {...badge}
-          user={user}
-          className={className}
-          style={style}
-        />
-      ))}
+      {/* One tight group, so the row's own gap only separates it from the name */}
+      <span className="inline-flex shrink-0 items-center gap-0.5">
+        {leading.map(badge => (
+          <BadgeWithTooltip key={badge.field} {...badge} {...badgeProps} />
+        ))}
+        <LevelMilestoneBadge {...badgeProps} />
+        {[...handGiven, ...linked].map(badge => (
+          <BadgeWithTooltip key={badge.field} {...badge} {...badgeProps} />
+        ))}
+        {reviewTier && <ReviewMilestoneBadge tier={reviewTier} {...badgeProps} />}
+        {earned.map(badge => (
+          <BadgeWithTooltip key={badge.field} {...badge} {...badgeProps} />
+        ))}
+      </span>
     </TooltipProvider>
   );
 }

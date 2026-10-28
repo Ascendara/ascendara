@@ -1,5 +1,4 @@
 import { useState } from "react";
-import SectionHeader from "./SectionHeader";
 import { EmptyState, Panel } from "./primitives";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -17,12 +16,9 @@ import {
   Globe,
   UserCheck,
   Inbox,
+  Star,
 } from "lucide-react";
-import EarnedBadges, {
-  ContributorBadge,
-  OwnerBadge,
-  VerifiedBadge,
-} from "@/components/EarnedBadges";
+import EarnedBadges from "@/components/EarnedBadges";
 
 export default function SearchSection({
   t,
@@ -38,48 +34,40 @@ export default function SearchSection({
   const [submittedQuery, setSubmittedQuery] = useState(null);
   return (
     <div className="mb-20 space-y-6">
-      <SectionHeader
-        icon={Search}
-        title={t("ascend.search.title")}
-        description={t("ascend.search.subtitle", {
-          defaultValue: "Find and connect with other players",
-        })}
+      <form
+        onSubmit={e => {
+          e.preventDefault();
+          if (isSearching || !searchQuery.trim()) return;
+          setSubmittedQuery(searchQuery.trim());
+          handleSearch();
+        }}
+        className="flex flex-wrap gap-3"
       >
-        <form
-          onSubmit={e => {
-            e.preventDefault();
-            if (isSearching || !searchQuery.trim()) return;
-            setSubmittedQuery(searchQuery.trim());
-            handleSearch();
-          }}
-          className="flex flex-wrap gap-3"
+        <div className="relative min-w-48 flex-1">
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            aria-label={t("ascend.search.placeholder")}
+            placeholder={t("ascend.search.placeholder")}
+            className="h-11 rounded-xl border-border/50 bg-card/60 pl-12"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <Button
+          type="submit"
+          disabled={isSearching || !searchQuery.trim()}
+          className="h-11 rounded-xl px-6 text-secondary"
         >
-          <div className="relative min-w-48 flex-1">
-            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              aria-label={t("ascend.search.placeholder")}
-              placeholder={t("ascend.search.placeholder")}
-              className="h-11 rounded-xl border-border/50 bg-card/60 pl-12"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <Button
-            type="submit"
-            disabled={isSearching || !searchQuery.trim()}
-            className="h-11 rounded-xl px-6 text-secondary"
-          >
-            {isSearching ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <>
-                <Search className="mr-2 h-4 w-4" />
-                {t("ascend.search.search")}
-              </>
-            )}
-          </Button>
-        </form>
-      </SectionHeader>
+          {isSearching ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <>
+              <Search className="mr-2 h-4 w-4" />
+              {t("ascend.search.search")}
+            </>
+          )}
+        </Button>
+      </form>
 
       {/* Search Results */}
       {isSearching ? (
@@ -167,15 +155,7 @@ export default function SearchSection({
                             {result.displayName}
                           </button>
                         </h3>
-                        {result.owner && <OwnerBadge className="h-4 w-4" />}
-                        {result.contributor && <ContributorBadge className="h-4 w-4" />}
-                        {result.verified && <VerifiedBadge className="h-4 w-4" />}
                         <EarnedBadges user={result} className="h-4 w-4" />
-                        {!result.private && result.level > 1 && (
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                            Lv. {result.level}
-                          </span>
-                        )}
                         {result.private && (
                           <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                             <LockIcon className="h-3 w-3" />
@@ -193,28 +173,15 @@ export default function SearchSection({
 
                       {/* Stats Row */}
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1.5">
-                          <div
-                            className={`h-2 w-2 rounded-full ${
-                              result.status === "online"
-                                ? "bg-green-500"
-                                : result.status === "away"
-                                  ? "bg-yellow-500"
-                                  : result.status === "busy"
-                                    ? "bg-red-500"
-                                    : "bg-gray-500"
-                            }`}
-                          />
-                          <span className="capitalize">
-                            {result.status === "online"
-                              ? t("ascend.status.online")
-                              : result.status === "away"
-                                ? t("ascend.status.away")
-                                : result.status === "busy"
-                                  ? t("ascend.status.busy")
-                                  : t("ascend.status.offline")}
-                          </span>
-                        </div>
+                        {!result.private && result.level > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <Star className="h-3.5 w-3.5" />
+                            <span>
+                              {t("ascend.profile.level", { defaultValue: "Level" })}{" "}
+                              {result.level}
+                            </span>
+                          </div>
+                        )}
                         {!result.private && result.totalPlaytime > 0 && (
                           <div className="flex items-center gap-1.5">
                             <Clock className="h-3.5 w-3.5" />

@@ -31,19 +31,14 @@ import { subscribeToUserStatus } from "@/services/firebase/firebaseService";
 import { setUserOnlineStatus } from "@/services/ascend/ascendStatusService";
 import { toast } from "sonner";
 import DiscordIcon from "@/pages/ascend/DiscordIcon";
-import EarnedBadges, {
-  ContributorBadge,
-  OwnerBadge,
-  VerifiedBadge,
-} from "@/components/EarnedBadges";
+import EarnedBadges from "@/components/EarnedBadges";
 
 const DiscordOutlineIcon = props => <DiscordIcon {...props} outline />;
 
-// Friends, requests, people search and the leaderboard share one tabbed
-// Community page, so they count as a single destination here
+// Friends (with their requests), people search and the leaderboard share one
+// tabbed Community page, so they count as a single destination here
 const COMMUNITY_SECTIONS = [
   "friends",
-  "requests",
   "search",
   "leaderboard",
   "userProfile",
@@ -277,9 +272,6 @@ const AscendNavBar = ({
               <DropdownMenuLabel className="font-normal">
                 <p className="flex items-center gap-1 truncate text-sm font-semibold">
                   {user?.displayName || "User"}
-                  {userData?.owner && <OwnerBadge className="h-3.5 w-3.5" />}
-                  {userData?.contributor && <ContributorBadge className="h-3.5 w-3.5" />}
-                  {userData?.verified && <VerifiedBadge className="h-3.5 w-3.5" />}
                   <EarnedBadges user={userData} className="h-3.5 w-3.5" />
                 </p>
                 <p className="truncate text-xs text-muted-foreground">{planTitle}</p>

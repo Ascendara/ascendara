@@ -13,11 +13,7 @@ import {
   Link2,
   Sparkle,
 } from "lucide-react";
-import EarnedBadges, {
-  ContributorBadge,
-  OwnerBadge,
-  VerifiedBadge,
-} from "@/components/EarnedBadges";
+import EarnedBadges from "@/components/EarnedBadges";
 
 export default function ProfileSettingsCard({
   t,
@@ -295,9 +291,6 @@ export default function ProfileSettingsCard({
             <div className="min-w-0 flex-1">
               <h3 className="flex items-center gap-1 truncate text-xl font-semibold">
                 {user.displayName}
-                {userData?.owner && <OwnerBadge className="mt-1 h-4 w-4" />}
-                {userData?.contributor && <ContributorBadge className="mt-1 h-4 w-4" />}
-                {userData?.verified && <VerifiedBadge className="mt-1 h-4 w-4" />}
                 <EarnedBadges user={userData} className="mt-1 h-4 w-4" />
               </h3>
               <p className="truncate text-sm text-muted-foreground">{user.email}</p>

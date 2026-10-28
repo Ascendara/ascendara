@@ -375,7 +375,8 @@ export default function HomeSection({
                 value: t("ascend.overview.friendsOnline", { count: friendsOnline }),
               },
               {
-                id: "requests",
+                id: "friendRequests",
+                section: "friends",
                 icon: UserPlus,
                 label: t("ascend.nav.requests"),
                 value: incomingRequests.length,
@@ -391,7 +392,7 @@ export default function HomeSection({
             ].map(row => (
               <button
                 key={row.id}
-                onClick={() => setActiveSection(row.id)}
+                onClick={() => setActiveSection(row.section ?? row.id)}
                 className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <row.icon className="h-4 w-4 text-muted-foreground" />
