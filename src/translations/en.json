@@ -568,8 +568,8 @@
           "title": "Subscriber channels"
         },
         "role": {
-          "description": "Get a verified role next to your name on the server.",
-          "title": "Verified role"
+          "description": "Get the Ascend role next to your name on the server.",
+          "title": "Custom role"
         },
         "support": {
           "description": "Get help from the team and community when something goes wrong.",
