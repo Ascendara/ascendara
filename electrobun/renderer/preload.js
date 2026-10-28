@@ -3,3 +3,6 @@
 
 import "./globals.js";
 import "../../electron/preload.js";
+import { hideLinkStatus } from "./hide-link-status.js";
+
+if (window.__electrobunPlatform === "windows") hideLinkStatus();

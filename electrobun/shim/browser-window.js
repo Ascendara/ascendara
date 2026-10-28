@@ -2,6 +2,7 @@
 // Only windows that ask for a preload and are not sandboxed get the IPC bridge;
 // provider, store and helper windows load with no RPC at all.
 
+import { dlopen, FFIType, ptr } from "bun:ffi";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import {
@@ -386,6 +387,33 @@ class WebContents extends EventEmitter {
   }
 }
 
+// Windows 11 rounds frameless (WS_POPUP) windows only when asked, which
+// Electron did for its frameless windows. Windows 10 ignores the request.
+const DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+const DWMWCP_ROUND = 2;
+let dwmapi;
+
+function roundWindowCorners(hwnd) {
+  if (process.platform !== "win32" || !hwnd) return;
+  try {
+    dwmapi ??= dlopen("dwmapi.dll", {
+      DwmSetWindowAttribute: {
+        args: [FFIType.ptr, FFIType.u32, FFIType.ptr, FFIType.u32],
+        returns: FFIType.i32,
+      },
+    });
+    const preference = new Int32Array([DWMWCP_ROUND]);
+    dwmapi.symbols.DwmSetWindowAttribute(
+      hwnd,
+      DWMWA_WINDOW_CORNER_PREFERENCE,
+      ptr(preference),
+      4
+    );
+  } catch (error) {
+    console.warn("[Electrobun] Could not round window corners:", error.message);
+  }
+}
+
 const allClosedListeners = new Set();
 
 export function onAllWindowsClosed(listener) {
@@ -524,6 +552,7 @@ export class BrowserWindow extends EventEmitter {
     });
     this._eb.on("move", () => this.emit("move"));
 
+    if (options.frame === false) roundWindowCorners(this._eb.ptr);
     if (options.alwaysOnTop) this._eb.setAlwaysOnTop(true);
     if (options.fullscreen || options.simpleFullscreen) this._eb.setFullScreen(true);
     if (options.show !== false) {
