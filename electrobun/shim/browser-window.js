@@ -112,6 +112,43 @@ class DownloadItem extends EventEmitter {
   }
 }
 
+// Navigation events carry the URL as a plain string on macOS, but Electrobun's
+// native layers can also send JSON ({"url": ..., "allowed": ...}). Anything that
+// is not a parseable URL is ignored so it can never stand in for the page URL
+// that IPC trust is checked against.
+let warnedEventFormat = false;
+
+// The webview's own placeholder pages, which can report in after the real
+// page has started loading and must not replace its URL.
+function isPlaceholderUrl(url) {
+  return (
+    url === "about:blank" || url.startsWith("views://internal") || url.startsWith("data:")
+  );
+}
+
+function navigationUrl(detail) {
+  let value = detail;
+  if (typeof value === "string" && value.trim().startsWith("{")) {
+    try {
+      value = JSON.parse(value);
+    } catch {}
+  }
+  if (value && typeof value === "object") value = value.url;
+  if (typeof value !== "string" || !value) return "";
+  try {
+    return new URL(value).href;
+  } catch {
+    if (!warnedEventFormat) {
+      warnedEventFormat = true;
+      console.warn(
+        "[Electrobun] Unrecognised navigation event detail:",
+        JSON.stringify(detail)
+      );
+    }
+    return "";
+  }
+}
+
 class WebContents extends EventEmitter {
   constructor(owner, session) {
     super();
@@ -266,7 +303,8 @@ class WebContents extends EventEmitter {
 
   _attach(view) {
     view.on("will-navigate", event => {
-      const url = typeof event.data?.detail === "string" ? event.data.detail : "";
+      const url = navigationUrl(event.data?.detail);
+      if (!url) return;
       this._lastNavigationUrl = url;
       const navEvent = makeEvent({ url });
       this.emit("will-navigate", navEvent, url);
@@ -278,33 +316,30 @@ class WebContents extends EventEmitter {
       // Leaving the current origin drops IPC trust at once: the bridge exists
       // on every page in this view, and did-navigate may arrive after the new
       // page's scripts start.
-      try {
-        if (new URL(url).origin !== this.mainFrame.origin) this._url = url;
-      } catch {
-        this._url = url;
-      }
+      if (new URL(url).origin !== this.mainFrame.origin) this._url = url;
     });
     view.on("did-navigate", event => {
-      const url = typeof event.data?.detail === "string" ? event.data.detail : this._url;
+      const url = navigationUrl(event.data?.detail) || this._url;
       // Electrobun cannot cancel a navigation from Bun, so undo a vetoed one.
       if (this._blockedUrl && url === this._blockedUrl) {
         this._blockedUrl = null;
         if (this._lastAllowedUrl) this._view.loadURL(this._lastAllowedUrl);
         return;
       }
+      if (isPlaceholderUrl(url) && this._url) return;
       this._url = url;
       this._lastAllowedUrl = url;
       this.emit("did-navigate", makeEvent(), url, 200, "OK");
     });
     view.on("did-navigate-in-page", event => {
-      const url = typeof event.data?.detail === "string" ? event.data.detail : this._url;
+      const url = navigationUrl(event.data?.detail) || this._url;
+      if (isPlaceholderUrl(url) && this._url) return;
       this._url = url;
       this.emit("did-navigate-in-page", makeEvent(), url, true);
     });
     view.on("dom-ready", event => {
-      const url = typeof event.data?.detail === "string" ? event.data.detail : "";
-      if (url && url !== "about:blank" && !url.startsWith("views://internal"))
-        this._url = url;
+      const url = navigationUrl(event.data?.detail);
+      if (url && !isPlaceholderUrl(url)) this._url = url;
       this._loading = false;
       this.emit("dom-ready", makeEvent());
       this.emit("did-stop-loading");
