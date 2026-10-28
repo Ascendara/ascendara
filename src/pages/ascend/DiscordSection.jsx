@@ -108,11 +108,11 @@ export default function DiscordSection({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span
-                  className={`h-2.5 w-2.5 rounded-full ${
+                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${
                     isConnected ? "bg-green-500" : "bg-muted-foreground/50"
                   }`}
                 />
-                <h2 className="text-lg font-semibold">
+                <h2 className="mb-0 text-lg font-semibold">
                   {isConnected
                     ? t("ascend.discord.connected")
                     : t("ascend.discord.notConnected")}
