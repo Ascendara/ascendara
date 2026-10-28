@@ -72,3 +72,5 @@ binaries/AscendaraDownloader/src/AscendaraDownloader_OLD.py
 __pycache__/
 /electron/assets/
 /electron/index.html
+/.electrobun
+/.hutch
