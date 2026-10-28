@@ -1,8 +1,10 @@
 // dialog, shell, screen, Tray, Menu, nativeImage, Notification and clipboard.
 
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import crypto from "node:crypto";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { Screen, Tray as EBTray, Utils } from "electrobun/main";
 
@@ -272,12 +274,63 @@ export class Menu {
   }
 }
 
+// The macOS status item takes its width from the image's natural size, so a
+// full-size .icns or 512px PNG stretches across the menu bar. Hand it an
+// 18pt image at 2x instead.
+const MENU_BAR_POINTS = 18;
+
+function menuBarImage(imagePath) {
+  if (process.platform !== "darwin" || !imagePath || !fs.existsSync(imagePath))
+    return imagePath;
+  const stat = fs.statSync(imagePath);
+  const key = crypto
+    .createHash("sha1")
+    .update(`${imagePath}:${stat.size}:${stat.mtimeMs}`)
+    .digest("hex");
+  const target = path.join(os.tmpdir(), `ascendara-tray-${key.slice(0, 12)}.png`);
+  if (!fs.existsSync(target)) {
+    const pixels = String(MENU_BAR_POINTS * 2);
+    try {
+      execFileSync(
+        "sips",
+        [
+          "-s",
+          "format",
+          "png",
+          "-z",
+          pixels,
+          pixels,
+          "-s",
+          "dpiWidth",
+          "144",
+          "-s",
+          "dpiHeight",
+          "144",
+          imagePath,
+          "--out",
+          target,
+        ],
+        { stdio: "ignore" }
+      );
+    } catch {
+      return imagePath;
+    }
+  }
+  return target;
+}
+
 export class Tray extends EventEmitter {
   constructor(image) {
     super();
-    const imagePath = typeof image === "string" ? image : image?._path || "";
+    const imagePath = menuBarImage(
+      typeof image === "string" ? image : image?._path || ""
+    );
     const size =
-      typeof image === "object" && image?._size ? image._size : { width: 16, height: 16 };
+      process.platform === "darwin"
+        ? { width: MENU_BAR_POINTS, height: MENU_BAR_POINTS }
+        : typeof image === "object" && image?._size
+          ? image._size
+          : { width: 16, height: 16 };
     this._actions = new Map();
     this._lastClick = 0;
     this._eb = new EBTray({ image: imagePath, template: false, ...size });
@@ -308,7 +361,9 @@ export class Tray extends EventEmitter {
   }
 
   setImage(image) {
-    this._eb.setImage(typeof image === "string" ? image : image?._path || "");
+    this._eb.setImage(
+      menuBarImage(typeof image === "string" ? image : image?._path || "")
+    );
   }
 
   destroy() {

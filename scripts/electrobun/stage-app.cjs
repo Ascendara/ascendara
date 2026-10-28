@@ -123,12 +123,18 @@ function stageResources(resourcesDir) {
   }
 }
 
-// Electrobun wants a .iconset folder for macOS; build one from the PNG logos.
+// Electrobun wants a .iconset folder for macOS. Build every size from the
+// 1024px image in the shipped macOS icon (the rounded-square artwork).
 function stageMacIconset() {
   const iconset = path.join(ROOT, ".electrobun", "icon.iconset");
+  const extracted = path.join(ROOT, ".electrobun", "icns.iconset");
   fs.rmSync(iconset, { recursive: true, force: true });
+  fs.rmSync(extracted, { recursive: true, force: true });
   fs.mkdirSync(iconset, { recursive: true });
-  const source = path.join(ROOT, "readme", "logo", "png", "ascendara_1024x.png");
+  execFileSync("iconutil", ["-c", "iconset", path.join(ROOT, "readme", "logo", "icns", "icon.icns"), "-o", extracted], {
+    stdio: "ignore",
+  });
+  const source = path.join(extracted, "icon_512x512@2x.png");
   for (const size of [16, 32, 128, 256, 512]) {
     for (const scale of [1, 2]) {
       const pixels = size * scale;
@@ -138,6 +144,7 @@ function stageMacIconset() {
       });
     }
   }
+  fs.rmSync(extracted, { recursive: true, force: true });
 }
 
 function stagePackaged() {
