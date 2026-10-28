@@ -238,22 +238,16 @@ const checkTrainerSupport = async gameName => {
       return result;
     }
 
-    // Find best match
+    // Search results can mention the game only in their body. Require a title
+    // match rather than falling back to an unrelated result or a sequel.
     const normalizedSearch = normalizeGameName(gameName);
-    let bestMatch = trainers[0];
-
-    for (const trainer of trainers) {
-      const normalizedName = normalizeGameName(trainer.name);
-      if (normalizedName === normalizedSearch) {
-        bestMatch = trainer;
-        break;
-      }
-      if (
-        normalizedName.includes(normalizedSearch) ||
-        normalizedSearch.includes(normalizedName)
-      ) {
-        bestMatch = trainer;
-      }
+    const bestMatch = trainers.find(
+      trainer => normalizedSearch && normalizeGameName(trainer.name) === normalizedSearch
+    );
+    if (!bestMatch) {
+      const result = { supported: false, trainerData: null };
+      trainerCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      return result;
     }
 
     // Fetch trainer details to get download link

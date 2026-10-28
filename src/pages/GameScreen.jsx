@@ -2100,11 +2100,16 @@ function InstalledGameScreen() {
 
   // Check FLiNG Trainer support for the game
   useEffect(() => {
+    let cancelled = false;
+    setSupportsFlingTrainer(false);
+    setFlingTrainerData(null);
+    setTrainerExists(false);
     const checkFlingTrainerSupport = async () => {
       if (game?.game || game?.name) {
         const gameName = game.game || game.name;
         try {
           const result = await flingTrainerService.checkTrainerSupport(gameName);
+          if (cancelled) return;
           setSupportsFlingTrainer(result.supported);
           setFlingTrainerData(result.trainerData);
 
@@ -2113,8 +2118,9 @@ function InstalledGameScreen() {
             gameName,
             game?.isCustom || false
           );
-          setTrainerExists(exists);
+          if (!cancelled) setTrainerExists(exists);
         } catch (error) {
+          if (cancelled) return;
           console.error("Error checking FLiNG Trainer support:", error);
           setSupportsFlingTrainer(false);
         }
@@ -2122,6 +2128,9 @@ function InstalledGameScreen() {
     };
 
     checkFlingTrainerSupport();
+    return () => {
+      cancelled = true;
+    };
   }, [game?.game, game?.name, game?.isCustom]);
 
   // Verify Ascend access
