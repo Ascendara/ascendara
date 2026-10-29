@@ -12,6 +12,7 @@ let lastSyncSignature = null;
 let lastSyncAt = 0;
 let syncInFlight = false;
 let syncRequested = false;
+let commandsInFlight = false;
 
 // Stopped, failed and waiting downloads stay in the list indefinitely, so an
 // unchanged list is only re-sent this often instead of on every tick.
@@ -219,6 +220,9 @@ export const checkDownloadCommands = async () => {
     return [];
   }
 
+  if (commandsInFlight) return [];
+  commandsInFlight = true;
+  const user = currentUser;
   try {
     // Check if electron API is available
     if (!window.electron) {
@@ -230,13 +234,15 @@ export const checkDownloadCommands = async () => {
       return [];
     }
 
-    const firebaseToken = await currentUser.getIdToken();
+    const firebaseToken = await user.getIdToken();
+    if (user !== currentUser) return [];
     console.log("[DownloadCommands] Checking for commands for user:", currentUser.uid);
 
     const response = await fetch(
       `https://monitor.ascendara.app/downloads/commands/${currentUser.uid}`,
       {
         method: "GET",
+        signal: AbortSignal.timeout(15000),
         headers: {
           Authorization: `Bearer ${firebaseToken}`,
         },
@@ -253,8 +259,9 @@ export const checkDownloadCommands = async () => {
       return [];
     }
 
-    commandBackoff.success();
     const data = await response.json();
+    if (user !== currentUser) return [];
+    commandBackoff.success();
     console.log("[DownloadCommands] Received response:", data);
     const commands = data.commands || [];
     console.log(
@@ -268,6 +275,8 @@ export const checkDownloadCommands = async () => {
     commandBackoff.failure();
     console.error("[DownloadCommands] Error checking download commands:", error);
     return [];
+  } finally {
+    commandsInFlight = false;
   }
 };
 

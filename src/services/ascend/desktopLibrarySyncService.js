@@ -7,6 +7,13 @@ let user = null;
 let busy = false;
 let lastSync = 0;
 let nextSyncAttempt = 0;
+let lastLibrarySignature = null;
+let lastActivitySignature = null;
+let lastActivityAt = 0;
+let supportsHeartbeat = false;
+let failures = 0;
+let retryAt = 0;
+let syncFailures = 0;
 const handled = new Map();
 
 async function gameId(game, isCustom) {
@@ -52,7 +59,10 @@ async function localGames() {
 }
 
 async function authorizedFetch(path, options = {}) {
-  const token = await user.getIdToken();
+  const requestUser = user;
+  if (!requestUser) throw new Error("Monitor sync stopped");
+  const token = await requestUser.getIdToken();
+  if (requestUser !== user) throw new Error("Monitor account changed");
   const response = await fetch(`${MONITOR}${path}`, {
     ...options,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -65,7 +75,7 @@ async function authorizedFetch(path, options = {}) {
 }
 
 async function tick() {
-  if (busy || !user || !window.electron) return;
+  if (busy || !user || !window.electron || Date.now() < retryAt) return;
   busy = true;
   try {
     const currentUser = user;
@@ -92,63 +102,87 @@ async function tick() {
       try {
         games = await localGames();
         if (currentUser !== user) return;
-        await authorizedFetch("/library/sync", {
-          method: "POST",
-          body: JSON.stringify({
-            games: games.map(({ id, game, isCustom }) => ({
-              id,
-              name: game.game || game.name,
-              isCustom,
-              version: game.version || "",
-              playTime: game.playTime || 0,
-              launchCount: game.launchCount || 0,
-              lastPlayed: game.lastPlayed || "",
-              favorite: Boolean(game.favorite),
-              description: game.desc || game.description || "",
-              size: game.size || "",
-              categories: game.category || game.categories || [],
-              online: game.online === true,
-              dlc: game.dlc === true,
-            })),
-          }),
+        const body = JSON.stringify({
+          games: games.map(({ id, game, isCustom }) => ({
+            id,
+            name: game.game || game.name,
+            isCustom,
+            version: game.version || "",
+            playTime: game.playTime || 0,
+            launchCount: game.launchCount || 0,
+            lastPlayed: game.lastPlayed || "",
+            favorite: Boolean(game.favorite),
+            description: game.desc || game.description || "",
+            size: game.size || "",
+            categories: game.category || game.categories || [],
+            online: game.online === true,
+            dlc: game.dlc === true,
+          })),
         });
-        lastSync = Date.now();
-      } catch (error) {
+        if (
+          body !== lastLibrarySignature ||
+          Date.now() - lastSync >= (supportsHeartbeat ? 300000 : 30000)
+        ) {
+          await authorizedFetch("/library/sync", { method: "POST", body });
+          if (currentUser !== user) return;
+          lastLibrarySignature = body;
+          lastSync = Date.now();
+          syncFailures = 0;
+        }
         nextSyncAttempt = Date.now() + 15000;
+      } catch (error) {
+        syncFailures += 1;
+        nextSyncAttempt =
+          Date.now() + Math.min(300000, 15000 * 2 ** Math.min(syncFailures, 5));
         console.error("[DesktopLibrary] Library sync failed:", error);
       }
     }
     const sessions = await window.electron.getRunningGameSessions();
     if (currentUser !== user) return;
     if (!games) games = await localGames();
-    await authorizedFetch("/library/activity", {
-      method: "POST",
-      body: JSON.stringify({
-        sessions: sessions.flatMap(session => {
-          const entry = games.find(
-            ({ game, isCustom }) =>
-              isCustom === session.isCustom &&
-              (game.game || game.name) === session.name &&
-              (!session.sourceDir || game._sourceDir === session.sourceDir) &&
-              (!isCustom || game.executable === session.executable)
-          );
-          return entry
-            ? [
-                {
-                  gameId: entry.id,
-                  sessionId: session.sessionId,
-                  startedAt: session.startedAt,
-                  canStop: session.canStop,
-                },
-              ]
-            : [];
-        }),
+    if (currentUser !== user) return;
+    const activityBody = JSON.stringify({
+      sessions: sessions.flatMap(session => {
+        const entry = games.find(
+          ({ game, isCustom }) =>
+            isCustom === session.isCustom &&
+            (game.game || game.name) === session.name &&
+            (!session.sourceDir || game._sourceDir === session.sourceDir) &&
+            (!isCustom || game.executable === session.executable)
+        );
+        return entry
+          ? [
+              {
+                gameId: entry.id,
+                sessionId: session.sessionId,
+                startedAt: session.startedAt,
+                canStop: session.canStop,
+              },
+            ]
+          : [];
       }),
     });
+    if (activityBody !== lastActivitySignature || Date.now() - lastActivityAt >= 15000) {
+      const activity = await authorizedFetch("/library/activity", {
+        method: "POST",
+        body: activityBody,
+      });
+      if (currentUser !== user) return;
+      supportsHeartbeat = activity.libraryHeartbeat === true;
+      if (activity.syncRequired) {
+        lastLibrarySignature = null;
+        lastSync = 0;
+        nextSyncAttempt = 0;
+      }
+      lastActivitySignature = activityBody;
+      lastActivityAt = Date.now();
+    }
     const { commands } = await authorizedFetch(
       `/library/commands/${encodeURIComponent(user.uid)}?actions=launch,stop`
     );
     if (currentUser !== user) return;
+    failures = 0;
+    retryAt = 0;
     if (commands.length && !games) games = await localGames();
     for (const command of commands) {
       let outcome = handled.get(command.id);
@@ -236,6 +270,8 @@ async function tick() {
       }
     }
   } catch (error) {
+    failures += 1;
+    retryAt = Date.now() + Math.min(300000, 3000 * 2 ** Math.min(failures, 7));
     console.error("[DesktopLibrary] Sync or command check failed:", error);
   } finally {
     busy = false;
@@ -258,5 +294,12 @@ export function stopDesktopLibrarySync() {
   user = null;
   lastSync = 0;
   nextSyncAttempt = 0;
+  lastLibrarySignature = null;
+  lastActivitySignature = null;
+  lastActivityAt = 0;
+  supportsHeartbeat = false;
+  failures = 0;
+  retryAt = 0;
+  syncFailures = 0;
   handled.clear();
 }

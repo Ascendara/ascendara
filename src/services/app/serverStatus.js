@@ -126,7 +126,17 @@ const checkBuckets = async () => {
   return Promise.all([checkEndpoint(ENDPOINTS.storage), checkEndpoint(ENDPOINTS.r2)]);
 };
 
-export const checkServerStatus = async (force = false) => {
+let pendingCheck = null;
+export const checkServerStatus = (force = false) => {
+  if (!pendingCheck) {
+    pendingCheck = performStatusCheck(force).finally(() => {
+      pendingCheck = null;
+    });
+  }
+  return pendingCheck;
+};
+
+const performStatusCheck = async (force = false) => {
   // Return cached status if available and not forced
   if (!force && currentStatus && lastCheck && Date.now() - lastCheck < CACHE_DURATION) {
     return currentStatus;
