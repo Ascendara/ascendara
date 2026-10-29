@@ -407,8 +407,8 @@ const GameProfilesCenter = () => {
 
                 {isLinux && (
                   <FeatureSection
-                    title="Online-Fix"
-                    description="Native support for Online-Fix / SteamFix / FreeTP / Photon cracks."
+                    title={t("featureCenters.profiles.onlineFix.title")}
+                    description={t("featureCenters.profiles.onlineFix.description")}
                     actions={
                       <Button
                         size="sm"
@@ -421,14 +421,18 @@ const GameProfilesCenter = () => {
                           if (res?.success) {
                             setProfile(cur => ({ ...cur, onlineFix: res.onlineFix }));
                             toast.success(
-                              res.onlineFix ? "Online-Fix detected" : "No fix detected"
+                              t(
+                                res.onlineFix
+                                  ? "featureCenters.profiles.onlineFix.detected"
+                                  : "featureCenters.profiles.onlineFix.notDetected"
+                              )
                             );
                           } else {
-                            toast.error(res?.error || "Detection error");
+                            toast.error(res?.error || t("featureCenters.profiles.onlineFix.detectError"));
                           }
                         }}
                       >
-                        <RefreshCw className="mr-2 h-4 w-4" /> Re-detect
+                        <RefreshCw className="mr-2 h-4 w-4" /> {t("featureCenters.profiles.onlineFix.redetect")}
                       </Button>
                     }
                   >
@@ -460,10 +464,10 @@ const GameProfilesCenter = () => {
                         <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3">
                           <div className="space-y-1">
                             <Label htmlFor="profile-of-proton-direct" className="text-sm font-medium">
-                              Launch via Proton Direct
+                              {t("featureCenters.profiles.onlineFix.protonDirect.label")}
                             </Label>
                             <p className="text-xs text-muted-foreground">
-                              Bypasses UMU-Launcher so OnlineFix works. Steam must be running in the background.
+                              {t("featureCenters.profiles.onlineFix.protonDirect.description")}
                             </p>
                           </div>
                           <Switch
@@ -478,27 +482,22 @@ const GameProfilesCenter = () => {
                                 },
                               }))
                             }
-                            aria-label="Launch via Proton Direct"
+                            aria-label={t("featureCenters.profiles.onlineFix.protonDirect.label")}
                           />
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-3">
                         <p className="text-sm text-muted-foreground">
-                          No Online-Fix fix detected in the game folder.
-                          If you know this game uses one (fix added after import,
-                          unrecognized file names, manual installation), you can
-                          force Proton Direct manually and provide the overrides
-                          yourself.
+                          {t("featureCenters.profiles.onlineFix.fallback.description")}
                         </p>
                         <div className="flex items-start justify-between gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
                           <div className="space-y-1">
                             <Label htmlFor="profile-of-force-proton-direct" className="text-sm font-medium">
-                              Force Proton Direct (expert mode)
+                              {t("featureCenters.profiles.onlineFix.fallback.forceLabel")}
                             </Label>
                             <p className="text-xs text-muted-foreground">
-                              Steam must be running in the background. Only enable this
-                              if you are sure this game uses OnlineFix.
+                              {t("featureCenters.profiles.onlineFix.fallback.forceDescription")}
                             </p>
                           </div>
                           <Switch
@@ -512,13 +511,13 @@ const GameProfilesCenter = () => {
                                   : null,
                               }))
                             }
-                            aria-label="Force Proton Direct"
+                            aria-label={t("featureCenters.profiles.onlineFix.fallback.forceLabel")}
                           />
                         </div>
                         {profile.onlineFix?.useProtonDirect === true && (
                           <div className="space-y-2">
                             <Label htmlFor="profile-of-manual-overrides" className="text-sm font-medium">
-                              WINEDLLOVERRIDES (optional)
+                              {t("featureCenters.profiles.onlineFix.fallback.overridesLabel")}
                             </Label>
                             <Input
                               id="profile-of-manual-overrides"
@@ -533,7 +532,7 @@ const GameProfilesCenter = () => {
                                   },
                                 }))
                               }
-                              placeholder="e.g. onlinefix64=n;winmm=n,b"
+                              placeholder={t("featureCenters.profiles.onlineFix.fallback.overridesPlaceholder")}
                             />
                           </div>
                         )}

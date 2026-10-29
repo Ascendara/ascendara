@@ -206,6 +206,25 @@ const featureCenterResources = {
         },
       },
       profiles: {
+        onlineFix: {
+          title: "Online-Fix",
+          description: "Native support for Online-Fix / SteamFix / FreeTP / Photon.",
+          redetect: "Re-detect",
+          detected: "Online-Fix detected",
+          notDetected: "No fix detected",
+          detectError: "Detection error",
+          protonDirect: {
+            label: "Launch via Proton Direct",
+            description: "Bypasses UMU-Launcher so OnlineFix works. Steam must be running in the background.",
+          },
+          fallback: {
+            description: "No Online-Fix fix detected in the game folder. If you know this game uses one (fix added after import, unrecognized file names, manual installation), you can force Proton Direct manually and provide the overrides yourself.",
+            forceLabel: "Force Proton Direct (expert mode)",
+            forceDescription: "Steam must be running in the background. Only enable this if you are sure this game uses OnlineFix.",
+            overridesLabel: "WINEDLLOVERRIDES (optional)",
+            overridesPlaceholder: "e.g. onlinefix64=n;winmm=n,b",
+          },
+        },
         title: "Game Profiles",
         description: "Keep launch, compatibility and backup behavior together for each installed game.",
         refresh: "Refresh games",
@@ -436,6 +455,25 @@ const featureCenterResources = {
         },
       },
       profiles: {
+        onlineFix: {
+          title: "Online-Fix",
+          description: "Suporte nativo para Online-Fix / SteamFix / FreeTP / Photon.",
+          redetect: "Detectar novamente",
+          detected: "Online-Fix detectado",
+          notDetected: "Nenhum fix detectado",
+          detectError: "Erro de detecção",
+          protonDirect: {
+            label: "Iniciar via Proton Direct",
+            description: "Ignora o UMU-Launcher para que o OnlineFix funcione. O Steam precisa estar aberto em segundo plano.",
+          },
+          fallback: {
+            description: "Nenhum fix Online-Fix foi detectado na pasta do jogo. Se você sabe que este jogo usa um (fix adicionado após a importação, nomes de arquivo não reconhecidos, instalação manual), você pode forçar o Proton Direct manualmente e informar os overrides você mesmo.",
+            forceLabel: "Forçar Proton Direct (modo especialista)",
+            forceDescription: "O Steam precisa estar aberto em segundo plano. Ative apenas se você tiver certeza de que este jogo usa OnlineFix.",
+            overridesLabel: "WINEDLLOVERRIDES (opcional)",
+            overridesPlaceholder: "ex.: onlinefix64=n;winmm=n,b",
+          },
+        },
         title: "Perfis de Jogos",
         description: "Mantenha inicialização, compatibilidade e backups juntos para cada jogo instalado.",
         refresh: "Atualizar jogos",
