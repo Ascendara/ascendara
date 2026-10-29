@@ -74,6 +74,9 @@ def parse_linux_runner_args(args):
         "highball_bottle": None,
         "highball_home": None,
         "highball_renderer": None,
+        "winedlloverrides": None,
+        "steamappid": None,
+        "umu_use_steam": False,
     }
 
     i = 0
@@ -104,6 +107,15 @@ def parse_linux_runner_args(args):
             i += 2
         elif args[i] == "--highball-renderer" and i + 1 < len(args):
             config["highball_renderer"] = args[i + 1]
+            i += 2
+        elif args[i] == "--linux-winedlloverrides" and i + 1 < len(args):
+            config["winedlloverrides"] = args[i + 1]
+            i += 2
+        elif args[i] == "--linux-steamappid" and i + 1 < len(args):
+            config["steamappid"] = args[i + 1]
+            i += 2
+        elif args[i] == "--linux-umu-use-steam" and i + 1 < len(args):
+            config["umu_use_steam"] = args[i + 1] == "1"
             i += 2
         else:
             i += 1
@@ -480,6 +492,23 @@ def launch_with_umu(exe_path, linux_config, game_launch_cmd=None):
 
     extra_env, extra_args = _split_env_and_args(game_launch_cmd)
     env.update(extra_env)
+
+    # Online-Fix environment variables
+    if linux_config.get("umu_use_steam"):
+        env["UMU_USE_STEAM"] = "1"
+    if linux_config.get("steamappid"):
+        env["SteamAppId"] = linux_config["steamappid"]
+        env["SteamGameId"] = linux_config["steamappid"]
+    if linux_config.get("winedlloverrides"):
+        existing = env.get("WINEDLLOVERRIDES", "")
+        merged = ";".join(filter(None, [existing, linux_config["winedlloverrides"]]))
+        env["WINEDLLOVERRIDES"] = merged
+    if linux_config.get("umu_use_steam") or linux_config.get("steamappid"):
+        logging.info(
+            f"[UMU] Online-Fix: UMU_USE_STEAM={env.get('UMU_USE_STEAM')}, "
+            f"SteamAppId={env.get('SteamAppId')}, "
+            f"WINEDLLOVERRIDES={env.get('WINEDLLOVERRIDES')}"
+        )
 
     cmd = [umu_bin, exe_path]
     cmd.extend(extra_args)

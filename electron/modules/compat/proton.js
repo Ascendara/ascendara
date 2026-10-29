@@ -1366,7 +1366,14 @@ async function resolveRunner(gameOverride) {
  *
  * Returns: { cmd: string[], env: object, runner: object } or null
  */
-async function buildLaunchConfig(gameName, exePath, gameRunnerOverride, umuId, store) {
+async function buildLaunchConfig(
+  gameName,
+  exePath,
+  gameRunnerOverride,
+  umuId,
+  store,
+  onlineFix = null
+) {
   const { linuxUmuBin } = require("../core/config");
   const compatDataPath = getCompatDataPath(gameName);
   const winePrefix = path.join(compatDataPath, "pfx");
@@ -1391,6 +1398,21 @@ async function buildLaunchConfig(gameName, exePath, gameRunnerOverride, umuId, s
     // STORE (optional) (egs, gog, steam, humble, itchio, none...)
     if (store && store !== "none") {
       env.STORE = store;
+    }
+
+    // Online-Fix : WINEDLLOVERRIDES + fake AppID + Steam runtime
+    if (onlineFix?.detected) {
+      if (onlineFix.overrides) {
+        const existing = env.WINEDLLOVERRIDES;
+        env.WINEDLLOVERRIDES = existing
+          ? `${existing};${onlineFix.overrides}`
+          : onlineFix.overrides;
+      }
+      if (onlineFix.fakeAppId) {
+        env.SteamAppId = String(onlineFix.fakeAppId);
+        env.SteamGameId = String(onlineFix.fakeAppId);
+        env.UMU_USE_STEAM = "1";
+      }
     }
 
     return {

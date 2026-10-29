@@ -42,6 +42,7 @@ const EMPTY_PROFILE = {
   autoBackup: false,
   umuId: "",
   savePaths: [],
+  onlineFix: null,
 };
 
 function profilesMatch(left, right) {
@@ -401,6 +402,67 @@ const GameProfilesCenter = () => {
                       }
                       placeholder={t("featureCenters.profiles.optional")}
                     />
+                  </FeatureSection>
+                )}
+
+                {isLinux && (
+                  <FeatureSection
+                    title="Online-Fix"
+                    description="Native support for Online-Fix / SteamFix / FreeTP / Photon cracks."
+                    actions={
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          const res = await window.electron.onlinefixDetect(
+                            getGameName(selectedGame),
+                            selectedGame.isCustom
+                          );
+                          if (res?.success) {
+                            setProfile(cur => ({ ...cur, onlineFix: res.onlineFix }));
+                            toast.success(
+                              res.onlineFix ? "Online-Fix detected" : "No fix detected"
+                            );
+                          } else {
+                            toast.error(res?.error || "Detection error");
+                          }
+                        }}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" /> Re-detect
+                      </Button>
+                    }
+                  >
+                    {profile.onlineFix?.detected ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="default">{profile.onlineFix.fixType}</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            FakeAppId :{" "}
+                            <span className="font-mono">
+                              {profile.onlineFix.fakeAppId}
+                            </span>
+                          </span>
+                        </div>
+                        <Input
+                          className="font-mono text-xs"
+                          value={profile.onlineFix.overrides || ""}
+                          onChange={e =>
+                            setProfile(cur => ({
+                              ...cur,
+                              onlineFix: {
+                                ...cur.onlineFix,
+                                overrides: e.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="WINEDLLOVERRIDES"
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No Online-Fix fix detected.
+                      </p>
+                    )}
                   </FeatureSection>
                 )}
 

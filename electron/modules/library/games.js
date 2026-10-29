@@ -37,6 +37,7 @@ const { ensureInstallSize } = require("./installSize");
 
 const steamgrid = require("./steamgrid");
 const { resetOnboarding } = require("../core/onboarding");
+const { parseOnlineFix } = require("../compat/onlinefix-parser");
 
 // Load proton module only on linux
 const proton = isLinux ? require("../compat/proton") : null;
@@ -873,11 +874,33 @@ function registerGameHandlers() {
             console.warn("[Games] Could not read umuId:", e.message);
           }
 
+          // Read Online-Fix metadata
+          let onlineFix = null;
+          try {
+            if (!isCustom) {
+              const gameInfoPath = path.join(
+                gameDirectory,
+                `${sanitizeGameName(game)}.ascendara.json`
+              );
+              if (fs.existsSync(gameInfoPath)) {
+                onlineFix =
+                  JSON.parse(fs.readFileSync(gameInfoPath, "utf8")).onlineFix || null;
+              }
+            } else {
+              const gameInfo = findCustomGame(game, settings);
+              onlineFix = gameInfo?.onlineFix || null;
+            }
+          } catch (e) {
+            console.warn("[Games] Could not read onlineFix metadata:", e.message);
+          }
+
           const launchConfig = await proton.buildLaunchConfig(
             game,
             executable,
             gameRunnerOverride,
-            umuId
+            umuId,
+            null,
+            onlineFix
           );
 
           if (launchConfig.error) {
@@ -909,6 +932,20 @@ function registerGameHandlers() {
               "--linux-proton-path",
               launchConfig.env.PROTONPATH || ""
             );
+
+            // Online-Fix env
+            if (launchConfig.env.WINEDLLOVERRIDES) {
+              gameHandlerArgs.push(
+                "--linux-winedlloverrides",
+                launchConfig.env.WINEDLLOVERRIDES
+              );
+            }
+            if (launchConfig.env.SteamAppId) {
+              gameHandlerArgs.push("--linux-steamappid", launchConfig.env.SteamAppId);
+            }
+            if (launchConfig.env.UMU_USE_STEAM === "1") {
+              gameHandlerArgs.push("--linux-umu-use-steam", "1");
+            }
           }
 
           console.log(
@@ -2231,6 +2268,92 @@ function registerGameHandlers() {
     } catch (error) {
       console.error("Error restoring cloud game data:", error);
       return { success: false, error: error.message };
+    }
+  });
+
+  // Online-Fix IPC handlers
+  ipcMain.handle("onlinefix-detect", async (_, game, isCustom = false) => {
+    try {
+      const settings = settingsManager.getSettings();
+      let gameDir = null;
+      if (!isCustom) {
+        for (const dir of [
+          settings.downloadDirectory,
+          ...(settings.additionalDirectories || []),
+        ].filter(Boolean)) {
+          const p = path.join(dir, sanitizeGameName(game));
+          if (fs.existsSync(p)) { gameDir = p; break; }
+        }
+      } else {
+        const info = findCustomGame(game, settings);
+        gameDir = info?.executable ? path.dirname(info.executable) : null;
+      }
+      if (!gameDir) return { success: false, error: "Game directory not found" };
+      const result = await parseOnlineFix(gameDir);
+      return { success: true, onlineFix: result };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("onlinefix-get", async (_, game, isCustom = false) => {
+    try {
+      const settings = settingsManager.getSettings();
+      if (!isCustom) {
+        for (const dir of [
+          settings.downloadDirectory,
+          ...(settings.additionalDirectories || []),
+        ].filter(Boolean)) {
+          const p = path.join(
+            dir,
+            sanitizeGameName(game),
+            `${sanitizeGameName(game)}.ascendara.json`
+          );
+          if (fs.existsSync(p)) {
+            return JSON.parse(fs.readFileSync(p, "utf8")).onlineFix || null;
+          }
+        }
+      } else {
+        return findCustomGame(game, settings)?.onlineFix || null;
+      }
+      return null;
+    } catch { return null; }
+  });
+
+  ipcMain.handle("onlinefix-set", async (_, game, isCustom, onlineFix) => {
+    try {
+      const settings = settingsManager.getSettings();
+      if (!isCustom) {
+        for (const dir of [
+          settings.downloadDirectory,
+          ...(settings.additionalDirectories || []),
+        ].filter(Boolean)) {
+          const p = path.join(
+            dir,
+            sanitizeGameName(game),
+            `${sanitizeGameName(game)}.ascendara.json`
+          );
+          if (fs.existsSync(p)) {
+            const data = JSON.parse(fs.readFileSync(p, "utf8"));
+            if (onlineFix) data.onlineFix = onlineFix;
+            else delete data.onlineFix;
+            fs.writeFileSync(p, JSON.stringify(data, null, 2));
+            return { success: true };
+          }
+        }
+      } else {
+        const gamesPath = path.join(settings.downloadDirectory, "games.json");
+        const data = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
+        const idx = data.games.findIndex(g => g.game === game && !g._isDeleted);
+        if (idx === -1) return { success: false, error: "Custom game not found" };
+        if (onlineFix) data.games[idx].onlineFix = onlineFix;
+        else delete data.games[idx].onlineFix;
+        fs.writeFileSync(gamesPath, JSON.stringify(data, null, 2));
+        return { success: true };
+      }
+      return { success: false, error: "Game config not found" };
+    } catch (err) {
+      return { success: false, error: err.message };
     }
   });
 }

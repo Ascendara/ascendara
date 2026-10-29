@@ -151,6 +151,13 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("umu-set-game-id", gameName, umuId),
   umuAutoDetect: gameName => ipcRenderer.invoke("umu-auto-detect", gameName),
 
+  // Online-Fix
+  onlinefixDetect: (game, isCustom) =>
+    ipcRenderer.invoke("onlinefix-detect", game, isCustom),
+  onlinefixGet: (game, isCustom) => ipcRenderer.invoke("onlinefix-get", game, isCustom),
+  onlinefixSet: (game, isCustom, onlineFix) =>
+    ipcRenderer.invoke("onlinefix-set", game, isCustom, onlineFix),
+
   // Crack/Emulator Settings
   getLocalCrackUsername: () => ipcRenderer.invoke("get-local-crack-username"),
   getLocalCrackDirectory: () => ipcRenderer.invoke("get-local-crack-directory"),

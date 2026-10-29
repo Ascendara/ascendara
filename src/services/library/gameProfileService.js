@@ -72,13 +72,16 @@ export async function loadGameProfile(game, isLinux) {
   const gameName = getGameName(game);
   if (!gameName) throw new Error("Game name is unavailable");
 
-  const [launchCommands, autoBackup, savePathsResult, umuId] = await Promise.all([
+  const [launchCommands, autoBackup, savePathsResult, umuId, onlineFix] = await Promise.all([
     window.electron.getLaunchCommands(gameName, game.isCustom).catch(() => ""),
     window.electron.isGameAutoBackupsEnabled(gameName, game.isCustom).catch(() => false),
     window.electron.getCustomSavePaths(gameName, game.isCustom),
     isLinux
       ? window.electron.umuGetGameId(gameName).catch(() => "")
       : Promise.resolve(""),
+    isLinux
+      ? window.electron.onlinefixGet(gameName, game.isCustom).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   if (!savePathsResult?.success) {
@@ -98,6 +101,7 @@ export async function loadGameProfile(game, isLinux) {
         ? String(umuId || "")
         : String(umuId?.id || umuId?.umuId || ""),
     savePaths: savePathsResult.paths || [],
+    onlineFix: onlineFix || null,
   };
 }
 
@@ -139,6 +143,15 @@ export async function saveGameProfile(game, profile, isLinux) {
     const umuResult = await window.electron.umuSetGameId(gameName, profile.umuId.trim());
     if (!umuResult?.success) {
       throw new Error(umuResult?.error || "Ascendara could not save the UMU game ID");
+    }
+
+    const ofResult = await window.electron.onlinefixSet(
+      gameName,
+      game.isCustom,
+      profile.onlineFix || null
+    );
+    if (!ofResult?.success) {
+      throw new Error(ofResult?.error || "Ascendara could not save Online-Fix config");
     }
   }
 
