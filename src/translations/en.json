@@ -486,6 +486,7 @@
         "title": "Request Community Creation"
       },
       "denied": "Denied",
+      "description": "Your friends, new people to meet, and the top players",
       "joinCommunity": "Join this community",
       "joinRequest": {
         "approved": "Member approved!",
@@ -505,8 +506,7 @@
       },
       "search": "Search communities...",
       "title": "Communities",
-      "yourCommunities": "Your Communities",
-      "description": "Your friends, new people to meet, and the top players"
+      "yourCommunities": "Your Communities"
     },
     "companion": {
       "activeNow": "Active now",
@@ -590,9 +590,12 @@
       "awayOrBusy": "Away / Busy",
       "empty": "No friends yet",
       "emptyHint": "Search for users to add them as friends",
+      "filterAll": "All",
+      "filterPlaceholder": "Filter friends...",
       "findFriends": "Find Friends",
       "friends": "Friends",
       "hasRequestPending": "This user has sent you a friend request",
+      "noMatches": "No friends match this filter",
       "notAcceptingRequests": "Not Accepting Requests",
       "offline": "Offline",
       "offlineSection": "Offline",
@@ -607,10 +610,7 @@
       "requestSent": "Friend request sent!",
       "subtitle": "Connect and play with your friends",
       "title": "Friends",
-      "totalFriends": "Total Friends",
-      "filterAll": "All",
-      "filterPlaceholder": "Filter friends...",
-      "noMatches": "No friends match this filter"
+      "totalFriends": "Total Friends"
     },
     "homeSubtitle": "Here's what's happening in your network",
     "leaderboard": {
@@ -947,10 +947,10 @@
       "noOutgoing": "No outgoing requests",
       "outgoing": "Sent Requests",
       "pending": "Pending",
-      "title": "Friend Requests",
-      "wantsToAdd": "wants to be your friend",
       "sentCount_one": "{{count}} sent request pending",
-      "sentCount_other": "{{count}} sent requests pending"
+      "sentCount_other": "{{count}} sent requests pending",
+      "title": "Friend Requests",
+      "wantsToAdd": "wants to be your friend"
     },
     "search": {
       "hint": "Search for users by their display name to view their profile, add them as friends, or start a conversation.",
@@ -1301,14 +1301,14 @@
     },
     "welcome": "Welcome back, {{name}}!",
     "wishlist": {
-      "title": "Steam wishlist",
-      "nowAvailable": "{{game}} from your Steam wishlist is now on Ascendara",
-      "newGames_one": "{{count}} game from your Steam wishlist was just added to Ascendara",
-      "newGames_other": "{{count}} games from your Steam wishlist were just added to Ascendara",
       "alreadyAvailable_one": "{{count}} game from your Steam wishlist is already on Ascendara",
       "alreadyAvailable_other": "{{count}} games from your Steam wishlist are already on Ascendara",
-      "view": "View",
-      "gameMissing": "This game is no longer in the game index"
+      "gameMissing": "This game is no longer in the game index",
+      "newGames_one": "{{count}} game from your Steam wishlist was just added to Ascendara",
+      "newGames_other": "{{count}} games from your Steam wishlist were just added to Ascendara",
+      "nowAvailable": "{{game}} from your Steam wishlist is now on Ascendara",
+      "title": "Steam wishlist",
+      "view": "View"
     }
   },
   "ascendTour": {
@@ -2008,11 +2008,11 @@
       "conflictResolveFailed": "Failed to resolve folder conflict",
       "deletedExisting": "Existing folder deleted",
       "downloadFailed": "Failed to start download",
-      "downloaderMissing": "Ascendara's downloader is missing, most likely removed by your antivirus. Restore it from quarantine or reinstall Ascendara, then try again.",
       "downloadQueueLimit": "You can have 1 active download and 1 queued download at a time. Sign in with Ascend for unlimited queueing.",
       "downloadQueued": "Download added to queue - will start when current download finishes",
       "downloadReady": "Download ready to start",
       "downloadStarted": "Download started successfully",
+      "downloaderMissing": "Ascendara's downloader is missing, most likely removed by your antivirus. Restore it from quarantine or reinstall Ascendara, then try again.",
       "gofileAccountError": "Gofile Account Creation Failed",
       "gofileAccountErrorDesc": "Unable to create a temporary Gofile account. Try enabling a VPN or wait a few minutes before retrying.",
       "gofileRateLimit": "Gofile Rate Limit Reached",
@@ -2083,9 +2083,6 @@
     }
   },
   "downloads": {
-    "dllRepair": "Restore missing DLLs",
-    "dllRepairResult": "Restored {{count}} missing DLL file(s). Verify the game files to check the installation.",
-    "dllRepairing": "Restoring DLLs…",
     "actionRequired": "Action Required",
     "actions": {
       "cancelAndDelete": "Cancel & Delete",
@@ -2122,6 +2119,9 @@
     "diskActivity": "Disk Activity",
     "diskRead": "Read",
     "diskWrite": "Write",
+    "dllRepair": "Restore missing DLLs",
+    "dllRepairResult": "Restored {{count}} missing DLL file(s). Verify the game files to check the installation.",
+    "dllRepairing": "Restoring DLLs…",
     "downloadConflictError": "The download could not start (Conflict). Refresh the download link or choose another source. If this continues, check downloadmanager.log for the original error.",
     "downloadError": "Download Error",
     "downloadSize": "{{size}} download",
@@ -2469,9 +2469,6 @@
     "loadingAchievements": "Loading achievements...",
     "loadingMods": "Loading mods...",
     "loadingSoundtrack": "Loading soundtrack...",
-    "soundtrackBlocked": "KHInsider is blocking soundtrack requests right now. Please try again later.",
-    "soundtrackFailed": "Unable to load the soundtrack. Check your connection and try again.",
-    "soundtrackRetry": "Try again",
     "mainFile": "Main",
     "manualAppIdHelp": "Enter the Steam App ID directly. You can find this in the Steam store URL.",
     "manualEntry": "Manual Entry",
@@ -2534,6 +2531,9 @@
     "sortPopular": "Most Popular",
     "sortRecent": "Recently Updated",
     "soundtrack": "Soundtrack",
+    "soundtrackBlocked": "KHInsider is blocking soundtrack requests right now. Please try again later.",
+    "soundtrackFailed": "Unable to load the soundtrack. Check your connection and try again.",
+    "soundtrackRetry": "Try again",
     "startSteam": "Start Steam",
     "startingSteam": "Starting Steam...",
     "startingUpdate": "Starting Update...",
@@ -3394,28 +3394,28 @@
       "title": "VR Games and Ascendara"
     },
     "wishlist": {
-      "title": "Wishlist",
-      "available": "On Ascendara",
-      "watching": "Watching",
-      "openSteam": "Open on Steam",
       "addedOn": "Wishlisted {{date}}",
-      "download": "Download",
-      "notYet": "Not on Ascendara yet",
-      "ascendTitle": "Wishlist alerts are an Ascend feature",
+      "alerts": "Notify me",
       "ascendDescription": "Bring your Steam wishlist into Ascendara and get notified the moment one of those games is added, with a link straight to its download page.",
-      "getAscend": "Get Ascend",
-      "connectTitle": "Connect Steam to see your wishlist",
-      "connectDescription": "Ascendara reads your Steam wishlist and lets you know as soon as a game on it is available here.",
+      "ascendTitle": "Wishlist alerts are an Ascend feature",
+      "available": "On Ascendara",
       "connect": "Connect Steam",
+      "connectDescription": "Ascendara reads your Steam wishlist and lets you know as soon as a game on it is available here.",
+      "connectTitle": "Connect Steam to see your wishlist",
+      "download": "Download",
       "empty": "Your Steam wishlist is empty",
       "emptyDescription": "Wishlist games on Steam and they'll show up here. If your wishlist isn't empty, refresh your Steam account.",
-      "manage": "Store accounts",
       "filterAll": "All ({{count}})",
       "filterAvailable": "On Ascendara ({{count}})",
-      "alerts": "Notify me",
+      "getAscend": "Get Ascend",
+      "hidePage": "Hide this page",
+      "manage": "Store accounts",
       "noneAvailable": "None of your wishlist games are on Ascendara yet",
       "noneAvailableDescription": "You'll get a notification as soon as one is added.",
-      "hidePage": "Hide this page"
+      "notYet": "Not on Ascendara yet",
+      "openSteam": "Open on Steam",
+      "title": "Wishlist",
+      "watching": "Watching"
     }
   },
   "localRefresh": {
@@ -4404,11 +4404,6 @@
     "visit-status-page": "Visit Status Page"
   },
   "settings": {
-    "contributeRepairDlls": "Contribute DLL repair files",
-    "contributeRepairDllsDescription": "Allow Ascendara to automatically upload approved DLL files from completed game installations to help other users repair missing files. The files are stored with Cloudflare and publicly downloadable. Only DLLs matching Ascendara's approved hashes are shared; this feature does not upload saves or personal documents.",
-    "contributeRepairDllsControl": "Off by default. You can restore missing DLLs without contributing. Turning this off stops future contributions and cancels uploads in progress where possible; files already shared are not removed.",
-    "contributeRepairDllsPrivacy": "Read the Privacy Policy",
-    "contributeRepairDllsSaveError": "Could not save your DLL contribution preference. Please try again.",
     "achievementWatcher": {
       "addDir": "Add Directory",
       "defaultDirs": "Default Watching Directories",
@@ -4533,6 +4528,11 @@
     "communityThemesDescription": "Browse and apply themes created by the community. Want to submit your own?",
     "components": "Application Components",
     "componentsDescription": "View all official app sidecars and check which game dependencies are installed. You can also reinstall required dependencies from this page.",
+    "contributeRepairDlls": "Contribute DLL repair files",
+    "contributeRepairDllsControl": "Off by default. You can restore missing DLLs without contributing. Turning this off stops future contributions and cancels uploads in progress where possible; files already shared are not removed.",
+    "contributeRepairDllsDescription": "Allow Ascendara to automatically upload approved DLL files from completed game installations to help other users repair missing files. The files are stored with Cloudflare and publicly downloadable. Only DLLs matching Ascendara's approved hashes are shared; this feature does not upload saves or personal documents.",
+    "contributeRepairDllsPrivacy": "Read the Privacy Policy",
+    "contributeRepairDllsSaveError": "Could not save your DLL contribution preference. Please try again.",
     "controllerConnected": "Controller Connected",
     "controllerConnectedDescription": "Ready to use Big Picture mode",
     "controllerType": "Controller Type",
@@ -4549,6 +4549,7 @@
     "defaultLandingPageDescription": "Choose which page opens when you start Ascendara.",
     "discordRPC": "Discord Rich Presence",
     "discordRPCDescription": "Show what game your playing with Ascendara in Discord.",
+    "dllRepairTitle": "DLL Repair",
     "downloadLimit": "Download Speed Limit",
     "downloadLimitDescription": "Set a maximum speed for downloads. 0 means unlimited.",
     "downloadLocationWarning": "Ascendara cannot write files to the chosen directory. Change was not saved.",
@@ -5061,9 +5062,9 @@
     "unsupportedDetection": "Automatic installation detection for this store is currently available on Windows. You can still open the store to install or play.",
     "viewInLibrary": "View in library",
     "wishlist": {
-      "title": "Steam wishlist alerts",
       "description": "Get notified when a game on your wishlist is added to Ascendara. Watching {{count}} games.",
-      "requiresAscend": "Get notified when a game on your Steam wishlist is added to Ascendara. Requires Ascend."
+      "requiresAscend": "Get notified when a game on your Steam wishlist is added to Ascendara. Requires Ascend.",
+      "title": "Steam wishlist alerts"
     }
   },
   "torbox": {
