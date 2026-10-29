@@ -244,7 +244,7 @@ export default function SearchSection({
                               {t("ascend.friends.requestReceived") || "Request Received"}
                             </Button>
                           );
-                        } else if (result.allowFriendRequests === false) {
+                        } else if (result.preventFriendRequests) {
                           return (
                             <Button
                               size="sm"

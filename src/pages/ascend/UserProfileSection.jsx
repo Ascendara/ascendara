@@ -257,7 +257,7 @@ export default function UserProfileSection({
                           {t("ascend.friends.requestReceived") || "Request Received"}
                         </Button>
                       );
-                    } else if (viewingProfile.allowFriendRequests === false) {
+                    } else if (viewingProfile.preventFriendRequests) {
                       return (
                         <Button variant="outline" className="gap-2" disabled>
                           <UserX className="h-4 w-4" />

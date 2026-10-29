@@ -717,7 +717,7 @@ export const updateUserData = async (uid, data) => {
       "profileStats",
       "private",
       "hidePartnerAds",
-      "allowFriendRequests",
+      "preventFriendRequests",
     ];
 
     for (const field of allowedFields) {
@@ -1937,7 +1937,7 @@ export const searchUsers = async searchQuery => {
         reviewCount: data.reviewCount,
         discordLinked: Boolean(data.socials?.linkedDiscord),
         private: isPrivate,
-        allowFriendRequests: data.allowFriendRequests !== false,
+        preventFriendRequests: data.preventFriendRequests === true,
         status: statusMap.get(uid) || "offline",
         level: isPrivate ? 0 : data.profileStats?.level || 1,
         totalPlaytime: isPrivate ? 0 : totalPlaytime,
@@ -2043,7 +2043,7 @@ export const getUserPublicProfile = async userId => {
           reviewCount: userData.reviewCount,
           discordLinked: Boolean(userData.socials?.linkedDiscord),
           isFriend,
-          allowFriendRequests: userData.allowFriendRequests !== false,
+          preventFriendRequests: userData.preventFriendRequests === true,
           private: true,
         },
         error: null,
@@ -2076,7 +2076,7 @@ export const getUserPublicProfile = async userId => {
         totalAchievements,
         unlockedAchievements,
         isFriend,
-        allowFriendRequests: userData.allowFriendRequests !== false,
+        preventFriendRequests: userData.preventFriendRequests === true,
         private: false,
       },
       error: null,
@@ -2137,7 +2137,7 @@ export const sendFriendRequest = async toUid => {
     const toDisplayName = toUserDoc.data()?.displayName || "Unknown";
 
     // The rules enforce this too; checking here gives a readable error
-    if (toUserDoc.data()?.allowFriendRequests === false) {
+    if (toUserDoc.data()?.preventFriendRequests === true) {
       return { success: false, error: "This user isn't accepting friend requests" };
     }
 

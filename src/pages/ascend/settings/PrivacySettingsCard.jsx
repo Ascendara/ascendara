@@ -1,6 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Eye, LockIcon, UserPlus } from "lucide-react";
+import { Eye, LockIcon, UserX } from "lucide-react";
 
 export default function PrivacySettingsCard({ t, userData, updateData }) {
   return (
@@ -64,30 +64,30 @@ export default function PrivacySettingsCard({ t, userData, updateData }) {
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <UserPlus className="h-4 w-4 text-muted-foreground" />
+                <UserX className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">
-                  {t("ascend.settings.allowFriendRequests") || "Allow Friend Requests"}
+                  {t("ascend.settings.preventFriendRequests") || "Prevent Friend Requests"}
                 </span>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                {t("ascend.settings.allowFriendRequestsDescription") ||
-                  "When disabled, other users won't be able to send you friend requests."}
+                {t("ascend.settings.preventFriendRequestsDescription") ||
+                  "When enabled, other users won't be able to send you friend requests."}
               </p>
             </div>
             <div className="ml-4">
               <Checkbox
-                id="allowFriendRequests"
-                checked={userData?.allowFriendRequests !== false}
+                id="preventFriendRequests"
+                checked={userData?.preventFriendRequests || false}
                 onCheckedChange={async checked => {
                   try {
-                    const result = await updateData({ allowFriendRequests: checked });
+                    const result = await updateData({ preventFriendRequests: checked });
                     if (result.success) {
                       toast.success(
                         checked
-                          ? t("ascend.settings.allowFriendRequestsOn") ||
-                              "Friend requests are now turned on"
-                          : t("ascend.settings.allowFriendRequestsOff") ||
-                              "Friend requests are now turned off"
+                          ? t("ascend.settings.friendRequestsNowPrevented") ||
+                              "Other users can no longer send you friend requests"
+                          : t("ascend.settings.friendRequestsNowAllowed") ||
+                              "Other users can now send you friend requests"
                       );
                     } else {
                       toast.error(
