@@ -47,6 +47,7 @@ class SettingsManager {
       downloadLimit: 0,
       sideScrollBar: false,
       excludeFolders: false,
+      contributeRepairDlls: false,
       prioritizeTorboxOverSeamless: false,
       crackDirectory: "",
       twitchSecret: "",
@@ -191,6 +192,12 @@ class SettingsManager {
 
       fs.writeFileSync(this.filePath, JSON.stringify(mergedSettings, null, 2));
       this.settings = mergedSettings;
+      if (
+        existingSettings.contributeRepairDlls === true &&
+        mergedSettings.contributeRepairDlls !== true
+      ) {
+        require("../downloads/dllRepair").stopContributions();
+      }
       return true;
     } catch (error) {
       console.error("Failed to save settings:", error);

@@ -9,6 +9,20 @@ const CDN = "https://repair.ascendara.app";
 const MAX_DLL = 32 * 1024 * 1024;
 const MAX_TOTAL = 128 * 1024 * 1024;
 const sha256 = bytes => crypto.createHash("sha256").update(bytes).digest("hex");
+const contributionControllers = new Set();
+
+function contributionAllowed() {
+  return (
+    require("../core/settings")
+      .getSettingsManager()
+      .getSetting("contributeRepairDlls") === true
+  );
+}
+
+function stopContributions() {
+  for (const controller of contributionControllers) controller.abort();
+  scheduled.clear();
+}
 
 function relativeName(value) {
   if (typeof value !== "string" || value.length > 500)
@@ -201,23 +215,26 @@ function idle(info, upload) {
   );
 }
 
-async function token() {
+async function token(signal) {
   const auth = require("../core/auth-helper");
   const response = await auth.authenticatedFetch(`${API}/auth/token`, {
     redirect: "error",
-    signal: AbortSignal.timeout(15000),
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(15000)])
+      : AbortSignal.timeout(15000),
   });
   if (!response.ok) throw new Error("Repair authentication failed.");
   return (await response.json()).token;
 }
 
-async function approved(release, bearer) {
+async function approved(release, bearer, signal) {
   try {
     const response = await axios.get(`${API}/repair/v1/manifests/${release}`, {
       headers: { Authorization: `Bearer ${bearer}` },
       timeout: 15000,
       maxRedirects: 0,
       maxContentLength: 128 * 1024,
+      signal,
     });
     return response.data;
   } catch (error) {
@@ -230,18 +247,38 @@ async function approved(release, bearer) {
 }
 
 async function run(directory, metadataName, upload = false) {
+  if (!upload) return runOperation(directory, metadataName, false);
+  if (!contributionAllowed()) throw new Error("DLL contributions are turned off.");
+  const controller = new AbortController();
+  contributionControllers.add(controller);
+  try {
+    return await runOperation(directory, metadataName, true, controller.signal);
+  } finally {
+    contributionControllers.delete(controller);
+  }
+}
+
+async function runOperation(directory, metadataName, upload, signal) {
+  const checkConsent = () => {
+    signal?.throwIfAborted();
+    if (upload && !contributionAllowed())
+      throw new Error("DLL contributions are turned off.");
+  };
+  checkConsent();
   const ctx = await context(directory, metadataName);
   if (!idle(ctx.info, upload))
     throw new Error("Wait for this game to finish downloading or running.");
-  const bearer = await token();
+  checkConsent();
+  const bearer = await token(signal);
   const files = validateManifest(
-    await approved(ctx.release, bearer),
+    await approved(ctx.release, bearer, signal),
     ctx.release,
     ctx.allowed,
     ctx.filemap
   );
   let restored = 0;
   for (const file of files) {
+    checkConsent();
     const latest = await context(directory, metadataName);
     if (latest.release !== ctx.release || !idle(latest.info, upload))
       throw new Error("Installation changed during repair.");
@@ -249,6 +286,7 @@ async function run(directory, metadataName, upload = false) {
     if (upload) {
       const bytes = await readBounded(directory, file.path, MAX_DLL);
       if (bytes.length !== file.size || sha256(bytes) !== file.sha256) continue;
+      checkConsent();
       await axios.put(`${API}/repair/v1/objects/${ctx.release}/${file.sha256}`, bytes, {
         headers: {
           Authorization: `Bearer ${bearer}`,
@@ -258,6 +296,7 @@ async function run(directory, metadataName, upload = false) {
         maxRedirects: 0,
         maxBodyLength: MAX_DLL,
         maxContentLength: 4096,
+        signal,
       });
     } else {
       try {
@@ -343,6 +382,7 @@ async function resolveTarget(settings, game, libraryDirectory) {
 const scheduled = new Map();
 let queue = Promise.resolve();
 function scheduleContribution(info, directory, metadataName) {
+  if (!contributionAllowed()) return;
   if (!idle(info, true) || !info.gameID || info.privateSource) return;
   const key = `${directory}:${info.version}`;
   if ((scheduled.get(key) || 0) > Date.now()) return;
@@ -356,6 +396,7 @@ function scheduleContribution(info, directory, metadataName) {
 }
 
 module.exports = {
+  stopContributions,
   run,
   resolveTarget,
   scheduleContribution,

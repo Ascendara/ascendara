@@ -41,6 +41,7 @@ export function SettingsProvider({ children }) {
     singleStream: true,
     downloadLimit: 0,
     excludeFolders: false,
+    contributeRepairDlls: false,
     sideScrollBar: false,
     prioritizeTorboxOverSeamless: false,
     crackDirectory: "",

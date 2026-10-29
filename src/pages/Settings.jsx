@@ -1876,6 +1876,53 @@ function Settings() {
                   </div>
                 ) : null}
 
+                <div
+                  id="repair-contributions"
+                  className="flex items-start justify-between gap-4"
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="contributeRepairDlls">
+                      {t("settings.contributeRepairDlls")}
+                    </Label>
+                    <p
+                      id="repair-contributions-description"
+                      className="text-sm text-muted-foreground"
+                    >
+                      {t("settings.contributeRepairDllsDescription")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("settings.contributeRepairDllsControl")}
+                    </p>
+                    <button
+                      type="button"
+                      className="text-sm text-primary hover:underline"
+                      onClick={() =>
+                        window.electron.openURL("https://ascendara.app/privacy")
+                      }
+                    >
+                      {t("settings.contributeRepairDllsPrivacy")}
+                    </button>
+                  </div>
+                  <Switch
+                    id="contributeRepairDlls"
+                    aria-describedby="repair-contributions-description"
+                    checked={settings.contributeRepairDlls === true}
+                    onCheckedChange={async checked => {
+                      try {
+                        const saved = await window.electron.updateSetting(
+                          "contributeRepairDlls",
+                          checked
+                        );
+                        if (!saved)
+                          throw new Error(t("settings.contributeRepairDllsSaveError"));
+                        setSettingsLocal({ contributeRepairDlls: checked });
+                      } catch {
+                        toast.error(t("settings.contributeRepairDllsSaveError"));
+                      }
+                    }}
+                  />
+                </div>
+
                 {/* Single Stream Download Toggle */}
                 <div id="single-stream" className="flex items-center justify-between">
                   <div className="space-y-0.5">

@@ -4404,6 +4404,11 @@
     "visit-status-page": "Visit Status Page"
   },
   "settings": {
+    "contributeRepairDlls": "Contribute DLL repair files",
+    "contributeRepairDllsDescription": "Allow Ascendara to automatically upload approved DLL files from completed game installations to help other users repair missing files. The files are stored with Cloudflare and publicly downloadable. Only DLLs matching Ascendara's approved hashes are shared; this feature does not upload saves or personal documents.",
+    "contributeRepairDllsControl": "Off by default. You can restore missing DLLs without contributing. Turning this off stops future contributions and cancels uploads in progress where possible; files already shared are not removed.",
+    "contributeRepairDllsPrivacy": "Read the Privacy Policy",
+    "contributeRepairDllsSaveError": "Could not save your DLL contribution preference. Please try again.",
     "achievementWatcher": {
       "addDir": "Add Directory",
       "defaultDirs": "Default Watching Directories",
