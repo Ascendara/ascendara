@@ -195,8 +195,9 @@ async function syncAchievements(appID, game, cache) {
   const pending = await loadPending();
   const target = await library.resolveGame(appID, game.name);
   if (!target) {
-    console.warn(`No installed game matches appid ${appID} (${game.name}), will retry`);
+    // Retried every rescan, so only log when it first becomes pending
     if (!pending.has(appID)) {
+      console.warn(`No installed game matches appid ${appID} (${game.name}), will retry`);
       pending.add(appID);
       await savePending();
     }
@@ -435,12 +436,9 @@ var app = {
     this.watched.set(dir, watcher);
   },
   load: async function (appID) {
-    console.log(`loading steam schema for ${appID}`);
-
     let game = this.cache.find(game => game.appid == appID);
-    if (game) {
-      console.log("from memory cache");
-    } else {
+    if (!game) {
+      console.log(`loading steam schema for ${appID}`);
       const lang = await getSteamApiLang();
       game = await steam.loadSteamData(appID, lang);
       this.cache.push(game);
