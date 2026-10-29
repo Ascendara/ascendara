@@ -34,6 +34,7 @@ const { hideWindow, showWindow } = require("../app/window");
 
 const { createGameExitMonitor } = require("./gameExitMonitor");
 const { ensureInstallSize } = require("./installSize");
+const { scheduleContribution } = require("../downloads/dllRepair");
 
 const steamgrid = require("./steamgrid");
 const { resetOnboarding } = require("../core/onboarding");
@@ -387,6 +388,11 @@ function registerGameHandlers() {
                 const gameInfoData = await fs.promises.readFile(gameInfoPath, "utf8");
                 const parsed = JSON.parse(gameInfoData);
                 ensureInstallSize(parsed, path.join(downloadDir, dir), gameInfoPath);
+                scheduleContribution(
+                  parsed,
+                  path.join(downloadDir, dir),
+                  path.basename(gameInfoPath)
+                );
                 return {
                   ...parsed,
                   isCustom: false,

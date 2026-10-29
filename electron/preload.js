@@ -330,7 +330,10 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("check-game-directory-conflict", game, additionalDirIndex),
   renameExistingGameDirectory: (game, additionalDirIndex) =>
     ipcRenderer.invoke("rename-existing-game-directory", game, additionalDirIndex),
-  verifyGame: game => ipcRenderer.invoke("verify-game", game),
+  verifyGame: (game, libraryDirectory) =>
+    ipcRenderer.invoke("verify-game", game, libraryDirectory),
+  repairGameDlls: (game, libraryDirectory) =>
+    ipcRenderer.invoke("repair-game-dlls", game, libraryDirectory),
   getLauncherImportState: () => ipcRenderer.invoke("get-launcher-import-state"),
   storeAccounts: {
     state: () => ipcRenderer.invoke("store-accounts-state"),

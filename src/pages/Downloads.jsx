@@ -1277,6 +1277,7 @@ const DownloadCard = ({
 }) => {
   const [isReporting, setIsReporting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isRepairingDlls, setIsRepairingDlls] = useState(false);
   const [isLaunchingInstaller, setIsLaunchingInstaller] = useState(false);
   const [installerLaunched, setInstallerLaunched] = useState(false);
   const [isFinishingInstall, setIsFinishingInstall] = useState(false);
@@ -1502,7 +1503,10 @@ const DownloadCard = ({
   const handleVerifyGame = async () => {
     setIsVerifying(true);
     try {
-      const result = await window.electron.verifyGame(game.game);
+      const result = await window.electron.verifyGame(
+        game._folderName || game.game,
+        game._sourceDir
+      );
       if (!result.success) throw new Error(result.error);
       toast.success(t("downloads.verificationSuccess"), {
         description: t("downloads.verificationSuccessDesc"),
@@ -1512,6 +1516,27 @@ const DownloadCard = ({
       toast.error(t("downloads.verificationFailed"));
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  const handleRepairDlls = async () => {
+    setIsRepairingDlls(true);
+    try {
+      const result = await window.electron.repairGameDlls(
+        game._folderName || game.game,
+        game._sourceDir
+      );
+      if (!result.success) throw new Error(result.error);
+      toast.success(
+        t("downloads.dllRepairResult", {
+          count: result.restored,
+          defaultValue: `Restored ${result.restored} missing DLL file(s). Use Verify again to check the installation.`,
+        })
+      );
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsRepairingDlls(false);
     }
   };
 
@@ -2188,10 +2213,25 @@ const DownloadCard = ({
               variant="outline"
               size="sm"
               onClick={handleVerifyGame}
-              disabled={isVerifying}
+              disabled={isVerifying || isRepairingDlls}
             >
               {isVerifying ? t("downloads.verifying") : t("downloads.verifyAgain")}
             </Button>
+            {downloadingData.verifyError.some(error =>
+              /\.dll$/i.test(error.file || "")
+            ) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-2"
+                onClick={handleRepairDlls}
+                disabled={isVerifying || isRepairingDlls}
+              >
+                {isRepairingDlls
+                  ? t("downloads.dllRepairing", { defaultValue: "Restoring DLLs…" })
+                  : t("downloads.dllRepair", { defaultValue: "Restore missing DLLs" })}
+              </Button>
+            )}
           </div>
         )}
 

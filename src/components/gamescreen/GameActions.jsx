@@ -62,6 +62,8 @@ export default function GameActions({
   backupEnabled,
   onBackupSaves,
   onVerifyFiles,
+  onRepairDlls,
+  isRepairingDlls,
   onLaunchOptions,
   onCreateShortcut,
   onCreateStartMenuShortcut,
@@ -212,10 +214,24 @@ export default function GameActions({
               </div>
             </DropdownMenuItem>
             {!game.isCustom && (
-              <DropdownMenuItem className="gap-2" onSelect={onVerifyFiles}>
-                <FileCheck2 className="h-4 w-4" />
-                {t("library.verifyGameFiles")}
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem className="gap-2" onSelect={onVerifyFiles}>
+                  <FileCheck2 className="h-4 w-4" />
+                  {t("library.verifyGameFiles")}
+                </DropdownMenuItem>
+                {!game.privateSource && game.gameID && (
+                  <DropdownMenuItem
+                    className="gap-2"
+                    onSelect={onRepairDlls}
+                    disabled={isRunning || isRepairingDlls}
+                  >
+                    <FileCheck2 className="h-4 w-4" />
+                    {t(
+                      isRepairingDlls ? "downloads.dllRepairing" : "downloads.dllRepair"
+                    )}
+                  </DropdownMenuItem>
+                )}
+              </>
             )}
             {isOnLinux && (
               <DropdownMenuItem className="gap-2" onSelect={onResetPrefix}>

@@ -43,6 +43,7 @@ const {
 const withDownloadOperation = createOperationLock();
 const downloadProcesses = new Map();
 const retryDownloadProcesses = new Map();
+const dllRepair = require("./dllRepair");
 
 /**
  * Log into qBittorrent's WebUI and remove any torrent(s) whose save path
@@ -233,6 +234,11 @@ function registerDownloadHandlers() {
               if (!gameData.downloadingData) {
                 await withDownloadOperation(dir, () =>
                   gameUpdateBackup.finish(path.join(downloadDir, dir))
+                );
+                dllRepair.scheduleContribution(
+                  gameData,
+                  path.join(downloadDir, dir),
+                  `${dir}.ascendara.json`
                 );
               }
 
@@ -858,7 +864,10 @@ function registerDownloadHandlers() {
             provider: browserDirect ? "browser" : linkProvider(link),
             update: updateFlow ? "true" : "false",
           };
-          sendAnalyticsEvent("download_start", { ...analyticsParams, download_size: size });
+          sendAnalyticsEvent("download_start", {
+            ...analyticsParams,
+            download_size: size,
+          });
           trackDownloadOutcome(downloadProcess, gameDirectory, analyticsParams);
           downloadProcess.once("exit", code => {
             if (code === 0 && updateFlow) {
@@ -1333,33 +1342,70 @@ function registerDownloadHandlers() {
     }
   );
 
-  // Verify game handler
-  ipcMain.handle("verify-game", async (_, game) => {
+  ipcMain.handle("repair-game-dlls", async (_, game, libraryDirectory) => {
     try {
-      const settings = settingsManager.getSettings();
-      if (!settings.downloadDirectory) {
-        throw new Error("Download directory not set");
+      const name = sanitizeGameName(sanitizeText(game));
+      if (!name || name !== game || name === "." || name === ".." || /[/\\]/.test(name)) {
+        throw new Error("Invalid game name.");
       }
-      const gameDirectory = path.join(settings.downloadDirectory, game);
-      const filemapPath = path.join(gameDirectory, "filemap.ascendara.json");
-      const gameInfoPath = path.join(gameDirectory, `${game}.ascendara.json`);
+      return await withDownloadOperation(name, async () => {
+        const target = await dllRepair.resolveTarget(
+          settingsManager.getSettings(),
+          name,
+          libraryDirectory
+        );
+        return await dllRepair.run(target.directory, target.metadataName);
+      });
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
 
-      const filemap = JSON.parse(fs.readFileSync(filemapPath, "utf8"));
-      let gameInfo = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
-
+  // Verify game handler
+  ipcMain.handle("verify-game", async (_, game, libraryDirectory) => {
+    try {
+      const target = await dllRepair.resolveTarget(
+        settingsManager.getSettings(),
+        game,
+        libraryDirectory
+      );
+      const gameDirectory = target.directory;
+      const gameInfoPath = await dllRepair.safePath(gameDirectory, target.metadataName);
+      const filemap = JSON.parse(
+        await dllRepair.readBounded(
+          gameDirectory,
+          "filemap.ascendara.json",
+          16 * 1024 * 1024
+        )
+      );
+      const gameInfo = JSON.parse(
+        await dllRepair.readBounded(gameDirectory, target.metadataName, 4 * 1024 * 1024)
+      );
+      const data = gameInfo.downloadingData;
+      if (
+        gameInfo.isRunning ||
+        data?.downloading ||
+        data?.extracting ||
+        data?.verifying ||
+        data?.updating ||
+        data?.awaitingRecoveryAction
+      ) {
+        throw new Error("Wait for the game to finish downloading or running.");
+      }
       const verifyErrors = [];
       for (const filePath in filemap) {
-        const normalizedPath = filePath.replace(/[/\\]/g, path.sep);
-        const fullPath = path.join(gameDirectory, normalizedPath);
-
-        const pathExists =
-          process.platform === "win32"
-            ? fs.existsSync(fullPath.toLowerCase()) ||
-              fs.existsSync(fullPath.toUpperCase()) ||
-              fs.existsSync(fullPath)
-            : fs.existsSync(fullPath);
-
-        if (!pathExists) {
+        try {
+          const fullPath = await dllRepair.safePath(gameDirectory, filePath);
+          const stat = await fs.promises.lstat(fullPath);
+          if (!stat.isFile() || stat.size !== filemap[filePath].size) {
+            verifyErrors.push({
+              file: filePath,
+              error: "File size mismatch",
+              expected_size: filemap[filePath].size,
+            });
+          }
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error;
           verifyErrors.push({
             file: filePath,
             error: "File not found",

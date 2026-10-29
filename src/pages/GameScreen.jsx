@@ -1247,6 +1247,7 @@ function InstalledGameScreen() {
   const location = useLocation();
   const { gameData, libraryPage, returnToFolder } = location.state || {};
   const { settings } = useSettings();
+  const [isRepairingDlls, setIsRepairingDlls] = useState(false);
   const { isAuthenticated, user } = useAuth();
   const [game, setGame] = useState(gameData || null);
   const [ascendAccess, setAscendAccess] = useState({
@@ -2759,6 +2760,22 @@ function InstalledGameScreen() {
             backupEnabled={settings.ludusavi.enabled}
             onBackupSaves={() => setBackupDialogOpen(true)}
             onVerifyFiles={() => setIsVerifyingOpen(true)}
+            isRepairingDlls={isRepairingDlls}
+            onRepairDlls={async () => {
+              setIsRepairingDlls(true);
+              try {
+                const result = await window.electron.repairGameDlls(
+                  game._folderName || game.game || game.name,
+                  game._sourceDir
+                );
+                if (!result.success) throw new Error(result.error);
+                toast.success(t("downloads.dllRepairResult", { count: result.restored }));
+              } catch (error) {
+                toast.error(error.message);
+              } finally {
+                setIsRepairingDlls(false);
+              }
+            }}
             onLaunchOptions={async () => {
               const commands = await window.electron.getLaunchCommands(
                 game.game || game.name,

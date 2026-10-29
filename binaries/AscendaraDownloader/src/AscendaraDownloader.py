@@ -245,6 +245,32 @@ class ProgressWriter:
 class VerificationFailure(RuntimeError):
     pass
 
+class RepairableDllFailure(VerificationFailure):
+    """A new install is intact except for listed DLLs removed after installation."""
+    pass
+
+
+def can_keep_install_for_dll_repair(directory, errors, update_flow, old_map, private_source):
+    if update_flow or old_map is not None or private_source or not errors:
+        return False
+    try:
+        with open(os.path.join(directory, 'dlllist.txt'), encoding='utf-8-sig') as stream:
+            text = stream.read(65537)
+        if len(text) > 65536:
+            return False
+        listed = [line.strip().replace('\\', '/').lower() for line in text.splitlines() if line.strip()]
+        if not 1 <= len(listed) <= 128 or any(not name.endswith('.dll') for name in listed):
+            return False
+        for error in errors:
+            name = error.get('file', '').replace('\\', '/').lower()
+            if error.get('error') != 'File not found' or not name.endswith('.dll'):
+                return False
+            if not any(item == name or ('/' not in item and item == name.rsplit('/', 1)[-1]) for item in listed):
+                return False
+        return True
+    except (OSError, UnicodeError):
+        return False
+
 class SmoothETA:
     """Smooth the predicted finish time while letting seconds count down normally."""
     def __init__(self):
@@ -1260,7 +1286,7 @@ class AscendaraDownloader:
         except InterruptedError:
             logging.info('Download cancelled; retaining source archive and partial download')
         except VerificationFailure:
-            logging.error('Verification failed; previous installation restored')
+            logging.error('Verification failed; source archives retained for recovery')
         except Exception as exc:
             logging.exception('V4 download failed')
             if not self._check_for_stop():
@@ -1779,10 +1805,21 @@ class AscendaraDownloader:
             data['verifying'] = False
             if errors:
                 data['verifyError'] = errors
+                if can_keep_install_for_dll_repair(self.download_dir, errors, self.updateFlow,
+                                                  old_map, self.game_info.get('privateSource')):
+                    self._detect_and_set_executable()
+                    data.update(downloading=False, extracting=False, verifying=False,
+                                progressCompleted='100.00', dllRepairPending=True)
+                    safe_write_json(self.game_info_path, self.game_info)
+                    raise RepairableDllFailure('Missing listed DLLs; installed files retained for repair')
                 safe_write_json(self.game_info_path, self.game_info)
                 raise VerificationFailure('Installed files failed size verification')
             self._detect_and_set_executable()
             self._check_cancelled()
+        except RepairableDllFailure:
+            # No old installation exists in this case. Keep the new payload and
+            # filemap for targeted repair; the downloaded archives also survive.
+            raise
         except BaseException:
             self.game_info.setdefault('downloadingData', data if 'data' in locals() else {})
             try:

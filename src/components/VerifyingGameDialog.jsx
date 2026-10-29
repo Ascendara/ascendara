@@ -42,7 +42,10 @@ const VerifyingGameDialog = ({ game, open, onOpenChange }) => {
     setDownloadingData(prev => ({ ...prev, verifying: true, verifyError: [] }));
 
     try {
-      const result = await window.electron.verifyGame(game.game || game.name);
+      const result = await window.electron.verifyGame(
+        game._folderName || game.game || game.name,
+        game._sourceDir
+      );
 
       if (
         result.error?.includes("ENOENT") &&

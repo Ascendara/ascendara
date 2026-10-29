@@ -2083,6 +2083,9 @@
     }
   },
   "downloads": {
+    "dllRepair": "Restore missing DLLs",
+    "dllRepairResult": "Restored {{count}} missing DLL file(s). Verify the game files to check the installation.",
+    "dllRepairing": "Restoring DLLs…",
     "actionRequired": "Action Required",
     "actions": {
       "cancelAndDelete": "Cancel & Delete",
