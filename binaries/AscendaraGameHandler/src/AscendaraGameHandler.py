@@ -645,6 +645,41 @@ def get_running_processes_in_dir(game_dir, exclude_pids=None):
             continue
     return matches
 
+def refresh_process_tree(seen, root_pid):
+    """Return the live descendants of root_pid, recording every descendant ever
+    seen (pid -> create time) in seen.
+
+    A .bat/launcher can start the real game and exit within milliseconds, so the
+    game is found by its parent pid, which Windows keeps after the parent exits.
+    Comparing create times stops a reused pid from adopting unrelated processes.
+    """
+    if root_pid not in seen:
+        try:
+            seen[root_pid] = psutil.Process(root_pid).create_time()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            seen[root_pid] = 0
+    procs = []
+    for proc in psutil.process_iter(['pid', 'ppid', 'create_time']):
+        info = proc.info
+        if info.get('ppid') is not None and info.get('create_time') is not None:
+            procs.append((proc, info['ppid'], info['create_time']))
+    live = {proc.pid: created for proc, _, created in procs}
+    alive = []
+    found = True
+    while found:
+        found = False
+        for proc, ppid, created in procs:
+            if proc.pid in seen or ppid not in seen or created < seen[ppid]:
+                continue
+            if ppid in live and live[ppid] != seen[ppid]:
+                continue  # parent pid now belongs to an unrelated process
+            seen[proc.pid] = created
+            found = True
+    for proc, _, created in procs:
+        if proc.pid != root_pid and seen.get(proc.pid) == created:
+            alive.append(proc)
+    return alive
+
 ERROR_CANCELLED = 1223
 
 class ElevatedProcess:
@@ -1470,11 +1505,26 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         stub_exited_logged = False
         tracked_related_process = False
         session_end_time = start_time
+        last_alive_time = start_time
+        # Processes spawned by what we launched (e.g. a .bat starting the game).
+        # Only tracked on Windows: under Wine/Proton the tree includes wineserver,
+        # which can outlive the game.
+        track_tree = current_platform == 'windows'
+        tree_seen = {}
+        # How long nothing may be running before the game counts as closed. The
+        # longer startup window bridges launcher -> game handoffs, where the
+        # launcher exits a few seconds before the real game process appears.
+        STARTUP_WINDOW_SECONDS = 300
+        STARTUP_GRACE_SECONDS = 60
+        EXIT_GRACE_SECONDS = 5
         while True:
+            tree_alive = refresh_process_tree(tree_seen, process.pid) if track_tree else []
             if stop_requested.is_set():
                 stop_requested.clear()
                 was_stopped = True
                 targets = {p.pid: p for p in get_running_processes_in_dir(game_root_dir, exclude_pids={handler_pid})}
+                for proc in tree_alive:
+                    targets[proc.pid] = proc
                 if process.poll() is None:
                     try:
                         parent = psutil.Process(process.pid)
@@ -1512,19 +1562,28 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                     )
                     stub_exited_logged = True
                 related_processes = get_running_processes_in_dir(game_root_dir, exclude_pids={handler_pid})
-                game_alive = len(related_processes) > 0
+                game_alive = len(related_processes) > 0 or len(tree_alive) > 0
                 if game_alive:
                     tracked_related_process = True
 
-            if not game_alive:
-                session_end_time = time.time()
-                break
-
             current_time = time.time()
+            if game_alive:
+                last_alive_time = current_time
+            else:
+                if was_stopped:
+                    grace = 0
+                elif last_alive_time - start_time < STARTUP_WINDOW_SECONDS:
+                    grace = STARTUP_GRACE_SECONDS
+                else:
+                    grace = EXIT_GRACE_SECONDS
+                if current_time - last_alive_time >= grace:
+                    session_end_time = last_alive_time
+                    break
+
             elapsed = int(current_time - last_update)
-            
+
             # Wait 180 seconds (3 minutes)
-            if elapsed >= 180: 
+            if game_alive and elapsed >= 180:
                 if is_custom_game and games_json_path:
                     logging.debug(f"Updating play time for custom game during run: {game_name}")
                     update_play_time(games_json_path, True, game_entry, seconds_to_add=180)
