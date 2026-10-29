@@ -12,6 +12,7 @@ lerna-debug.log*
 
 # Dependencies
 node_modules
+.venv/
 dist
 dist-ssr
 *.local
