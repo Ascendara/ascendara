@@ -80,6 +80,7 @@ import {
   List as ListIcon,
   ChevronRight,
   Wrench,
+  PanelLeft,
   Info,
   X,
 } from "lucide-react";
@@ -133,6 +134,7 @@ import { useStoreLibrary } from "@/hooks/useStoreLibrary";
 import { storeGameKey, storeLibraryEntries, storeNames } from "@/lib/storeLibrary";
 import LibraryBackupsDialog from "@/components/LibraryBackupsDialog";
 import NewFolderDialog from "@/components/NewFolderDialog";
+import LibraryPagesDialog from "@/components/LibraryPagesDialog";
 import MoveToFolderDialog from "@/components/MoveToFolderDialog";
 import FolderCard from "@/components/FolderCard";
 import EditCoverDialog from "@/components/EditCoverDialog";
@@ -310,6 +312,7 @@ const Library = () => {
     };
   }, []);
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [isLibraryPagesOpen, setIsLibraryPagesOpen] = useState(false);
   const [gameToMove, setGameToMove] = useState(null);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -386,6 +389,15 @@ const Library = () => {
   const [wishlistTabHidden, setWishlistTabHidden] = useState(
     () => localStorage.getItem("library-wishlist-hidden") === "true"
   );
+  // Sidebar pages the user turned off from the library pages dialog
+  const [hiddenSidebarTabs, setHiddenSidebarTabs] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("library-hidden-tabs") || "[]");
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  });
   // Play Later games state
   const [playLaterGames, setPlayLaterGames] = useState([]);
   // History (deleted games with preserved stats) state
@@ -423,9 +435,12 @@ const Library = () => {
     const order = saved
       ? JSON.parse(saved)
       : ["all", "favoritesGallery", "cloud", "wishlist", "playLater", "history"];
+    const hiddenTabs = localStorage.getItem("library-hidden-tabs") || "[]";
     return (
       order.find(
-        id => id !== "hiddenFolders" || loadFolders().some(folder => folder.hidden)
+        id =>
+          !hiddenTabs.includes(`"${id}"`) &&
+          (id !== "hiddenFolders" || loadFolders().some(folder => folder.hidden))
       ) || "all"
     );
   }); // "all" | "favoritesGallery" | "cloud" | "wishlist" | "playLater" | "history"
@@ -1637,7 +1652,7 @@ const Library = () => {
     account => account.store === "steam" && account.connected
   );
 
-  const sidebarTabs = [
+  const allSidebarTabs = [
     {
       id: "all",
       label: t("library.pageTitle") || "All Games",
@@ -1692,7 +1707,52 @@ const Library = () => {
       label: t("retro.title"),
       icon: <Gamepad2 className="h-4 w-4" />,
     },
-  ].filter(tab => !tab.hidden);
+  ];
+  const sidebarTabs = allSidebarTabs.filter(
+    tab => !tab.hidden && !hiddenSidebarTabs.includes(tab.id)
+  );
+
+  const setSidebarTabVisible = (id, visible) => {
+    const next = visible
+      ? hiddenSidebarTabs.filter(tabId => tabId !== id)
+      : [...new Set([...hiddenSidebarTabs, id])];
+    setHiddenSidebarTabs(next);
+    safeSetItem("library-hidden-tabs", JSON.stringify(next));
+    // Turning the wishlist back on also undoes dismissing its Ascend pitch
+    if (id === "wishlist" && visible && wishlistTabHidden) {
+      localStorage.removeItem("library-wishlist-hidden");
+      setWishlistTabHidden(false);
+    }
+    if (!visible && activeTab === id) {
+      setActiveTab("all");
+      if (id === "retro") {
+        const params = new URLSearchParams(location.search);
+        params.delete("tab");
+        navigate({ search: params.toString() ? `?${params}` : "" }, { replace: true });
+      }
+    }
+  };
+
+  // "All Games" is the fallback page, so it can't be turned off
+  const libraryPages = [
+    ...sidebarTabOrder.map(id => allSidebarTabs.find(tab => tab.id === id)),
+    ...allSidebarTabs.filter(tab => !sidebarTabOrder.includes(tab.id)),
+  ]
+    .filter(tab => tab && tab.id !== "all")
+    .map(tab => ({
+      id: tab.id,
+      label: tab.label,
+      icon: tab.icon,
+      visible:
+        !hiddenSidebarTabs.includes(tab.id) &&
+        !(tab.id === "wishlist" && !hasAscend && wishlistTabHidden),
+      hint:
+        tab.id === "hiddenFolders" && tab.hidden
+          ? t("library.pagesDialog.hiddenFoldersHint")
+          : tab.id === "cloud" && tab.hidden
+            ? t("library.pagesDialog.cloudHint")
+            : undefined,
+    }));
 
   // Subtle reminder to sync the library to the cloud if it's been a while.
   // "A while" = 3+ days since the last sync (or never synced at all).
@@ -1896,23 +1956,61 @@ const Library = () => {
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent
+              align="end"
+              collisionPadding={12}
+              className="w-72 p-1.5"
+            >
               <DropdownMenuItem
-                className="gap-2"
+                className="gap-3 rounded-md px-2 py-2"
                 onSelect={() => {
                   storeLibrary.refresh();
                   setIsImportChooserOpen(true);
                 }}
               >
-                <Import className="h-4 w-4 text-muted-foreground" />
-                {t("library.importChooser.menuItem")}
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <Import className="h-4 w-4" />
+                </span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-medium">
+                    {t("library.importChooser.menuItem")}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {t("library.importChooser.menuItemDesc")}
+                  </span>
+                </span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="gap-2"
+                className="gap-3 rounded-md px-2 py-2"
                 onSelect={() => setIsNewFolderOpen(true)}
               >
-                <FolderPlus className="h-4 w-4 text-muted-foreground" />
-                {t("library.newFolder.create") || "New Folder"}
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                  <FolderPlus className="h-4 w-4" />
+                </span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-medium">
+                    {t("library.newFolder.create") || "New Folder"}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {t("library.newFolder.menuItemDesc")}
+                  </span>
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-3 rounded-md px-2 py-2"
+                onSelect={() => setIsLibraryPagesOpen(true)}
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                  <PanelLeft className="h-4 w-4" />
+                </span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-medium">
+                    {t("library.pagesDialog.menuItem")}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {t("library.pagesDialog.menuItemDesc")}
+                  </span>
+                </span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -2171,6 +2269,12 @@ const Library = () => {
           open={isNewFolderOpen}
           onOpenChange={setIsNewFolderOpen}
           onCreate={handleCreateFolder}
+        />
+        <LibraryPagesDialog
+          open={isLibraryPagesOpen}
+          onOpenChange={setIsLibraryPagesOpen}
+          pages={libraryPages}
+          onToggle={setSidebarTabVisible}
         />
         <LibraryBackupsDialog
           canManage={

@@ -2974,6 +2974,7 @@
       "description": "Already have games on Steam, Epic Games or another launcher? Bring them into Ascendara so all your games are in one place.",
       "hint": "Not sure where to start? Choose games installed on this PC. You can always come back and do the other later.",
       "menuItem": "Import from other launchers",
+      "menuItemDesc": "Steam, Epic Games, GOG and more",
       "recommended": "Recommended",
       "scanDescription": "Finds games you have already downloaded with Steam, Epic Games, GOG, Ubisoft or Battle.net and adds them here. Nothing is moved or downloaded again.",
       "scanRunning": "A scan is running",
@@ -3224,6 +3225,7 @@
       "create": "Create Folder",
       "desc": "Enter a name for the new folder",
       "exists": "A folder with this name already exists",
+      "menuItemDesc": "Group games into a collection",
       "placeholder": "Folder Name",
       "required": "Folder name is required",
       "title": "New Folder"
@@ -3236,6 +3238,15 @@
     "openGameDirectory": "Open Game Directory",
     "pageSubtitle": "All your installed games in one place.",
     "pageTitle": "All Games",
+    "pagesDialog": {
+      "cloudHint": "Only shows while you're signed in",
+      "description": "Choose which pages show in the library sidebar.",
+      "done": "Done",
+      "hiddenFoldersHint": "Only shows once you hide a folder",
+      "menuItem": "Library pages",
+      "menuItemDesc": "Show or hide sidebar pages",
+      "title": "Library pages"
+    },
     "play": "Play",
     "playLater": {
       "addedOn": "Added",
