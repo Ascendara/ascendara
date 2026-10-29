@@ -1813,6 +1813,13 @@ function InstalledGameScreen() {
       }
     };
 
+    const handleSteamNotRunningWarning = (_event, data) => {
+      const gameName = game?.game || game?.name;
+      if (data?.game === gameName) {
+        setShowSteamNotRunningWarning(true);
+      }
+    };
+
     const unsubLaunchError = window.electron.onGameLaunchError(handleGameLaunchError);
     const unsubCoverUpdated = window.electron.onCoverImageUpdated(
       handleCoverImageUpdated
@@ -1821,12 +1828,16 @@ function InstalledGameScreen() {
       handleGameAssetsUpdated(null, data)
     );
     const unsubGameClosed = window.electron.onGameClosed(handleGameClosed);
+    const unsubSteamWarning = window.electron.onSteamNotRunningWarning(
+      handleSteamNotRunningWarning
+    );
 
     return () => {
       unsubLaunchError();
       unsubCoverUpdated();
       unsubAssetsUpdated();
       unsubGameClosed();
+      unsubSteamWarning();
     };
   }, [isInitialized, setShowRateDialog, game]); // Add required dependencies
 

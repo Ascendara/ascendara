@@ -239,6 +239,20 @@ def launch_with_proton(exe_path, linux_config, game_launch_cmd=None):
     extra_env, extra_args = _split_env_and_args(game_launch_cmd)
     env.update(extra_env)
 
+    # Online-Fix environment variables
+    if linux_config.get("steamappid"):
+        env["SteamAppId"] = linux_config["steamappid"]
+        env["SteamGameId"] = linux_config["steamappid"]
+    if linux_config.get("winedlloverrides"):
+        existing = env.get("WINEDLLOVERRIDES", "")
+        merged = ";".join(filter(None, [existing, linux_config["winedlloverrides"]]))
+        env["WINEDLLOVERRIDES"] = merged
+    if linux_config.get("winedlloverrides") or linux_config.get("steamappid"):
+        logging.info(
+            f"[Proton] Online-Fix: SteamAppId={env.get('SteamAppId')}, "
+            f"WINEDLLOVERRIDES={env.get('WINEDLLOVERRIDES')}"
+        )
+
     cmd = [proton_script, "run", exe_path]
     cmd.extend(extra_args)
 

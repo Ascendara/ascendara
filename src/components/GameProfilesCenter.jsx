@@ -457,11 +457,87 @@ const GameProfilesCenter = () => {
                           }
                           placeholder="WINEDLLOVERRIDES"
                         />
+                        <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="profile-of-proton-direct" className="text-sm font-medium">
+                              Launch via Proton Direct
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              Bypasses UMU-Launcher so OnlineFix works. Steam must be running in the background.
+                            </p>
+                          </div>
+                          <Switch
+                            id="profile-of-proton-direct"
+                            checked={profile.onlineFix?.useProtonDirect !== false}
+                            onCheckedChange={v =>
+                              setProfile(cur => ({
+                                ...cur,
+                                onlineFix: {
+                                  ...cur.onlineFix,
+                                  useProtonDirect: Boolean(v),
+                                },
+                              }))
+                            }
+                            aria-label="Launch via Proton Direct"
+                          />
+                        </div>
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No Online-Fix fix detected.
-                      </p>
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          No Online-Fix fix detected in the game folder.
+                          If you know this game uses one (fix added after import,
+                          unrecognized file names, manual installation), you can
+                          force Proton Direct manually and provide the overrides
+                          yourself.
+                        </p>
+                        <div className="flex items-start justify-between gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="profile-of-force-proton-direct" className="text-sm font-medium">
+                              Force Proton Direct (expert mode)
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              Steam must be running in the background. Only enable this
+                              if you are sure this game uses OnlineFix.
+                            </p>
+                          </div>
+                          <Switch
+                            id="profile-of-force-proton-direct"
+                            checked={profile.onlineFix?.useProtonDirect === true}
+                            onCheckedChange={v =>
+                              setProfile(cur => ({
+                                ...cur,
+                                onlineFix: v
+                                  ? { ...(cur.onlineFix || {}), useProtonDirect: true }
+                                  : null,
+                              }))
+                            }
+                            aria-label="Force Proton Direct"
+                          />
+                        </div>
+                        {profile.onlineFix?.useProtonDirect === true && (
+                          <div className="space-y-2">
+                            <Label htmlFor="profile-of-manual-overrides" className="text-sm font-medium">
+                              WINEDLLOVERRIDES (optional)
+                            </Label>
+                            <Input
+                              id="profile-of-manual-overrides"
+                              className="font-mono text-xs"
+                              value={profile.onlineFix?.overrides || ""}
+                              onChange={e =>
+                                setProfile(cur => ({
+                                  ...cur,
+                                  onlineFix: {
+                                    ...(cur.onlineFix || {}),
+                                    overrides: e.target.value,
+                                  },
+                                }))
+                              }
+                              placeholder="e.g. onlinefix64=n;winmm=n,b"
+                            />
+                          </div>
+                        )}
+                      </div>
                     )}
                   </FeatureSection>
                 )}

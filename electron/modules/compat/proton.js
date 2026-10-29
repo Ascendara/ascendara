@@ -1379,8 +1379,12 @@ async function buildLaunchConfig(
   const winePrefix = path.join(compatDataPath, "pfx");
   fs.ensureDirSync(winePrefix);
 
-  // UMU Mode (prioritized if umu-run is installed)
-  if (isUmuInstalled()) {
+  // UMU Mode (prioritized if umu-run is installed, unless OnlineFix forces Proton direct)
+  // Proton Direct is triggered whenever the user (or the parser) has set
+  // useProtonDirect to true. This works even when detection failed, so the
+  // user can manually force Proton Direct for a game the parser missed.
+  const forceProtonDirect = !!onlineFix?.useProtonDirect;
+  if (isUmuInstalled() && !forceProtonDirect) {
     const runner = await resolveRunner(gameRunnerOverride);
 
     const env = {
@@ -1400,20 +1404,6 @@ async function buildLaunchConfig(
       env.STORE = store;
     }
 
-    // Online-Fix : WINEDLLOVERRIDES + fake AppID + Steam runtime
-    if (onlineFix?.detected) {
-      if (onlineFix.overrides) {
-        const existing = env.WINEDLLOVERRIDES;
-        env.WINEDLLOVERRIDES = existing
-          ? `${existing};${onlineFix.overrides}`
-          : onlineFix.overrides;
-      }
-      if (onlineFix.fakeAppId) {
-        env.SteamAppId = String(onlineFix.fakeAppId);
-        env.SteamGameId = String(onlineFix.fakeAppId);
-        env.UMU_USE_STEAM = "1";
-      }
-    }
 
     return {
       cmd: [linuxUmuBin, exePath],
@@ -1433,12 +1423,22 @@ async function buildLaunchConfig(
   }
 
   if (runner.type === "proton") {
+    const protonEnv = {
+      STEAM_COMPAT_DATA_PATH: compatDataPath,
+      STEAM_COMPAT_CLIENT_INSTALL_PATH: findSteamInstallPath(),
+    };
+    if (onlineFix?.detected) {
+      if (onlineFix.overrides) {
+        protonEnv.WINEDLLOVERRIDES = onlineFix.overrides;
+      }
+      if (onlineFix.fakeAppId) {
+        protonEnv.SteamAppId = String(onlineFix.fakeAppId);
+        protonEnv.SteamGameId = String(onlineFix.fakeAppId);
+      }
+    }
     return {
       cmd: [path.join(runner.path, "proton"), "run", exePath],
-      env: {
-        STEAM_COMPAT_DATA_PATH: compatDataPath,
-        STEAM_COMPAT_CLIENT_INSTALL_PATH: findSteamInstallPath(),
-      },
+      env: protonEnv,
       runner,
       compatDataPath,
       mode: "proton-direct",

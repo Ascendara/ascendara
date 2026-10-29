@@ -457,6 +457,11 @@ contextBridge.exposeInMainWorld("electron", {
       includeEventPlaceholder: true,
       selectArgs: args => [args[0]],
     }),
+  onSteamNotRunningWarning: callback =>
+    preloadIpc.subscribe("steam-not-running-warning", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
   onGameClosed: callback =>
     preloadIpc.subscribe("game-closed", callback, {
       includeEventPlaceholder: true,

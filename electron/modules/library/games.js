@@ -894,6 +894,56 @@ function registerGameHandlers() {
             console.warn("[Games] Could not read onlineFix metadata:", e.message);
           }
 
+          // Auto-scan if missing or stale (>7 days)
+          const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+          const isStale =
+            !onlineFix || !onlineFix._lastScan
+              ? true
+              : Date.now() - onlineFix._lastScan > SEVEN_DAYS_MS;
+          if (isStale) {
+            try {
+              const scanned = await parseOnlineFix(gameDirectory);
+              if (scanned) {
+                // Preserve user's useProtonDirect choice if any
+                if (onlineFix && typeof onlineFix.useProtonDirect === "boolean") {
+                  scanned.useProtonDirect = onlineFix.useProtonDirect;
+                }
+                onlineFix = scanned;
+                console.log(`[Games] OnlineFix: auto-scan detected ${scanned.fixType} fix`);
+
+                // Persist so the UI (Game Profiles) sees the detection
+                try {
+                  if (!isCustom) {
+                    const giPath = path.join(
+                      gameDirectory,
+                      `${sanitizeGameName(game)}.ascendara.json`
+                    );
+                    if (fs.existsSync(giPath)) {
+                      const gi = JSON.parse(fs.readFileSync(giPath, "utf8"));
+                      gi.onlineFix = scanned;
+                      fs.writeFileSync(giPath, JSON.stringify(gi, null, 2));
+                    }
+                  } else {
+                    const gamesPath = path.join(settings.downloadDirectory, "games.json");
+                    const gd = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
+                    const idx = gd.games.findIndex(g => g.game === game && !g._isDeleted);
+                    if (idx !== -1) {
+                      gd.games[idx].onlineFix = scanned;
+                      fs.writeFileSync(gamesPath, JSON.stringify(gd, null, 2));
+                    }
+                  }
+                } catch (persistErr) {
+                  console.warn("[Games] Could not persist auto-scan:", persistErr.message);
+                }
+              } else if (onlineFix) {
+                // Keep previous data but bump timestamp so it doesn't rescan every launch
+                onlineFix = { ...onlineFix, _lastScan: Date.now() };
+              }
+            } catch (e) {
+              console.warn("[Games] Auto-scan failed:", e.message);
+            }
+          }
+
           const launchConfig = await proton.buildLaunchConfig(
             game,
             executable,
@@ -924,7 +974,7 @@ function registerGameHandlers() {
             proton.findSteamInstallPath()
           );
 
-          // If UMU mode, append necessary env arguments
+          // UMU-specific arguments
           if (launchConfig.mode === "umu") {
             gameHandlerArgs.push(
               "--linux-umu-id",
@@ -932,8 +982,13 @@ function registerGameHandlers() {
               "--linux-proton-path",
               launchConfig.env.PROTONPATH || ""
             );
+            if (launchConfig.env.UMU_USE_STEAM === "1") {
+              gameHandlerArgs.push("--linux-umu-use-steam", "1");
+            }
+          }
 
-            // Online-Fix env
+          // OnlineFix overrides (applies to both UMU and Proton-direct modes)
+          if (launchConfig.env) {
             if (launchConfig.env.WINEDLLOVERRIDES) {
               gameHandlerArgs.push(
                 "--linux-winedlloverrides",
@@ -943,8 +998,23 @@ function registerGameHandlers() {
             if (launchConfig.env.SteamAppId) {
               gameHandlerArgs.push("--linux-steamappid", launchConfig.env.SteamAppId);
             }
-            if (launchConfig.env.UMU_USE_STEAM === "1") {
-              gameHandlerArgs.push("--linux-umu-use-steam", "1");
+          }
+
+          // Block if OnlineFix runs in proton-direct mode without Steam
+          if (launchConfig.mode === "proton-direct" && onlineFix?.detected) {
+            let steamRunning = false;
+            try {
+              execSync("pgrep -x steam", { stdio: "ignore" });
+              steamRunning = true;
+              console.log("[Games] OnlineFix: Steam is running");
+            } catch {
+              steamRunning = false;
+            }
+            if (!steamRunning) {
+              event.sender.send("steam-not-running-warning", { game });
+              throw new Error(
+                "OnlineFix requires Steam to be running. Please start Steam, then launch the game again."
+              );
             }
           }
 
@@ -2290,6 +2360,33 @@ function registerGameHandlers() {
       }
       if (!gameDir) return { success: false, error: "Game directory not found" };
       const result = await parseOnlineFix(gameDir);
+      if (result) {
+        // Preserve user's useProtonDirect choice if they had one
+        let existing = null;
+        try {
+          if (!isCustom) {
+            for (const dir of [
+              settings.downloadDirectory,
+              ...(settings.additionalDirectories || []),
+            ].filter(Boolean)) {
+              const p = path.join(
+                dir,
+                sanitizeGameName(game),
+                `${sanitizeGameName(game)}.ascendara.json`
+              );
+              if (fs.existsSync(p)) {
+                existing = JSON.parse(fs.readFileSync(p, "utf8")).onlineFix;
+                break;
+              }
+            }
+          } else {
+            existing = findCustomGame(game, settings)?.onlineFix || null;
+          }
+        } catch {}
+        if (existing && typeof existing.useProtonDirect === "boolean") {
+          result.useProtonDirect = existing.useProtonDirect;
+        }
+      }
       return { success: true, onlineFix: result };
     } catch (err) {
       return { success: false, error: err.message };

@@ -134,6 +134,8 @@ async function parseOnlineFix(gameDir) {
     overrides: overrides.join(";"),
     fakeAppId: fakeAppId || "480",
     realAppId: realAppId || fakeAppId || "480",
+    useProtonDirect: true,
+    _lastScan: Date.now(),
   };
 }
 
