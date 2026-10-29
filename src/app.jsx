@@ -19,6 +19,7 @@ import FirstIndexDialog from "@/components/FirstIndexDialog";
 import BranchWelcomeDialog from "@/components/BranchWelcomeDialog";
 import UpdateOverlay from "@/components/UpdateOverlay";
 import ChangelogDialog from "@/components/ChangelogDialog";
+import DllSharingConsentDialog from "@/components/DllSharingConsentDialog";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { TourProvider } from "@/context/TourContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
@@ -1268,6 +1269,15 @@ const AppRoutes = () => {
   const [welcomeData, setWelcomeData] = useState(null);
   const [showWatcherWarn, setShowWatcherWarn] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [showDllSharingConsent, setShowDllSharingConsent] = useState(false);
+
+  // Existing users are asked once whether to enroll in DLL sharing. New users
+  // accept the current terms during welcome and are marked as asked there.
+  const promptDllSharingIfNeeded = async hasLaunched => {
+    if (!hasLaunched || !(await window.electron.isV7())) return;
+    if (await window.electron.getTimestampValue("dllSharingPromptSeen")) return;
+    setShowDllSharingConsent(true);
+  };
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -1443,15 +1453,15 @@ const AppRoutes = () => {
           // Clear the updating flag after a delay
           setTimeout(async () => {
             await window.electron.setTimestampValue("isUpdating", false);
-            await checkAndSetWelcomeStatus();
-            setIsUpdating(false);
-            setIsLoading(false);
-
+            const hasLaunched = await checkAndSetWelcomeStatus();
             // Only show changelog on live branch
             const branch = await window.electron.getBranch();
             if (branch === "live") {
               setShowChangelog(true);
             }
+            await promptDllSharingIfNeeded(hasLaunched);
+            setIsUpdating(false);
+            setIsLoading(false);
 
             // Use testing version for non-live branches
             let versionToShow = __APP_VERSION__;
@@ -1472,6 +1482,7 @@ const AppRoutes = () => {
         }
 
         const hasLaunched = await checkAndSetWelcomeStatus();
+        await promptDllSharingIfNeeded(hasLaunched);
         const isWindows = await window.electron.isOnWindows();
         if (hasLaunched && isWindows) {
           const isWatchdogActive = await window.electron.isWatchdogRunning();
@@ -1528,6 +1539,7 @@ const AppRoutes = () => {
 
   const handleWelcomeComplete = async (withTour = false) => {
     setWelcomeData({ isNew: false, isV7: true });
+    await window.electron.setTimestampValue("dllSharingPromptSeen", true);
 
     // Persist tour intent via sessionStorage instead of a query param.
     // Query params are fragile here because the interim renders between
@@ -1952,6 +1964,21 @@ const AppRoutes = () => {
         open={showChangelog}
         onOpenChange={setShowChangelog}
         currentVersion={__APP_VERSION__}
+      />
+      {/* Waits until the changelog and any other startup dialog is dismissed */}
+      <DllSharingConsentDialog
+        open={
+          showDllSharingConsent &&
+          !effectiveShowWelcome &&
+          !showChangelog &&
+          !showWatcherWarn &&
+          !showBranchWelcome &&
+          !showFirstIndexDialog &&
+          !showSupportDialog &&
+          !showPlatformWarning &&
+          !isBrokenVersion
+        }
+        onOpenChange={setShowDllSharingConsent}
       />
     </>
   );

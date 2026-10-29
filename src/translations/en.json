@@ -207,6 +207,14 @@
       "title": "Oh no...",
       "troubleshooting": "Try these steps to resolve the issue:"
     },
+    "dllSharingConsent": {
+      "and": "and the",
+      "decline": "Not now",
+      "enroll": "Enable DLL sharing",
+      "intro": "This update adds optional DLL sharing, and Ascendara's Terms of Service and Privacy Policy have been updated to cover it. Please review them and choose whether to take part. You can change this anytime in Settings.",
+      "readPolicies": "I have read the updated",
+      "title": "Help repair games for everyone"
+    },
     "downloading-update": "Downloading Update...",
     "experiment": "EXPERIMENTAL",
     "firstIndexDialog": {
