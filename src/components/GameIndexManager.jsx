@@ -1569,9 +1569,6 @@ const GameIndexManager = ({
                 <h1 className="mb-0 text-3xl font-bold tracking-tight">
                   {t("externalSources.title")}
                 </h1>
-                <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                  {t("localRefresh.experimental") || "Experimental"}
-                </Badge>
               </div>
               <p className="mt-1 max-w-2xl text-muted-foreground">
                 {t("externalSources.description")}{" "}
@@ -2121,7 +2118,9 @@ const GameIndexManager = ({
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {t("localRefresh.heroDescAscendara")}
+                      {customSourcesMode
+                        ? t("localRefresh.heroDescAscendaraInactive")
+                        : t("localRefresh.heroDescAscendara")}
                     </p>
                   </div>
 
@@ -2231,12 +2230,6 @@ const GameIndexManager = ({
                       <h3 className="mb-0 text-base font-semibold text-foreground">
                         {t("externalSources.title")}
                       </h3>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] uppercase tracking-wide"
-                      >
-                        {t("localRefresh.experimental") || "Experimental"}
-                      </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {customSourcesMode

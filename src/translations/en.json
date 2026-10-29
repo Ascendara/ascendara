@@ -3486,6 +3486,7 @@
     "gamesProcessed": "Games Processed",
     "getStarted": "Get the index",
     "heroDescAscendara": "You are using the official Ascendara Game Index.",
+    "heroDescAscendaraInactive": "The official Ascendara Game Index is inactive while an external source is in use.",
     "heroDescCustomActive": "Pulling games from your selected external source.",
     "heroDescCustomEmpty": "Set a source bucket URL below to start pulling games.",
     "hourAgo": "hour ago",
