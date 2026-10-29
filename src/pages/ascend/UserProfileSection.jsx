@@ -11,6 +11,7 @@ import {
   Loader2,
   MessageCircle,
   UserPlus,
+  UserX,
   X,
   Clock,
   ArrowLeft,
@@ -254,6 +255,14 @@ export default function UserProfileSection({
                         <Button variant="outline" className="gap-2" disabled>
                           <Inbox className="h-4 w-4 text-blue-500" />
                           {t("ascend.friends.requestReceived") || "Request Received"}
+                        </Button>
+                      );
+                    } else if (viewingProfile.allowFriendRequests === false) {
+                      return (
+                        <Button variant="outline" className="gap-2" disabled>
+                          <UserX className="h-4 w-4" />
+                          {t("ascend.friends.notAcceptingRequests") ||
+                            "Not Accepting Requests"}
                         </Button>
                       );
                     } else {

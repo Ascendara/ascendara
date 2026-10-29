@@ -1,6 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Eye, LockIcon } from "lucide-react";
+import { Eye, LockIcon, UserPlus } from "lucide-react";
 
 export default function PrivacySettingsCard({ t, userData, updateData }) {
   return (
@@ -50,6 +50,54 @@ export default function PrivacySettingsCard({ t, userData, updateData }) {
                     }
                   } catch (e) {
                     console.error("Failed to update privacy setting:", e);
+                    toast.error(
+                      t("ascend.settings.privacyUpdateFailed") ||
+                        "Failed to update privacy setting"
+                    );
+                  }
+                }}
+                className="h-5 w-5"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <UserPlus className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">
+                  {t("ascend.settings.allowFriendRequests") || "Allow Friend Requests"}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t("ascend.settings.allowFriendRequestsDescription") ||
+                  "When disabled, other users won't be able to send you friend requests."}
+              </p>
+            </div>
+            <div className="ml-4">
+              <Checkbox
+                id="allowFriendRequests"
+                checked={userData?.allowFriendRequests !== false}
+                onCheckedChange={async checked => {
+                  try {
+                    const result = await updateData({ allowFriendRequests: checked });
+                    if (result.success) {
+                      toast.success(
+                        checked
+                          ? t("ascend.settings.allowFriendRequestsOn") ||
+                              "Friend requests are now turned on"
+                          : t("ascend.settings.allowFriendRequestsOff") ||
+                              "Friend requests are now turned off"
+                      );
+                    } else {
+                      toast.error(
+                        result.error ||
+                          t("ascend.settings.privacyUpdateFailed") ||
+                          "Failed to update privacy setting"
+                      );
+                    }
+                  } catch (e) {
+                    console.error("Failed to update friend request setting:", e);
                     toast.error(
                       t("ascend.settings.privacyUpdateFailed") ||
                         "Failed to update privacy setting"

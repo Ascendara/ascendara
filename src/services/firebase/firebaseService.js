@@ -717,6 +717,7 @@ export const updateUserData = async (uid, data) => {
       "profileStats",
       "private",
       "hidePartnerAds",
+      "allowFriendRequests",
     ];
 
     for (const field of allowedFields) {
@@ -1936,6 +1937,7 @@ export const searchUsers = async searchQuery => {
         reviewCount: data.reviewCount,
         discordLinked: Boolean(data.socials?.linkedDiscord),
         private: isPrivate,
+        allowFriendRequests: data.allowFriendRequests !== false,
         status: statusMap.get(uid) || "offline",
         level: isPrivate ? 0 : data.profileStats?.level || 1,
         totalPlaytime: isPrivate ? 0 : totalPlaytime,
@@ -2041,6 +2043,7 @@ export const getUserPublicProfile = async userId => {
           reviewCount: userData.reviewCount,
           discordLinked: Boolean(userData.socials?.linkedDiscord),
           isFriend,
+          allowFriendRequests: userData.allowFriendRequests !== false,
           private: true,
         },
         error: null,
@@ -2073,6 +2076,7 @@ export const getUserPublicProfile = async userId => {
         totalAchievements,
         unlockedAchievements,
         isFriend,
+        allowFriendRequests: userData.allowFriendRequests !== false,
         private: false,
       },
       error: null,
@@ -2131,6 +2135,11 @@ export const sendFriendRequest = async toUid => {
     // Get target user's display name
     const toUserDoc = await getDoc(doc(db, "users", toUid));
     const toDisplayName = toUserDoc.data()?.displayName || "Unknown";
+
+    // The rules enforce this too; checking here gives a readable error
+    if (toUserDoc.data()?.allowFriendRequests === false) {
+      return { success: false, error: "This user isn't accepting friend requests" };
+    }
 
     // Create friend request. The rules require this "<from>_<to>" ID so the
     // same pair can't stack duplicate requests.

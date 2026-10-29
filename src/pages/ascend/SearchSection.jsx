@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Search,
   UserPlus,
+  UserX,
   Clock,
   Gamepad2,
   LockIcon,
@@ -241,6 +242,19 @@ export default function SearchSection({
                             >
                               <Inbox className="mr-2 h-4 w-4" />
                               {t("ascend.friends.requestReceived") || "Request Received"}
+                            </Button>
+                          );
+                        } else if (result.allowFriendRequests === false) {
+                          return (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-xl"
+                              disabled
+                            >
+                              <UserX className="mr-2 h-4 w-4" />
+                              {t("ascend.friends.notAcceptingRequests") ||
+                                "Not Accepting Requests"}
                             </Button>
                           );
                         } else {
