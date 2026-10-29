@@ -5019,6 +5019,17 @@
       "showDescription": "Include games you own on other stores, even when they are not installed."
     },
     "failed": "The account operation failed. Please try again.",
+    "fixShortcut": {
+      "cover": "Cover",
+      "description": "Change how this game appears in your library. The store library is not changed.",
+      "invalidImage": "Choose a PNG or JPEG image under 20MB.",
+      "menuDescription": "Change its name or cover",
+      "name": "Name",
+      "resetCover": "Use store cover",
+      "saved": "Shortcut updated",
+      "title": "Fix this shortcut",
+      "uploadCover": "Upload cover"
+    },
     "gameCount": "{{count}} games",
     "installNamed": "Install with {{store}}",
     "installed": "Installed",

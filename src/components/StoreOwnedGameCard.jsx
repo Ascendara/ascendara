@@ -11,6 +11,7 @@ import {
   Play,
   Timer,
   Trash2,
+  Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -20,9 +21,10 @@ import { useGameRunning } from "@/hooks/useGameRunning";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
 import { storeNames } from "@/lib/storeLibrary";
+import FixStoreShortcutDialog from "@/components/FixStoreShortcutDialog";
 
 const MENU_WIDTH = 260;
-const MENU_HEIGHT = 250;
+const MENU_HEIGHT = 310;
 
 function MenuItem({ icon: Icon, iconClassName, destructive, title, description, onClick }) {
   return (
@@ -57,6 +59,7 @@ export default function StoreOwnedGameCard({
   favorite,
   onToggleFavorite,
   onRemove,
+  onRename,
   selectionMode = false,
   isSelected = false,
   onSelect,
@@ -68,6 +71,7 @@ export default function StoreOwnedGameCard({
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [fixOpen, setFixOpen] = useState(false);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -149,6 +153,23 @@ export default function StoreOwnedGameCard({
     action();
   };
 
+  // The dialog portals out, but React still bubbles its events to the card
+  const fixDialog = (
+    <span
+      className="contents"
+      onClick={event => event.stopPropagation()}
+      onContextMenu={event => event.stopPropagation()}
+    >
+      <FixStoreShortcutDialog
+        open={fixOpen}
+        onOpenChange={setFixOpen}
+        game={game}
+        artwork={artwork}
+        onRename={onRename}
+      />
+    </span>
+  );
+
   const contextMenuPortal =
     contextMenuOpen &&
     createPortal(
@@ -208,6 +229,12 @@ export default function StoreOwnedGameCard({
                 />
               )}
               <MenuItem
+                icon={Wrench}
+                title={t("storeAccounts.fixShortcut.title")}
+                description={t("storeAccounts.fixShortcut.menuDescription")}
+                onClick={fromMenu(() => setFixOpen(true))}
+              />
+              <MenuItem
                 icon={Trash2}
                 destructive
                 title={t("common.contextMenu.removeGame")}
@@ -246,6 +273,7 @@ export default function StoreOwnedGameCard({
         className="group relative flex cursor-pointer items-center gap-4 rounded-xl border border-border/60 bg-card p-2 pr-4 shadow-sm transition-all duration-200 hover:border-primary/30 hover:bg-accent/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         {contextMenuPortal}
+        {fixDialog}
         {selectionCheckbox}
 
         <div className="relative h-[72px] w-56 shrink-0 overflow-hidden rounded-lg bg-zinc-900 shadow-sm md:w-64">
@@ -364,6 +392,7 @@ export default function StoreOwnedGameCard({
       className="press group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
       {contextMenuPortal}
+      {fixDialog}
       {selectionCheckbox}
 
       <CardContent className="p-0">

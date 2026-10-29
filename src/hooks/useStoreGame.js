@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 const images = new Map();
 const pending = new Map();
+
+// Shares a changed cover with every card and screen showing this game.
+export function updateStoreArtwork(key, artwork) {
+  images.set(key, artwork);
+  window.dispatchEvent(
+    new CustomEvent("store-artwork-updated", { detail: { key, artwork } }),
+  );
+}
 export function useStoreGame(game, enabled = true) {
   const key = `${game.store}:${game.id}`;
   const [artwork, setArtwork] = useState(() => images.get(key) || {});
@@ -30,6 +38,10 @@ export function useStoreGame(game, enabled = true) {
         });
     update();
     window.addEventListener("focus", update);
+    const artworkUpdated = (event) => {
+      if (event.detail.key === key) setArtwork(event.detail.artwork);
+    };
+    window.addEventListener("store-artwork-updated", artworkUpdated);
     if (images.has(key)) setArtwork(images.get(key));
     else {
       if (!pending.has(key)) {
@@ -54,6 +66,7 @@ export function useStoreGame(game, enabled = true) {
     return () => {
       active = false;
       window.removeEventListener("focus", update);
+      window.removeEventListener("store-artwork-updated", artworkUpdated);
     };
   }, [enabled, game.store, game.id, key, refresh]);
   return { artwork, details, error };

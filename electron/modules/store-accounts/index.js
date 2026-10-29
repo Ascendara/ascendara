@@ -199,6 +199,7 @@ function registerStoreAccountHandlers() {
   handle("store-game-open-directory", storeGames.openDirectory);
   handle("store-game-details", storeGames.details);
   handle("store-game-artwork", storeGames.artwork);
+  handle("store-game-set-cover", storeGames.setCover);
   app.on("before-quit", manager.shutdown);
   app.on("before-quit", sessions.shutdown);
 }

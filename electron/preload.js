@@ -344,6 +344,8 @@ contextBridge.exposeInMainWorld("electron", {
     openDirectory: (store, id) =>
       ipcRenderer.invoke("store-game-open-directory", store, id),
     artwork: (store, id) => ipcRenderer.invoke("store-game-artwork", store, id),
+    setCover: (store, id, image) =>
+      ipcRenderer.invoke("store-game-set-cover", store, id, image),
     onGameLaunched: callback => preloadIpc.subscribe("store-game-launched", callback),
     onGameClosed: callback => preloadIpc.subscribe("store-game-closed", callback),
   },

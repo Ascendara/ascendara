@@ -92,13 +92,16 @@ function createStoreGames({
       return false;
     }
   }
-  async function artwork(store, id) {
-    const game = owned(store, id);
+  function artworkDirectory(store, id) {
     const hash = crypto
       .createHash("sha256")
       .update(`${store}:${id}`)
       .digest("hex");
-    const assetDirectory = path.join(directory, hash);
+    return { hash, assetDirectory: path.join(directory, hash) };
+  }
+  async function artwork(store, id) {
+    const game = owned(store, id);
+    const { hash, assetDirectory } = artworkDirectory(store, id);
     const cached = await readArtwork(assetDirectory);
     if (cached.grid && cached.hero && cached.logo) return cached;
     if (!artworkJobs.has(hash)) {
@@ -118,6 +121,12 @@ function createStoreGames({
                 }
               : {};
           await downloadAssets({ game: game.name, assetDirectory }, options);
+          // Not every Steam app has library art on the CDN; search by title instead
+          const current = await readArtwork(assetDirectory);
+          if (store === "steam" && !(current.grid && current.hero && current.logo) &&
+              !/^(appid_)?\d+$/i.test(game.name)) {
+            await downloadAssets({ game: game.name, assetDirectory });
+          }
         });
       queues[slot] = task;
       artworkJobs.set(hash, task);
@@ -128,6 +137,26 @@ function createStoreGames({
     await artworkJobs.get(hash);
     owned(store, id);
     return readArtwork(assetDirectory);
+  }
+  // A null image restores the store's own cover on the next artwork request.
+  async function setCover(store, id, image) {
+    owned(store, id);
+    const { hash, assetDirectory } = artworkDirectory(store, id);
+    await artworkJobs.get(hash)?.catch(() => {});
+    let buffer = null;
+    let extension = null;
+    if (image !== null) {
+      const match = /^data:image\/(png|jpe?g);base64,([a-z0-9+/=]+)$/i.exec(String(image));
+      if (!match) throw new Error("Choose a PNG or JPEG image.");
+      buffer = Buffer.from(match[2], "base64");
+      if (buffer.length > 20 * 1024 * 1024) throw new Error("The image is too large.");
+      extension = match[1].toLowerCase() === "png" ? "png" : "jpg";
+    }
+    await fs.mkdir(assetDirectory, { recursive: true });
+    for (const ext of ["png", "jpg", "jpeg"])
+      await fs.rm(path.join(assetDirectory, `grid.ascendara.${ext}`), { force: true });
+    if (buffer) await fs.writeFile(path.join(assetDirectory, `grid.ascendara.${extension}`), buffer);
+    return image === null ? artwork(store, id) : readArtwork(assetDirectory);
   }
   async function readArtwork(assetDirectory) {
     const result = {};
@@ -228,6 +257,6 @@ function createStoreGames({
     }
     return { action: "store", installed: false };
   }
-  return { details, artwork, open, openDirectory };
+  return { details, artwork, setCover, open, openDirectory };
 }
 module.exports = { createStoreGames, matchesInstallation };

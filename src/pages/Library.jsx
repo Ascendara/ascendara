@@ -655,6 +655,19 @@ const Library = () => {
       ...queuedStubs,
     ]
   );
+  const renameStoreGame = (game, name) => {
+    const key = storeGameKey(game.store, game.id);
+    const saved = storeLibrary.updatePreferences({
+      ...storeLibrary.preferences,
+      names: { ...storeLibrary.preferences.names, [key]: name },
+    });
+    // Favorites are keyed by title, so carry the favorite over to the new name
+    if (saved && favorites.includes(game.game)) {
+      toggleFavorite(game.game);
+      toggleFavorite(name);
+    }
+    return saved;
+  };
   const hideStoreGame = game => {
     const hiddenGames = [
       ...new Set([
@@ -3027,6 +3040,7 @@ const Library = () => {
                       favorite={favorites.includes(game.game)}
                       onToggleFavorite={() => toggleFavorite(game.game)}
                       onRemove={() => hideStoreGame(game)}
+                      onRename={name => renameStoreGame(game, name)}
                     />
                   ) : game.isFolder ? (
                     <DroppableFolderCard

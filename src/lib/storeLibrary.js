@@ -3,6 +3,7 @@ export const defaultStoreDisplay = {
   enabled: false,
   stores: ["steam", "epic", "gog"],
   hiddenGames: [],
+  names: {},
 };
 
 export const storeGameKey = (store, id) => `${store}:${id}`;
@@ -18,6 +19,11 @@ export function readStoreDisplay() {
       hiddenGames: Array.isArray(value?.hiddenGames)
         ? value.hiddenGames.filter(key => typeof key === "string")
         : [],
+      names: Object.fromEntries(
+        Object.entries(value?.names || {}).filter(
+          ([key, name]) => typeof name === "string" && name.trim() && key.includes(":"),
+        ),
+      ),
     };
   } catch {
     return defaultStoreDisplay;
@@ -45,13 +51,18 @@ export function storeLibraryEntries(accounts, preferences, installed) {
   );
   const seen = new Set();
   const hidden = new Set(preferences.hiddenGames || []);
+  const renamed = preferences.names || {};
   return accounts
     .filter(
       (account) =>
         account.connected && preferences.stores.includes(account.store),
     )
     .flatMap((account) =>
-      account.games.map((item) => ({ ...item, store: account.store })),
+      account.games.map((item) => ({
+        ...item,
+        name: renamed[storeGameKey(account.store, item.id)] || item.name,
+        store: account.store,
+      })),
     )
     .filter((item) => {
       const key = storeGameKey(item.store, item.id);
