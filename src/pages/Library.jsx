@@ -335,7 +335,12 @@ const Library = () => {
     favorites: false,
     vrOnly: false,
     onlineGames: false,
+    // Remembered so connected store libraries stay out of the way between launches
+    installedOnly: localStorage.getItem("library-installedOnly") === "true",
   });
+  useEffect(() => {
+    safeSetItem("library-installedOnly", String(filters.installedOnly));
+  }, [filters.installedOnly]);
   const [lastLaunchedGame, setLastLaunchedGame] = useState(null);
   const lastLaunchedGameRef = useRef(null);
   const [isOnWindows, setIsOnWindows] = useState(true);
@@ -668,7 +673,14 @@ const Library = () => {
         !filters.favorites || favorites.includes(game.game || game.name);
       const matchesVr = !filters.vrOnly || game.isVr;
       const matchesOnline = !filters.onlineGames || game.online;
-      return matchesSearch && matchesFavorites && matchesVr && matchesOnline;
+      const matchesInstalled = !filters.installedOnly || !game._isStoreOwned;
+      return (
+        matchesSearch &&
+        matchesFavorites &&
+        matchesVr &&
+        matchesOnline &&
+        matchesInstalled
+      );
     })
     .sort((a, b) => {
       if (Boolean(a.isFolder) !== Boolean(b.isFolder)) {
@@ -1975,7 +1987,12 @@ const Library = () => {
                       );
                     if (tab.id === "hiddenFolders") {
                       setSearchQuery("");
-                      setFilters({ favorites: false, vrOnly: false, onlineGames: false });
+                      setFilters(prev => ({
+                        ...prev,
+                        favorites: false,
+                        vrOnly: false,
+                        onlineGames: false,
+                      }));
                     }
                   }}
                   className={cn(
@@ -2364,6 +2381,7 @@ const Library = () => {
                     const activeFilterCount = [
                       filters.vrOnly,
                       filters.onlineGames,
+                      filters.installedOnly,
                     ].filter(Boolean).length;
                     const hasActiveFilters =
                       activeFilterCount > 0 ||
@@ -2604,6 +2622,37 @@ const Library = () => {
                       <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
                     )}
                   </DropdownMenuItem>
+                  {ownedStoreGames.length > 0 || filters.installedOnly ? (
+                    <DropdownMenuItem
+                      onClick={() =>
+                        setFilters(prev => ({
+                          ...prev,
+                          installedOnly: !prev.installedOnly,
+                        }))
+                      }
+                      className={cn(
+                        "cursor-pointer",
+                        filters.installedOnly
+                          ? "bg-primary/10 font-medium text-primary"
+                          : "text-foreground"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                          filters.installedOnly
+                            ? "bg-primary/20 text-primary"
+                            : "bg-muted/60 text-muted-foreground"
+                        )}
+                      >
+                        <HardDrive className="h-4 w-4" />
+                      </span>
+                      {t("library.filters.installedOnly")}
+                      {filters.installedOnly && (
+                        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
+                    </DropdownMenuItem>
+                  ) : null}
                 </DropdownMenuContent>
               </DropdownMenu>
 

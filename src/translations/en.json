@@ -2912,6 +2912,7 @@
         "empty": "You haven't favorited any games yet...",
         "label": "Favorites"
       },
+      "installedOnly": "Installed Only",
       "onlineGames": "Online Games",
       "vrGames": "VR Games"
     },
