@@ -1000,7 +1000,6 @@ function registerGameHandlers() {
             }
           }
 
-          // Block if OnlineFix runs in proton-direct mode without Steam
           if (launchConfig.mode === "proton-direct" && onlineFix?.detected) {
             let steamRunning = false;
             try {
@@ -1011,10 +1010,9 @@ function registerGameHandlers() {
               steamRunning = false;
             }
             if (!steamRunning) {
+              console.log("[Games] OnlineFix: Steam not running, showing dialog");
               event.sender.send("steam-not-running-warning", { game });
-              throw new Error(
-                "OnlineFix requires Steam to be running. Please start Steam, then launch the game again."
-              );
+              return false;
             }
           }
 

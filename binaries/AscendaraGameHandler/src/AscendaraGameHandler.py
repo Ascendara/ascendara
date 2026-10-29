@@ -253,6 +253,19 @@ def launch_with_proton(exe_path, linux_config, game_launch_cmd=None):
             f"WINEDLLOVERRIDES={env.get('WINEDLLOVERRIDES')}"
         )
 
+    # Proton standalone (outside Steam) crashes with FileNotFoundError on
+    # tracked_files when it tries to upgrade a fresh prefix. Create an empty
+    # placeholder so setup_prefix() can read it. This is a known Proton quirk
+    # when STEAM_COMPAT_CLIENT_INSTALL_PATH points to a Steam install but no
+    # tracked_files exists yet in the compatdata dir.
+    tracked_files_path = os.path.join(linux_config["compat_data"], "tracked_files")
+    if not os.path.exists(tracked_files_path):
+        try:
+            open(tracked_files_path, "w").close()
+            logging.info(f"[Proton] Created tracked_files placeholder: {tracked_files_path}")
+        except Exception as e:
+            logging.warning(f"[Proton] Could not create tracked_files: {e}")
+
     cmd = [proton_script, "run", exe_path]
     cmd.extend(extra_args)
 
