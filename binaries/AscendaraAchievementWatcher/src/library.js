@@ -5,11 +5,6 @@ const fs = require("fs").promises;
 const ini = require("ini");
 const { getSettings } = require("./userConfig.js");
 
-const appData =
-  process.env["APPDATA"] ||
-  path.join(process.env.HOME || require("os").homedir(), ".config");
-const learnedFile = path.join(appData, "Achievement Watcher/steam_cache/folders.json");
-
 const EMU_CONFIG_FILES = [
   "ALI213.ini",
   "valve.ini",
@@ -182,24 +177,12 @@ async function findAppId(folder) {
 
 async function getAppId(folder) {
   const cached = appidCache.get(folder);
-  if (cached && (cached.appid || Date.now() - cached.checkedAt < APPID_RETRY_MS)) {
+  if (cached && Date.now() - cached.checkedAt < APPID_RETRY_MS) {
     return cached.appid;
   }
   const appid = await findAppId(folder);
   appidCache.set(folder, { appid, checkedAt: Date.now() });
   return appid;
-}
-
-async function loadLearned() {
-  return (await readJson(learnedFile)) || {};
-}
-
-async function learn(appID, game) {
-  const learned = await loadLearned();
-  learned[appID] = game.executable || game.folder;
-  await fs.mkdir(path.dirname(learnedFile), { recursive: true });
-  await fs.writeFile(learnedFile, JSON.stringify(learned, null, 2), "utf8");
-  console.log(`[Library] Linked appid ${appID} to ${learned[appID]}`);
 }
 
 // Finds which game an appid belongs to, so achievements land on the right
@@ -212,26 +195,15 @@ async function resolveGame(appID, schemaName) {
     if ((await getAppId(game.folder)) === appID) return game;
   }
 
-  const learned = (await loadLearned())[appID];
-  if (learned) {
-    const match = games.find(
-      g => normalizePath(g.executable || g.folder) === normalizePath(learned)
-    );
-    if (match) return match;
-  }
-
   const wanted = normalizeName(schemaName);
-  const byName = wanted ? games.filter(g => normalizeName(g.name) === wanted) : [];
-  if (byName.length === 1) {
-    await learn(appID, byName[0]);
-    return byName[0];
+  const byName = [];
+  for (const game of games) {
+    // A title must never override a conflicting on-disk identity.
+    if (wanted && normalizeName(game.name) === wanted && !(await getAppId(game.folder))) {
+      byName.push(game);
+    }
   }
-
-  const running = games.filter(g => g.isRunning);
-  if (running.length === 1) {
-    await learn(appID, running[0]);
-    return running[0];
-  }
+  if (byName.length === 1) return byName[0];
 
   return null;
 }

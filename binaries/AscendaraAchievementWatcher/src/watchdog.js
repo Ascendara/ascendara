@@ -355,6 +355,7 @@ var app = {
     return monitor.getFolders(tempFile);
   },
   refresh: async function ({ initial = false } = {}) {
+    await enqueue(() => repairAchievements());
     const folders = await this.discover();
     const added = [];
     for (const folder of folders) {
@@ -449,6 +450,70 @@ var app = {
   },
 };
 
+// Revalidate legacy displays even when no save file changes after an update.
+// Keep a backup and retain the per-app unlock database; never transfer unlocks
+// from a display that may belong to a different game.
+async function repairAchievements() {
+  for (const target of await library.listGames()) {
+    if (target.kind !== "custom" && !target.installed) continue;
+    try {
+      const file =
+        target.kind === "custom"
+          ? target.gamesJsonPath
+          : path.join(target.folder, "achievements.ascendara.json");
+      let document;
+      try {
+        document = JSON.parse(await fs.readFile(file, "utf8"));
+      } catch (error) {
+        if (error.code === "ENOENT") continue;
+        throw error;
+      }
+      const custom =
+        target.kind === "custom"
+          ? document.games.find(
+              g =>
+                library.normalizePath(g.executable) ===
+                library.normalizePath(target.executable)
+            )
+          : null;
+      const display = custom ? custom.achievementWatcher : document;
+      if (!display) continue;
+      const appid = await library.getAppId(target.folder);
+      if (display.identityVersion === 1 && (!appid || display.appid === appid)) continue;
+      if (display.identityVersion !== 1) {
+        // Exclusive copy preserves the original backup across retries/restarts.
+        await fs
+          .copyFile(
+            file,
+            file + ".before-identity-fix.bak",
+            require("fs").constants.COPYFILE_EXCL
+          )
+          .catch(error => {
+            if (error.code !== "EEXIST") throw error;
+          });
+      }
+      const cleared = {
+        identityVersion: 1,
+        appid: null,
+        achievements: [],
+        lastUpdated: new Date().toISOString(),
+      };
+      if (custom) custom.achievementWatcher = cleared;
+      await fs.writeFile(
+        file,
+        JSON.stringify(custom ? document : cleared, null, 2),
+        "utf8"
+      );
+      if (appid) {
+        const game = await app.load(appid);
+        await writeAchievementsJson(target, game, await track.load(appid));
+      }
+    } catch (error) {
+      console.warn(`Achievement identity repair failed for ${target.name}:`, error);
+    }
+  }
+}
+
 // Writes the game's full achievement list where Ascendara reads it from
 async function writeAchievementsJson(target, game, achievedCache) {
   const allAchievements = Array.isArray(game.achievement?.list)
@@ -488,6 +553,8 @@ async function writeAchievementsJson(target, game, achievedCache) {
       throw new Error(`Could not find ${target.executable} in games.json`);
     }
     gamesObj.games[matchIdx].achievementWatcher = {
+      identityVersion: 1,
+      appid: String(game.appid),
       achievements: achievementsJson,
       lastUpdated: now,
     };
@@ -495,7 +562,16 @@ async function writeAchievementsJson(target, game, achievedCache) {
   } else {
     await fs.writeFile(
       path.join(target.folder, "achievements.ascendara.json"),
-      JSON.stringify({ achievements: achievementsJson, lastUpdated: now }, null, 2),
+      JSON.stringify(
+        {
+          identityVersion: 1,
+          appid: String(game.appid),
+          achievements: achievementsJson,
+          lastUpdated: now,
+        },
+        null,
+        2
+      ),
       "utf8"
     );
   }
