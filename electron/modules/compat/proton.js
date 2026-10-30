@@ -223,8 +223,8 @@ async function getUmuProtonInfo() {
       throw new Error("No tar.gz asset found in the latest UMU-Proton release");
     }
 
-    // Check if this exact version is already installed
-    const targetDir = path.join(linuxRunnersDir, tagName);
+    const extractedDirName = tarAsset.name.replace(/\.tar\.gz$/, "");
+    const targetDir = path.join(linuxRunnersDir, extractedDirName);
     const alreadyInstalled = fs.existsSync(path.join(targetDir, "proton"));
 
     // Check if ANY UMU-Proton is installed (for update detection)
@@ -703,7 +703,8 @@ async function getProtonCachyOSInfo() {
     });
     if (!tarAsset) throw new Error("No tarball found in latest proton-cachyos release");
 
-    const targetDir = path.join(linuxRunnersDir, tagName);
+    const extractedDirName = tarAsset.name.replace(/\.tar\.(xz|gz)$/, "");
+    const targetDir = path.join(linuxRunnersDir, extractedDirName);
 
     // Normalize: strip "proton-" prefix and "-x86_64"/"-x86_64_v3"/"-arm64" suffix
     // to compare "cachyos-11.0-20260601-slr" and  "proton-cachyos-11.0-20260601-slr-x86_64" for examplz
@@ -896,20 +897,13 @@ async function downloadProtonCachyOS(parentWindow) {
     updateProgress(95);
     await fs.remove(tempPath);
 
-    let installedPath = path.join(linuxRunnersDir, info.name);
-    let installedName = info.name;
+    let installedPath = info.installPath;
+    let installedName = path.basename(info.installPath);
 
     if (!fs.existsSync(path.join(installedPath, "proton"))) {
-      const extractedDirs = await fs.readdir(linuxRunnersDir, { withFileTypes: true });
-      const found = extractedDirs.find(
-        d => d.isDirectory() && d.name.toLowerCase().includes("cachyos")
+      throw new Error(
+        `Extraction succeeded but proton script not found at expected path: ${installedPath}`
       );
-      if (found && fs.existsSync(path.join(linuxRunnersDir, found.name, "proton"))) {
-        installedPath = path.join(linuxRunnersDir, found.name);
-        installedName = found.name;
-      } else {
-        throw new Error("Extraction succeeded but proton script not found");
-      }
     }
 
     const settingsManager = getSettingsManager();
@@ -1003,8 +997,8 @@ async function getProtonGEInfo() {
       throw new Error(`No ${archSuffix} tar.gz asset found in the latest release`);
     }
 
-    // Check if this exact version is already installed
-    const targetDir = path.join(linuxRunnersDir, tagName);
+    const extractedDirName = tarAsset.name.replace(/\.tar\.gz$/, "");
+    const targetDir = path.join(linuxRunnersDir, extractedDirName);
     const alreadyInstalled = fs.existsSync(path.join(targetDir, "proton"));
 
     // Check if ANY Proton-GE is installed (for update detection)
@@ -1218,8 +1212,8 @@ async function downloadProtonGE(parentWindow) {
     await fs.remove(tempPath);
 
     // 5. Verify
-    let installedPath = path.join(linuxRunnersDir, info.name);
-    let installedName = info.name;
+    let installedPath = info.installPath;
+    let installedName = path.basename(info.installPath);
 
     if (!fs.existsSync(path.join(installedPath, "proton"))) {
       const extractedDirs = await fs.readdir(linuxRunnersDir, { withFileTypes: true });
