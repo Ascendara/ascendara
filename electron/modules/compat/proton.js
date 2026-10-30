@@ -977,12 +977,30 @@ async function getProtonGEInfo() {
     const release = await releaseRes.json();
     const tagName = release.tag_name;
 
-    const tarAsset = release.assets.find(
-      a => a.name.endsWith(".tar.gz") && !a.name.includes("sha512sum")
+    // GE-Proton releases from 11-4 onward ship both -aarch64.tar.gz and
+    // -x86_64.tar.gz. Older releases shipped a single tar.gz with no arch
+    // suffix (x86_64 only). Picks the asset that matches the host arch.
+    const archSuffix = process.arch === "arm64" ? "aarch64" : "x86_64";
+
+    let tarAsset = release.assets.find(
+      a =>
+        a.name.endsWith(".tar.gz") &&
+        !a.name.includes("sha512sum") &&
+        a.name.includes(archSuffix)
     );
 
+    // Fallback: older releases without an arch suffix (x86_64 only).
+    if (!tarAsset && process.arch !== "arm64") {
+      tarAsset = release.assets.find(
+        a =>
+          a.name.endsWith(".tar.gz") &&
+          !a.name.includes("sha512sum") &&
+          !a.name.includes("aarch64")
+      );
+    }
+
     if (!tarAsset) {
-      throw new Error("No tar.gz asset found in the latest release");
+      throw new Error(`No ${archSuffix} tar.gz asset found in the latest release`);
     }
 
     // Check if this exact version is already installed
