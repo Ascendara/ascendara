@@ -200,7 +200,7 @@ function printDevModeIntro(appVersion, nodeEnv, isDev = true) {
     `${colors.cyan}${colors.bright}  ║           ASCENDARA DEVELOPER MODE        ║${colors.reset}`
   );
   console.log(
-    `${colors.cyan}${colors.bright}  ║           Version: ${appVersion} (${nodeEnv})${" ".repeat(Math.max(0, 15 - appVersion.length - nodeEnv.length))}    ║${colors.reset}`
+    `${colors.cyan}${colors.bright}  ║           Version: ${appVersion} (${nodeEnv})${" ".repeat(Math.max(0, 15 - appVersion.length - nodeEnv.length))}   ║${colors.reset}`
   );
   console.log(
     `${colors.cyan}${colors.bright}  ╚═══════════════════════════════════════════╝${colors.reset}`
