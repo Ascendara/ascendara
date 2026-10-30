@@ -42,6 +42,7 @@ const EMPTY_PROFILE = {
   autoBackup: false,
   umuId: "",
   savePaths: [],
+  onlineFix: null,
 };
 
 function profilesMatch(left, right) {
@@ -401,6 +402,142 @@ const GameProfilesCenter = () => {
                       }
                       placeholder={t("featureCenters.profiles.optional")}
                     />
+                  </FeatureSection>
+                )}
+
+                {isLinux && (
+                  <FeatureSection
+                    title={t("featureCenters.profiles.onlineFix.title")}
+                    description={t("featureCenters.profiles.onlineFix.description")}
+                    actions={
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          const res = await window.electron.onlinefixDetect(
+                            getGameName(selectedGame),
+                            selectedGame.isCustom
+                          );
+                          if (res?.success) {
+                            setProfile(cur => ({ ...cur, onlineFix: res.onlineFix }));
+                            toast.success(
+                              t(
+                                res.onlineFix
+                                  ? "featureCenters.profiles.onlineFix.detected"
+                                  : "featureCenters.profiles.onlineFix.notDetected"
+                              )
+                            );
+                          } else {
+                            toast.error(res?.error || t("featureCenters.profiles.onlineFix.detectError"));
+                          }
+                        }}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" /> {t("featureCenters.profiles.onlineFix.redetect")}
+                      </Button>
+                    }
+                  >
+                    {profile.onlineFix?.detected ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="default">{profile.onlineFix.fixType}</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            FakeAppId :{" "}
+                            <span className="font-mono">
+                              {profile.onlineFix.fakeAppId}
+                            </span>
+                          </span>
+                        </div>
+                        <Input
+                          className="font-mono text-xs"
+                          value={profile.onlineFix.overrides || ""}
+                          onChange={e =>
+                            setProfile(cur => ({
+                              ...cur,
+                              onlineFix: {
+                                ...cur.onlineFix,
+                                overrides: e.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="WINEDLLOVERRIDES"
+                        />
+                        <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="profile-of-proton-direct" className="text-sm font-medium">
+                              {t("featureCenters.profiles.onlineFix.protonDirect.label")}
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              {t("featureCenters.profiles.onlineFix.protonDirect.description")}
+                            </p>
+                          </div>
+                          <Switch
+                            id="profile-of-proton-direct"
+                            checked={profile.onlineFix?.useProtonDirect !== false}
+                            onCheckedChange={v =>
+                              setProfile(cur => ({
+                                ...cur,
+                                onlineFix: {
+                                  ...cur.onlineFix,
+                                  useProtonDirect: Boolean(v),
+                                },
+                              }))
+                            }
+                            aria-label={t("featureCenters.profiles.onlineFix.protonDirect.label")}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          {t("featureCenters.profiles.onlineFix.fallback.description")}
+                        </p>
+                        <div className="flex items-start justify-between gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="profile-of-force-proton-direct" className="text-sm font-medium">
+                              {t("featureCenters.profiles.onlineFix.fallback.forceLabel")}
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              {t("featureCenters.profiles.onlineFix.fallback.forceDescription")}
+                            </p>
+                          </div>
+                          <Switch
+                            id="profile-of-force-proton-direct"
+                            checked={profile.onlineFix?.useProtonDirect === true}
+                            onCheckedChange={v =>
+                              setProfile(cur => ({
+                                ...cur,
+                                onlineFix: v
+                                  ? { ...(cur.onlineFix || {}), useProtonDirect: true }
+                                  : null,
+                              }))
+                            }
+                            aria-label={t("featureCenters.profiles.onlineFix.fallback.forceLabel")}
+                          />
+                        </div>
+                        {profile.onlineFix?.useProtonDirect === true && (
+                          <div className="space-y-2">
+                            <Label htmlFor="profile-of-manual-overrides" className="text-sm font-medium">
+                              {t("featureCenters.profiles.onlineFix.fallback.overridesLabel")}
+                            </Label>
+                            <Input
+                              id="profile-of-manual-overrides"
+                              className="font-mono text-xs"
+                              value={profile.onlineFix?.overrides || ""}
+                              onChange={e =>
+                                setProfile(cur => ({
+                                  ...cur,
+                                  onlineFix: {
+                                    ...(cur.onlineFix || {}),
+                                    overrides: e.target.value,
+                                  },
+                                }))
+                              }
+                              placeholder={t("featureCenters.profiles.onlineFix.fallback.overridesPlaceholder")}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </FeatureSection>
                 )}
 
