@@ -1175,7 +1175,7 @@ const Profile = () => {
     const CurrentStatus = StatusOptions.find(Status => Status.id === UserStatus);
 
     return (
-      <Panel className="overflow-hidden">
+      <Panel data-tour="profile-header" className="overflow-hidden">
         <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center">
           <Popover>
             <PopoverTrigger asChild>
@@ -1462,7 +1462,7 @@ const Profile = () => {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0 space-y-6">
-          <Panel className="overflow-hidden">
+          <Panel data-tour="profile-games" className="overflow-hidden">
             <PanelHeader
               icon={Gamepad2}
               title={T("profile.games")}
@@ -1511,7 +1511,7 @@ const Profile = () => {
             )}
           </Panel>
 
-          <Panel className="overflow-hidden">
+          <Panel data-tour="profile-history" className="overflow-hidden">
             <PanelHeader
               icon={FileDown}
               title={T("profile.downloadHistory")}
@@ -1564,7 +1564,7 @@ const Profile = () => {
         </div>
 
         <div className="space-y-6">
-          <Panel className="overflow-hidden">
+          <Panel data-tour="profile-achievements" className="overflow-hidden">
             <PanelHeader
               icon={Trophy}
               title={T("profile.achievements")}
@@ -1624,7 +1624,7 @@ const Profile = () => {
             </dl>
           </Panel>
 
-          <Panel className="overflow-hidden">
+          <Panel data-tour="profile-notes" className="overflow-hidden">
             <PanelHeader
               icon={NotebookPen}
               title={T("profile.privateNotes")}

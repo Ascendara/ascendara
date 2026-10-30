@@ -1034,6 +1034,7 @@ const Downloads = () => {
 
             {/* Speed overview */}
             <section
+              data-tour="downloads-speed"
               className={cn(
                 "relative overflow-hidden rounded-2xl border bg-card transition-colors duration-500",
                 highSpeed
@@ -1175,7 +1176,7 @@ const Downloads = () => {
 
             {/* Queue */}
             {queuedDownloads.length > 0 && (
-              <section>
+              <section data-tour="downloads-queue">
                 <h2 className="mb-2 px-1 text-sm font-medium text-muted-foreground">
                   {t("downloads.queuedDownloads", "Queued Downloads")} ·{" "}
                   {queuedDownloads.length}
@@ -1781,6 +1782,7 @@ const DownloadCard = ({
 
   return (
     <div
+      data-tour="downloads-card"
       className={cn(
         "group relative overflow-hidden rounded-xl border bg-card transition-all duration-500",
         isFading && "scale-95 opacity-0",

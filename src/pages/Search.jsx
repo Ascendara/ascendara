@@ -959,7 +959,10 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                   </a>
                 </div>
               )}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div
+                data-tour="search-indexed"
+                className="flex w-fit items-center gap-2 text-sm text-muted-foreground"
+              >
                 <span>
                   {apiMetadata.games.toLocaleString()} {t("search.gamesIndexed")}
                 </span>
@@ -1123,7 +1126,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
 
           <div className="space-y-6">
             <div className="flex items-center gap-4">
-              <div className="relative flex-1">
+              <div data-tour="search-input" className="relative flex-1">
                 <SearchIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   ref={mainSearchRef}
@@ -1247,6 +1250,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
               <Sheet>
                 <SheetTrigger asChild>
                   <Button
+                    data-tour="search-filters"
                     variant="secondary"
                     className="flex items-center gap-2 border-0 hover:bg-accent"
                   >
@@ -1832,7 +1836,10 @@ const GameGrid = memo(
       : null;
 
     return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div
+        data-tour="search-results"
+        className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4"
+      >
         {featuredGame && (
           <FeaturedGameCard
             key={featuredKey + "-featured"}

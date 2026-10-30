@@ -242,7 +242,7 @@ function Tour({ onClose, steps: customSteps, onFinish, sound = true }) {
     const layer = `ascend${soundLevel}`;
     // The final step plays the drop once; earlier layers loop
     const loop = soundLevel < 4;
-    soundService.crossfadeTo(layer, loop ? 0.25 : 0.4, loop);
+    soundService.crossfadeTo(layer, loop ? 0.35 : 0.55, loop);
   }, [soundLevel, isMuted]);
 
   const toggleMute = () => {
@@ -295,6 +295,20 @@ function Tour({ onClose, steps: customSteps, onFinish, sound = true }) {
     observer.observe(card);
     return () => observer.disconnect();
   }, []);
+
+  // Page tours point at things further down the page, so bring each one into view
+  useEffect(() => {
+    const element = step.spotlight && document.querySelector(step.spotlight);
+    if (!element) return;
+    const { top, bottom, height } = element.getBoundingClientRect();
+    const fits = height < window.innerHeight - TOP_MARGIN;
+    const inView = fits
+      ? top >= TOP_MARGIN && bottom <= window.innerHeight
+      : top >= TOP_MARGIN && top < window.innerHeight / 2;
+    if (!inView) {
+      element.scrollIntoView({ behavior: "smooth", block: fits ? "center" : "start" });
+    }
+  }, [step.spotlight]);
 
   useEffect(() => {
     if (step.navigateTo) navigate(step.navigateTo);

@@ -10,6 +10,7 @@ import ContextMenu from "@/components/ContextMenu";
 import Layout from "@/components/Layout";
 import MenuBar from "@/components/MenuBar";
 import MiniPlayer from "@/components/MiniPlayer";
+import { enablePageTours } from "@/components/PageTours";
 import SupportDialog from "@/components/SupportDialog";
 import PlatformWarningDialog from "@/components/PlatformWarningDialog";
 import WatcherWarnDialog from "@/components/WatcherWarnDialog";
@@ -1558,6 +1559,7 @@ const AppRoutes = () => {
   const handleWelcomeComplete = async (withTour = false) => {
     setWelcomeData({ isNew: false, isV7: true });
     await window.electron.setTimestampValue("dllSharingPromptSeen", true);
+    enablePageTours();
 
     // Persist tour intent via sessionStorage instead of a query param.
     // Query params are fragile here because the interim renders between

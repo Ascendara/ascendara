@@ -80,6 +80,7 @@ export default function GameActions({
     <TooltipProvider>
       {canLaunchGame ? (
         <Button
+          data-tour="game-play"
           size="lg"
           className="h-12 min-w-[11rem] gap-2 px-8 text-base text-secondary"
           onClick={() => onPlay()}
@@ -104,6 +105,7 @@ export default function GameActions({
         </Button>
       ) : (
         <Button
+          data-tour="game-play"
           size="lg"
           className="h-12 gap-2 px-8 text-base text-secondary"
           onClick={onSetExecutable}
@@ -133,7 +135,7 @@ export default function GameActions({
         </Tooltip>
       )}
 
-      <div className="ml-auto flex flex-wrap items-center gap-2">
+      <div data-tour="game-quick" className="ml-auto flex flex-wrap items-center gap-2">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -167,7 +169,7 @@ export default function GameActions({
         {/* Non-modal so the dialogs these items open keep working pointer events */}
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="h-12 gap-2">
+            <Button data-tour="game-manage" variant="outline" className="h-12 gap-2">
               <Settings2 className="h-4 w-4" />
               {t("library.manage")}
               {!executableExists && <AlertTriangle className="h-4 w-4 text-yellow-500" />}

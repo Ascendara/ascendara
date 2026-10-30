@@ -5,6 +5,7 @@ import { useLocation } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { resetPageTours } from "@/components/PageTours";
 import { Input } from "@/components/ui/input";
 import DownloadLimitSelector from "@/components/DownloadLimitSelector";
 import { motion, AnimatePresence } from "framer-motion";
@@ -4497,6 +4498,17 @@ function Settings() {
                             </Button>
                           </>
                         )}
+                        <Button
+                          className="w-full"
+                          variant="outline"
+                          onClick={() => {
+                            // Welcome flow ends with the main tour and turns page tours back on
+                            resetPageTours();
+                            window.dispatchEvent(new CustomEvent("ascendara:show-welcome"));
+                          }}
+                        >
+                          Replay Onboarding & Tours
+                        </Button>
                       </div>
                       <div className="flex flex-col space-y-2">
                         <Label>Screen Trigger</Label>

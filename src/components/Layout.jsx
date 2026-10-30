@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useSettings } from "@/context/SettingsContext";
 import Navigation from "./Navigation";
 import Tour from "./Tour";
+import PageTours from "./PageTours";
 import { useNaturalDownloadScroll } from "@/hooks/useNaturalDownloadScroll";
 import Search from "@/pages/Search";
 
@@ -176,6 +177,7 @@ const Layout = memo(() => {
       <Navigation className="fixed bottom-0 left-0 right-0" />
       {/* Keep one instance mounted while the tour navigates between pages. */}
       {showTour && <Tour onClose={handleCloseTour} />}
+      <PageTours suppressed={showTour} />
     </div>
   );
 });

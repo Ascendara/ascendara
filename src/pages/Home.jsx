@@ -1290,6 +1290,7 @@ const Home = memo(() => {
             <div className="grid gap-4 lg:grid-cols-3">
               {/* Main Featured Game */}
               <div
+                data-tour="home-featured"
                 className="group relative lg:col-span-2"
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
@@ -1439,6 +1440,7 @@ const Home = memo(() => {
 
               {/* Side Cards - Recently Played */}
               <div
+                data-tour="home-recent"
                 className="hidden flex-col lg:flex"
                 style={{ height: "calc(100% - 0px)" }}
               >
@@ -1497,6 +1499,7 @@ const Home = memo(() => {
                       }
                     }, 150);
                   }}
+                  data-tour="home-search"
                   className="group flex-1 cursor-text lg:w-[600px] lg:flex-none"
                 >
                   <div className="relative flex items-center gap-3 rounded-2xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 px-5 py-4 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
@@ -1515,9 +1518,10 @@ const Home = memo(() => {
                 </div>
 
                 {/* Quick Access Buttons */}
-                <div className="flex gap-2">
+                <div data-tour="home-links" className="flex gap-2">
                   {/* Customizable Quick Access Button */}
                   <div
+                    data-tour="home-quick-access"
                     className="group cursor-pointer"
                     onMouseDown={() => {
                       setIsLongPressing(false);
@@ -1722,13 +1726,15 @@ const Home = memo(() => {
 
         {/* Top Games - Horizontal Scroll */}
         {topGames.length > 0 && (
-          <HorizontalSection
-            title={t("home.topGames")}
-            icon={TrendingUp}
-            games={topGames}
-            onGameClick={handleCarouselGameClick}
-            onContextMenu={handleContextMenu}
-          />
+          <div data-tour="home-rows">
+            <HorizontalSection
+              title={t("home.topGames")}
+              icon={TrendingUp}
+              games={topGames}
+              onGameClick={handleCarouselGameClick}
+              onContextMenu={handleContextMenu}
+            />
+          </div>
         )}
 
         {/* Recently Updated - Horizontal Scroll */}

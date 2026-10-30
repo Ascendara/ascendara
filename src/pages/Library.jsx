@@ -1945,7 +1945,7 @@ const Library = () => {
         </div>
 
         {/* ── Add to library ── */}
-        <div className="flex gap-1.5 px-3 pt-3">
+        <div data-tour="library-add" className="flex gap-1.5 px-3 pt-3">
           <Button
             className="h-9 flex-1 gap-2 text-secondary"
             onClick={() => setIsAddGameOpen(true)}
@@ -2030,7 +2030,7 @@ const Library = () => {
         </div>
 
         {/* ── Library views ── */}
-        <nav className="space-y-0.5 px-2 pt-3">
+        <nav data-tour="library-tabs" className="space-y-0.5 px-2 pt-3">
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
             Library
           </p>
@@ -2153,7 +2153,7 @@ const Library = () => {
         <div className="flex-1" />
 
         {/* ── Library tools: less frequent actions live in one menu ── */}
-        <div className="px-2 pb-1">
+        <div data-tour="library-tools" className="px-2 pb-1">
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary data-[state=open]:bg-accent/60 data-[state=open]:text-foreground">
@@ -2310,7 +2310,7 @@ const Library = () => {
         />
 
         {/* ── Storage info ── */}
-        <div className="px-4 pb-4 pt-2">
+        <div data-tour="library-storage" className="px-4 pb-4 pt-2">
           <div className="space-y-2 rounded-lg bg-muted/30 p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -2432,7 +2432,7 @@ const Library = () => {
         {/* Sticky toolbar */}
         <div className="flex shrink-0 flex-col gap-2 bg-background/95 px-6 py-3 shadow-[0_1px_0_0_hsl(var(--border)/0.4)] backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <div className="relative min-w-0 flex-1">
+            <div data-tour="library-search" className="relative min-w-0 flex-1">
               <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="text"
@@ -2465,7 +2465,10 @@ const Library = () => {
               {(activeTab === "all" ||
                 activeTab === "favorites" ||
                 activeTab === "hiddenFolders") && (
-                <div className="flex h-9 items-center rounded-lg border border-border/60 bg-card p-0.5">
+                <div
+                  data-tour="library-view"
+                  className="flex h-9 items-center rounded-lg border border-border/60 bg-card p-0.5"
+                >
                   {[
                     { mode: "grid", icon: LayoutGrid, label: t("library.view.grid") },
                     { mode: "list", icon: ListIcon, label: t("library.view.list") },
@@ -2509,6 +2512,7 @@ const Library = () => {
                     return (
                       <button
                         type="button"
+                        data-tour="library-filters"
                         className={cn(
                           "flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-all",
                           hasActiveFilters
@@ -7298,7 +7302,7 @@ const DraggableGameCard = ({ game, children, disabled = false }) => {
   );
 
   return (
-    <div ref={drag} style={{ opacity: isDragging ? 0.5 : 1 }}>
+    <div ref={drag} data-tour="library-game" style={{ opacity: isDragging ? 0.5 : 1 }}>
       {children}
     </div>
   );

@@ -2880,6 +2880,7 @@ function InstalledGameScreen() {
         {/* Section navigation */}
         <div
           role="tablist"
+          data-tour="game-sections"
           className="flex flex-wrap items-center gap-1 border-b border-border/40"
         >
           {sections.map(section => (

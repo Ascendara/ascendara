@@ -3668,6 +3668,188 @@
     "play": "Play",
     "unmute": "Unmute"
   },
+  "pageTours": {
+    "accept": "Show me around",
+    "decline": "No thanks",
+    "downloads": {
+      "card": {
+        "content": "Each download gets its own card. Pause and resume it, open its folder, or stop it and choose whether to delete what was downloaded. While a game is extracting, you can open a live log to see what it's doing.",
+        "title": "Your Downloads"
+      },
+      "final": "When a download finishes, the game shows up in your Library ready to play.",
+      "intro": {
+        "content": "This is where you watch your games come in. Here's what everything does.",
+        "title": "Downloads"
+      },
+      "prompt": "Want a quick tour of Downloads?",
+      "queue": {
+        "content": "Games you start while another is downloading wait here. Drag them by the handle to change the order, or remove one from the queue.",
+        "title": "Download Queue"
+      },
+      "speed": {
+        "content": "Your total download speed, live. You can also see your peak speed and how many downloads are active or queued. While games extract, this switches to show disk activity.",
+        "title": "Speed Overview"
+      }
+    },
+    "final": {
+      "title": "You're all set"
+    },
+    "finish": "Got it",
+    "gameScreen": {
+      "final": "That's everything on the game page. Every game you install gets one.",
+      "intro": {
+        "content": "Every game in your library has its own page. Ascendara will show you what you can do here.",
+        "title": "Your Game Page"
+      },
+      "manage": {
+        "content": "Everything for managing the install lives here: launch options, changing the executable, backing up saves, verifying files, repairing missing DLLs, creating desktop or Start Menu shortcuts, and deleting the game.",
+        "title": "Manage"
+      },
+      "play": {
+        "content": "Launch the game from here. <strong>Hold Shift while you click Play</strong> to run it as administrator, which some games need. If a game has more than one executable, you'll be asked which one to start.",
+        "title": "Play"
+      },
+      "prompt": "Want a quick tour of the game page?",
+      "quick": {
+        "content": "Use the heart to add the game to your favorites, and open its install folder with one click.",
+        "title": "Quick Actions"
+      },
+      "sections": {
+        "content": "Switch between the game's overview, your achievements and its soundtrack. Games that support mods or trainers get an extra tab for those too.",
+        "title": "Game Sections"
+      }
+    },
+    "home": {
+      "featured": {
+        "content": "A rotating pick of games to check out. Drag or use the arrows to flip through them, and click one to open its page.",
+        "title": "Featured Games"
+      },
+      "final": "That's the Home page. Come back anytime to find something new to play.",
+      "intro": {
+        "content": "Home is where you'll find new games and jump back into the ones you've been playing. Ascendara will walk you through it.",
+        "title": "Your Home Page"
+      },
+      "links": {
+        "content": "Shortcuts for the things you'll want most: a page of your choice, the Ascendara Discord community, and the help docs.",
+        "title": "Quick Buttons"
+      },
+      "prompt": "Want a quick tour of Home?",
+      "quickAccess": {
+        "content": "Click this button to jump straight to its page. <strong>Press and hold it</strong> to choose which page it opens: your Library, Downloads, Big Picture or Ascend.",
+        "title": "Make It Yours"
+      },
+      "recent": {
+        "content": "The last games you played show up here, so you can get back into them in one click.",
+        "title": "Recently Played"
+      },
+      "rows": {
+        "content": "Scroll through each row to browse. Click a game to see more, or <strong>right-click it</strong> to download it right away, add it to Play Later, or read more about it.",
+        "title": "Browse Games"
+      },
+      "search": {
+        "content": "Click here to start searching for any game. It takes you straight to the Search page.",
+        "title": "Search"
+      }
+    },
+    "library": {
+      "add": {
+        "content": "Add a game you already have on your PC. The arrow next to it lets you import games from other launchers, create a folder, or choose which pages show in your library. You can also drag a game's .exe file onto the library to add it.",
+        "title": "Add Games"
+      },
+      "filters": {
+        "content": "Sort your games, group them and filter them, for example to show only installed, online or VR games.",
+        "title": "Sort & Filter"
+      },
+      "final": "That's your Library. Everything you download or add will show up here.",
+      "games": {
+        "content": "Click a game to open its page. <strong>Right-click it</strong> to play, open its folder, move it into a folder or delete it. You can also drag a game onto a folder to move it there.",
+        "title": "Your Games"
+      },
+      "intro": {
+        "content": "This is your Library, where every game you download or add lives. Ascendara will take you through it.",
+        "title": "Your Library"
+      },
+      "prompt": "Want a quick tour of your Library?",
+      "search": {
+        "content": "Type here to quickly find a game in your library.",
+        "title": "Search Your Library"
+      },
+      "storage": {
+        "content": "See how much space your games take up and how much is left on your drive.",
+        "title": "Storage"
+      },
+      "tabs": {
+        "content": "Switch between pages of your library, like all your games, favorites, Play Later and history. Drag a page by its handle to change the order.",
+        "title": "Library Pages"
+      },
+      "tools": {
+        "content": "Less frequent tools live here: library backups, syncing your library to the cloud, and working out what your library is worth.",
+        "title": "Library Tools"
+      },
+      "view": {
+        "content": "Switch between showing your games as a grid of covers or as a list.",
+        "title": "Grid or List"
+      }
+    },
+    "profile": {
+      "achievements": {
+        "content": "Your games with the most unlocked achievements, and how close you are to getting them all.",
+        "title": "Achievements"
+      },
+      "final": "That's your profile. The more you play, the more it fills up.",
+      "games": {
+        "content": "Every game you've played, with how long you've played it.",
+        "title": "Your Games"
+      },
+      "header": {
+        "content": "Click your picture to change it. Sign in to Ascend to get an online profile your friends can see.",
+        "title": "Your Profile"
+      },
+      "history": {
+        "content": "A list of everything you've downloaded. Hover over one to remove it from the list.",
+        "title": "Download History"
+      },
+      "intro": {
+        "content": "Your profile keeps track of how you play. It's all for fun, and it stays on your PC.",
+        "title": "Your Profile"
+      },
+      "notes": {
+        "content": "Write anything you want to remember here. Your notes are only saved on this PC.",
+        "title": "Private Notes"
+      },
+      "prompt": "Want a quick tour of your profile?",
+      "stats": {
+        "content": "Earn XP and level up by playing games. Your total playtime and how many games you've played are here too.",
+        "title": "Level & Stats"
+      }
+    },
+    "promptContent": "Ascendara will point out everything on this page so you know where things are. It only takes a minute, and you won't be asked again.",
+    "search": {
+      "filters": {
+        "content": "Narrow down the results: sort by popularity, name or recent updates, show only games with DLC or online play, set a maximum size and pick categories.",
+        "title": "Filters"
+      },
+      "final": "That's everything you need to find your next game.",
+      "indexed": {
+        "content": "How many games you can search. Click the info icon to see where the games come from, when the list was last updated, and to refresh it.",
+        "title": "Games Indexed"
+      },
+      "input": {
+        "content": "Type a game's name to search. Results appear as you type, and your recent searches are saved here too.",
+        "title": "Search"
+      },
+      "intro": {
+        "content": "This is where you find and download games. Ascendara will show you what's here.",
+        "title": "Search & Download"
+      },
+      "prompt": "Want a quick tour of Search?",
+      "results": {
+        "content": "Click a game to see more and download it. <strong>Right-click it</strong> to download it straight away, add it to Play Later or read more about it. Look for the Online tag if you want to play with friends.",
+        "title": "Games"
+      }
+    },
+    "start": "Start the tour"
+  },
   "privateSources": {
     "add": "Add source",
     "addTitle": "Add self-hosted source",
