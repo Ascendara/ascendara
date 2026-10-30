@@ -1416,6 +1416,17 @@ async function buildLaunchConfig(
       env.STORE = store;
     }
 
+    // Online-Fix with Proton Direct turned off: still apply the fix through UMU
+    if (onlineFix?.detected) {
+      if (onlineFix.overrides) {
+        env.WINEDLLOVERRIDES = onlineFix.overrides;
+      }
+      if (onlineFix.fakeAppId) {
+        env.SteamAppId = String(onlineFix.fakeAppId);
+        env.SteamGameId = String(onlineFix.fakeAppId);
+        env.UMU_USE_STEAM = "1";
+      }
+    }
 
     return {
       cmd: [linuxUmuBin, exePath],
@@ -1439,14 +1450,14 @@ async function buildLaunchConfig(
       STEAM_COMPAT_DATA_PATH: compatDataPath,
       STEAM_COMPAT_CLIENT_INSTALL_PATH: findSteamInstallPath(),
     };
-    if (onlineFix?.detected) {
-      if (onlineFix.overrides) {
-        protonEnv.WINEDLLOVERRIDES = onlineFix.overrides;
-      }
-      if (onlineFix.fakeAppId) {
-        protonEnv.SteamAppId = String(onlineFix.fakeAppId);
-        protonEnv.SteamGameId = String(onlineFix.fakeAppId);
-      }
+    // Overrides apply to manually forced profiles too; the fake AppID only
+    // comes from a detected fix
+    if (onlineFix?.overrides) {
+      protonEnv.WINEDLLOVERRIDES = onlineFix.overrides;
+    }
+    if (onlineFix?.detected && onlineFix.fakeAppId) {
+      protonEnv.SteamAppId = String(onlineFix.fakeAppId);
+      protonEnv.SteamGameId = String(onlineFix.fakeAppId);
     }
     return {
       cmd: [path.join(runner.path, "proton"), "run", exePath],

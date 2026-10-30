@@ -38,7 +38,10 @@ const { scheduleContribution } = require("../downloads/dllRepair");
 
 const steamgrid = require("./steamgrid");
 const { resetOnboarding } = require("../core/onboarding");
-const { parseOnlineFix } = require("../compat/onlinefix-parser");
+const {
+  parseOnlineFix,
+  SCAN_VERSION: ONLINEFIX_SCAN_VERSION,
+} = require("../compat/onlinefix-parser");
 
 // Load proton module only on linux
 const proton = isLinux ? require("../compat/proton") : null;
@@ -847,7 +850,10 @@ function registerGameHandlers() {
         if (isLinux && proton && proton.isWindowsExecutable(executable)) {
           // Auto-detect UMU ID if not already set
           try {
-            const { autoDetectAndSaveUmuId, getGameUmuId } = require("../compat/umu-database");
+            const {
+              autoDetectAndSaveUmuId,
+              getGameUmuId,
+            } = require("../compat/umu-database");
             const existingId = await getGameUmuId(game);
             if (!existingId) {
               autoDetectAndSaveUmuId(game).catch(() => {});
@@ -900,13 +906,42 @@ function registerGameHandlers() {
             console.warn("[Games] Could not read onlineFix metadata:", e.message);
           }
 
-          // Auto-scan if missing or stale (>7 days)
+          // Auto-scan if missing, stale (>7 days) or detected by older parser rules
           const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
           const isStale =
-            !onlineFix || !onlineFix._lastScan
-              ? true
-              : Date.now() - onlineFix._lastScan > SEVEN_DAYS_MS;
+            !onlineFix ||
+            !onlineFix._lastScan ||
+            Date.now() - onlineFix._lastScan > SEVEN_DAYS_MS ||
+            (onlineFix.detected && onlineFix._scanVersion !== ONLINEFIX_SCAN_VERSION);
           if (isStale) {
+            const persistOnlineFix = value => {
+              try {
+                if (!isCustom) {
+                  const giPath = path.join(
+                    gameDirectory,
+                    `${sanitizeGameName(game)}.ascendara.json`
+                  );
+                  if (fs.existsSync(giPath)) {
+                    const gi = JSON.parse(fs.readFileSync(giPath, "utf8"));
+                    if (value) gi.onlineFix = value;
+                    else delete gi.onlineFix;
+                    fs.writeFileSync(giPath, JSON.stringify(gi, null, 2));
+                  }
+                } else {
+                  const gamesPath = path.join(settings.downloadDirectory, "games.json");
+                  const gd = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
+                  const idx = gd.games.findIndex(g => g.game === game && !g._isDeleted);
+                  if (idx !== -1) {
+                    if (value) gd.games[idx].onlineFix = value;
+                    else delete gd.games[idx].onlineFix;
+                    fs.writeFileSync(gamesPath, JSON.stringify(gd, null, 2));
+                  }
+                }
+              } catch (persistErr) {
+                console.warn("[Games] Could not persist auto-scan:", persistErr.message);
+              }
+            };
+
             try {
               const scanned = await parseOnlineFix(gameDirectory);
               if (scanned) {
@@ -915,35 +950,23 @@ function registerGameHandlers() {
                   scanned.useProtonDirect = onlineFix.useProtonDirect;
                 }
                 onlineFix = scanned;
-                console.log(`[Games] OnlineFix: auto-scan detected ${scanned.fixType} fix`);
-
+                console.log(
+                  `[Games] OnlineFix: auto-scan detected ${scanned.fixType} fix`
+                );
                 // Persist so the UI (Game Profiles) sees the detection
-                try {
-                  if (!isCustom) {
-                    const giPath = path.join(
-                      gameDirectory,
-                      `${sanitizeGameName(game)}.ascendara.json`
-                    );
-                    if (fs.existsSync(giPath)) {
-                      const gi = JSON.parse(fs.readFileSync(giPath, "utf8"));
-                      gi.onlineFix = scanned;
-                      fs.writeFileSync(giPath, JSON.stringify(gi, null, 2));
-                    }
-                  } else {
-                    const gamesPath = path.join(settings.downloadDirectory, "games.json");
-                    const gd = JSON.parse(fs.readFileSync(gamesPath, "utf8"));
-                    const idx = gd.games.findIndex(g => g.game === game && !g._isDeleted);
-                    if (idx !== -1) {
-                      gd.games[idx].onlineFix = scanned;
-                      fs.writeFileSync(gamesPath, JSON.stringify(gd, null, 2));
-                    }
-                  }
-                } catch (persistErr) {
-                  console.warn("[Games] Could not persist auto-scan:", persistErr.message);
-                }
+                persistOnlineFix(scanned);
+              } else if (onlineFix?.detected) {
+                // A previous scan detected a fix that is no longer there (or was a
+                // false positive), so drop it instead of forcing Proton Direct
+                console.log(
+                  "[Games] OnlineFix: previous detection no longer valid, clearing"
+                );
+                onlineFix = null;
+                persistOnlineFix(null);
               } else if (onlineFix) {
-                // Keep previous data but bump timestamp so it doesn't rescan every launch
+                // Manually forced profile: keep it and bump the timestamp
                 onlineFix = { ...onlineFix, _lastScan: Date.now() };
+                persistOnlineFix(onlineFix);
               }
             } catch (e) {
               console.warn("[Games] Auto-scan failed:", e.message);
@@ -2356,7 +2379,10 @@ function registerGameHandlers() {
           ...(settings.additionalDirectories || []),
         ].filter(Boolean)) {
           const p = path.join(dir, sanitizeGameName(game));
-          if (fs.existsSync(p)) { gameDir = p; break; }
+          if (fs.existsSync(p)) {
+            gameDir = p;
+            break;
+          }
         }
       } else {
         const info = findCustomGame(game, settings);
@@ -2418,7 +2444,9 @@ function registerGameHandlers() {
         return findCustomGame(game, settings)?.onlineFix || null;
       }
       return null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   });
 
   ipcMain.handle("onlinefix-set", async (_, game, isCustom, onlineFix) => {
