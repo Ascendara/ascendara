@@ -206,6 +206,58 @@ def _split_env_and_args(game_launch_cmd):
 
     return extra_env, extra_args
 
+def _steam_install_candidates():
+    """Return all plausible Steam install roots, most likely first."""
+    import shutil
+    candidates = []
+
+    # 1) handles custom/non-standard installs
+    steam_bin = shutil.which("steam")
+    if steam_bin:
+        p = os.path.abspath(steam_bin)
+        for _ in range(4):
+            p = os.path.dirname(p)
+            if os.path.isdir(os.path.join(p, "ubuntu12_32")):
+                candidates.append(p)
+                break
+
+    # 2) Well-known locations (native, Debian package, Flatpak, Snap, immutable)
+    home = os.path.expanduser("~")
+    candidates += [
+        os.path.join(home, ".local/share/Steam"),
+        os.path.join(home, ".steam/steam"),
+        os.path.join(home, ".steam/debian-installation"),
+        os.path.join(home, ".var/app/com.valvesoftware.Steam/.local/share/Steam"),
+        os.path.join(home, "snap/steam/common/.local/share/Steam"),
+        os.path.join("/var/home", os.path.basename(home), ".steam"),
+    ]
+
+    # Deduplicate while preserving order
+    seen, out = set(), []
+    for c in candidates:
+        c = os.path.normpath(c)
+        if c not in seen and os.path.isdir(c):
+            seen.add(c)
+            out.append(c)
+    return out
+
+
+def _resolve_steam_overlay():
+    """Return an LD_PRELOAD value with gameoverlayrenderer.so, or None."""
+    for root in _steam_install_candidates():
+        so32 = os.path.join(root, "ubuntu12_32", "gameoverlayrenderer.so")
+        so64 = os.path.join(root, "ubuntu12_64", "gameoverlayrenderer.so")
+        has32 = os.path.isfile(so32)
+        has64 = os.path.isfile(so64)
+        if has32 and has64:
+            return f"{so32}:{so64}"
+        if has32:
+            return so32
+        if has64:
+            return so64
+    return None
+
+
 def launch_with_proton(exe_path, linux_config, game_launch_cmd=None):
     """
     Launch a Windows executable using Proton.
@@ -265,6 +317,24 @@ def launch_with_proton(exe_path, linux_config, game_launch_cmd=None):
             logging.info(f"[Proton] Created tracked_files placeholder: {tracked_files_path}")
         except Exception as e:
             logging.warning(f"[Proton] Could not create tracked_files: {e}")
+
+    # Steam overlay injection (only for OnlineFix games with a SteamAppId)
+    # Best-effort. Preloads both gameoverlayrenderer.so (32 + 64 bit); the dynamic
+    # loader picks the matching one.
+    # On some setups the overlay may not appear,
+    # but the game still launches normally and can still be played online.
+    if linux_config.get("steamappid"):
+        overlay_so = _resolve_steam_overlay()
+        if overlay_so:
+            env["LD_PRELOAD"] = overlay_so
+            env["ENABLE_VK_LAYER_VALVE_steam_overlay_1"] = "1"
+            env["SteamOverlayGameId"] = linux_config["steamappid"]
+            logging.info(
+                f"[Proton] Steam overlay injected: LD_PRELOAD={overlay_so}, "
+                f"SteamOverlayGameId={linux_config['steamappid']}"
+            )
+        else:
+            logging.warning("[Proton] gameoverlayrenderer.so not found; overlay disabled")
 
     cmd = [proton_script, "run", exe_path]
     cmd.extend(extra_args)
