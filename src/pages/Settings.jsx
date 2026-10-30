@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
+import SafeHtml from "@/components/SafeHtml";
 import "@/components/ui/tabs";
 import {
   Accordion,
@@ -3500,9 +3501,12 @@ function Settings() {
                               <div className="flex items-center gap-2">
                                 <AlertTriangle className="h-4 w-4 text-yellow-500" />
                                 <p className="text-sm text-yellow-500">
-                                  {t("settings.linuxCompat.updateAvailable", {
-                                    version: protonCachyInfo.latestVersion,
-                                  })}
+                                  <SafeHtml
+                                    html={t("settings.linuxCompat.updateAvailable", {
+                                      version: protonCachyInfo.latestVersion,
+                                    })}
+                                    style={{ display: "inline" }}
+                                  />
                                   {protonCachyInfo.installedVersions.length > 0 && (
                                     <span className="text-yellow-500/70">
                                       {" "}
@@ -3634,9 +3638,12 @@ function Settings() {
                                   <div className="flex items-center gap-2">
                                     <AlertTriangle className="h-4 w-4 text-yellow-500" />
                                     <p className="text-sm text-yellow-500">
-                                      {t("settings.linuxCompat.updateAvailable", {
-                                        version: protonGEInfo.latestVersion,
-                                      })}
+                                      <SafeHtml
+                                        html={t("settings.linuxCompat.updateAvailable", {
+                                          version: protonGEInfo.latestVersion,
+                                        })}
+                                        style={{ display: "inline" }}
+                                      />
                                       {protonGEInfo.installedVersions.length > 0 && (
                                         <span className="text-yellow-500/70">
                                           {" "}
