@@ -258,8 +258,10 @@ def can_keep_install_for_dll_repair(directory, errors, update_flow, old_map, pri
             text = stream.read(65537)
         if len(text) > 65536:
             return False
+        # Online-fix lists also name managed assemblies and config files; only DLLs are repairable
         listed = [line.strip().replace('\\', '/').lower() for line in text.splitlines() if line.strip()]
-        if not 1 <= len(listed) <= 128 or any(not name.endswith('.dll') for name in listed):
+        listed = [name for name in listed if name.endswith('.dll')]
+        if not 1 <= len(listed) <= 128:
             return False
         for error in errors:
             name = error.get('file', '').replace('\\', '/').lower()
