@@ -710,6 +710,8 @@ contextBridge.exposeInMainWorld("electron", {
   showTestNotification: () => ipcRenderer.invoke("show-test-notification"),
   showNotification: (title, message) =>
     ipcRenderer.invoke("show-notification", title, message),
+  previewNotification: (colors, achievement) =>
+    ipcRenderer.invoke("preview-notification", colors, achievement),
 
   //===========================================================================
   // API & NETWORKING

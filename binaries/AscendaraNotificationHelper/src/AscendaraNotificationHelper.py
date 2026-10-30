@@ -5,23 +5,26 @@
 # Read more about the Notification Helper Tool here:
 # https://ascendara.app/docs/binary-tool/notification-helper
 
-
-
-
-
-
 import sys
 import os
-from PyQt6.QtCore import Qt, QTimer, QEasingCurve, QPropertyAnimation, QRect, QSize, QPoint
-from PyQt6.QtGui import QColor, QPainter, QPainterPath, QIcon, QPixmap
-import subprocess
+import json
 import atexit
 import logging
 import argparse
-from typing import Literal
+import subprocess
+import tempfile
+import traceback
+import urllib.request
+from PyQt6.QtCore import (
+    Qt, QTimer, QEasingCurve, QPropertyAnimation, QPoint, QRectF, QLockFile,
+    QElapsedTimer,
+)
+from PyQt6.QtGui import (
+    QColor, QPainter, QPainterPath, QPixmap, QFont, QFontMetrics, QPen,
+    QTextLayout, QGuiApplication, QCursor,
+)
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QLabel, QPushButton, 
-    QVBoxLayout, QHBoxLayout, QGraphicsOpacityEffect, QGraphicsDropShadowEffect
+    QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QSizePolicy,
 )
 
 
@@ -57,84 +60,193 @@ def log_uncaught_exceptions(exctype, value, tb):
 
 sys.excepthook = log_uncaught_exceptions
 
-# Pre-compute theme colors as QColor objects
-THEME_COLORS = {
-    "light": {
-        "bg": QColor(255, 255, 255),      # --color-background
-        "fg": QColor(15, 23, 42),         # --color-foreground
-        "border": QColor(226, 232, 240),  # --color-border
-        "shadow": QColor(0, 0, 0, 50),    # subtle shadow
-    },
-    "dark": {
-        "bg": QColor(15, 23, 42),         # --color-background
-        "fg": QColor(241, 245, 249),      # --color-foreground
-        "border": QColor(51, 65, 85),      # --color-border
-        "shadow": QColor(0, 0, 0, 160),   # deeper shadow
-    },
-    "blue": {
-        "bg": QColor(30, 41, 59),         # --color-background
-        "fg": QColor(241, 245, 249),      # --color-foreground
-        "border": QColor(59, 130, 246),    # --color-border
-        "shadow": QColor(0, 0, 0, 120),
-    },
-    "purple": {
-        "bg": QColor(88, 28, 135),        # --color-background
-        "fg": QColor(237, 233, 254),      # --color-foreground
-        "border": QColor(147, 51, 234),    # --color-border
-        "shadow": QColor(0, 0, 0, 110),
-    },
-    "emerald": {
-        "bg": QColor(6, 78, 59),          # --color-background
-        "fg": QColor(209, 250, 229),      # --color-foreground
-        "border": QColor(16, 185, 129),    # --color-border
-        "shadow": QColor(0, 0, 0, 110),
-    },
-    "rose": {
-        "bg": QColor(159, 18, 57),        # --color-background
-        "fg": QColor(255, 228, 230),      # --color-foreground
-        "border": QColor(244, 63, 94),     # --color-border
-        "shadow": QColor(0, 0, 0, 110),
-    },
-    "cyberpunk": {
-        "bg": QColor(17, 24, 39),         # --color-background
-        "fg": QColor(236, 72, 153),       # --color-foreground
-        "border": QColor(244, 114, 182),   # --color-border
-        "shadow": QColor(0, 0, 0, 120),
-    },
-    "sunset": {
-        "bg": QColor(124, 45, 18),        # --color-background
-        "fg": QColor(254, 215, 170),      # --color-foreground
-        "border": QColor(251, 146, 60),    # --color-border
-        "shadow": QColor(0, 0, 0, 110),
-    },
-    "forest": {
-        "bg": QColor(20, 83, 45),         # --color-background
-        "fg": QColor(187, 247, 208),      # --color-foreground
-        "border": QColor(34, 197, 94),     # --color-border
-        "shadow": QColor(0, 0, 0, 110),
-    },
-    "midnight": {
-        "bg": QColor(30, 41, 59),         # --color-background
-        "fg": QColor(241, 245, 249),      # --color-foreground
-        "border": QColor(51, 65, 85),      # --color-border
-        "shadow": QColor(0, 0, 0, 120),
-    },
-    "amber": {
-        "bg": QColor(120, 53, 15),        # --color-background
-        "fg": QColor(254, 243, 199),      # --color-foreground
-        "border": QColor(245, 158, 11),    # --color-border
-        "shadow": QColor(0, 0, 0, 110),
-    },
-    "ocean": {
-        "bg": QColor(12, 74, 110),        # --color-background
-        "fg": QColor(186, 230, 253),      # --color-foreground
-        "border": QColor(14, 165, 233),    # --color-border
-        "shadow": QColor(0, 0, 0, 110),
-    }
+
+# ------------------------------------------------------------------------------
+# Theme palettes
+# ------------------------------------------------------------------------------
+# Mirrors the app's tailwind theme tokens (tailwind.config.js) so a notification
+# looks like it belongs to the theme the user picked. Values are "r g b" strings,
+# the same format custom themes are stored in.
+STATUS_DEFAULTS = {
+    "success": "34 197 94",
+    "warning": "234 179 8",
+    "error": "239 68 68",
+    "info": "59 130 246",
+    "achievement": "250 204 21",
 }
 
-# Cache for icon pixmap
-_icon_pixmap = None
+THEMES = {
+    "light":     {"bg": "255 255 255", "fg": "15 23 42",    "muted": "100 116 139", "accent": "59 130 246",  "border": "226 232 240"},
+    "blue":      {"bg": "255 255 255", "fg": "30 58 138",   "muted": "71 85 105",   "accent": "37 99 235",   "border": "191 219 254"},
+    "purple":    {"bg": "255 255 255", "fg": "59 7 100",    "muted": "107 33 168",  "accent": "124 58 237",  "border": "221 214 254"},
+    "emerald":   {"bg": "255 255 255", "fg": "6 78 59",     "muted": "4 120 87",    "accent": "16 185 129",  "border": "167 243 208"},
+    "rose":      {"bg": "255 255 255", "fg": "136 19 55",   "muted": "190 18 60",   "accent": "225 29 72",   "border": "254 205 211"},
+    "amber":     {"bg": "255 251 235", "fg": "120 53 15",   "muted": "146 64 14",   "accent": "217 119 6",   "border": "253 230 138"},
+    "dark":      {"bg": "30 41 59",    "fg": "241 245 249", "muted": "148 163 184", "accent": "59 130 246",  "border": "51 65 85"},
+    "midnight":  {"bg": "15 23 42",    "fg": "199 210 254", "muted": "165 180 252", "accent": "129 140 248", "border": "51 65 85"},
+    "cyberpunk": {"bg": "31 41 55",    "fg": "251 207 232", "muted": "249 168 212", "accent": "236 72 153",  "border": "55 65 81"},
+    "sunset":    {"bg": "51 65 85",    "fg": "254 215 170", "muted": "253 186 116", "accent": "249 115 22",  "border": "71 85 105"},
+    "forest":    {"bg": "30 41 35",    "fg": "187 247 208", "muted": "74 222 128",  "accent": "34 197 94",   "border": "40 51 45"},
+    "ocean":     {"bg": "30 41 59",    "fg": "207 250 254", "muted": "103 232 249", "accent": "34 211 238",  "border": "51 65 85"},
+}
+
+# Custom theme keys the theme maker writes, with the general theme keys each one
+# falls back to so older custom themes still get a sensible notification
+CUSTOM_KEYS = {
+    "bg": ("notificationBackground", "card", "background"),
+    "fg": ("notificationForeground", "cardForeground", "foreground"),
+    "muted": ("notificationMuted", "mutedForeground"),
+    "accent": ("notificationAccent", "primary"),
+    "border": ("notificationBorder", "border"),
+    "achievement": ("notificationAchievement", "starFilled"),
+    "success": ("success",),
+    "warning": ("warning",),
+    "error": ("error",),
+    "info": ("info",),
+}
+
+FONT_FAMILIES = ["Segoe UI Variable Text", "Segoe UI", "Inter", "Noto Sans", "Ubuntu", "Helvetica Neue", "Arial"]
+
+
+def parse_rgb(value):
+    """Parse "r g b", "r,g,b" or "#rrggbb" into a QColor, or None"""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    value = value.strip()
+    if value.startswith("#"):
+        color = QColor(value)
+        return color if color.isValid() else None
+    try:
+        parts = [int(float(p)) for p in value.replace(",", " ").split()]
+    except ValueError:
+        return None
+    if len(parts) != 3 or any(p < 0 or p > 255 for p in parts):
+        return None
+    return QColor(*parts)
+
+
+def find_settings_path():
+    if sys.platform == "win32":
+        base = os.getenv("APPDATA") or ""
+        folders = ["Ascendara", "ascendara", "Electron"]
+    elif sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support")
+        folders = ["ascendara", "Ascendara", "Electron"]
+    else:
+        base = os.path.expanduser("~/.config")
+        folders = ["ascendara", "Ascendara", "Electron"]
+    for folder in folders:
+        candidate = os.path.join(base, folder, "ascendarasettings.json")
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def load_custom_theme():
+    path = find_settings_path()
+    if not path:
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            settings = json.load(f)
+        custom = settings.get("customTheme")
+        if isinstance(custom, list) and custom and isinstance(custom[0], dict):
+            return custom[0]
+    except Exception as e:
+        logger.warning(f"Failed to read custom theme from {path}: {e}")
+    return None
+
+
+def is_dark(color):
+    return 0.2126 * color.red() + 0.7152 * color.green() + 0.0722 * color.blue() < 128
+
+
+def resolve_palette(theme, colors_override=None):
+    """Build the notification palette for a theme name, reading the custom theme
+    from settings when needed. colors_override (a custom theme dict) wins."""
+    custom = colors_override
+    if custom is None and (theme == "custom" or theme not in THEMES):
+        custom = load_custom_theme()
+
+    base = dict(THEMES.get(theme) or THEMES["dark"])
+    base.update({k: v for k, v in STATUS_DEFAULTS.items() if k not in base})
+
+    palette = {}
+    for key, fallback in base.items():
+        color = None
+        if custom:
+            for custom_key in CUSTOM_KEYS.get(key, ()):
+                color = parse_rgb(custom.get(custom_key))
+                if color:
+                    break
+        palette[key] = color or parse_rgb(fallback)
+        palette.setdefault("_defaulted", set())
+        if not color:
+            palette["_defaulted"].add(key)
+
+    palette["dark"] = is_dark(palette["bg"])
+    # Bright yellow washes out on light cards, so deepen it unless the user chose it
+    if not palette["dark"]:
+        for key, deeper in (("achievement", "202 138 4"), ("warning", "202 138 4")):
+            if key in palette["_defaulted"]:
+                palette[key] = parse_rgb(deeper)
+    del palette["_defaulted"]
+    return palette
+
+
+def infer_type(title):
+    title = (title or "").lower()
+    if "fail" in title or "error" in title:
+        return "error"
+    if "warn" in title:
+        return "warning"
+    if any(word in title for word in ("complete", "success", "installed", "finished", "ready")):
+        return "success"
+    return "info"
+
+
+def rgba(color, alpha):
+    return f"rgba({color.red()}, {color.green()}, {color.blue()}, {alpha})"
+
+
+def make_font(px, weight=QFont.Weight.Normal, letter_spacing=0.0):
+    font = QFont()
+    font.setFamilies(FONT_FAMILIES)
+    font.setPixelSize(px)
+    font.setWeight(weight)
+    font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+    if letter_spacing:
+        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, letter_spacing)
+    return font
+
+
+def elide_lines(text, font, width, max_lines):
+    """Wrap text to width and elide the last visible line"""
+    text = " ".join((text or "").split())
+    if not text:
+        return ""
+    metrics = QFontMetrics(font)
+    layout = QTextLayout(text, font)
+    layout.beginLayout()
+    lines = []
+    while True:
+        line = layout.createLine()
+        if not line.isValid():
+            break
+        line.setLineWidth(width)
+        lines.append((line.textStart(), line.textLength()))
+    layout.endLayout()
+    if len(lines) <= max_lines:
+        return "\n".join(text[s:s + n].strip() for s, n in lines)
+    visible = [text[s:s + n].strip() for s, n in lines[:max_lines - 1]]
+    start = lines[max_lines - 1][0]
+    visible.append(metrics.elidedText(text[start:], Qt.TextElideMode.ElideRight, width))
+    return "\n".join(visible)
+
+
+# ------------------------------------------------------------------------------
+# Crash reporter
+# ------------------------------------------------------------------------------
 
 def _launch_crash_reporter_on_exit(error_code, error_message):
     try:
@@ -157,303 +269,557 @@ def launch_crash_reporter(error_code, error_message):
         atexit.register(_launch_crash_reporter_on_exit, error_code, error_message)
         launch_crash_reporter._registered = True
 
-class NotificationWindow(QWidget):
-    def __init__(self, theme: Literal["light", "dark", "blue", "purple", "emerald", "rose", "cyberpunk", "sunset", "forest", "midnight", "amber", "ocean"], title: str, message: str, is_achievement: bool = False, icon: str = None, appid: str = None, game: str = None, achievement: str = None, description: str = None):
-        super().__init__()
-        logger.info(f"Initializing notification with theme: {theme}, is_achievement: {is_achievement}")
-        self.theme = theme if theme in THEME_COLORS else "dark"
-        self.title = title
-        self.message = message
-        self.is_achievement = is_achievement
-        self.icon = icon
-        self.appid = appid
-        self.game = game
-        self.achievement = achievement
-        self.description = description
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self.bg_color = THEME_COLORS[self.theme]["bg"]
-        self.fg_color = THEME_COLORS[self.theme]["fg"]
-        self.border_color = THEME_COLORS[self.theme]["border"]
-        self.shadow_color = THEME_COLORS[self.theme]["shadow"]
-        if self.is_achievement:
-            self._setup_achievement_ui()
-        else:
-            self._setup_ui()
-        self._apply_shadow()
-        self._set_position()
-        self._animate_in()
-        QTimer.singleShot(5000, self.close_notification)
 
-    def _setup_ui(self):
-        self.setMinimumWidth(320)
-        self.setMaximumWidth(380)
-        self.setMinimumHeight(80)
-        self.setMaximumHeight(160)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 16, 18, 16)
-        layout.setSpacing(10)
+# ------------------------------------------------------------------------------
+# Stacking
+# ------------------------------------------------------------------------------
+# Every notification is its own process, so they coordinate through lock files
+# to stack instead of drawing on top of each other.
+SLOT_DIR = os.path.join(tempfile.gettempdir(), "ascendara-notifications")
+MAX_SLOTS = 5
 
-        # Title
-        title_label = QLabel(self.title)
-        title_label.setStyleSheet(f"color: {self.fg_color.name()}; font-size: 15px; font-weight: 600; font-family: 'Segoe UI'; margin-bottom: 2px;")
-        layout.addWidget(title_label)
 
-        # Message
-        message_label = QLabel(self.message)
-        message_label.setStyleSheet(f"color: {self.fg_color.name()}; font-size: 13px; font-family: 'Segoe UI'; margin-bottom: 8px;")
-        message_label.setWordWrap(True)
-        layout.addWidget(message_label)
+class StackSlot:
+    def __init__(self):
+        self.index = 0
+        self.lock = None
+        os.makedirs(SLOT_DIR, exist_ok=True)
+        for i in range(MAX_SLOTS):
+            lock = QLockFile(os.path.join(SLOT_DIR, f"slot-{i}.lock"))
+            lock.setStaleLockTime(30000)
+            if lock.tryLock(0):
+                self.index, self.lock = i, lock
+                return
+        # Every slot is taken, so reuse the top one rather than not showing at all
+        self.index = MAX_SLOTS - 1
 
-        # Action buttons (Open and Dismiss) positioned bottom right with padding
-        button_container = QWidget()
-        button_container_layout = QHBoxLayout(button_container)
-        button_container_layout.setContentsMargins(0, 0, 8, 0)  # Right padding
-        button_container_layout.setSpacing(10)
-        button_container_layout.addStretch()
-
-        open_button = QPushButton("Open")
-        open_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        open_button.setStyleSheet(
-            f"QPushButton {{ background: {self.fg_color.name()}; color: {self.bg_color.name()}; border: none; border-radius: 8px; "
-            f"font-size: 13px; font-family: 'Segoe UI'; font-weight: 600; padding: 5px 18px; }} "
-            f"QPushButton:hover {{ background: {self.border_color.name()}; color: {self.fg_color.name()}; }}"
-        )
-        open_button.clicked.connect(self._handle_open)
-        button_container_layout.addWidget(open_button)
-
-        dismiss_button = QPushButton("Dismiss")
-        dismiss_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        dismiss_button.setStyleSheet(
-            f"QPushButton {{ background: rgba(0,0,0,0.06); color: {self.fg_color.name()}; border: none; border-radius: 8px; "
-            f"font-size: 13px; font-family: 'Segoe UI'; font-weight: 600; padding: 5px 18px; }} "
-            f"QPushButton:hover {{ background: {self.fg_color.name()}; color: {self.bg_color.name()}; }}"
-        )
-        dismiss_button.clicked.connect(self.close_notification)
-        button_container_layout.addWidget(dismiss_button)
-
-        # Add vertical stretch before the button row to push to bottom
-        layout.addStretch()
-        layout.addWidget(button_container, alignment=Qt.AlignmentFlag.AlignRight)
-
-        footer = QWidget()
-        footer_layout = QHBoxLayout(footer)
-        footer_layout.setContentsMargins(0, 0, 0, 0)
-        footer_layout.addStretch()
-        layout.addWidget(footer)
-
-    def _setup_achievement_ui(self):
-        self.setMinimumWidth(380)
-        self.setMaximumWidth(400)
-        self.setMinimumHeight(88)
-        self.setMaximumHeight(120)
-        # Card layout with accent bar visually merged
-        card_layout = QHBoxLayout(self)
-        card_layout.setContentsMargins(0, 0, 0, 0)
-        card_layout.setSpacing(0)
-
-        # Accent bar (gold), flush with card and shares border radius
-        accent = QWidget()
-        accent.setFixedWidth(8)
-        accent.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFD700, stop:1 #B8860B); border-top-left-radius: 16px; border-bottom-left-radius: 16px;")
-        card_layout.addWidget(accent)
-
-        # Main content area (rounded on right, flush left)
-        content = QWidget()
-        content_layout = QHBoxLayout(content)
-        content_layout.setContentsMargins(10, 8, 16, 8)
-        content_layout.setSpacing(10)
-        content.setStyleSheet("border-top-right-radius: 16px; border-bottom-right-radius: 16px; background: #10182b;")
-
-        # Icon (rounded, shadow, tight)
-        icon_label = QLabel()
-        icon_label.setFixedSize(44, 44)
-        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setStyleSheet("border-radius: 8px; background: #232a3b; box-shadow: 0px 2px 8px rgba(0,0,0,0.10);")
-        if self.icon:
+    def offset_below(self, gap):
+        """Total height of the notifications stacked under this one"""
+        total = 0
+        for i in range(self.index):
             try:
-                pixmap = QPixmap()
-                if self.icon.startswith('http'):
-                    import requests
-                    from io import BytesIO
-                    response = requests.get(self.icon, timeout=2)
-                    if response.status_code == 200:
-                        pixmap.loadFromData(response.content)
-                else:
-                    pixmap.load(self.icon)
-                if not pixmap.isNull():
-                    icon_label.setPixmap(pixmap.scaled(44, 44, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-                else:
-                    icon_label.setText("🏆")
-                    icon_label.setStyleSheet("font-size: 28px; border-radius: 8px; background: #FFD700; color: #232a3b; text-align: center;")
-            except Exception as e:
-                logger.warning(f"Failed to load achievement icon: {e}")
-                icon_label.setText("🏆")
-                icon_label.setStyleSheet("font-size: 28px; border-radius: 8px; background: #FFD700; color: #232a3b; text-align: center;")
-        else:
-            icon_label.setText("🏆")
-            icon_label.setStyleSheet("font-size: 28px; border-radius: 8px; background: #FFD700; color: #232a3b; text-align: center;")
-        content_layout.addWidget(icon_label, alignment=Qt.AlignmentFlag.AlignVCenter)
+                with open(os.path.join(SLOT_DIR, f"slot-{i}.height"), "r") as f:
+                    total += int(f.read().strip()) + gap
+            except (OSError, ValueError):
+                total += 110 + gap
+        return total
 
-        # Info Column (tight, centered)
-        info_col = QVBoxLayout()
-        info_col.setSpacing(0)
-        info_col.setContentsMargins(0, 0, 0, 0)
-
-        # Trophy header (bold, gold, larger)
-        unlocked_header = QLabel("🏆 Achievement Unlocked!")
-        unlocked_header.setStyleSheet("color: #FFD700; font-size: 18px; font-weight: 900; font-family: 'Segoe UI', Arial, sans-serif; margin-bottom: 0px; letter-spacing: 0.5px;")
-        unlocked_header.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        info_col.addWidget(unlocked_header)
-
-        # Game name (bold, larger)
-        game_label = QLabel(self.game or "")
-        game_label.setStyleSheet(f"color: {self.fg_color.name()}; font-size: 17px; font-weight: bold; font-family: 'Segoe UI'; margin-bottom: 0px; text-shadow: 1px 1px 6px rgba(0,0,0,0.13);")
-        info_col.addWidget(game_label)
-
-        # Achievement name (larger, light)
-        achievement_text = self.achievement or "Achievement Unlocked!"
-        ach_label = QLabel(achievement_text)
-        ach_label.setStyleSheet(f"color: {self.fg_color.name()}; font-size: 14px; font-family: 'Segoe UI', Arial, sans-serif; font-weight: 400; margin-bottom: 0px; letter-spacing: 0.2px; text-shadow: 1px 1px 6px rgba(0,0,0,0.09);")
-        ach_label.setWordWrap(True)
-        info_col.addWidget(ach_label)
-
-        # If no achievement details, show a friendly message
-        if not self.achievement or self.achievement.strip() == "":
-            empty_label = QLabel("You just unlocked a new achievement!")
-            empty_label.setStyleSheet(f"color: {self.fg_color.name()}; font-size: 13px; font-family: 'Segoe UI'; margin-top: 0px;")
-            info_col.addWidget(empty_label)
-
-        info_col.addStretch()
-        content_layout.addLayout(info_col)
-        content.setLayout(content_layout)
-        card_layout.addWidget(content)
-
-    def _handle_open(self):
-        import subprocess
-        exe_path = os.path.join(os.path.dirname("../Ascendara.exe"))
+    def publish_height(self, height):
+        if self.lock is None:
+            return
         try:
-            subprocess.Popen([exe_path], shell=False)
-            logger.info(f"Launched: {exe_path}")
-        except Exception as e:
-            logger.error(f"Failed to launch {exe_path}: {e}")
-        self.close_notification()
+            with open(os.path.join(SLOT_DIR, f"slot-{self.index}.height"), "w") as f:
+                f.write(str(height))
+        except OSError:
+            pass
 
-    def _apply_shadow(self):
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(22)
-        shadow.setXOffset(0)
-        shadow.setYOffset(6)
-        shadow.setColor(self.shadow_color)
-        self.setGraphicsEffect(shadow)
+    def release(self):
+        if self.lock is not None:
+            self.lock.unlock()
+            self.lock = None
 
-    def _set_position(self):
-        screen = QApplication.primaryScreen()
-        geometry = screen.availableGeometry()  # Use availableGeometry for taskbar safety
-        dpr = screen.devicePixelRatio() if hasattr(screen, 'devicePixelRatio') else 1.0
-        # Use actual widget size for precise placement
-        self.adjustSize()
-        width, height = self.width(), self.height()
-        margin_x, margin_y = int(18 * dpr), int(18 * dpr)
-        x = geometry.x() + geometry.width() - width - margin_x
-        y = geometry.y() + geometry.height() - height - margin_y
-        self.setGeometry(x, y, width, height)
-        logger.debug(f"Window positioned at: {x}, {y}")
 
-    def _animate_in(self):
-        self.opacity_effect = QGraphicsOpacityEffect(self)
-        self.setGraphicsEffect(self.opacity_effect)
-        self.opacity_effect.setOpacity(0.0)
-        self.fade_in_animation = QPropertyAnimation(self.opacity_effect, b"opacity")
-        self.fade_in_animation.setDuration(260)
-        self.fade_in_animation.setStartValue(0.0)
-        self.fade_in_animation.setEndValue(1.0)
-        self.fade_in_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self.fade_in_animation.start()
-        self.move(self.x(), self.y() + 40)
-        self.slide_in_animation = QPropertyAnimation(self, b"pos")
-        self.slide_in_animation.setDuration(260)
-        self.slide_in_animation.setStartValue(self.pos())
-        self.slide_in_animation.setEndValue(self.pos() - QPoint(0, 40))
-        self.slide_in_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self.slide_in_animation.start()
-        QTimer.singleShot(4000, self.close_notification)
-        self.show()
-        logger.debug("Window shown")
+# ------------------------------------------------------------------------------
+# Widgets
+# ------------------------------------------------------------------------------
+
+class StatusIcon(QWidget):
+    """Tinted badge with a vector glyph for the notification type"""
+
+    def __init__(self, kind, palette, size=40, parent=None):
+        super().__init__(parent)
+        self.kind = kind
+        self.palette_ = palette
+        self.setFixedSize(size, size)
 
     def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        color = self.palette_[self.kind] if self.kind != "info" else self.palette_["accent"]
+        rect = QRectF(self.rect())
 
-        # Modern, softer rounded rectangle
-        radius = 18
-        path = QPainterPath()
-        path.addRoundedRect(0, 0, self.width(), self.height(), radius, radius)
+        tint = QColor(color)
+        tint.setAlpha(46 if self.palette_["dark"] else 30)
+        badge = QPainterPath()
+        badge.addRoundedRect(rect, 11, 11)
+        p.fillPath(badge, tint)
 
-        # Draw background
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.fillPath(path, self.bg_color)
+        pen = QPen(color, 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        c = rect.center()
+        r = rect.width() * 0.24
+        if self.kind == "success":
+            path = QPainterPath()
+            path.moveTo(c.x() - r * 0.95, c.y() + r * 0.05)
+            path.lineTo(c.x() - r * 0.25, c.y() + r * 0.75)
+            path.lineTo(c.x() + r * 1.0, c.y() - r * 0.7)
+            p.drawPath(path)
+        elif self.kind == "error":
+            p.drawLine(QPoint(int(c.x() - r * 0.7), int(c.y() - r * 0.7)), QPoint(int(c.x() + r * 0.7), int(c.y() + r * 0.7)))
+            p.drawLine(QPoint(int(c.x() + r * 0.7), int(c.y() - r * 0.7)), QPoint(int(c.x() - r * 0.7), int(c.y() + r * 0.7)))
+        elif self.kind == "warning":
+            p.drawLine(QPoint(int(c.x()), int(c.y() - r * 0.95)), QPoint(int(c.x()), int(c.y() + r * 0.25)))
+            p.setBrush(color)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawEllipse(c + QPoint(0, int(r * 0.85)), 1.6, 1.6)
+        else:
+            # Download arrow for general Ascendara activity
+            p.drawLine(QPoint(int(c.x()), int(c.y() - r * 1.0)), QPoint(int(c.x()), int(c.y() + r * 0.45)))
+            path = QPainterPath()
+            path.moveTo(c.x() - r * 0.6, c.y() - r * 0.1)
+            path.lineTo(c.x(), c.y() + r * 0.5)
+            path.lineTo(c.x() + r * 0.6, c.y() - r * 0.1)
+            p.drawPath(path)
+            p.drawLine(QPoint(int(c.x() - r * 0.9), int(c.y() + r * 1.0)), QPoint(int(c.x() + r * 0.9), int(c.y() + r * 1.0)))
 
-        # Draw subtle border with opacity
-        border_color = QColor(self.border_color)
-        border_color.setAlpha(110)
-        painter.setPen(border_color)
-        painter.drawPath(path)
+
+class AchievementIcon(QWidget):
+    """Rounded achievement artwork with an accent ring, or a drawn trophy"""
+
+    def __init__(self, pixmap, palette, size=60, parent=None):
+        super().__init__(parent)
+        self.pixmap = pixmap
+        self.palette_ = palette
+        self.setFixedSize(size, size)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        gold = self.palette_["achievement"]
+        rect = QRectF(self.rect()).adjusted(1.5, 1.5, -1.5, -1.5)
+        clip = QPainterPath()
+        clip.addRoundedRect(rect, 12, 12)
+
+        if self.pixmap and not self.pixmap.isNull():
+            p.save()
+            p.setClipPath(clip)
+            scaled = self.pixmap.scaled(
+                rect.size().toSize(),
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            x = rect.x() + (rect.width() - scaled.width()) / 2
+            y = rect.y() + (rect.height() - scaled.height()) / 2
+            p.drawPixmap(int(x), int(y), scaled)
+            p.restore()
+        else:
+            tint = QColor(gold)
+            tint.setAlpha(46 if self.palette_["dark"] else 36)
+            p.fillPath(clip, tint)
+            self._draw_trophy(p, rect, gold)
+
+        ring = QColor(gold)
+        ring.setAlpha(200)
+        p.setPen(QPen(ring, 2))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawPath(clip)
+
+    @staticmethod
+    def _draw_trophy(p, rect, color):
+        c = rect.center()
+        s = rect.width() / 60.0
+        p.setPen(QPen(color, 2.4 * s, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        # Handles
+        p.drawArc(QRectF(c.x() - 17 * s, c.y() - 13 * s, 12 * s, 12 * s), 90 * 16, 180 * 16)
+        p.drawArc(QRectF(c.x() + 5 * s, c.y() - 13 * s, 12 * s, 12 * s), 270 * 16, 180 * 16)
+        # Cup
+        cup = QPainterPath()
+        cup.moveTo(c.x() - 11 * s, c.y() - 14 * s)
+        cup.lineTo(c.x() + 11 * s, c.y() - 14 * s)
+        cup.lineTo(c.x() + 11 * s, c.y() - 4 * s)
+        cup.cubicTo(c.x() + 11 * s, c.y() + 4 * s, c.x() - 11 * s, c.y() + 4 * s, c.x() - 11 * s, c.y() - 4 * s)
+        cup.closeSubpath()
+        fill = QColor(color)
+        fill.setAlpha(70)
+        p.setBrush(fill)
+        p.drawPath(cup)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        # Stem and base
+        p.drawLine(QPoint(int(c.x()), int(c.y() + 3 * s)), QPoint(int(c.x()), int(c.y() + 10 * s)))
+        p.drawLine(QPoint(int(c.x() - 8 * s), int(c.y() + 14 * s)), QPoint(int(c.x() + 8 * s), int(c.y() + 14 * s)))
+        p.drawLine(QPoint(int(c.x() - 5 * s), int(c.y() + 10 * s)), QPoint(int(c.x() + 5 * s), int(c.y() + 10 * s)))
+
+
+class CloseButton(QWidget):
+    def __init__(self, palette, on_click, parent=None):
+        super().__init__(parent)
+        self.palette_ = palette
+        self.on_click = on_click
+        self.hovered = False
+        self.setFixedSize(24, 24)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip("Dismiss")
+
+    def enterEvent(self, event):
+        self.hovered = True
+        self.update()
+
+    def leaveEvent(self, event):
+        self.hovered = False
+        self.update()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(event.position().toPoint()):
+            self.on_click()
+        event.accept()
+
+    def mousePressEvent(self, event):
+        event.accept()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        fg = self.palette_["fg"]
+        if self.hovered:
+            hover = QColor(fg)
+            hover.setAlpha(28)
+            path = QPainterPath()
+            path.addRoundedRect(QRectF(self.rect()), 7, 7)
+            p.fillPath(path, hover)
+        glyph = QColor(self.palette_["fg"] if self.hovered else self.palette_["muted"])
+        if not self.hovered:
+            glyph.setAlpha(190)
+        p.setPen(QPen(glyph, 1.6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        c = QRectF(self.rect()).center()
+        d = 4.0
+        p.drawLine(QPoint(int(c.x() - d), int(c.y() - d)), QPoint(int(c.x() + d), int(c.y() + d)))
+        p.drawLine(QPoint(int(c.x() + d), int(c.y() - d)), QPoint(int(c.x() - d), int(c.y() + d)))
+
+
+def load_pixmap(source):
+    if not source:
+        return None
+    pixmap = QPixmap()
+    try:
+        if source.startswith(("http://", "https://")):
+            request = urllib.request.Request(source, headers={"User-Agent": "Ascendara"})
+            with urllib.request.urlopen(request, timeout=3) as response:
+                pixmap.loadFromData(response.read())
+        else:
+            pixmap.load(source)
+    except Exception as e:
+        logger.warning(f"Failed to load icon {source}: {e}")
+        return None
+    return None if pixmap.isNull() else pixmap
+
+
+def resource_path(name):
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, name)
+
+
+# ------------------------------------------------------------------------------
+# Notification window
+# ------------------------------------------------------------------------------
+
+class NotificationWindow(QWidget):
+    CARD_WIDTH = 360
+    SHADOW = 18       # transparent margin the soft shadow is painted into
+    RADIUS = 14
+    SCREEN_MARGIN = 12
+    STACK_GAP = 10
+
+    def __init__(self, palette, title, message, kind="info", is_achievement=False,
+                 icon=None, game=None, achievement=None, description=None, duration=None):
+        super().__init__()
+        self.palette_ = palette
+        self.kind = kind
+        self.is_achievement = is_achievement
+        self.duration = duration or (7000 if is_achievement else 6000)
+        self.remaining = self.duration
+        self.closing = False
+        self._progress = 1.0
+
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.Tool
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.WindowDoesNotAcceptFocus
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedWidth(self.CARD_WIDTH + self.SHADOW * 2)
+
+        if is_achievement:
+            self._build_achievement(icon, game, achievement, description)
+        else:
+            self._build_standard(title, message)
+
+        self.adjustSize()
+        self.setFixedHeight(self.sizeHint().height())
+
+        self.slot = StackSlot()
+        self.slot.publish_height(self.height() - self.SHADOW * 2)
+
+        self.clock = QElapsedTimer()
+        self.tick = QTimer(self)
+        self.tick.setInterval(16)
+        self.tick.timeout.connect(self._on_tick)
+
+    # -- layout -----------------------------------------------------------------
+
+    def _root_layout(self):
+        layout = QHBoxLayout(self)
+        m = self.SHADOW
+        # Extra bottom padding leaves room for the countdown bar
+        layout.setContentsMargins(m + 14, m + 14, m + 10, m + 16)
+        layout.setSpacing(12)
+        return layout
+
+    def _label(self, text, font, color, alpha=1.0):
+        label = QLabel(text)
+        label.setFont(font)
+        label.setStyleSheet(f"color: {rgba(color, alpha)}; background: transparent;")
+        label.setTextFormat(Qt.TextFormat.PlainText)
+        label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        return label
+
+    def _header(self, text, color, letter_spacing=0.6):
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(6)
+        app_icon = load_pixmap(resource_path("ascendara.ico"))
+        if app_icon and not self.is_achievement:
+            icon_label = QLabel()
+            icon_label.setPixmap(app_icon.scaled(14, 14, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            icon_label.setStyleSheet("background: transparent;")
+            row.addWidget(icon_label)
+        header = self._label(text.upper(), make_font(10, QFont.Weight.DemiBold, letter_spacing), color)
+        row.addWidget(header, 1)
+        row.addWidget(CloseButton(self.palette_, self.close_notification), 0, Qt.AlignmentFlag.AlignTop)
+        return row
+
+    def _text_width(self, icon_size):
+        # card width minus paddings, icon, spacing
+        return self.CARD_WIDTH - 14 - 10 - icon_size - 12
+
+    def _build_standard(self, title, message):
+        p = self.palette_
+        layout = self._root_layout()
+        layout.addWidget(StatusIcon(self.kind, p, 40), 0, Qt.AlignmentFlag.AlignTop)
+
+        text_width = self._text_width(40)
+        col = QVBoxLayout()
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(3)
+        col.addLayout(self._header("Ascendara", p["accent"]))
+
+        title_font = make_font(14, QFont.Weight.DemiBold)
+        title_label = self._label(
+            QFontMetrics(title_font).elidedText(title or "", Qt.TextElideMode.ElideRight, text_width - 4),
+            title_font, p["fg"],
+        )
+        col.addWidget(title_label)
+
+        if message:
+            message_font = make_font(13)
+            message_label = self._label(elide_lines(message, message_font, text_width - 4, 3), message_font, p["muted"])
+            col.addWidget(message_label)
+
+        layout.addLayout(col, 1)
+
+    def _build_achievement(self, icon, game, achievement, description):
+        p = self.palette_
+        layout = self._root_layout()
+        layout.addWidget(AchievementIcon(load_pixmap(icon), p, 60), 0, Qt.AlignmentFlag.AlignTop)
+
+        text_width = self._text_width(60)
+        col = QVBoxLayout()
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(2)
+        col.addLayout(self._header("★  Achievement unlocked", p["achievement"], 0.8))
+
+        name_font = make_font(15, QFont.Weight.DemiBold)
+        name = achievement or "New achievement"
+        col.addWidget(self._label(
+            QFontMetrics(name_font).elidedText(name, Qt.TextElideMode.ElideRight, text_width - 4),
+            name_font, p["fg"],
+        ))
+
+        if description:
+            desc_font = make_font(12)
+            col.addWidget(self._label(elide_lines(description, desc_font, text_width - 4, 2), desc_font, p["muted"]))
+
+        if game:
+            game_font = make_font(11, QFont.Weight.Medium)
+            col.addSpacing(2)
+            col.addWidget(self._label(
+                QFontMetrics(game_font).elidedText(game, Qt.TextElideMode.ElideRight, text_width - 4),
+                game_font, p["muted"], 0.8,
+            ))
+
+        layout.addLayout(col, 1)
+
+    # -- painting ---------------------------------------------------------------
+
+    def card_rect(self):
+        m = self.SHADOW
+        return QRectF(m, m, self.width() - m * 2, self.height() - m * 2)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pal = self.palette_
+        card = self.card_rect()
+
+        # Soft layered shadow, offset slightly downward
+        shadow_strength = 0.55 if pal["dark"] else 0.22
+        steps = 12
+        for i in range(steps):
+            t = i / steps
+            spread = self.SHADOW * (1 - t)
+            alpha = int(255 * shadow_strength * (t ** 2) / steps * 2.2)
+            path = QPainterPath()
+            path.addRoundedRect(
+                card.adjusted(-spread, -spread + 4, spread, spread + 4),
+                self.RADIUS + spread, self.RADIUS + spread,
+            )
+            p.fillPath(path, QColor(0, 0, 0, alpha))
+
+        body = QPainterPath()
+        body.addRoundedRect(card, self.RADIUS, self.RADIUS)
+        p.fillPath(body, pal["bg"])
+
+        border = QColor(pal["border"])
+        border.setAlpha(255 if pal["dark"] else 220)
+        p.setPen(QPen(border, 1))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRoundedRect(card.adjusted(0.5, 0.5, -0.5, -0.5), self.RADIUS, self.RADIUS)
+
+        # Countdown bar along the bottom edge, clipped to the card's corners
+        accent = pal["achievement"] if self.is_achievement else (
+            pal[self.kind] if self.kind != "info" else pal["accent"]
+        )
+        p.save()
+        p.setClipPath(body)
+        track = QColor(accent)
+        track.setAlpha(28)
+        bar_h = 3
+        p.fillRect(QRectF(card.x(), card.bottom() - bar_h, card.width(), bar_h), track)
+        p.fillRect(QRectF(card.x(), card.bottom() - bar_h, card.width() * self._progress, bar_h), accent)
+        p.restore()
+
+    # -- lifecycle --------------------------------------------------------------
+
+    def _target_pos(self):
+        screen = QGuiApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
+        area = screen.availableGeometry()
+        x = area.right() - self.width() + self.SHADOW - self.SCREEN_MARGIN + 1
+        y = area.bottom() - self.height() + self.SHADOW - self.SCREEN_MARGIN + 1
+        y -= self.slot.offset_below(self.STACK_GAP)
+        return QPoint(x, y)
+
+    def present(self):
+        target = self._target_pos()
+        self.move(target + QPoint(28, 0))
+        self.setWindowOpacity(0.0)
+        self.show()
+
+        self.slide = QPropertyAnimation(self, b"pos", self)
+        self.slide.setDuration(320)
+        self.slide.setStartValue(self.pos())
+        self.slide.setEndValue(target)
+        self.slide.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        self.fade = QPropertyAnimation(self, b"windowOpacity", self)
+        self.fade.setDuration(220)
+        self.fade.setStartValue(0.0)
+        self.fade.setEndValue(1.0)
+        self.fade.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        self.slide.start()
+        self.fade.start()
+        self.clock.start()
+        self.tick.start()
+
+    def _on_tick(self):
+        elapsed = self.clock.restart()
+        self.remaining -= elapsed
+        self._progress = max(0.0, self.remaining / self.duration)
+        self.update()
+        if self.remaining <= 0:
+            self.close_notification()
+
+    def enterEvent(self, event):
+        # Hovering holds the notification open
+        self.tick.stop()
+
+    def leaveEvent(self, event):
+        if not self.closing:
+            self.clock.restart()
+            self.tick.start()
+
+    def mousePressEvent(self, event):
+        event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self.card_rect().contains(event.position()):
+                open_ascendara()
+            self.close_notification()
+        elif event.button() == Qt.MouseButton.RightButton:
+            self.close_notification()
 
     def close_notification(self):
-        if hasattr(self, 'fade_out_animation'):
+        if self.closing:
             return
+        self.closing = True
+        self.tick.stop()
+        logger.info("Closing notification")
 
-        logger.info("Starting fade-out and slide-down animation")
-        self.fade_out_animation = QPropertyAnimation(self.opacity_effect, b"opacity")
-        self.fade_out_animation.setDuration(180)
-        self.fade_out_animation.setStartValue(1.0)
-        self.fade_out_animation.setEndValue(0.0)
-        self.fade_out_animation.setEasingCurve(QEasingCurve.Type.InCubic)
-        self.fade_out_animation.finished.connect(self.cleanup)
-        self.fade_out_animation.start()
+        self.slide_out = QPropertyAnimation(self, b"pos", self)
+        self.slide_out.setDuration(200)
+        self.slide_out.setStartValue(self.pos())
+        self.slide_out.setEndValue(self.pos() + QPoint(28, 0))
+        self.slide_out.setEasingCurve(QEasingCurve.Type.InCubic)
 
-        self.slide_out_animation = QPropertyAnimation(self, b"pos")
-        self.slide_out_animation.setDuration(180)
-        self.slide_out_animation.setStartValue(self.pos())
-        self.slide_out_animation.setEndValue(self.pos() + QPoint(0, 40))
-        self.slide_out_animation.setEasingCurve(QEasingCurve.Type.InCubic)
-        self.slide_out_animation.start()
+        self.fade_out = QPropertyAnimation(self, b"windowOpacity", self)
+        self.fade_out.setDuration(200)
+        self.fade_out.setStartValue(self.windowOpacity())
+        self.fade_out.setEndValue(0.0)
+        self.fade_out.setEasingCurve(QEasingCurve.Type.InCubic)
+        self.fade_out.finished.connect(self.cleanup)
+
+        self.slide_out.start()
+        self.fade_out.start()
 
     def cleanup(self):
-        logger.info("Cleanup: closing window and quitting application")
+        self.slot.release()
         self.close()
         QApplication.instance().quit()
 
-    def _set_fallback_icon(self, label):
-        """Set fallback 'A' icon when the icon file cannot be loaded"""
-        label.setText("A")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setStyleSheet(f"""
-            QLabel {{
-                background-color: {self.border_color.name()};
-                color: {self.fg_color.name()};
-                border-radius: 12px;
-                font-family: 'Segoe UI';
-                font-size: 15px;
-                font-weight: 600;
-                min-width: 24px;
-                min-height: 24px;
-                max-width: 24px;
-                max-height: 24px;
-                text-align: center;
-                opacity: 0.85;
-            }}
-        """)
 
-import traceback
+def open_ascendara():
+    """Bring Ascendara forward. The app holds a single-instance lock, so launching
+    it again just focuses the running window."""
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
+    names = ["Ascendara.exe"] if sys.platform == "win32" else ["ascendara", "Ascendara"]
+    for folder in (os.path.dirname(exe_dir), exe_dir):
+        for name in names:
+            candidate = os.path.join(folder, name)
+            if os.path.isfile(candidate):
+                try:
+                    kwargs = {"creationflags": subprocess.DETACHED_PROCESS} if sys.platform == "win32" else {"start_new_session": True}
+                    subprocess.Popen([candidate], cwd=folder, **kwargs)
+                    logger.info(f"Launched: {candidate}")
+                except Exception as e:
+                    logger.error(f"Failed to launch {candidate}: {e}")
+                return
+    logger.warning("Could not find the Ascendara executable to open")
+
 
 def main():
     parser = argparse.ArgumentParser(description='Show a notification with the specified theme')
     parser.add_argument('--theme', type=str, default='dark', help='Theme to use for the notification')
     parser.add_argument('--title', type=str, default='Notification', help='Title of the notification')
     parser.add_argument('--message', type=str, default='This is a notification', help='Message to display')
+    parser.add_argument('--type', type=str, choices=['info', 'success', 'warning', 'error'], default=None, help='Notification type (inferred from the title when omitted)')
+    parser.add_argument('--colors', type=str, default=None, help='Custom theme colors as JSON, overrides the saved custom theme')
+    parser.add_argument('--duration', type=int, default=None, help='How long to show the notification, in milliseconds')
     parser.add_argument('--is-achievement', action='store_true', help='Is this an achievement notification?')
     parser.add_argument('--icon', type=str, default=None, help='Icon URL for the notification')
     parser.add_argument('--appid', type=str, default=None, help='AppID of the game')
@@ -461,32 +827,48 @@ def main():
     parser.add_argument('--achievement', type=str, default=None, help='Name of the achievement')
     parser.add_argument('--description', type=str, default=None, help='Description of the achievement')
     args = parser.parse_args()
-    
+
     logger.info(f"Starting notification helper with args: {args}")
-    
+
     try:
+        QGuiApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
         app = QApplication(sys.argv)
+        app.setQuitOnLastWindowClosed(True)
+
+        colors_override = None
+        if args.colors:
+            try:
+                parsed = json.loads(args.colors)
+                if isinstance(parsed, dict):
+                    colors_override = parsed
+            except json.JSONDecodeError as e:
+                logger.warning(f"Ignoring invalid --colors JSON: {e}")
+
+        theme = (args.theme or "dark").strip().lower()
+        palette = resolve_palette(theme, colors_override)
+
         if args.is_achievement:
-            # For achievements, use game as title and message as achievement name
+            # The watcher sends the achievement's display name as the message
             window = NotificationWindow(
-                args.theme,
+                palette,
                 args.game or "Achievement Unlocked!",
                 args.message or "",
                 is_achievement=True,
                 icon=args.icon,
-                appid=args.appid,
-                game=args.game,  # Game name for display
-                achievement=args.message,  # Achievement name for display
-                description=None
+                game=args.game,
+                achievement=args.message,
+                description=args.description,
+                duration=args.duration,
             )
         else:
-            # For standard notifications, only use theme, title, message
             window = NotificationWindow(
-                args.theme,
+                palette,
                 args.title,
                 args.message,
-                is_achievement=False
+                kind=args.type or infer_type(args.title),
+                duration=args.duration,
             )
+        window.present()
         sys.exit(app.exec())
     except Exception as e:
         logger.error("Exception occurred:")

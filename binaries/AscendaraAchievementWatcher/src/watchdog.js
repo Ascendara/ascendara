@@ -125,6 +125,7 @@ let sendNotification = async opts => {
     if (opts.appid) args.push("--appid", String(opts.appid));
     if (opts.game) args.push("--game", String(opts.game));
     if (opts.achievement) args.push("--achievement", String(opts.achievement));
+    if (opts.description) args.push("--description", String(opts.description));
     const child = spawn(exePath, args, {
       detached: true,
       stdio: "ignore",

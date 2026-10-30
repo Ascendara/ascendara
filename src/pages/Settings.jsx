@@ -72,6 +72,8 @@ import {
   Library,
   Settings2,
   Gamepad2,
+  Bell,
+  Trophy,
 } from "lucide-react";
 import gameService from "@/services/games/gameService";
 import { useNavigate } from "react-router-dom";
@@ -1015,6 +1017,26 @@ function Settings() {
       );
     }
   }, [theme, customColors]);
+
+  // Desktop notification colors fall back to the general theme colors until the
+  // user picks their own, matching how the notification helper resolves them
+  const notificationColorFallbacks = {
+    notificationBackground: "card",
+    notificationForeground: "cardForeground",
+    notificationMuted: "mutedForeground",
+    notificationAccent: "primary",
+    notificationBorder: "border",
+    notificationAchievement: "starFilled",
+  };
+  const notificationColor = key =>
+    customColors[key] || customColors[notificationColorFallbacks[key]];
+
+  const handleSendTestNotification = async achievement => {
+    const result = await window.electron.previewNotification(customColors, achievement);
+    if (!result?.success) {
+      toast.error(result?.error || "Failed to show notification");
+    }
+  };
 
   // Handle custom color change - only called on blur/change complete
   const handleCustomColorChange = (colorKey, hexValue) => {
@@ -5068,6 +5090,51 @@ function Settings() {
                   />
                 </div>
               </div>
+
+              {/* Desktop Notifications */}
+              <div>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                  Desktop Notifications
+                </h4>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                  <ColorPickerInput
+                    colorKey="notificationBackground"
+                    label="Background"
+                    value={notificationColor("notificationBackground")}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="notificationForeground"
+                    label="Title"
+                    value={notificationColor("notificationForeground")}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="notificationMuted"
+                    label="Message"
+                    value={notificationColor("notificationMuted")}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="notificationAccent"
+                    label="Accent"
+                    value={notificationColor("notificationAccent")}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="notificationBorder"
+                    label="Border"
+                    value={notificationColor("notificationBorder")}
+                    onColorChange={handleCustomColorChange}
+                  />
+                  <ColorPickerInput
+                    colorKey="notificationAchievement"
+                    label="Achievement"
+                    value={notificationColor("notificationAchievement")}
+                    onColorChange={handleCustomColorChange}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Live Preview */}
@@ -5379,6 +5446,117 @@ function Settings() {
                       </span>
                     </div>
                   </div>
+                </div>
+
+                {/* Desktop Notification Preview */}
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p
+                      className="text-xs font-medium"
+                      style={{ color: `rgb(${customColors.mutedForeground})` }}
+                    >
+                      {t("settings.preview.desktopNotification")}
+                    </p>
+                    {isOnWindows && (
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          title={t("settings.preview.sendTestNotification")}
+                          className="rounded-md p-1 opacity-70 transition-opacity hover:opacity-100"
+                          style={{ color: `rgb(${customColors.foreground})` }}
+                          onClick={() => handleSendTestNotification(false)}
+                        >
+                          <Bell className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title={t("settings.preview.sendTestNotification")}
+                          className="rounded-md p-1 opacity-70 transition-opacity hover:opacity-100"
+                          style={{ color: `rgb(${customColors.foreground})` }}
+                          onClick={() => handleSendTestNotification(true)}
+                        >
+                          <Trophy className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {[false, true].map(isAchievement => {
+                    const tone = isAchievement
+                      ? notificationColor("notificationAchievement")
+                      : customColors.success;
+                    return (
+                      <div
+                        key={String(isAchievement)}
+                        className="relative flex gap-3 overflow-hidden rounded-xl border p-3 pb-3.5 shadow-lg"
+                        style={{
+                          backgroundColor: `rgb(${notificationColor("notificationBackground")})`,
+                          borderColor: `rgb(${notificationColor("notificationBorder")})`,
+                        }}
+                      >
+                        <div
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
+                          style={{
+                            backgroundColor: `rgb(${tone} / 0.16)`,
+                            color: `rgb(${tone})`,
+                            boxShadow: isAchievement
+                              ? `inset 0 0 0 1.5px rgb(${tone})`
+                              : "none",
+                          }}
+                        >
+                          {isAchievement ? (
+                            <Trophy className="h-4 w-4" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className="text-[9px] font-semibold uppercase tracking-wider"
+                            style={{
+                              color: `rgb(${isAchievement ? tone : notificationColor("notificationAccent")})`,
+                            }}
+                          >
+                            {isAchievement
+                              ? `\u2605 ${t("settings.preview.achievementUnlocked")}`
+                              : "Ascendara"}
+                          </p>
+                          <p
+                            className="truncate text-sm font-semibold"
+                            style={{
+                              color: `rgb(${notificationColor("notificationForeground")})`,
+                            }}
+                          >
+                            {isAchievement
+                              ? t("settings.preview.achievementName")
+                              : t("settings.preview.desktopNotificationTitle")}
+                          </p>
+                          <p
+                            className="truncate text-xs"
+                            style={{
+                              color: `rgb(${notificationColor("notificationMuted")})`,
+                            }}
+                          >
+                            {isAchievement
+                              ? t("settings.preview.achievementGame")
+                              : t("settings.preview.desktopNotificationMessage")}
+                          </p>
+                        </div>
+                        <X
+                          className="h-3.5 w-3.5 shrink-0"
+                          style={{ color: `rgb(${notificationColor("notificationMuted")})` }}
+                        />
+                        <div
+                          className="absolute bottom-0 left-0 h-[3px] w-full"
+                          style={{ backgroundColor: `rgb(${tone} / 0.15)` }}
+                        >
+                          <div
+                            className="h-full w-3/5"
+                            style={{ backgroundColor: `rgb(${tone})` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Startup Screen Preview */}

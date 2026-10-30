@@ -877,6 +877,19 @@ function registerMiscHandlers() {
     }
   });
 
+  const spawnNotificationHelper = args => {
+    const notificationHelperPath = isDev
+      ? "./binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper.exe"
+      : path.join(appDirectory, "/resources/AscendaraNotificationHelper.exe");
+
+    const child = spawn(notificationHelperPath, args, {
+      detached: true,
+      stdio: "ignore",
+    });
+    child.on("error", err => console.error("Failed to spawn notification helper:", err));
+    child.unref();
+  };
+
   // Native notifications go through the themed helper on Windows and the
   // system notifier elsewhere, and respect the notifications setting
   const showNotification = (title, message) => {
@@ -886,24 +899,14 @@ function registerMiscHandlers() {
     }
 
     if (isWindows) {
-      const notificationHelperPath = isDev
-        ? "./binaries/AscendaraNotificationHelper/dist/AscendaraNotificationHelper.exe"
-        : path.join(appDirectory, "/resources/AscendaraNotificationHelper.exe");
-
-      const args = [
+      spawnNotificationHelper([
         "--theme",
         settings.theme || "purple",
         "--title",
         title,
         "--message",
         message,
-      ];
-
-      const process = spawn(notificationHelperPath, args, {
-        detached: true,
-        stdio: "ignore",
-      });
-      process.unref();
+      ]);
     } else {
       const notification = new Notification({
         title,
@@ -928,6 +931,43 @@ function registerMiscHandlers() {
       );
     } catch (error) {
       console.error("Error showing test notification:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Shows a notification styled with unsaved theme maker colors. It's an
+  // explicit preview, so it ignores the notifications setting.
+  ipcMain.handle("preview-notification", async (_, colors, achievement) => {
+    try {
+      if (!isWindows) {
+        return { success: false, error: "Themed notifications are only on Windows" };
+      }
+      if (!colors || typeof colors !== "object") {
+        return { success: false, error: "Invalid colors" };
+      }
+      const args = ["--theme", "custom", "--colors", JSON.stringify(colors)];
+      if (achievement) {
+        args.push(
+          "--is-achievement",
+          "--message",
+          "First Steps",
+          "--game",
+          "Ascendara",
+          "--description",
+          "This is how achievement unlocks will look with your theme."
+        );
+      } else {
+        args.push(
+          "--title",
+          "Download Complete",
+          "--message",
+          "This is how notifications will look with your theme."
+        );
+      }
+      spawnNotificationHelper(args);
+      return { success: true };
+    } catch (error) {
+      console.error("Error showing preview notification:", error);
       return { success: false, error: error.message };
     }
   });
