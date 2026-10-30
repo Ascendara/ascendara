@@ -2283,58 +2283,6 @@ function Settings() {
               </Card>
 
               <Card
-                id="repair-contributions"
-                className="space-y-5 border border-border/60 p-6 shadow-none"
-              >
-                <h3 className="text-base font-semibold text-foreground">
-                  {t("settings.dllRepairTitle")}
-                </h3>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contributeRepairDlls">
-                      {t("settings.contributeRepairDlls")}
-                    </Label>
-                    <p
-                      id="repair-contributions-description"
-                      className="text-sm text-muted-foreground"
-                    >
-                      {t("settings.contributeRepairDllsDescription")}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {t("settings.contributeRepairDllsControl")}
-                    </p>
-                    <button
-                      type="button"
-                      className="text-sm text-primary hover:underline"
-                      onClick={() =>
-                        window.electron.openURL("https://ascendara.app/privacy")
-                      }
-                    >
-                      {t("settings.contributeRepairDllsPrivacy")}
-                    </button>
-                  </div>
-                  <Switch
-                    id="contributeRepairDlls"
-                    aria-describedby="repair-contributions-description"
-                    checked={settings.contributeRepairDlls === true}
-                    onCheckedChange={async checked => {
-                      try {
-                        const saved = await window.electron.updateSetting(
-                          "contributeRepairDlls",
-                          checked
-                        );
-                        if (!saved)
-                          throw new Error(t("settings.contributeRepairDllsSaveError"));
-                        setSettingsLocal({ contributeRepairDlls: checked });
-                      } catch {
-                        toast.error(t("settings.contributeRepairDllsSaveError"));
-                      }
-                    }}
-                  />
-                </div>
-              </Card>
-
-              <Card
                 id="torbox-settings"
                 className="space-y-5 border border-border/60 p-6 shadow-none"
               >

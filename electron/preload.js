@@ -339,6 +339,7 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("rename-existing-game-directory", game, additionalDirIndex),
   verifyGame: (game, libraryDirectory) =>
     ipcRenderer.invoke("verify-game", game, libraryDirectory),
+  setAscendRepairToken: token => ipcRenderer.invoke("set-ascend-repair-token", token),
   repairGameDlls: (game, libraryDirectory) =>
     ipcRenderer.invoke("repair-game-dlls", game, libraryDirectory),
   getLauncherImportState: () => ipcRenderer.invoke("get-launcher-import-state"),

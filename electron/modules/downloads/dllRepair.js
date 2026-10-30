@@ -10,6 +10,15 @@ const MAX_DLL = 32 * 1024 * 1024;
 const MAX_TOTAL = 128 * 1024 * 1024;
 const sha256 = bytes => crypto.createHash("sha256").update(bytes).digest("hex");
 const contributionControllers = new Set();
+// Firebase ID token pushed by the renderer while an Ascend member is signed in. Memory only.
+let ascendToken = null;
+
+function setAscendToken(value) {
+  ascendToken =
+    typeof value === "string" && value.length <= 16384 && !/[\r\n]/.test(value)
+      ? value
+      : null;
+}
 
 function contributionAllowed() {
   return (
@@ -130,11 +139,11 @@ function listedDlls(text, filemap) {
     .replace(/^\uFEFF/, "")
     .split(/\r?\n/)
     .map(s => s.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    // Online-fix lists also name managed assemblies and config files; only DLLs are shared.
+    .filter(name => /\.dll$/i.test(name));
   if (!list.length || list.length > 128) throw new Error("Invalid DLL list.");
   const names = list.map(relativeName);
-  if (names.some(name => !/\.dll$/i.test(name)))
-    throw new Error("DLL list contains a non-DLL file.");
   return Object.keys(filemap)
     .map(relativeName)
     .filter(
@@ -238,12 +247,46 @@ async function approved(release, bearer, signal) {
     });
     return response.data;
   } catch (error) {
-    if (error.response?.status === 404)
-      throw new Error(
+    if (error.response?.status === 404) {
+      const missing = new Error(
         "No approved repair files are available for this exact release yet."
       );
+      missing.code = "NO_MANIFEST";
+      throw missing;
+    }
     throw new Error("The repair service is unavailable. Try again later.");
   }
+}
+
+// Reports this install's listed DLL hashes so the server can approve the release once
+// enough Ascend members agree. Returns the manifest when this report approved it.
+async function report(directory, ctx, bearer, signal) {
+  if (!ascendToken) throw new Error("Sign in to Ascend to help approve repair files.");
+  const files = [];
+  for (const name of ctx.allowed) {
+    let bytes;
+    try {
+      bytes = await readBounded(directory, name, MAX_DLL);
+    } catch (error) {
+      if (error.code === "ENOENT") continue;
+      throw error;
+    }
+    if (bytes.length !== ctx.filemap[name]?.size) continue;
+    files.push({ path: name, size: bytes.length, sha256: sha256(bytes) });
+  }
+  if (!files.length) throw new Error("No listed DLLs are intact in this installation.");
+  const response = await axios.post(
+    `${API}/repair/v1/reports/${ctx.release}`,
+    { files },
+    {
+      headers: { Authorization: `Bearer ${bearer}`, "X-Ascend-Token": ascendToken },
+      timeout: 15000,
+      maxRedirects: 0,
+      maxContentLength: 128 * 1024,
+      signal,
+    }
+  );
+  return response.data?.manifest || null;
 }
 
 async function run(directory, metadataName, upload = false) {
@@ -270,12 +313,26 @@ async function runOperation(directory, metadataName, upload, signal) {
     throw new Error("Wait for this game to finish downloading or running.");
   checkConsent();
   const bearer = await token(signal);
-  const files = validateManifest(
-    await approved(ctx.release, bearer, signal),
-    ctx.release,
-    ctx.allowed,
-    ctx.filemap
-  );
+  let manifest;
+  try {
+    manifest = await approved(ctx.release, bearer, signal);
+  } catch (error) {
+    if (!upload || error.code !== "NO_MANIFEST") throw error;
+    checkConsent();
+    manifest = await report(directory, ctx, bearer, signal);
+    if (!manifest) return { success: true, restored: 0, reported: true };
+  }
+  const covered = new Set(manifest?.files?.map(file => file.path) || []);
+  if (upload && ctx.allowed.some(name => !covered.has(name))) {
+    // Keep voting on listed DLLs that were not approved yet; uploads continue either way.
+    try {
+      checkConsent();
+      manifest = (await report(directory, ctx, bearer, signal)) || manifest;
+    } catch (error) {
+      if (signal?.aborted || !contributionAllowed()) throw error;
+    }
+  }
+  const files = validateManifest(manifest, ctx.release, ctx.allowed, ctx.filemap);
   let restored = 0;
   for (const file of files) {
     checkConsent();
@@ -390,12 +447,16 @@ function scheduleContribution(info, directory, metadataName) {
   if (scheduled.size > 1000) scheduled.delete(scheduled.keys().next().value);
   queue = queue
     .then(() => run(directory, metadataName, true))
-    .catch(() => {
+    .catch(error => {
       // Sharing is best effort and must never turn a successful install into a failure.
+      console.warn(
+        `[DLL Repair] Contribution skipped for ${directory}: ${error.message}`
+      );
     });
 }
 
 module.exports = {
+  setAscendToken,
   stopContributions,
   run,
   resolveTarget,

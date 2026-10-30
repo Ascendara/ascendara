@@ -1270,14 +1270,32 @@ const AppRoutes = () => {
   const [showWatcherWarn, setShowWatcherWarn] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showDllSharingConsent, setShowDllSharingConsent] = useState(false);
+  const [dllSharingPending, setDllSharingPending] = useState(false);
 
   // Existing users are asked once whether to enroll in DLL sharing. New users
   // accept the current terms during welcome and are marked as asked there.
   const promptDllSharingIfNeeded = async hasLaunched => {
     if (!hasLaunched || !(await window.electron.isV7())) return;
     if (await window.electron.getTimestampValue("dllSharingPromptSeen")) return;
-    setShowDllSharingConsent(true);
+    setDllSharingPending(true);
   };
+
+  // DLL sharing is an Ascend feature, so only members are asked
+  useEffect(() => {
+    if (!dllSharingPending || !user) return;
+    let canceled = false;
+    verifyAscendAccess()
+      .then(access => {
+        if (!canceled && (access.hasAccess || access.isSubscribed || access.isVerified)) {
+          setDllSharingPending(false);
+          setShowDllSharingConsent(true);
+        }
+      })
+      .catch(error => console.error("Failed to check Ascend access:", error));
+    return () => {
+      canceled = true;
+    };
+  }, [dllSharingPending, user]);
 
   useEffect(() => {
     const initializeApp = async () => {

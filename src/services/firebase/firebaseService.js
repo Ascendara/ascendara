@@ -7,6 +7,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  onIdTokenChanged,
   sendPasswordResetEmail,
   updateProfile,
   sendEmailVerification,
@@ -745,6 +746,16 @@ export const subscribeToAuthChanges = callback => {
     return () => {};
   }
   return onAuthStateChanged(auth, callback);
+};
+
+/**
+ * Subscribe to ID token changes, including the hourly refresh
+ * @param {function} callback - Called with the user or null
+ * @returns {function} Unsubscribe function
+ */
+export const subscribeToIdTokenChanges = callback => {
+  if (!auth) return () => {};
+  return onIdTokenChanged(auth, callback);
 };
 
 /**

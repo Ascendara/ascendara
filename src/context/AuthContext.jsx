@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 import {
   subscribeToAuthChanges,
+  subscribeToIdTokenChanges,
   loginUser,
   logoutUser,
   registerUser,
@@ -189,6 +190,19 @@ export const AuthProvider = ({ children }) => {
       unsubscribe();
       userDataUnsubscribeRef.current();
     };
+  }, []);
+
+  // DLL repair reports run in the main process and are counted per Ascend member
+  useEffect(() => {
+    const unsubscribe = subscribeToIdTokenChanges(async firebaseUser => {
+      try {
+        const token = firebaseUser ? await firebaseUser.getIdToken() : null;
+        await window.electron?.setAscendRepairToken?.(token);
+      } catch (err) {
+        console.error("Failed to share Ascend token for DLL repair:", err);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   // Register new user

@@ -1,13 +1,5 @@
 export const settingsSearchData = [
   {
-    id: "repair-contributions",
-    title: "Contribute DLL repair files",
-    description: "Opt in to sharing approved DLLs to help other users repair games",
-    keywords: ["dll", "repair", "privacy", "upload", "sharing", "contribute", "consent"],
-    section: "Downloads",
-    scrollTo: "repair-contributions",
-  },
-  {
     id: "local-index",
     title: "Local Game Index",
     description: "Manage your local game index and refresh settings",
