@@ -116,6 +116,31 @@ function ColorField({
   );
 }
 
+// Last known card per user, shown instantly while a fresh copy loads
+const CACHE_KEY = "ascend-review-card-cache";
+const memoryCache = new Map();
+
+const readCache = uid => {
+  if (!uid) return null;
+  if (memoryCache.has(uid)) return memoryCache.get(uid);
+  try {
+    const stored = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+    if (stored?.uid === uid && stored.data) {
+      memoryCache.set(uid, stored.data);
+      return stored.data;
+    }
+  } catch {}
+  return null;
+};
+
+const writeCache = (uid, data) => {
+  if (!uid) return;
+  memoryCache.set(uid, data);
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ uid, data }));
+  } catch {}
+};
+
 const loadImage = file =>
   new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -134,33 +159,57 @@ const loadImage = file =>
 export default function ReviewCardSettingsCard({ t, user, userData }) {
   // background is the live image; pending is a new upload awaiting approval,
   // while the approved one keeps showing to everyone
-  const [background, setBackground] = useState(null);
-  const [pending, setPending] = useState(null);
+  const uid = user?.uid;
+  const [cached] = useState(() => readCache(uid));
+  const [background, setBackground] = useState(cached?.background ?? null);
+  const [pending, setPending] = useState(cached?.pending ?? null);
   const [previewSlot, setPreviewSlot] = useState("pending");
-  const [status, setStatus] = useState("loading");
+  const [status, setStatus] = useState(cached ? "ready" : "loading");
   const [busy, setBusy] = useState(false);
   const [previewDate] = useState(() => new Date().toISOString());
   const [cropFile, setCropFile] = useState(null);
   // savedStyle is what everyone sees; style is the draft shown in the preview
-  const [savedStyle, setSavedStyle] = useState({});
-  const [style, setStyle] = useState({});
+  const [savedStyle, setSavedStyle] = useState(cached?.style ?? {});
+  const [style, setStyle] = useState(cached?.style ?? {});
   const [savingStyle, setSavingStyle] = useState(false);
   const inputRef = useRef(null);
+  // Set once the user starts editing so a background refresh doesn't clobber the draft
+  const touchedRef = useRef(false);
+  // Set after an upload, removal or style save, whose results are newer than the refresh
+  const mutatedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     getReviewCard().then(result => {
       if (cancelled) return;
-      setBackground(result.background);
-      setPending(result.pending);
-      setSavedStyle(result.style || {});
-      setStyle(result.style || {});
-      setStatus(result.error ? "error" : "ready");
+      if (result.error) {
+        // Keep showing the cached card if there is one
+        if (!readCache(uid)) setStatus("error");
+        return;
+      }
+      writeCache(uid, {
+        background: result.background ?? null,
+        pending: result.pending ?? null,
+        style: result.style || {},
+      });
+      if (!mutatedRef.current) {
+        setBackground(result.background);
+        setPending(result.pending);
+        setSavedStyle(result.style || {});
+      }
+      if (!touchedRef.current && !mutatedRef.current) setStyle(result.style || {});
+      setStatus("ready");
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [uid]);
+
+  // Keep the cache in step with local changes
+  useEffect(() => {
+    if (status !== "ready") return;
+    writeCache(uid, { background, pending, style: savedStyle });
+  }, [uid, status, background, pending, savedStyle]);
 
   const handleFile = async event => {
     const file = event.target.files?.[0];
@@ -211,6 +260,7 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
       toast.error(result.error);
       return;
     }
+    mutatedRef.current = true;
     setCropFile(null);
     setBackground(result.background);
     setPending(result.pending);
@@ -232,6 +282,7 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
       toast.error(result.error);
       return;
     }
+    mutatedRef.current = true;
     setPending(null);
     if (!pendingOnly) setBackground(null);
     toast.success(
@@ -249,12 +300,14 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
   const previewUrl = showingPending ? pending.url : background?.url;
 
   const styleChanged = STYLE_FIELDS.some(field => style[field] !== savedStyle[field]);
-  const setStyleField = (field, value) =>
+  const setStyleField = (field, value) => {
+    touchedRef.current = true;
     setStyle(current => {
       const next = { ...current, [field]: value };
       if (value === null || value === undefined) delete next[field];
       return next;
     });
+  };
 
   const handleSaveStyle = async () => {
     setSavingStyle(true);
@@ -266,6 +319,7 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
       toast.error(result.error);
       return;
     }
+    mutatedRef.current = true;
     setSavedStyle(result.style || {});
     setStyle(result.style || {});
     toast.success(t("ascend.settings.reviewCard.styleSaved"));
