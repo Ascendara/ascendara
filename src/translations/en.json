@@ -1456,7 +1456,7 @@
       "title": "Unlocked Across Ascendara"
     },
     "final": {
-      "content": "New features are added to Ascend all the time, and your subscription helps fund every one of them. Thank you for supporting Ascendara.",
+      "content": "New features are added to Ascend all the time, so check back often. Enjoy everything Ascend has to offer.",
       "title": "You're All Set"
     },
     "finish": "Start exploring",
@@ -1470,7 +1470,7 @@
     },
     "prompt": {
       "accept": "Take the tour",
-      "content": "We put together a quick tour of everything your Ascend subscription unlocks. Want to take a look?",
+      "content": "Here's a quick tour of everything Ascend unlocks. Want to take a look?",
       "decline": "No thanks",
       "title": "New: Ascend Tour"
     },
@@ -1480,7 +1480,7 @@
       "title": "Update Preview"
     },
     "welcome": {
-      "content": "Thank you for supporting Ascendara! Your subscription is active and every feature is unlocked. Let's take a minute to show you what you can do now.",
+      "content": "Ascend is active on your account and every feature is unlocked. Here's a quick look at everything you can do with it.",
       "title": "Welcome to Ascend"
     }
   },

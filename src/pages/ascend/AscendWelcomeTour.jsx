@@ -71,7 +71,7 @@ function UnlockedChip({ t }) {
   );
 }
 
-// Walks a new subscriber through every Ascend section right after checkout
+// Walks a new Ascend member (trial or checkout) through every Ascend section
 export default function AscendWelcomeTour({ t, setActiveSection, onClose }) {
   const steps = useMemo(() => {
     const step = (key, icon, section, spotlight, extra = {}) => ({

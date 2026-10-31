@@ -2143,24 +2143,41 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     navigate(location.pathname, { replace: true, state: {} });
   }, [location.state?.ascendWelcome]);
 
-  // Subscribers from before the tour existed never got it after checkout, so
-  // offer it once. The delay lets a checkout return claim the tour first.
+  // First visit with access: new accounts on the trial get the tour right away,
+  // subscribers from before the tour existed are offered it once. Waits until
+  // the hub is actually on screen (email verified, display name chosen), and
+  // the delay lets a checkout return claim the tour first.
+  const needsEmailVerification =
+    !!user && !user.emailVerified && user.providerData?.[0]?.providerId === "password";
   useEffect(() => {
     if (
       !user?.uid ||
       verifyingAccess ||
-      !ascendAccess.isSubscribed ||
+      needsEmailVerification ||
+      showDisplayNamePrompt ||
+      !ascendAccess.hasAccess ||
       showWelcomeTour ||
       location.state?.ascendWelcome ||
       hasSeenWelcomeTour(user.uid)
     ) {
       return;
     }
-    const timer = setTimeout(() => setShowWelcomeTourPrompt(true), 1500);
+    const subscribed = ascendAccess.isSubscribed;
+    const timer = setTimeout(() => {
+      if (subscribed) {
+        setShowWelcomeTourPrompt(true);
+      } else {
+        markWelcomeTourSeen(user.uid);
+        setShowWelcomeTour(true);
+      }
+    }, 1500);
     return () => clearTimeout(timer);
   }, [
     user?.uid,
     verifyingAccess,
+    needsEmailVerification,
+    showDisplayNamePrompt,
+    ascendAccess.hasAccess,
     ascendAccess.isSubscribed,
     showWelcomeTour,
     location.state?.ascendWelcome,
