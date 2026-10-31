@@ -11,9 +11,85 @@ const MARKER_PATTERN =
   /^online.*\.(dll|ini|json)$|^steamfix.*\.ini$|^epicfix.*\.dll$|^launch_data\.of.*$/i;
 
 // Bump when detection rules change so stored results get rescanned
-const SCAN_VERSION = 2;
+const SCAN_VERSION = 3;
+
+const MAX_SCAN_DIRS = 16;
+const UE_SEARCH_DEPTH = 4;
+const SKIP_SCAN_DIR = /^(?:engine|saved|content|node_modules)$/i;
 
 const stripDllExt = n => n.replace(/\.dll$/i, "");
+
+function isInside(root, target) {
+  const rel = path.relative(path.resolve(root), path.resolve(target));
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
+// Unreal games keep the real binary in <Project>/Binaries/<Platform>. The exe
+// at the game root is only a bootstrap, so fixes live next to the engine
+// binary instead. Walk a bounded part of the tree and collect those folders,
+// skipping Engine/Saved/Content so we never pick up third-party Steam DLLs.
+function collectUeBinaryDirs(gameDir) {
+  const dirs = [];
+  const queue = [{ dir: gameDir, depth: 0 }];
+  let visited = 0;
+  while (queue.length && visited < 4000 && dirs.length < MAX_SCAN_DIRS) {
+    const { dir, depth } = queue.shift();
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      if (!e.isDirectory() || e.isSymbolicLink()) continue;
+      if (e.name.startsWith(".") || SKIP_SCAN_DIR.test(e.name)) continue;
+      const full = path.join(dir, e.name);
+      visited += 1;
+      if (
+        /^(?:Win64|Win32|WinGDK|Linux|Mac)$/i.test(e.name) &&
+        path.basename(dir).toLowerCase() === "binaries"
+      ) {
+        dirs.push(full);
+        continue;
+      }
+      if (depth < UE_SEARCH_DEPTH) queue.push({ dir: full, depth: depth + 1 });
+    }
+  }
+  return dirs;
+}
+
+function collectScanDirs(gameDir, { executable, extraScanDirs } = {}) {
+  const candidates = [gameDir];
+  if (typeof executable === "string" && executable.trim()) {
+    const abs = path.isAbsolute(executable)
+      ? executable
+      : path.resolve(gameDir, executable);
+    candidates.push(path.dirname(abs));
+  }
+  if (Array.isArray(extraScanDirs)) candidates.push(...extraScanDirs);
+  candidates.push(...collectUeBinaryDirs(gameDir));
+
+  const seen = new Set();
+  const dirs = [];
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string" || !candidate) continue;
+    const resolved = path.resolve(candidate);
+    if (!isInside(gameDir, resolved)) continue;
+    let stat;
+    try {
+      stat = fs.statSync(resolved);
+    } catch {
+      continue;
+    }
+    if (!stat.isDirectory()) continue;
+    const key = resolved.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    dirs.push(resolved);
+    if (dirs.length >= MAX_SCAN_DIRS) break;
+  }
+  return dirs;
+}
 
 function parseIni(content) {
   const sections = { Main: {} };
@@ -82,18 +158,27 @@ function findRecursive(dir, name, depth = 6) {
   return null;
 }
 
-async function parseOnlineFix(gameDir) {
+async function parseOnlineFix(gameDir, options = {}) {
   if (!gameDir || !fs.existsSync(gameDir)) return null;
-  let files;
-  try {
-    files = fs
-      .readdirSync(gameDir, { withFileTypes: true })
-      .filter(d => d.isFile() && SCAN_PATTERN.test(d.name))
-      .map(d => d.name);
-  } catch {
-    return null;
+
+  const scanDirs = collectScanDirs(gameDir, options);
+  const entries = [];
+  for (const dir of scanDirs) {
+    let dirents;
+    try {
+      dirents = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const d of dirents) {
+      if (d.isFile() && SCAN_PATTERN.test(d.name)) entries.push({ dir, name: d.name });
+    }
   }
-  if (!files.some(name => MARKER_PATTERN.test(name))) return null;
+
+  // A marker can sit in the game root while the actual DLLs live next to the
+  // real engine binary (e.g. Unreal's Binaries/Win64), so merge every scanned
+  // folder before deciding whether this is an Online-Fix install.
+  if (!entries.some(e => MARKER_PATTERN.test(e.name))) return null;
 
   const overrides = [];
   const addOverride = (dll, mode = "n") => {
@@ -105,12 +190,13 @@ async function parseOnlineFix(gameDir) {
     realAppId = null,
     fixType = "steam";
 
-  for (const name of files) {
+  for (const { dir, name } of entries) {
     const lower = name.toLowerCase();
+    const filePath = path.join(dir, name);
 
     if (/^(winmm|dlllist)\.txt$/i.test(name)) {
       try {
-        for (const raw of fs.readFileSync(path.join(gameDir, name), "utf8").split("\n")) {
+        for (const raw of fs.readFileSync(filePath, "utf8").split("\n")) {
           const t = raw.trim();
           if (!t.toLowerCase().endsWith(".dll")) continue;
           addOverride(stripDllExt(path.basename(t.replace(/\\/g, "/"))), "n");
@@ -120,7 +206,6 @@ async function parseOnlineFix(gameDir) {
     }
 
     if (/^(online|steam)fix\.ini$/i.test(name)) {
-      const filePath = path.join(gameDir, name);
       let content;
       try {
         content = fs.readFileSync(filePath, "utf8");
@@ -148,8 +233,9 @@ async function parseOnlineFix(gameDir) {
 
     if (/^launch_data\.of|^onlinefix\.json$/i.test(lower)) {
       fixType = "photon";
-      const newton = path.join(gameDir, "Newtonsoft.Json.dll");
-      if (fs.existsSync(path.join(gameDir, "Launcher.exe")) && !fs.existsSync(newton)) {
+      const anchor = fs.existsSync(path.join(dir, "Launcher.exe")) ? dir : gameDir;
+      const newton = path.join(anchor, "Newtonsoft.Json.dll");
+      if (fs.existsSync(path.join(anchor, "Launcher.exe")) && !fs.existsSync(newton)) {
         const found = findRecursive(gameDir, "Newtonsoft.Json.dll");
         if (found && found !== newton) {
           try {
