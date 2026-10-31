@@ -167,6 +167,10 @@
         "label": "Two-step verification",
         "off": "Off",
         "on": "On",
+        "supportClose": "Close",
+        "supportDescription": "Two-step verification can't be turned off from the app. To disable it, contact support in the Ascendara Discord server or email contact@ascendara.app",
+        "supportJoin": "Join Discord",
+        "supportTitle": "Contact support to turn off",
         "title": "Security",
         "turnOff": "Turn off",
         "turnOn": "Turn on"
@@ -1119,6 +1123,45 @@
       "noProfileInfo": "Add a bio, country, or social links to personalize your profile",
       "notAllowedBio": "Bio contains words that are not allowed",
       "notAllowedDisplayName": "Display name contains words that are not allowed",
+      "pages": {
+        "account": {
+          "nav": "Account",
+          "requestDeletionButton": "Request deletion",
+          "signedInAs": "Signed in as"
+        },
+        "dllSharing": {
+          "approvedText": "A file is approved once several members report the same hash for it.",
+          "approvedTitle": "Approved by the community",
+          "description": "Help other players fix games that are missing DLL files by sharing the ones from your finished installs.",
+          "onlyDllsText": "Only DLLs listed for a game are shared. Saves and personal documents are never uploaded.",
+          "onlyDllsTitle": "Only listed DLLs",
+          "publicText": "Approved files are stored with Cloudflare so anyone can use them to repair a game.",
+          "publicTitle": "Publicly downloadable",
+          "toggle": "Share repair files automatically"
+        },
+        "howItWorks": "How it works",
+        "privacy": {
+          "description": "Choose who can see your profile, games and achievements, and who can reach you.",
+          "private": "Private",
+          "public": "Public",
+          "publicDescription": "Anyone on Ascend can see your profile details, games and achievements.",
+          "title": "Profile visibility"
+        },
+        "profile": {
+          "signatureAlt": "Santiago's signature",
+          "thanksBody": "Being part of Ascend is what keeps Ascendara growing, and it genuinely means a lot to me. If there's ever something you'd like to see, or something that could work better, I'd love to hear about it.",
+          "thanksEyebrow": "A note from the developer",
+          "thanksGreeting": "Thank you, {{name}}."
+        },
+        "security": {
+          "codesGoTo": "Codes are sent to {{email}}",
+          "step1Text": "Enter your email and password like you always do.",
+          "step1Title": "Sign in as usual",
+          "step2Text": "Ascendara emails you a 6-digit code and asks for it before letting you in.",
+          "step2Title": "Check your email",
+          "step3Title": "Codes expire fast"
+        }
+      },
       "partnerAdsHidden": "Partner ads are now hidden",
       "partnerAdsVisible": "Partner ads are now visible",
       "paymentNotCompleted": "Payment was not completed. Please try again.",
@@ -1326,46 +1369,7 @@
       "viewInvoices": "View Invoices",
       "visitMonitor": "Scan the QR code to connect your device",
       "webappConnection": "Remote Access",
-      "welcomeToAscend": "Welcome to Ascend!",
-      "pages": {
-        "howItWorks": "How it works",
-        "profile": {
-          "thanksEyebrow": "A note from the developer",
-          "thanksGreeting": "Thank you, {{name}}.",
-          "thanksBody": "Being part of Ascend is what keeps Ascendara growing, and it genuinely means a lot to me. If there's ever something you'd like to see, or something that could work better, I'd love to hear about it.",
-          "signatureAlt": "Santiago's signature"
-        },
-        "privacy": {
-          "title": "Profile visibility",
-          "description": "Choose who can see your profile, games and achievements, and who can reach you.",
-          "public": "Public",
-          "publicDescription": "Anyone on Ascend can see your profile details, games and achievements.",
-          "private": "Private"
-        },
-        "security": {
-          "codesGoTo": "Codes are sent to {{email}}",
-          "step1Title": "Sign in as usual",
-          "step1Text": "Enter your email and password like you always do.",
-          "step2Title": "Check your email",
-          "step2Text": "Ascendara emails you a 6-digit code and asks for it before letting you in.",
-          "step3Title": "Codes expire fast"
-        },
-        "dllSharing": {
-          "description": "Help other players fix games that are missing DLL files by sharing the ones from your finished installs.",
-          "toggle": "Share repair files automatically",
-          "onlyDllsTitle": "Only listed DLLs",
-          "onlyDllsText": "Only DLLs listed for a game are shared. Saves and personal documents are never uploaded.",
-          "approvedTitle": "Approved by the community",
-          "approvedText": "A file is approved once several members report the same hash for it.",
-          "publicTitle": "Publicly downloadable",
-          "publicText": "Approved files are stored with Cloudflare so anyone can use them to repair a game."
-        },
-        "account": {
-          "nav": "Account",
-          "signedInAs": "Signed in as",
-          "requestDeletionButton": "Request deletion"
-        }
-      }
+      "welcomeToAscend": "Welcome to Ascend!"
     },
     "stats": {
       "friends": "Friends",
@@ -5135,16 +5139,15 @@
     "preview": {
       "accentBadge": "Accent Badge",
       "accentButton": "Accent",
+      "achievementGame": "Your favorite game",
+      "achievementName": "First Steps",
+      "achievementUnlocked": "Achievement unlocked",
       "badge": "Badge",
       "cardDescription": "This is some muted description text.",
       "cardTitle": "Card Title",
       "desktopNotification": "Desktop Notification",
       "desktopNotificationMessage": "Successfully downloaded your game",
       "desktopNotificationTitle": "Download Complete",
-      "achievementUnlocked": "Achievement unlocked",
-      "achievementName": "First Steps",
-      "achievementGame": "Your favorite game",
-      "sendTestNotification": "Send test notification",
       "error": "Error",
       "info": "Info",
       "inputPlaceholder": "Input field preview",
@@ -5154,6 +5157,7 @@
       "popoverTitle": "Popover Content",
       "primaryButton": "Primary",
       "secondaryButton": "Secondary",
+      "sendTestNotification": "Send test notification",
       "starRating": "Star Rating",
       "startupScreen": "Startup Screen",
       "success": "Success",

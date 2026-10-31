@@ -9,9 +9,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Mail, Shield, ShieldCheck } from "lucide-react";
+import { ExternalLink, Loader2, Mail, Shield, ShieldCheck } from "lucide-react";
 import {
-  disableTwoFactor,
   enableTwoFactor,
   getCurrentUser,
   getTwoFactorStatus,
@@ -22,8 +21,10 @@ import { FocusHero, FocusPoints, StatusPill } from "./SettingsLayout";
 
 export default function TwoFactorSettingsCard({ t }) {
   const [enabled, setEnabled] = useState(null);
-  // "enable" or "disable" while the code dialog is open
+  // "enable" while the code dialog is open
   const [purpose, setPurpose] = useState(null);
+  // Turning off is handled by support, not in the app
+  const [supportOpen, setSupportOpen] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -69,23 +70,15 @@ export default function TwoFactorSettingsCard({ t }) {
     if (submitted.length !== 6 || isSubmitting) return;
     setIsSubmitting(true);
     setError("");
-    const result = await (purpose === "enable" ? enableTwoFactor : disableTwoFactor)(
-      submitted
-    );
+    const result = await enableTwoFactor(submitted);
     setIsSubmitting(false);
     if (!result.success) {
       setCode("");
       setError(result.error || t("account.twoFactor.verifyFailed"));
       return;
     }
-    setEnabled(purpose === "enable");
-    toast.success(
-      t(
-        purpose === "enable"
-          ? "account.twoFactor.settings.enabled"
-          : "account.twoFactor.settings.disabled"
-      )
-    );
+    setEnabled(true);
+    toast.success(t("account.twoFactor.settings.enabled"));
     closeDialog();
   };
 
@@ -112,7 +105,7 @@ export default function TwoFactorSettingsCard({ t }) {
             variant={enabled ? "outline" : "default"}
             className={enabled ? "" : "text-secondary"}
             disabled={enabled === null || isSending}
-            onClick={() => sendCode(enabled ? "disable" : "enable")}
+            onClick={() => (enabled ? setSupportOpen(true) : sendCode("enable"))}
           >
             {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {enabled
@@ -151,11 +144,7 @@ export default function TwoFactorSettingsCard({ t }) {
       <Dialog open={purpose !== null} onOpenChange={open => !open && closeDialog()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {purpose === "enable"
-                ? t("account.twoFactor.settings.enableTitle")
-                : t("account.twoFactor.settings.disableTitle")}
-            </DialogTitle>
+            <DialogTitle>{t("account.twoFactor.settings.enableTitle")}</DialogTitle>
             <DialogDescription>
               {t("account.twoFactor.settings.dialogDescription", { email })}
             </DialogDescription>
@@ -195,17 +184,37 @@ export default function TwoFactorSettingsCard({ t }) {
               </Button>
               <Button
                 type="submit"
-                variant={purpose === "disable" ? "destructive" : "default"}
-                className={purpose === "disable" ? "" : "text-secondary"}
+                className="text-secondary"
                 disabled={isSubmitting || code.length !== 6}
               >
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {purpose === "enable"
-                  ? t("account.twoFactor.settings.turnOn")
-                  : t("account.twoFactor.settings.turnOff")}
+                {t("account.twoFactor.settings.turnOn")}
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={supportOpen} onOpenChange={setSupportOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("account.twoFactor.settings.supportTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("account.twoFactor.settings.supportDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setSupportOpen(false)}>
+              {t("account.twoFactor.settings.supportClose")}
+            </Button>
+            <Button
+              className="text-secondary"
+              onClick={() => window.electron?.openURL("https://discord.gg/ascendara")}
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              {t("account.twoFactor.settings.supportJoin")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
