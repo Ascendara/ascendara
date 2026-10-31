@@ -118,6 +118,37 @@ function registerMiscHandlers() {
     }
   });
 
+  // CheapShark API request handler (CheapShark rejects generic User-Agents)
+  ipcMain.handle("cheapshark-request", async (_, { path, params }) => {
+    if (typeof path !== "string" || !/^\/[a-z]+$/i.test(path)) {
+      return { success: false, status: 400, error: "Invalid CheapShark path" };
+    }
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await axios.get(`https://www.cheapshark.com/api/1.0${path}`, {
+          headers: {
+            "User-Agent": "Ascendara Game Library (contact@ascendara.com)",
+            Accept: "application/json",
+          },
+          params,
+          timeout: 15000,
+        });
+        return { success: true, data: response.data };
+      } catch (error) {
+        const status = error.response?.status;
+        if (status === 429 && attempt < 2) {
+          const retryAfter = parseInt(error.response.headers?.["retry-after"], 10);
+          const waitMs =
+            (Number.isFinite(retryAfter) ? retryAfter : 2 * (attempt + 1)) * 1000;
+          await new Promise(resolve => setTimeout(resolve, Math.min(waitMs, 15000)));
+          continue;
+        }
+        console.error("CheapShark request error:", error.message);
+        return { success: false, status, error: error.message };
+      }
+    }
+  });
+
   // Steam API request handler (now proxied through backend)
   ipcMain.handle("steam-request", async (_, { url }) => {
     try {

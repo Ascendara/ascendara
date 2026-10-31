@@ -408,11 +408,11 @@ const Library = () => {
   const [gameUpdates, setGameUpdates] = useState({}); // {gameID: updateInfo}
   const [isLibraryValueOpen, setIsLibraryValueOpen] = useState(false);
   const [libraryValueData, setLibraryValueData] = useState(() => {
-    const cached = localStorage.getItem("library-value-cache");
+    const cached = localStorage.getItem("library-value-cache-v2");
     return cached ? JSON.parse(cached) : null;
   });
   const [cachedGameCount, setCachedGameCount] = useState(() => {
-    return parseInt(localStorage.getItem("library-value-game-count") || "0", 10);
+    return parseInt(localStorage.getItem("library-value-game-count-v2") || "0", 10);
   });
   const [isCalculatingValue, setIsCalculatingValue] = useState(false);
   const [valueProgress, setValueProgress] = useState({ current: 0, total: 0, game: "" });
@@ -1571,8 +1571,8 @@ const Library = () => {
       if (allGameTitles.length === 0) {
         const emptyResult = { totalValue: 0, games: [], notFound: [] };
         setLibraryValueData(emptyResult);
-        safeSetItem("library-value-cache", JSON.stringify(emptyResult));
-        safeSetItem("library-value-game-count", "0");
+        safeSetItem("library-value-cache-v2", JSON.stringify(emptyResult));
+        safeSetItem("library-value-game-count-v2", "0");
         setCachedGameCount(0);
         setIsCalculatingValue(false);
         return;
@@ -1589,8 +1589,8 @@ const Library = () => {
 
       // Cache the result
       setLibraryValueData(result);
-      safeSetItem("library-value-cache", JSON.stringify(result));
-      safeSetItem("library-value-game-count", String(allGameTitles.length));
+      safeSetItem("library-value-cache-v2", JSON.stringify(result));
+      safeSetItem("library-value-game-count-v2", String(allGameTitles.length));
       setCachedGameCount(allGameTitles.length);
     } catch (error) {
       console.error("Error calculating library value:", error);
@@ -1969,11 +1969,7 @@ const Library = () => {
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              collisionPadding={12}
-              className="w-72 p-1.5"
-            >
+            <DropdownMenuContent align="end" collisionPadding={12} className="w-72 p-1.5">
               <DropdownMenuItem
                 className="gap-3 rounded-md px-2 py-2"
                 onSelect={() => {

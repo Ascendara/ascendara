@@ -247,6 +247,8 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   steamRequest: url => ipcRenderer.invoke("steam-request", { url }),
   khinsiderRequest: path => ipcRenderer.invoke("khinsider-request", path),
+  cheapsharkRequest: (path, params) =>
+    ipcRenderer.invoke("cheapshark-request", { path, params }),
 
   switchRPC: state => ipcRenderer.invoke("switch-rpc", state),
 
