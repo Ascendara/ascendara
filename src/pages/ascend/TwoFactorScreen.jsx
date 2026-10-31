@@ -82,9 +82,14 @@ const TwoFactorScreen = ({ t, email, onVerified, onSignOut }) => {
           <motion.div {...fadeUp(0)} className="relative mb-6 h-16 w-16">
             {!reduceMotion && (
               <motion.span
-                className="absolute inset-0 rounded-2xl bg-primary/20"
-                animate={{ scale: [1, 1.35], opacity: [0.6, 0] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+                className="pointer-events-none absolute -inset-2 rounded-3xl bg-primary/30 blur-xl"
+                animate={{ opacity: [0.35, 0.9] }}
+                transition={{
+                  duration: 1.6,
+                  repeat: Infinity,
+                  repeatType: "mirror",
+                  ease: "easeInOut",
+                }}
                 aria-hidden="true"
               />
             )}
