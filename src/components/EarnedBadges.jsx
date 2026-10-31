@@ -903,8 +903,13 @@ function ReviewMilestoneBadge({ user, tier, className, style }) {
 }
 
 // Every badge a user has, in one fixed order: owner and verified first, then
-// their level, then contributor, Discord, and the earned ones
+// their level, then contributor, Discord, and the earned ones. A private
+// account's badges, a linked Discord included, show only to the account
+// itself and its friends.
 export default function EarnedBadges({ user, className = "h-4 w-4", style }) {
+  const { user: viewer, userData: viewerData } = useAuth();
+  const isSelf = user === viewerData || (viewer && user?.uid === viewer.uid);
+  if (user?.private && !user.isFriend && !isSelf) return null;
   const reviewCount = Number(user?.reviewCount);
   const reviewTier =
     Number.isFinite(reviewCount) && REVIEW_TIERS.find(tier => reviewCount >= tier.count);

@@ -1994,6 +1994,16 @@ export const verifyAscendAccess = async (hardwareId = null) => {
  * @param {string} searchQuery - Search query
  * @returns {Promise<{users: array, error: string|null}>}
  */
+// The signed-in user's friends, so a private friend's badges still show
+const getMyFriendUids = async () => {
+  try {
+    const snapshot = await getDoc(doc(db, "friends", auth.currentUser.uid));
+    return new Set(snapshot.exists() ? snapshot.data().list || [] : []);
+  } catch {
+    return new Set();
+  }
+};
+
 export const searchUsers = async searchQuery => {
   try {
     const currentUser = auth.currentUser;
@@ -2035,7 +2045,10 @@ export const searchUsers = async searchQuery => {
 
     // Batch fetch status for all matching users
     const matchingUserIds = matchingUsers.map(u => u.uid);
-    const statusMap = await batchGetUserStatus(matchingUserIds);
+    const [statusMap, friendUids] = await Promise.all([
+      batchGetUserStatus(matchingUserIds),
+      getMyFriendUids(),
+    ]);
 
     // Build user results
     for (const { uid, data } of matchingUsers) {
@@ -2064,6 +2077,7 @@ export const searchUsers = async searchQuery => {
         reviewCount: data.reviewCount,
         discordLinked: Boolean(data.socials?.linkedDiscord),
         private: isPrivate,
+        isFriend: friendUids.has(uid),
         preventFriendRequests: data.preventFriendRequests === true,
         status: statusMap.get(uid) || "offline",
         level: isPrivate ? 0 : data.profileStats?.level || 1,
@@ -2898,7 +2912,7 @@ export const getConversations = async () => {
       conversationsRef,
       where("participants", "array-contains", currentUser.uid)
     );
-    const snapshot = await getDocs(q);
+    const [snapshot, friendUids] = await Promise.all([getDocs(q), getMyFriendUids()]);
 
     const conversations = [];
     for (const docSnap of snapshot.docs) {
@@ -2933,6 +2947,8 @@ export const getConversations = async () => {
           owner: userData.owner || false,
           contributor: userData.contributor || false,
           bugCatcher: userData.bugCatcher || false,
+          private: userData.private || false,
+          isFriend: friendUids.has(otherUserId),
           reviewCount: userData.reviewCount,
           discordLinked: Boolean(userData.socials?.linkedDiscord),
           level: userData.private ? 0 : userData.profileStats?.level || 1,
@@ -3661,9 +3677,10 @@ export const subscribeToConversations = onUpdate => {
       const otherUserIds = conversationData.map(c => c.otherUserId);
 
       // Batch fetch all user data and statuses at once
-      const [userDataMap, statusMap] = await Promise.all([
+      const [userDataMap, statusMap, friendUids] = await Promise.all([
         batchGetUserData(otherUserIds),
         batchGetUserStatus(otherUserIds),
+        getMyFriendUids(),
       ]);
 
       // Build conversations array
@@ -3685,6 +3702,8 @@ export const subscribeToConversations = onUpdate => {
             owner: userData.owner || false,
             contributor: userData.contributor || false,
             bugCatcher: userData.bugCatcher || false,
+            private: userData.private || false,
+            isFriend: friendUids.has(otherUserId),
             reviewCount: userData.reviewCount,
             discordLinked: Boolean(userData.socials?.linkedDiscord),
             level: userData.private ? 0 : userData.profileStats?.level || 1,
