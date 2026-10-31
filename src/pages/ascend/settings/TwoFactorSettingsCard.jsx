@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Mail, ShieldCheck } from "lucide-react";
+import { Loader2, Mail, Shield, ShieldCheck } from "lucide-react";
 import {
   disableTwoFactor,
   enableTwoFactor,
@@ -18,6 +18,7 @@ import {
   sendTwoFactorCode,
 } from "@/services/firebase/firebaseService";
 import TwoFactorCodeInput from "../TwoFactorCodeInput";
+import { FocusHero, FocusPoints, StatusPill } from "./SettingsLayout";
 
 export default function TwoFactorSettingsCard({ t }) {
   const [enabled, setEnabled] = useState(null);
@@ -89,40 +90,27 @@ export default function TwoFactorSettingsCard({ t }) {
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
-      <div className="flex items-center justify-between border-b border-border/50 p-5">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold">{t("account.twoFactor.settings.title")}</h2>
-        </div>
-      </div>
-      <div className="p-5">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">{t("account.twoFactor.settings.label")}</span>
-              {enabled !== null && (
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                    enabled
-                      ? "bg-primary/15 text-primary"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {enabled
-                    ? t("account.twoFactor.settings.on")
-                    : t("account.twoFactor.settings.off")}
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t("account.twoFactor.settings.description")}
-            </p>
-          </div>
+    <div className="space-y-8">
+      <FocusHero
+        icon={enabled ? ShieldCheck : Shield}
+        tone={enabled ? "success" : "muted"}
+        eyebrow={t("account.twoFactor.settings.title")}
+        title={t("account.twoFactor.settings.label")}
+        status={
+          enabled !== null && (
+            <StatusPill tone={enabled ? "success" : "muted"}>
+              {enabled
+                ? t("account.twoFactor.settings.on")
+                : t("account.twoFactor.settings.off")}
+            </StatusPill>
+          )
+        }
+        description={t("account.twoFactor.settings.description")}
+      >
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
           <Button
             variant={enabled ? "outline" : "default"}
-            className={enabled ? "shrink-0" : "shrink-0 text-secondary"}
+            className={enabled ? "" : "text-secondary"}
             disabled={enabled === null || isSending}
             onClick={() => sendCode(enabled ? "disable" : "enable")}
           >
@@ -131,8 +119,34 @@ export default function TwoFactorSettingsCard({ t }) {
               ? t("account.twoFactor.settings.turnOff")
               : t("account.twoFactor.settings.turnOn")}
           </Button>
+          {email && (
+            <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <Mail className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">
+                {t("ascend.settings.pages.security.codesGoTo", { email })}
+              </span>
+            </span>
+          )}
         </div>
-      </div>
+      </FocusHero>
+
+      <FocusPoints
+        title={t("ascend.settings.pages.howItWorks")}
+        items={[
+          {
+            title: t("ascend.settings.pages.security.step1Title"),
+            text: t("ascend.settings.pages.security.step1Text"),
+          },
+          {
+            title: t("ascend.settings.pages.security.step2Title"),
+            text: t("ascend.settings.pages.security.step2Text"),
+          },
+          {
+            title: t("ascend.settings.pages.security.step3Title"),
+            text: t("account.twoFactor.expires"),
+          },
+        ]}
+      />
 
       <Dialog open={purpose !== null} onOpenChange={open => !open && closeDialog()}>
         <DialogContent className="sm:max-w-md">

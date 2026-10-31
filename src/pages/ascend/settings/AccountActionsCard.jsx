@@ -3,15 +3,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import {
   Lock,
   Loader2,
   LogOut,
-  ChevronRight,
   Check,
   Trash2,
   Infinity as InfinityIcon,
 } from "lucide-react";
+import { FocusHero, FocusLine } from "./SettingsLayout";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -25,6 +26,9 @@ import {
 
 export default function AccountActionsCard({
   t,
+  photoURL,
+  displayName,
+  email,
   handleLogout,
   showDeleteDialog,
   setShowDeleteDialog,
@@ -50,56 +54,49 @@ export default function AccountActionsCard({
   };
 
   return (
-    <div className="mt-8 space-y-4 border-t border-border/50 pt-8">
-      <h3 className="mb-4 text-sm font-medium text-muted-foreground">
-        {t("account.actions") || "Account Actions"}
-      </h3>
-
-      {/* Sign out button */}
-      <motion.button
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
-        onClick={handleLogout}
-        className="group flex w-full items-center justify-between rounded-xl border border-border/50 bg-card/60 p-4 text-left transition-all hover:border-primary/30 hover:bg-card"
+    <div className="space-y-8">
+      <FocusHero
+        media={
+          <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-primary text-2xl font-semibold text-secondary">
+            {photoURL ? (
+              <img
+                src={photoURL}
+                alt=""
+                className="h-full w-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              (displayName || email || "U").charAt(0).toUpperCase()
+            )}
+          </div>
+        }
+        eyebrow={t("ascend.settings.pages.account.signedInAs")}
+        title={displayName || email}
+        description={displayName ? email : undefined}
       >
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50 transition-colors group-hover:bg-primary/10">
-            <LogOut className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
-          </div>
-          <div>
-            <span className="font-medium">{t("account.signOut")}</span>
-            <p className="text-xs text-muted-foreground">
-              {t("account.signOutDescription") || "Sign out of your account"}
-            </p>
-          </div>
-        </div>
-        <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
-      </motion.button>
+        <Button variant="outline" onClick={handleLogout} className="gap-2">
+          <LogOut className="h-4 w-4" />
+          {t("account.signOut")}
+        </Button>
+      </FocusHero>
 
       {/* Request Account Deletion */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogTrigger asChild>
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            className="group flex w-full items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4 text-left transition-all hover:border-primary/40 hover:bg-primary/10"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
-                <Trash2 className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <span className="font-medium text-foreground">
-                  {t("account.requestDeletion") || "Request Account Deletion"}
-                </span>
-                <p className="text-xs text-muted-foreground">
-                  {t("account.deletionWarning") || "This action cannot be undone"}
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
-          </motion.button>
-        </AlertDialogTrigger>
+        <FocusLine
+          icon={Trash2}
+          danger
+          label={t("account.requestDeletion") || "Request Account Deletion"}
+          description={t("account.deletion.description")}
+        >
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="outline"
+              className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              {t("ascend.settings.pages.account.requestDeletionButton")}
+            </Button>
+          </AlertDialogTrigger>
+        </FocusLine>
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-foreground">

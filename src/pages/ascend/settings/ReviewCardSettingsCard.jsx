@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Clock,
   Image as ImageIcon,
+  Info,
   Loader2,
   RotateCcw,
   Trash2,
@@ -13,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import ImageCropDialog from "@/components/ImageCropDialog";
+import { FocusHero, StatusPill } from "./SettingsLayout";
 import ReviewCard from "@/components/ReviewCard";
 import { cropImage } from "@/lib/cropImage";
 import {
@@ -276,112 +278,30 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
     t("ascend.settings.reviewCard.previewName");
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
-      <div className="flex items-center justify-between border-b border-border/50 p-5">
-        <div className="flex items-center gap-2">
-          <ImageIcon className="h-5 w-5 text-primary" />
-          <h2 className="!m-0 font-semibold leading-tight">
-            {t("ascend.settings.reviewCard.title")}
-          </h2>
-        </div>
-        {hasImage && (
-          <span
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
-              awaitingApproval
-                ? "bg-yellow-500/10 text-yellow-500"
-                : "bg-green-500/10 text-green-500"
-            }`}
-          >
-            {awaitingApproval ? (
-              <Clock className="h-3.5 w-3.5" />
-            ) : (
-              <CheckCircle2 className="h-3.5 w-3.5" />
-            )}
-            {t(
-              awaitingApproval
-                ? "ascend.settings.reviewCard.pending"
-                : "ascend.settings.reviewCard.approved"
-            )}
-          </span>
-        )}
-      </div>
-      <div className="space-y-4 p-5">
-        <p className="text-sm text-muted-foreground">
-          {t("ascend.settings.reviewCard.description", {
-            width: CARD_WIDTH,
-            height: CARD_HEIGHT,
-          })}
-        </p>
-
-        {/* The real review card at its game page width (two per row beside the sidebar) */}
-        <div className="space-y-3 rounded-xl bg-card p-4">
-          {pending && background && (
-            <div
-              role="tablist"
-              className="inline-flex rounded-lg bg-muted p-0.5 text-xs font-medium"
+    <div className="space-y-8">
+      <FocusHero
+        icon={ImageIcon}
+        tone={hasImage && !awaitingApproval ? "success" : hasImage ? "primary" : "muted"}
+        title={t("ascend.settings.reviewCard.title")}
+        status={
+          hasImage && (
+            <StatusPill
+              tone={awaitingApproval ? "warning" : "success"}
+              icon={awaitingApproval ? Clock : CheckCircle2}
             >
-              {["live", "pending"].map(slot => (
-                <button
-                  key={slot}
-                  type="button"
-                  role="tab"
-                  aria-selected={previewSlot === slot}
-                  onClick={() => setPreviewSlot(slot)}
-                  className={`rounded-md px-2.5 py-1 transition-colors ${
-                    previewSlot === slot
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {t(
-                    slot === "live"
-                      ? "ascend.settings.reviewCard.previewCurrent"
-                      : "ascend.settings.reviewCard.previewNew"
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="max-w-[384px]">
-            <ReviewCard
-              review={{
-                rating: 5,
-                comments: t("ascend.settings.reviewCard.previewText"),
-                photoURL: userData?.photoURL || user?.photoURL,
-                badges: {
-                  owner: userData?.owner === true,
-                  contributor: userData?.contributor === true,
-                  verified: userData?.verified === true,
-                  bugCatcher: userData?.bugCatcher === true,
-                  reviewCount: userData?.reviewCount,
-                  discordLinked: Boolean(userData?.socials?.linkedDiscord),
-                  level: userData?.profileStats?.level,
-                },
-                cardBackground: previewUrl,
-                cardStyle: style,
-                createdAt: previewDate,
-              }}
-              username={name}
-              isGuest={false}
-            />
-          </div>
-        </div>
-
-        {awaitingApproval && (
-          <p className="text-sm text-muted-foreground">
-            {t(
-              pending && background?.passed
-                ? "ascend.settings.reviewCard.pendingKeepsCurrent"
-                : "ascend.settings.reviewCard.pendingDescription"
-            )}
-          </p>
-        )}
-        {status === "error" && (
-          <p className="text-destructive text-sm">
-            {t("ascend.settings.reviewCard.loadFailed")}
-          </p>
-        )}
-
+              {t(
+                awaitingApproval
+                  ? "ascend.settings.reviewCard.pending"
+                  : "ascend.settings.reviewCard.approved"
+              )}
+            </StatusPill>
+          )
+        }
+        description={t("ascend.settings.reviewCard.description", {
+          width: CARD_WIDTH,
+          height: CARD_HEIGHT,
+        })}
+      >
         <div className="flex flex-wrap gap-2">
           <input
             ref={inputRef}
@@ -429,8 +349,86 @@ export default function ReviewCardSettingsCard({ t, user, userData }) {
             </Button>
           )}
         </div>
+        {awaitingApproval && (
+          <p className="mt-3 max-w-xl text-xs leading-relaxed text-muted-foreground">
+            {t(
+              pending && background?.passed
+                ? "ascend.settings.reviewCard.pendingKeepsCurrent"
+                : "ascend.settings.reviewCard.pendingDescription"
+            )}
+          </p>
+        )}
+        {status === "error" && (
+          <p className="text-destructive mt-3 text-sm">
+            {t("ascend.settings.reviewCard.loadFailed")}
+          </p>
+        )}
+      </FocusHero>
 
-        <div className="space-y-4 border-t border-border/50 pt-4">
+      <div className="grid items-start gap-8 border-t border-border/50 pt-6 xl:grid-cols-[minmax(0,416px)_minmax(0,1fr)]">
+        {/* The real review card at its game page width (two per row beside the sidebar) */}
+        <div className="space-y-3 rounded-2xl bg-muted/30 p-4 ring-1 ring-border/50">
+          {pending && background && (
+            <div
+              role="tablist"
+              className="inline-flex rounded-lg bg-muted p-0.5 text-xs font-medium"
+            >
+              {["live", "pending"].map(slot => (
+                <button
+                  key={slot}
+                  type="button"
+                  role="tab"
+                  aria-selected={previewSlot === slot}
+                  onClick={() => setPreviewSlot(slot)}
+                  className={`rounded-md px-2.5 py-1 transition-colors ${
+                    previewSlot === slot
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t(
+                    slot === "live"
+                      ? "ascend.settings.reviewCard.previewCurrent"
+                      : "ascend.settings.reviewCard.previewNew"
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="max-w-[384px]">
+            <ReviewCard
+              review={{
+                rating: 5,
+                comments: t("ascend.settings.reviewCard.previewText"),
+                photoURL: userData?.photoURL || user?.photoURL,
+                // Matches the real card: private accounts never show badges there
+                badges: {
+                  private: userData?.private === true,
+                  owner: userData?.owner === true,
+                  contributor: userData?.contributor === true,
+                  verified: userData?.verified === true,
+                  bugCatcher: userData?.bugCatcher === true,
+                  reviewCount: userData?.reviewCount,
+                  discordLinked: Boolean(userData?.socials?.linkedDiscord),
+                  level: userData?.profileStats?.level,
+                },
+                cardBackground: previewUrl,
+                cardStyle: style,
+                createdAt: previewDate,
+              }}
+              username={name}
+              isGuest={false}
+            />
+          </div>
+          {userData?.private === true && (
+            <p className="flex max-w-[384px] items-start gap-1.5 text-xs leading-5 text-muted-foreground">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {t("ascend.settings.reviewCard.privateBadgesNote")}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-5">
           <div>
             <h3 className="text-sm font-semibold">
               {t("ascend.settings.reviewCard.styleTitle")}

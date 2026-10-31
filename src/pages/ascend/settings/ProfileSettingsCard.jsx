@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  User,
   Loader2,
   Pencil,
   Camera,
@@ -14,6 +13,7 @@ import {
   Sparkle,
 } from "lucide-react";
 import EarnedBadges from "@/components/EarnedBadges";
+import DeveloperSignature from "@/components/DeveloperSignature";
 
 export default function ProfileSettingsCard({
   t,
@@ -39,29 +39,12 @@ export default function ProfileSettingsCard({
   isSavingProfile,
   handleCancelEditProfile,
   userData,
+  showThanks,
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
-      <div className="flex items-center justify-between border-b border-border/50 p-5">
-        <div className="flex items-center gap-2">
-          <User className="mb-3 h-5 w-5 text-primary" />
-          <h2 className="font-semibold">{t("ascend.settings.profile")}</h2>
-        </div>
-        {!isEditingProfile && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleStartEditProfile}
-            className="gap-2"
-          >
-            <Pencil className="h-4 w-4" />
-            {t("ascend.settings.edit")}
-          </Button>
-        )}
-      </div>
-
+    <div>
       {isEditingProfile ? (
-        <div className="space-y-6 p-5">
+        <div className="space-y-6">
           {/* Avatar & Photo URL */}
           <div className="flex items-start gap-5">
             <div className="relative shrink-0">
@@ -269,7 +252,7 @@ export default function ProfileSettingsCard({
           </div>
         </div>
       ) : (
-        <div className="p-5">
+        <div>
           {/* Profile Display */}
           <div className="flex items-start gap-5">
             <div className="relative shrink-0">
@@ -310,6 +293,15 @@ export default function ProfileSettingsCard({
                 </div>
               )}
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleStartEditProfile}
+              className="shrink-0 gap-2"
+            >
+              <Pencil className="h-4 w-4" />
+              {t("ascend.settings.edit")}
+            </Button>
           </div>
 
           {/* Social Links Display */}
@@ -383,6 +375,28 @@ export default function ProfileSettingsCard({
                 </Button>
               </div>
             )}
+
+          {showThanks && (
+            <figure className="mt-10 border-t border-border/50 pt-8">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
+                {t("ascend.settings.pages.profile.thanksEyebrow")}
+              </p>
+              <blockquote className="max-w-xl space-y-3 text-sm leading-relaxed text-foreground/80">
+                <p className="font-medium text-foreground">
+                  {t("ascend.settings.pages.profile.thanksGreeting", {
+                    name: user.displayName || userData?.displayName || "",
+                  })}
+                </p>
+                <p>{t("ascend.settings.pages.profile.thanksBody")}</p>
+              </blockquote>
+              <figcaption className="mt-4">
+                <DeveloperSignature
+                  title={t("ascend.settings.pages.profile.signatureAlt")}
+                  className="h-auto w-32 text-foreground/85"
+                />
+              </figcaption>
+            </figure>
+          )}
         </div>
       )}
     </div>

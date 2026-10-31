@@ -48,35 +48,10 @@ export default function SubscriptionSettingsCard({
   handleSubscribe,
 }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/60">
-      <div className="relative flex items-center justify-between border-b border-border/50 p-5">
-        <div className="flex items-center gap-2">
-          <div
-            className={`flex h-8 w-8 items-center justify-center rounded-lg ${ascendAccess.isVerified ? "bg-muted/60" : ascendAccess.isSubscribed ? "bg-muted/60" : "bg-primary/10"}`}
-          >
-            {ascendAccess.isVerified ? (
-              <BadgeCheck className="h-4 w-4 text-blue-500" />
-            ) : (
-              <BadgeDollarSign
-                className={`h-4 w-4 ${ascendAccess.isSubscribed ? "text-yellow-500" : "text-primary"}`}
-              />
-            )}
-          </div>
-          <h2 className="mt-2 font-semibold">{t("ascend.settings.subscription")}</h2>
-        </div>
-        {ascendAccess.isVerified ? (
-          <div className="flex items-center gap-1.5 rounded-full bg-blue-500/10 px-3 py-1">
-            <BadgeCheck className="h-3.5 w-3.5 text-blue-500" />
-            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-              VERIFIED
-            </span>
-          </div>
-        ) : null}
-      </div>
-
+    <div className="relative">
       {/* Developer Mode Subscription State Switcher */}
       {isDev && (
-        <div className="border-t border-border bg-muted/30 p-3">
+        <div className="mb-8 rounded-lg border border-dashed border-border p-3">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-medium text-muted-foreground">
               Dev: Subscription State
@@ -96,7 +71,7 @@ export default function SubscriptionSettingsCard({
         </div>
       )}
 
-      <div className="relative p-5">
+      <div className="relative">
         {(isDev && devSubscriptionState === "verified") ||
         (!isDev && ascendAccess.isVerified) ? (
           // Verified User - Special Design
