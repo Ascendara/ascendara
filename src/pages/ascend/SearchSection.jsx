@@ -1,11 +1,11 @@
 import { useState } from "react";
+import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { EmptyState, Panel } from "./primitives";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Users,
-  User,
   Loader2,
   ChevronRight,
   Search,
@@ -105,31 +105,15 @@ export default function SearchSection({
                     {/* Avatar with status */}
                     <div className="relative shrink-0">
                       <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary">
-                        {result.photoURL ? (
-                          <>
-                            <img
-                              src={result.photoURL}
-                              alt={result.displayName}
-                              onError={event => {
-                                event.currentTarget.style.display = "none";
-                                event.currentTarget.nextElementSibling?.classList.remove(
-                                  "hidden"
-                                );
-                              }}
-                              className="h-full w-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                            <User
-                              className="text-primary-foreground hidden h-6 w-6"
-                              aria-hidden="true"
-                            />
-                          </>
-                        ) : (
-                          <User
-                            className="text-primary-foreground h-6 w-6"
-                            aria-hidden="true"
-                          />
-                        )}
+                        <ProfileImage
+                          src={result.photoURL}
+                          className="h-full w-full object-cover"
+                          fallback={
+                            <span className="text-primary-foreground text-base font-semibold">
+                              {getInitial(result.displayName)}
+                            </span>
+                          }
+                        />
                       </div>
                       <div
                         className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -49,18 +50,15 @@ export default function ProfileSettingsCard({
           <div className="flex items-start gap-5">
             <div className="relative shrink-0">
               <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-primary">
-                {editPhotoURL ? (
-                  <img
-                    src={editPhotoURL}
-                    alt="Preview"
-                    className="h-full w-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <span className="text-primary-foreground text-3xl font-bold">
-                    {(editDisplayName || user.email || "U")[0].toUpperCase()}
-                  </span>
-                )}
+                <ProfileImage
+                  src={editPhotoURL}
+                  className="h-full w-full object-cover"
+                  fallback={
+                    <span className="text-primary-foreground text-3xl font-bold">
+                      {getInitial(editDisplayName, user.email)}
+                    </span>
+                  }
+                />
               </div>
               <div className="absolute -bottom-2 -right-2 rounded-full bg-primary p-2 shadow-lg">
                 <Camera className="text-primary-foreground h-4 w-4" />
@@ -257,18 +255,15 @@ export default function ProfileSettingsCard({
           <div className="flex items-start gap-5">
             <div className="relative shrink-0">
               <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-primary">
-                {user.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt={user.displayName}
-                    className="h-full w-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <span className="text-primary-foreground text-3xl font-bold">
-                    {(user.displayName || user.email || "U")[0].toUpperCase()}
-                  </span>
-                )}
+                <ProfileImage
+                  src={user.photoURL}
+                  className="h-full w-full object-cover"
+                  fallback={
+                    <span className="text-primary-foreground text-3xl font-bold">
+                      {getInitial(user.displayName, user.email)}
+                    </span>
+                  }
+                />
               </div>
             </div>
             <div className="min-w-0 flex-1">

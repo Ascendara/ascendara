@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { motion, AnimatePresence } from "framer-motion";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -58,16 +59,11 @@ export default function AccountActionsCard({
       <FocusHero
         media={
           <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-primary text-2xl font-semibold text-secondary">
-            {photoURL ? (
-              <img
-                src={photoURL}
-                alt=""
-                className="h-full w-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              (displayName || email || "U").charAt(0).toUpperCase()
-            )}
+            <ProfileImage
+              src={photoURL}
+              className="h-full w-full object-cover"
+              fallback={getInitial(displayName, email)}
+            />
           </div>
         }
         eyebrow={t("ascend.settings.pages.account.signedInAs")}

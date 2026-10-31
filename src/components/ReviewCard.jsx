@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { Heart, HelpCircle, Star } from "lucide-react";
 import {
   Tooltip,
@@ -117,23 +118,11 @@ export default function ReviewCard({ review, username, isGuest, liked, onLike })
             isGuest ? "" : "ring-2 ring-primary/60 ring-offset-2 ring-offset-card"
           }`}
         >
-          {photoURL ? (
-            <>
-              <img
-                src={photoURL}
-                alt=""
-                referrerPolicy="no-referrer"
-                className="h-full w-full object-cover"
-                onError={event => {
-                  event.currentTarget.style.display = "none";
-                  event.currentTarget.nextElementSibling?.classList.remove("hidden");
-                }}
-              />
-              <span className="hidden">{username.slice(0, 1).toUpperCase()}</span>
-            </>
-          ) : (
-            username.slice(0, 1).toUpperCase()
-          )}
+          <ProfileImage
+            src={photoURL}
+            className="h-full w-full object-cover"
+            fallback={getInitial(username)}
+          />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">

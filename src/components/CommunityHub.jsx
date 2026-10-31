@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -814,17 +815,15 @@ const CommunityHub = ({ user, userData }) => {
                       className="group -mx-2 flex gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-accent/30"
                     >
                       <div className="relative flex-shrink-0">
-                        {msg.senderPhotoURL ? (
-                          <img
-                            src={msg.senderPhotoURL}
-                            alt=""
-                            className="h-10 w-10 rounded-full ring-2 ring-background"
-                          />
-                        ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-violet-500/20 ring-2 ring-background">
-                            <Users className="h-5 w-5 text-primary" />
-                          </div>
-                        )}
+                        <ProfileImage
+                          src={msg.senderPhotoURL}
+                          className="h-10 w-10 rounded-full object-cover ring-2 ring-background"
+                          fallback={
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-violet-500/20 text-sm font-semibold text-primary ring-2 ring-background">
+                              {getInitial(msg.senderName)}
+                            </div>
+                          }
+                        />
                         <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 ring-2 ring-background" />
                       </div>
                       <div className="min-w-0 flex-1">

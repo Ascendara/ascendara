@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,23 +26,11 @@ function Avatar({ person }) {
   return (
     <div className="relative shrink-0">
       <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-primary/10 text-sm font-semibold text-primary ring-1 ring-border/50">
-        {person.photoURL ? (
-          <>
-            <img
-              src={person.photoURL}
-              alt=""
-              referrerPolicy="no-referrer"
-              onError={event => {
-                event.currentTarget.style.display = "none";
-                event.currentTarget.nextElementSibling?.classList.remove("hidden");
-              }}
-              className="h-full w-full object-cover"
-            />
-            <User className="hidden h-5 w-5 text-primary" aria-hidden="true" />
-          </>
-        ) : (
-          <User className="h-5 w-5 text-primary" aria-hidden="true" />
-        )}
+        <ProfileImage
+          src={person.photoURL}
+          className="h-full w-full object-cover"
+          fallback={getInitial(person.displayName)}
+        />
       </div>
       <span
         aria-hidden="true"

@@ -1,4 +1,5 @@
 import { useLibraryConflicts } from "@/hooks/useLibraryConflicts";
+import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { libraryInstallKey, reconcileFolderItems } from "@/lib/libraryConflicts";
 import LibraryConflictDialog from "@/components/LibraryConflictDialog";
 import {
@@ -36,7 +37,6 @@ import {
   EyeOff,
   FolderOpen,
   ExternalLink,
-  User,
   HardDrive,
   Gamepad2,
   Gift,
@@ -1808,15 +1808,15 @@ const Library = () => {
               onClick={() => navigate("/profile")}
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 ring-1 ring-primary/30">
-                {userData?.photoURL ? (
-                  <img
-                    src={userData.photoURL}
-                    className="h-8 w-8 rounded-full object-cover"
-                    alt=""
-                  />
-                ) : (
-                  <User className="h-3.5 w-3.5 text-primary" />
-                )}
+                <ProfileImage
+                  src={userData?.photoURL}
+                  className="h-8 w-8 rounded-full object-cover"
+                  fallback={
+                    <span className="text-xs font-semibold text-primary">
+                      {getInitial(userData?.displayName, user?.displayName, username)}
+                    </span>
+                  }
+                />
               </div>
               <div className="min-w-0 flex-1 text-left">
                 <p className="truncate text-sm font-semibold leading-none text-foreground">
@@ -1901,17 +1901,15 @@ const Library = () => {
                         {friends.slice(0, 5).map(friend => (
                           <div key={friend.uid} className="flex items-center gap-2">
                             <div className="relative shrink-0">
-                              {friend.photoURL ? (
-                                <img
-                                  src={friend.photoURL}
-                                  className="h-5 w-5 rounded-full object-cover"
-                                  alt=""
-                                />
-                              ) : (
-                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground">
-                                  {friend.displayName?.[0]?.toUpperCase()}
-                                </div>
-                              )}
+                              <ProfileImage
+                                src={friend.photoURL}
+                                className="h-5 w-5 rounded-full object-cover"
+                                fallback={
+                                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground">
+                                    {getInitial(friend.displayName)}
+                                  </div>
+                                }
+                              />
                               <span
                                 className={cn(
                                   "absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-1 ring-background",

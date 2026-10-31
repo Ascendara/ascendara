@@ -1,4 +1,5 @@
 import { StatStrip } from "./primitives";
+import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -112,18 +113,15 @@ export default function UserProfileSection({
                 {/* Avatar */}
                 <div className="relative shrink-0">
                   <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl bg-primary ring-4 ring-background">
-                    {viewingProfile.photoURL ? (
-                      <img
-                        src={viewingProfile.photoURL}
-                        alt={viewingProfile.displayName}
-                        className="h-full w-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <span className="text-primary-foreground text-4xl font-bold">
-                        {viewingProfile.displayName?.[0]?.toUpperCase() || "U"}
-                      </span>
-                    )}
+                    <ProfileImage
+                      src={viewingProfile.photoURL}
+                      className="h-full w-full object-cover"
+                      fallback={
+                        <span className="text-primary-foreground text-4xl font-bold">
+                          {getInitial(viewingProfile.displayName)}
+                        </span>
+                      }
+                    />
                   </div>
                   <div
                     className={`absolute -bottom-1 -right-1 h-6 w-6 rounded-full border-4 border-card shadow-lg ${

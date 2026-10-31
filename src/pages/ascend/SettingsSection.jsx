@@ -1,4 +1,5 @@
 import ProfileSettingsCard from "./settings/ProfileSettingsCard";
+import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import PrivacySettingsCard from "./settings/PrivacySettingsCard";
 import ReviewCardSettingsCard from "./settings/ReviewCardSettingsCard";
 import SubscriptionSettingsCard from "./settings/SubscriptionSettingsCard";
@@ -271,11 +272,11 @@ export default function SettingsSection({
           {/* Whose settings these are */}
           <div className="mb-4 hidden items-center gap-3 px-2 lg:flex">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-semibold text-secondary">
-              {photoURL ? (
-                <img src={photoURL} alt="" className="h-full w-full object-cover" />
-              ) : (
-                displayName.charAt(0).toUpperCase() || <User className="h-4 w-4" />
-              )}
+              <ProfileImage
+                src={photoURL}
+                className="h-full w-full object-cover"
+                fallback={getInitial(displayName)}
+              />
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{displayName}</p>

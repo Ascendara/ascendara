@@ -1,11 +1,11 @@
 import { useState } from "react";
+import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { EmptyState, Panel } from "./primitives";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Users,
-  User,
   Eye,
   Loader2,
   Search,
@@ -62,26 +62,17 @@ function FriendRow({ friend, status, t, onView, onMessage, onRemove }) {
             isOffline ? "bg-muted" : "bg-primary"
           }`}
         >
-          {friend.photoURL ? (
-            <>
-              <img
-                src={friend.photoURL}
-                alt=""
-                onError={event => {
-                  event.currentTarget.style.display = "none";
-                  event.currentTarget.nextElementSibling?.classList.remove("hidden");
-                }}
-                className={`h-full w-full object-cover ${isOffline ? "opacity-70" : ""}`}
-                referrerPolicy="no-referrer"
-              />
-              <User className="hidden h-5 w-5 text-secondary" aria-hidden="true" />
-            </>
-          ) : (
-            <User
-              className={`h-5 w-5 ${isOffline ? "text-muted-foreground" : "text-secondary"}`}
-              aria-hidden="true"
-            />
-          )}
+          <ProfileImage
+            src={friend.photoURL}
+            className={`h-full w-full object-cover ${isOffline ? "opacity-70" : ""}`}
+            fallback={
+              <span
+                className={`text-sm font-semibold ${isOffline ? "text-muted-foreground" : "text-secondary"}`}
+              >
+                {getInitial(friend.displayName)}
+              </span>
+            }
+          />
         </span>
         <span
           className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${STATUS_DOT[status]}`}

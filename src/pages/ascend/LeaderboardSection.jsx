@@ -1,4 +1,5 @@
 import { EmptyState } from "./primitives";
+import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -117,18 +118,13 @@ export default function LeaderboardSection({
                   <div
                     className={`mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary ring-1 ring-border/50 ${index === 0 ? "sm:h-20 sm:w-20" : ""}`}
                   >
-                    {player.photoURL ? (
-                      <img
-                        src={player.photoURL}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-2xl font-semibold">
-                        {player.displayName?.[0]?.toUpperCase() || "U"}
-                      </span>
-                    )}
+                    <ProfileImage
+                      src={player.photoURL}
+                      className="h-full w-full object-cover"
+                      fallback={
+                        <span className="text-2xl font-semibold">{getInitial(player.displayName)}</span>
+                      }
+                    />
                   </div>
                   <div className="flex w-full min-w-0 items-center justify-center gap-1.5">
                     <h2 className="mb-0 truncate text-base font-semibold transition-colors group-hover:text-primary">
@@ -190,18 +186,15 @@ export default function LeaderboardSection({
                     {/* Avatar */}
                     <div className="relative shrink-0">
                       <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-primary">
-                        {user.photoURL ? (
-                          <img
-                            src={user.photoURL}
-                            alt=""
-                            className="h-full w-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <span className="text-sm font-semibold text-secondary">
-                            {user.displayName?.[0]?.toUpperCase() || "U"}
-                          </span>
-                        )}
+                        <ProfileImage
+                          src={user.photoURL}
+                          className="h-full w-full object-cover"
+                          fallback={
+                            <span className="text-sm font-semibold text-secondary">
+                              {getInitial(user.displayName)}
+                            </span>
+                          }
+                        />
                       </div>
                     </div>
 

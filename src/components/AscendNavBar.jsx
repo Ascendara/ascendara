@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
@@ -255,18 +256,15 @@ const AscendNavBar = ({
               >
                 <span className="relative shrink-0">
                   <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-primary/70">
-                    {user?.photoURL ? (
-                      <img
-                        src={user.photoURL}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <span className="text-sm font-bold text-secondary">
-                        {user?.displayName?.[0]?.toUpperCase() || "U"}
-                      </span>
-                    )}
+                    <ProfileImage
+                      src={user?.photoURL}
+                      className="h-full w-full object-cover"
+                      fallback={
+                        <span className="text-sm font-bold text-secondary">
+                          {getInitial(user?.displayName)}
+                        </span>
+                      }
+                    />
                   </span>
                   <span
                     className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${currentStatusOption.color}`}
