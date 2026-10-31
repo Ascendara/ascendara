@@ -29,7 +29,6 @@ import {
   verifyAscendAccess,
   getOrCreateConversation,
   sendMessage,
-  getConversations,
   markMessagesAsRead,
   syncProfileToAscend,
   getProfileStats,
@@ -192,6 +191,10 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const messagesEndRef = React.useRef(null);
+  const markingReadRef = useRef(false);
+  const [readPass, setReadPass] = useState(0);
+  const activeSectionRef = useRef(activeSection);
+  activeSectionRef.current = activeSection;
 
   // Profile sync state
   const [profileStats, setProfileStats] = useState(null);
@@ -440,10 +443,13 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       setMessages(newMessages);
       setLoadingMessages(false);
 
-      // Show toast notification for new incoming messages (not from current user)
+      // Toast new incoming messages unless this chat is already on screen
       if (newMessages.length > prevMessageCount && prevMessageCount > 0) {
         const latestMessage = newMessages[newMessages.length - 1];
-        if (!latestMessage.isOwn && selectedConversation) {
+        const chatOnScreen =
+          activeSectionRef.current === "messages" &&
+          document.visibilityState === "visible";
+        if (!latestMessage.isOwn && !chatOnScreen) {
           toast.info(
             `${selectedConversation.otherUser.displayName}: ${latestMessage.text.substring(0, 50)}${latestMessage.text.length > 50 ? "..." : ""}`,
             {
@@ -459,6 +465,32 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       unsubscribe();
     };
   }, [selectedConversation?.id]);
+
+  // Mark the open chat read whenever it has unread messages and is on screen,
+  // including messages that arrive while it stays open
+  const openConversation = conversations.find(c => c.id === selectedConversation?.id);
+  const hasUnreadInOpenChat =
+    Boolean(selectedConversation?.id) &&
+    !loadingMessages &&
+    (messages.some(message => !message.isOwn && message.read === false) ||
+      openConversation?.unreadCount > 0);
+  useEffect(() => {
+    if (activeSection !== "messages" || !hasUnreadInOpenChat) return;
+    const conversationId = selectedConversation.id;
+    const otherUserId = selectedConversation.otherUser?.uid;
+    const markRead = () => {
+      if (document.visibilityState !== "visible" || markingReadRef.current) return;
+      markingReadRef.current = true;
+      markMessagesAsRead(conversationId, otherUserId).then(result => {
+        markingReadRef.current = false;
+        // Messages that landed mid-write are caught by one more pass
+        if (result.updated) setReadPass(pass => pass + 1);
+      });
+    };
+    markRead();
+    document.addEventListener("visibilitychange", markRead);
+    return () => document.removeEventListener("visibilitychange", markRead);
+  }, [activeSection, hasUnreadInOpenChat, selectedConversation?.id, messages, readPass]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -1385,19 +1417,6 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     setLoadingRequests(false);
   };
 
-  const loadConversations = async () => {
-    setLoadingConversations(true);
-    try {
-      const result = await getConversations();
-      if (!result.error) {
-        setConversations(result.conversations);
-      }
-    } catch (e) {
-      console.error("Failed to load conversations:", e);
-    }
-    setLoadingConversations(false);
-  };
-
   const loadNotifications = async () => {
     setLoadingNotifications(true);
     try {
@@ -1572,14 +1591,9 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     // The message listener only restarts when the conversation ID changes.
     if (!conversation?.id || conversation.id === selectedConversation?.id) return;
 
+    // Read status is handled by the effect that watches the open chat
     setSelectedConversation(conversation);
     setLoadingMessages(true);
-    try {
-      // Mark messages as read (real-time listener will update UI automatically)
-      await markMessagesAsRead(conversation.id);
-    } catch (e) {
-      console.error("Failed to mark messages as read:", e);
-    }
     // Scroll to bottom after a short delay to ensure messages are rendered
     setTimeout(() => {
       if (messagesEndRef.current) {

@@ -2897,81 +2897,6 @@ export const sendMessage = async (conversationId, text) => {
 };
 
 /**
- * Get all conversations for the current user
- * @returns {Promise<{conversations: array, error: string|null}>}
- */
-export const getConversations = async () => {
-  try {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      return { conversations: [], error: "No user logged in" };
-    }
-
-    const conversationsRef = collection(db, "conversations");
-    const q = query(
-      conversationsRef,
-      where("participants", "array-contains", currentUser.uid)
-    );
-    const [snapshot, friendUids] = await Promise.all([getDocs(q), getMyFriendUids()]);
-
-    const conversations = [];
-    for (const docSnap of snapshot.docs) {
-      const data = docSnap.data();
-      const otherUserId = data.participants.find(id => id !== currentUser.uid);
-
-      // Get other user's data
-      const userDoc = await getDoc(doc(db, "users", otherUserId));
-      const userData = userDoc.exists()
-        ? userDoc.data()
-        : { displayName: "Unknown User" };
-
-      // Get other user's status
-      const statusDoc = await getDoc(doc(db, "userStatus", otherUserId));
-      const status = statusDoc.exists() ? statusDoc.data().status : "offline";
-
-      // Count unread messages (fetch all and filter client-side to avoid index)
-      const messagesRef = collection(db, "conversations", docSnap.id, "messages");
-      const messagesSnapshot = await getDocs(messagesRef);
-      const unreadCount = messagesSnapshot.docs.filter(msgDoc => {
-        const msgData = msgDoc.data();
-        return msgData.senderId !== currentUser.uid && msgData.read === false;
-      }).length;
-
-      conversations.push({
-        id: docSnap.id,
-        otherUser: {
-          uid: otherUserId,
-          displayName: userData.displayName,
-          photoURL: userData.photoURL,
-          status,
-          owner: userData.owner || false,
-          contributor: userData.contributor || false,
-          bugCatcher: userData.bugCatcher || false,
-          private: userData.private || false,
-          isFriend: friendUids.has(otherUserId),
-          reviewCount: userData.reviewCount,
-          discordLinked: Boolean(userData.socials?.linkedDiscord),
-          level: userData.private ? 0 : userData.profileStats?.level || 1,
-          verified: userData.verified || false,
-        },
-        lastMessage: data.lastMessage,
-        lastMessageSenderId: data.lastMessageSenderId,
-        lastMessageAt: data.lastMessageAt?.toDate(),
-        unreadCount,
-      });
-    }
-
-    // Sort by last message time
-    conversations.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
-
-    return { conversations, error: null };
-  } catch (error) {
-    console.error("Get conversations error:", error);
-    return { conversations: [], error: error.message };
-  }
-};
-
-/**
  * Get recent messages for a conversation, regardless of age
  * @param {string} conversationId - Conversation ID
  * @param {number} limitCount - Max messages to fetch
@@ -3005,41 +2930,44 @@ export const getMessages = async (conversationId, limitCount = 100) => {
 };
 
 /**
- * Mark messages as read in a conversation
+ * Mark the other participant's unread messages as read and reset the current
+ * user's unread counter. Only unread messages are fetched, so this costs one
+ * read per unread message instead of the whole conversation.
  * @param {string} conversationId - Conversation ID
- * @returns {Promise<{success: boolean, error: string|null}>}
+ * @param {string} [otherUserId] - The other participant's ID
+ * @returns {Promise<{success: boolean, updated?: number, error: string|null}>}
  */
-export const markMessagesAsRead = async conversationId => {
+export const markMessagesAsRead = async (conversationId, otherUserId) => {
   try {
     const currentUser = auth.currentUser;
     if (!currentUser) {
       return { success: false, error: "No user logged in" };
     }
 
+    const senderId =
+      otherUserId || conversationId.split("_").find(id => id !== currentUser.uid);
     const messagesRef = collection(db, "conversations", conversationId, "messages");
-    const snapshot = await getDocs(messagesRef);
+    // Equality-only filters are served by single-field indexes
+    const snapshot = await getDocs(
+      query(messagesRef, where("senderId", "==", senderId), where("read", "==", false))
+    );
 
-    // Filter client-side to avoid composite index
-    const unreadMessages = snapshot.docs.filter(docSnap => {
-      const data = docSnap.data();
-      return data.senderId !== currentUser.uid && data.read === false;
-    });
-
-    if (unreadMessages.length > 0) {
+    // A batch holds at most 500 writes; the last one also resets the counter
+    const docs = snapshot.docs;
+    for (let start = 0; start < docs.length || start === 0; start += 450) {
       const batch = writeBatch(db);
-      unreadMessages.forEach(docSnap => {
+      docs.slice(start, start + 450).forEach(docSnap => {
         batch.update(docSnap.ref, { read: true });
       });
+      if (start + 450 >= docs.length) {
+        batch.update(doc(db, "conversations", conversationId), {
+          [`unreadCount.${currentUser.uid}`]: 0,
+        });
+      }
       await batch.commit();
     }
 
-    // Reset unread counter for current user in conversation document
-    const conversationRef = doc(db, "conversations", conversationId);
-    await updateDoc(conversationRef, {
-      [`unreadCount.${currentUser.uid}`]: 0,
-    });
-
-    return { success: true, error: null };
+    return { success: true, updated: docs.length, error: null };
   } catch (error) {
     console.error("Mark messages as read error:", error);
     return { success: false, error: error.message };
@@ -3047,7 +2975,8 @@ export const markMessagesAsRead = async conversationId => {
 };
 
 /**
- * Get total unread message count across all conversations
+ * Get total unread message count across all conversations, using the unread
+ * counters kept on each conversation document
  * @returns {Promise<{count: number, newMessages: array, error: string|null}>}
  */
 export const getUnreadMessageCount = async () => {
@@ -3068,47 +2997,39 @@ export const getUnreadMessageCount = async () => {
     );
     const snapshot = await getDocs(q);
 
-    let totalUnread = 0;
-    const newMessages = [];
-
-    for (const docSnap of snapshot.docs) {
-      const data = docSnap.data();
-      const otherUserId = data.participants.find(id => id !== currentUser.uid);
-
-      // Count unread messages (fetch all and filter client-side to avoid index)
-      const messagesRef = collection(db, "conversations", docSnap.id, "messages");
-      const messagesSnapshot = await getDocs(messagesRef);
-      const unreadMessages = messagesSnapshot.docs.filter(msgDoc => {
-        const msgData = msgDoc.data();
-        return msgData.senderId !== currentUser.uid && msgData.read === false;
-      });
-
-      if (unreadMessages.length > 0) {
-        totalUnread += unreadMessages.length;
-
-        // Get sender info for notifications
-        const userDoc = await getDoc(doc(db, "users", otherUserId));
-        const userData = userDoc.exists() ? userDoc.data() : { displayName: "Someone" };
-
-        // Get the latest unread message
-        const latestMessage = unreadMessages
-          .map(d => ({ ...d.data(), id: d.id }))
-          .sort(
-            (a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)
-          )[0];
-
-        newMessages.push({
+    const unread = snapshot.docs
+      .map(docSnap => {
+        const data = docSnap.data();
+        return {
           conversationId: docSnap.id,
+          data,
+          otherUserId: data.participants.find(id => id !== currentUser.uid),
+          unreadCount: data.unreadCount?.[currentUser.uid] || 0,
+        };
+      })
+      .filter(conversation => conversation.unreadCount > 0);
+
+    const userDataMap = await batchGetUserData(unread.map(c => c.otherUserId));
+    const newMessages = unread.map(
+      ({ conversationId, data, otherUserId, unreadCount }) => {
+        const userData = userDataMap.get(otherUserId) || { displayName: "Someone" };
+        return {
+          conversationId,
           senderId: otherUserId,
           senderName: userData.displayName,
           senderPhoto: userData.photoURL,
-          messageText: latestMessage?.text,
-          unreadCount: unreadMessages.length,
-        });
+          messageText:
+            data.lastMessageSenderId === otherUserId ? data.lastMessage : undefined,
+          unreadCount,
+        };
       }
-    }
+    );
 
-    return { count: totalUnread, newMessages, error: null };
+    return {
+      count: unread.reduce((sum, c) => sum + c.unreadCount, 0),
+      newMessages,
+      error: null,
+    };
   } catch (error) {
     console.error("Get unread count error:", error);
     return { count: 0, newMessages: [], error: error.message };
@@ -3664,6 +3585,15 @@ export const subscribeToConversations = onUpdate => {
     limit(20)
   );
 
+  // Read receipts update conversation docs often, so reuse the friends list briefly
+  let friendUidsCache = null;
+  const getFriendUids = async () => {
+    if (!friendUidsCache || Date.now() - friendUidsCache.at > STATUS_CACHE_DURATION) {
+      friendUidsCache = { uids: await getMyFriendUids(), at: Date.now() };
+    }
+    return friendUidsCache.uids;
+  };
+
   return onSnapshot(
     q,
     async snapshot => {
@@ -3680,7 +3610,7 @@ export const subscribeToConversations = onUpdate => {
       const [userDataMap, statusMap, friendUids] = await Promise.all([
         batchGetUserData(otherUserIds),
         batchGetUserStatus(otherUserIds),
-        getMyFriendUids(),
+        getFriendUids(),
       ]);
 
       // Build conversations array
