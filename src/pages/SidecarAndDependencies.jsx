@@ -454,7 +454,7 @@ const SidecarAndDependencies = () => {
                   return (
                     <div
                       key={sidecar.id}
-                      className="group relative flex min-h-[170px] flex-col rounded-xl border border-border bg-card/90 p-5 shadow-sm transition-all duration-300 hover:shadow-lg"
+                      className="group relative flex min-h-[170px] flex-col rounded-xl bg-card/90 shadow p-5 transition-all duration-300 hover:shadow-lg"
                     >
                       {/* Name at the top, large and bold */}
                       <div className="mb-2 flex items-center gap-2">
@@ -515,7 +515,7 @@ const SidecarAndDependencies = () => {
               {dependencies.map(dep => (
                 <div
                   key={dep.name}
-                  className="flex items-center gap-4 rounded-lg border border-border bg-card/80 p-4 shadow-sm"
+                  className="flex items-center gap-4 rounded-lg bg-card/80 shadow p-4"
                 >
                   {dependencyStatus?.[dep.name]?.icon}
                   <div className="flex-1">

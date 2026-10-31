@@ -78,7 +78,7 @@ function HealthRow({ item, onAction, t }) {
   const Icon = meta.icon;
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-card/60 p-4 sm:flex-row sm:items-start">
+    <div className="flex flex-col gap-3 rounded-xl bg-card/60 p-4 shadow sm:flex-row sm:items-start">
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${meta.className}`} />
         <div className="min-w-0 flex-1">

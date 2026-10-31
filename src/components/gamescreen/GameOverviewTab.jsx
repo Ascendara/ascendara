@@ -64,7 +64,7 @@ export default function GameOverviewTab({
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div className="min-w-0 space-y-4">
         {hasDescription ? (
-          <section className="rounded-xl border border-border/40 bg-card p-6">
+          <section className="rounded-xl bg-card p-6 shadow">
             <h2 className="mb-3 text-xl font-semibold text-foreground">
               {t("gameScreen.aboutGame")}
             </h2>
@@ -78,7 +78,7 @@ export default function GameOverviewTab({
             )}
           </section>
         ) : (
-          <section className="flex items-center justify-center rounded-xl border border-dashed border-border/60 bg-card px-6 py-12 text-center text-sm text-muted-foreground">
+          <section className="flex items-center justify-center rounded-xl bg-card px-6 py-12 text-center text-sm text-muted-foreground shadow">
             {steamLoading ? (
               <Loader className="h-5 w-5 animate-spin text-primary" />
             ) : (
@@ -93,7 +93,7 @@ export default function GameOverviewTab({
         )}
 
         {screenshots.length > 0 && (
-          <section className="rounded-xl border border-border/40 bg-card p-6">
+          <section className="rounded-xl bg-card p-6 shadow">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-foreground">
                 {t("gameScreen.screenshots")}
@@ -131,7 +131,7 @@ export default function GameOverviewTab({
       </div>
 
       <aside className="space-y-4">
-        <section className="space-y-5 rounded-xl border border-border/40 bg-card p-5">
+        <section className="space-y-5 rounded-xl bg-card p-5 shadow">
           {/* Matched store entry that the description, artwork and achievements come from */}
           <div className="space-y-3">
             <div className="flex items-center gap-3">
@@ -196,7 +196,7 @@ export default function GameOverviewTab({
         )}
 
         {isOnLinux && (
-          <section className="space-y-2 rounded-xl border border-border/40 bg-card p-5">
+          <section className="space-y-2 rounded-xl bg-card p-5 shadow">
             <div className="flex items-center gap-2">
               <Terminal className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">{t("gameScreen.umuId")}</span>
@@ -252,7 +252,7 @@ export default function GameOverviewTab({
         )}
 
         {!isAuthenticated && (
-          <section className="space-y-3 rounded-xl border border-border/40 bg-card p-5">
+          <section className="space-y-3 rounded-xl bg-card p-5 shadow">
             <div className="flex items-start gap-3">
               <CloudOff className="h-5 w-5 shrink-0 text-muted-foreground" />
               <div className="min-w-0">

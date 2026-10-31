@@ -34,7 +34,7 @@ export default function AchievementsTab({
 
   if (loading) {
     return (
-      <section className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border/40 bg-card py-16">
+      <section className="flex flex-col items-center justify-center gap-4 rounded-xl bg-card py-16 shadow">
         <Award className="h-8 w-8 animate-pulse text-primary/70" />
         <p className="animate-pulse text-sm font-medium text-primary/80">
           {t("gameScreen.loadingAchievements")}
@@ -45,7 +45,7 @@ export default function AchievementsTab({
 
   if (all.length === 0) {
     return (
-      <section className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border/40 bg-card py-16 text-center">
+      <section className="flex flex-col items-center justify-center gap-4 rounded-xl bg-card py-16 text-center shadow">
         <div className="rounded-full bg-muted p-4">
           <Award className="h-10 w-10 text-muted-foreground" />
         </div>
@@ -63,7 +63,7 @@ export default function AchievementsTab({
   }
 
   return (
-    <section className="rounded-xl border border-border/40 bg-card p-6">
+    <section className="rounded-xl bg-card p-6 shadow">
       <div className="mb-5 space-y-3">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-xl font-semibold text-foreground">

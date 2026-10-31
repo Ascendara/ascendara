@@ -23,7 +23,7 @@ export default function AscendPerks({
   ].filter(Boolean);
 
   return (
-    <section className="rounded-xl border border-primary/25 bg-gradient-to-br from-primary/[0.08] via-card to-primary/[0.04] p-5">
+    <section className="rounded-xl bg-gradient-to-br from-primary/[0.08] via-card to-primary/[0.04] p-5">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-foreground">{t("common.ascend")}</h2>

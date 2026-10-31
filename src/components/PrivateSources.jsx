@@ -146,7 +146,7 @@ export default function PrivateSources() {
       }
     });
   return (
-    <section className="overflow-hidden rounded-xl border border-border/60 bg-card">
+    <section className="overflow-hidden rounded-xl bg-card shadow">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/50 p-5">
         <div className="flex items-center gap-3">
           <Server className="h-5 w-5 shrink-0 text-primary" />

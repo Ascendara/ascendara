@@ -1587,7 +1587,7 @@ const GameIndexManager = ({
             </div>
 
             {/* What search and downloads are using right now */}
-            <section className="overflow-hidden rounded-xl border border-border/60 bg-card">
+            <section className="overflow-hidden rounded-xl bg-card shadow">
               <div className="flex flex-wrap items-center gap-4 px-5 py-4">
                 <div
                   className={cn(
@@ -1711,7 +1711,7 @@ const GameIndexManager = ({
               </TabsList>
 
               <TabsContent value="community" className="mt-4">
-                <section className="overflow-hidden rounded-xl border border-border/60 bg-card">
+                <section className="overflow-hidden rounded-xl bg-card shadow">
                   <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/50 p-5">
                     <div className="flex items-center gap-3">
                       <Globe className="h-5 w-5 shrink-0 text-primary" />
@@ -1881,7 +1881,7 @@ const GameIndexManager = ({
               </TabsContent>
 
               <TabsContent value="list" className="mt-4">
-                <section className="overflow-hidden rounded-xl border border-border/60 bg-card">
+                <section className="overflow-hidden rounded-xl bg-card shadow">
                   <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/50 p-5">
                     <div className="flex items-center gap-3">
                       <ClipboardList className="h-5 w-5 shrink-0 text-primary" />
@@ -2083,7 +2083,7 @@ const GameIndexManager = ({
             {/* Overview and its settings sit side by side on wide windows */}
             <div className="grid gap-4 xl:grid-cols-2">
               <div className="flex flex-col gap-4">
-                <Card className="relative flex flex-1 flex-col overflow-hidden border border-border/60 p-6 shadow-none">
+                <Card className="relative flex flex-1 flex-col overflow-hidden p-6">
                   <AnimatePresence>
                     {justRefreshed && (
                       <motion.div
@@ -2209,12 +2209,7 @@ const GameIndexManager = ({
                 </Card>
 
                 {/* Everything that isn't the Ascendara index lives on its own page */}
-                <Card
-                  className={cn(
-                    "flex items-start gap-4 border px-6 py-4 shadow-none",
-                    customSourcesMode ? "border-primary/30" : "border-border/60"
-                  )}
-                >
+                <Card className="flex items-start gap-4 px-6 py-4">
                   <div
                     className={cn(
                       "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
@@ -2262,7 +2257,7 @@ const GameIndexManager = ({
                 </Card>
               </div>
 
-              <Card className="divide-y divide-border/60 border border-border/60 shadow-none">
+              <Card className="divide-y divide-border/60">
                 <h3 className="mb-0 px-6 py-4 text-base font-semibold text-foreground">
                   {t("localRefresh.settings") || "Settings"}
                 </h3>

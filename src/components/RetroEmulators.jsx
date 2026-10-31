@@ -123,7 +123,7 @@ export default function RetroEmulators({ access, platforms, onChoose, onClose, b
               {matches.map(entry => (
                 <article
                   key={entry.id}
-                  className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4"
+                  className="flex flex-col gap-3 rounded-xl bg-card p-4 shadow"
                 >
                   <div>
                     <div className="flex flex-wrap items-center justify-between gap-2">

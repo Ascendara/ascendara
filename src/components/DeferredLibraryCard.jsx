@@ -38,7 +38,7 @@ export default function DeferredLibraryCard({ children, viewMode, name }) {
           tabIndex={0}
           aria-label={name}
           onFocus={() => setReady(true)}
-          className="overflow-hidden rounded-xl border border-border bg-card"
+          className="overflow-hidden rounded-xl bg-card shadow"
         >
           {viewMode === "list" ? <div className="h-[88px]" /> : (
             <><div className="aspect-[2/3] bg-muted" /><div className="h-16" /></>

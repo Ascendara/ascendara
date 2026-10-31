@@ -330,7 +330,7 @@ export default function StoreGameScreen({ game }) {
         )}
 
         {details && !details.installationSupported && (
-          <p className="rounded-xl border border-border/40 bg-card px-5 py-3 text-xs text-muted-foreground">
+          <p className="rounded-xl bg-card px-5 py-3 text-xs text-muted-foreground shadow">
             {t(
               "storeAccounts.unsupportedDetection",
               "Automatic installation detection for this store is currently available on Windows. You can still open the store to install or play."

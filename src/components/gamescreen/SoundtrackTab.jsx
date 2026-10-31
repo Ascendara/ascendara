@@ -46,7 +46,7 @@ export default function SoundtrackTab({
 
   if (loading) {
     return (
-      <section className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border/40 bg-card py-16">
+      <section className="flex flex-col items-center justify-center gap-4 rounded-xl bg-card py-16 shadow">
         <Music2 className="h-8 w-8 animate-pulse text-primary/60" />
         <p className="animate-pulse text-sm font-medium text-primary/70">
           {t("gameScreen.loadingSoundtrack")}
@@ -57,7 +57,7 @@ export default function SoundtrackTab({
 
   if (error) {
     return (
-      <section className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border/40 bg-card px-6 py-16 text-center">
+      <section className="flex flex-col items-center justify-center gap-4 rounded-xl bg-card px-6 py-16 text-center shadow">
         <HeadphoneOff className="h-10 w-10 text-muted-foreground" />
         <p className="max-w-md text-sm text-muted-foreground">
           {t(`gameScreen.${error}`)}
@@ -71,7 +71,7 @@ export default function SoundtrackTab({
 
   if (soundtrack.length === 0) {
     return (
-      <section className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border/40 bg-card py-16 text-center">
+      <section className="flex flex-col items-center justify-center gap-4 rounded-xl bg-card py-16 text-center shadow">
         <div className="rounded-full bg-muted p-4">
           <HeadphoneOff className="h-10 w-10 text-muted-foreground" />
         </div>
@@ -86,7 +86,7 @@ export default function SoundtrackTab({
   }
 
   return (
-    <section className="overflow-hidden rounded-xl border border-border/40 bg-card">
+    <section className="overflow-hidden rounded-xl bg-card shadow">
       <div className="flex items-center justify-between gap-4 p-6">
         <div className="min-w-0">
           <h2 className="truncate text-xl font-semibold text-foreground">

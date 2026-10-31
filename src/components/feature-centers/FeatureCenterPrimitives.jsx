@@ -99,9 +99,7 @@ export function FeatureState({
 
 export function FeatureSection({ title, description, actions, children, className }) {
   return (
-    <section
-      className={cn("rounded-xl border border-border bg-card/70 p-4 sm:p-5", className)}
-    >
+    <section className={cn("rounded-xl bg-card/70 p-4 shadow sm:p-5", className)}>
       {(title || description || actions) && (
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -120,7 +118,7 @@ export function FeatureSection({ title, description, actions, children, classNam
 
 export function FeatureStat({ label, value, hint }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rounded-xl bg-card p-4 shadow">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>

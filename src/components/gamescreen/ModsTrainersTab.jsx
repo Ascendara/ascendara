@@ -24,7 +24,7 @@ import {
 function AscendPromo({ icon: Icon, title, subtitle, description, isAuthenticated, onGetAscend }) {
   const { t } = useLanguage();
   return (
-    <section className="flex flex-wrap items-center gap-4 rounded-xl border border-border/40 bg-card p-6">
+    <section className="flex flex-wrap items-center gap-4 rounded-xl bg-card p-6 shadow">
       <div className="rounded-full bg-primary/10 p-3">
         <Icon className="h-6 w-6 text-primary" />
       </div>
@@ -94,7 +94,7 @@ function TrainerSection({
 }) {
   const { t } = useLanguage();
   return (
-    <section className="flex flex-wrap items-center gap-5 rounded-xl border border-border/40 bg-card p-6">
+    <section className="flex flex-wrap items-center gap-5 rounded-xl bg-card p-6 shadow">
       {trainer?.imageUrl ? (
         <img
           src={trainer.imageUrl}
@@ -194,7 +194,7 @@ function ModsSection({
 }) {
   const { t } = useLanguage();
   return (
-    <section className="rounded-xl border border-border/40 bg-card p-6">
+    <section className="rounded-xl bg-card p-6 shadow">
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-foreground">

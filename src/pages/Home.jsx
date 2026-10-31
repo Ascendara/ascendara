@@ -148,7 +148,7 @@ const CompactGameCard = memo(({ game, onClick, onContextMenu }) => {
         onContextMenu?.(e, game);
       }}
     >
-      <div className="relative overflow-hidden rounded-xl border border-border/30 bg-card transition-all duration-300 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5">
+      <div className="relative overflow-hidden rounded-xl bg-card shadow transition-all duration-300 hover:shadow-xl hover:shadow-primary/5">
         <AspectRatio ratio={16 / 9}>
           {imageUrl ? (
             <img

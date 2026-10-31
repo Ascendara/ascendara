@@ -105,7 +105,7 @@ export default function PrivateGameDetails({ initialGame }) {
         <ArrowLeft className="h-4 w-4" />
         {t("common.back")}
       </Button>
-      <section className="overflow-hidden rounded-2xl border bg-card">
+      <section className="overflow-hidden rounded-2xl bg-card shadow">
         <div className="relative flex min-h-64 items-end bg-gradient-to-br from-primary/20 via-muted to-background p-8">
           {image && (
             <img

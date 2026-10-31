@@ -1297,7 +1297,7 @@ export default function Retro() {
                   {games.slice(0, limit).map(game => (
                     <article
                       key={game.id}
-                      className="group overflow-hidden rounded-xl border bg-card"
+                      className="group overflow-hidden rounded-xl bg-card shadow"
                     >
                       <button
                         className="block w-full text-left"
@@ -1380,7 +1380,7 @@ export default function Retro() {
                   ? t("retro.catalogue.downloadPrompt")
                   : t("retro.catalogue.searchPrompt")}
               </p>
-              <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-3">
+              <div className="flex flex-wrap gap-2 rounded-xl bg-card p-3 shadow">
                 <Button
                   variant="outline"
                   size="sm"
@@ -1413,7 +1413,7 @@ export default function Retro() {
                 {catalogueResults.map(game => (
                   <article
                     key={game.id}
-                    className="overflow-hidden rounded-xl border bg-card"
+                    className="overflow-hidden rounded-xl bg-card shadow"
                   >
                     <Cover game={game} />
                     <div className="space-y-1 p-3">

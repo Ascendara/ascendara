@@ -1503,7 +1503,7 @@ function Settings() {
             <SettingsCategory {...categoryProps("general")} layout="grid">
               <Card
                 id="appearance-settings"
-                className="border border-border/60 p-6 shadow-none"
+                className="p-6"
               >
                 {/* Appearance Section */}
                 <div className="space-y-4">
@@ -1657,7 +1657,7 @@ function Settings() {
 
               <Card
                 id="application-settings"
-                className="border border-border/60 p-6 shadow-none"
+                className="p-6"
               >
                 {/* Application Section */}
                 <div className="space-y-4">
@@ -1787,7 +1787,7 @@ function Settings() {
               {/* Spans both columns so it sits full width under Appearance and Application */}
               <Card
                 id="language"
-                className="border border-border/60 p-6 shadow-none xl:col-span-2"
+                className="p-6 xl:col-span-2"
               >
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1850,7 +1850,7 @@ function Settings() {
             <SettingsCategory {...categoryProps("downloads")} columns>
               <Card
                 id="download-manager"
-                className="space-y-5 border border-border/60 p-6 shadow-none"
+                className="space-y-5 p-6"
               >
                 <h3 className="text-base font-semibold text-foreground">
                   {t("settings.downloaderSettings")}
@@ -2197,7 +2197,7 @@ function Settings() {
 
               <Card
                 id="download-locations"
-                className="space-y-5 border border-border/60 p-6 shadow-none"
+                className="space-y-5 p-6"
               >
                 <h3 className="text-base font-semibold text-foreground">
                   {t("settings.downloadLocationsTitle")}
@@ -2314,7 +2314,7 @@ function Settings() {
 
               <Card
                 id="torbox-settings"
-                className="space-y-5 border border-border/60 p-6 shadow-none"
+                className="space-y-5 p-6"
               >
                 <h3 className="text-base font-semibold text-foreground">
                   {t("settings.torboxTitle")}
@@ -2454,7 +2454,7 @@ function Settings() {
               {/* Torrenting Card */}
               <Card
                 id="torrent-downloads"
-                className="border border-border/60 p-6 shadow-none"
+                className="p-6"
               >
                 <div className="mb-6 flex items-center justify-between">
                   <div>
@@ -2772,7 +2772,7 @@ function Settings() {
             <SettingsCategory {...categoryProps("gaming")} columns>
               <Card
                 id="gaming-settings"
-                className="border border-border/60 p-6 shadow-none"
+                className="p-6"
               >
                 <div className="space-y-4">
                   <div id="discord-rpc" className="flex items-center justify-between">
@@ -2898,7 +2898,7 @@ function Settings() {
 
               <Card
                 id="big-picture-settings"
-                className="space-y-5 border border-border/60 p-6 shadow-none"
+                className="space-y-5 p-6"
               >
                 <h3 className="text-base font-semibold text-foreground">
                   {t("settings.bigPictureSettings")}
@@ -2984,7 +2984,7 @@ function Settings() {
               </Card>
 
               {/* Achievement Watcher Directories Card */}
-              <Card className="border border-border/60 p-6 shadow-none">
+              <Card className="p-6">
                 <h3 className="mb-2 text-base font-semibold text-foreground">
                   {t("settings.achievementWatcher.title") ||
                     "Achievement Watcher Directories"}
@@ -3102,7 +3102,7 @@ function Settings() {
             </SettingsCategory>
 
             <SettingsCategory {...categoryProps("backups")}>
-              <Card id="ludusavi" className="border border-border/60 shadow-none">
+              <Card id="ludusavi" className="">
                 <div className="p-6">
                   <div>
                     <div>
@@ -3310,7 +3310,7 @@ function Settings() {
 
             {isOnMac && (
               <SettingsCategory {...categoryProps("compatibility")}>
-                <Card className="border border-border/60 p-6 shadow-none">
+                <Card className="p-6">
                   <HighballSettings />
                 </Card>
               </SettingsCategory>
@@ -3321,7 +3321,7 @@ function Settings() {
                 {/* ── Linux Compatibility Layer ── */}
                 {isOnLinux && (
                   <>
-                    <Card className="border border-border/60 p-6 shadow-none">
+                    <Card className="p-6">
                       <div className="space-y-6">
                         <h3 className="mb-2 text-base font-semibold text-foreground">
                           {t("welcome.compatibilityLayer")}
@@ -4211,7 +4211,7 @@ function Settings() {
 
             <SettingsCategory {...categoryProps("tools")} columns>
               {/* Timemachine Card */}
-              <Card id="timemachine" className="border border-border/60 p-6 shadow-none">
+              <Card id="timemachine" className="p-6">
                 <div className="mb-2 flex items-center gap-2">
                   <History className="mb-2 h-5 w-5 text-primary" />
                   <h2 className="text-base font-semibold text-foreground">
@@ -4254,7 +4254,7 @@ function Settings() {
               {/* Workshop Downloader Card */}
               <Card
                 id="workshop-downloader"
-                className="border border-border/60 p-6 shadow-none"
+                className="p-6"
               >
                 <div className="mb-2 flex items-center gap-2">
                   <Package className="mb-2 h-5 w-5 text-primary" />
@@ -4297,7 +4297,7 @@ function Settings() {
 
               {/* Components Card */}
               {isOnWindows && (
-                <Card id="components" className="border border-border/60 p-6 shadow-none">
+                <Card id="components" className="p-6">
                   <div className="mb-2 flex items-center gap-2">
                     <CpuIcon className="mb-2 h-5 w-5 text-primary" />
                     <h2 className="text-base font-semibold text-foreground">
@@ -4319,7 +4319,7 @@ function Settings() {
 
             <SettingsCategory {...categoryProps("advanced")} columns>
               {/* App Branch Card */}
-              <Card className="overflow-hidden border border-border/60 p-0 shadow-none">
+              <Card className="overflow-hidden p-0">
                 <div className="border-b border-border px-6 py-4">
                   <div className="flex items-center gap-2">
                     <FlaskConical className="mb-2 h-5 w-5 text-primary" />
@@ -4475,7 +4475,7 @@ function Settings() {
 
               {/* Developer Settings Card - Only shown in development mode */}
               {isDev && (
-                <Card className="border border-border/60 p-6 shadow-none">
+                <Card className="p-6">
                   <div className="space-y-6">
                     <div>
                       <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
@@ -4581,7 +4581,7 @@ function Settings() {
                 </Card>
               )}
 
-              <Card className="border border-border/60 p-6 shadow-none">
+              <Card className="p-6">
                 <div className="mb-2 flex items-center gap-2">
                   <MessageCircleQuestion className="mb-2 h-5 w-5 text-primary" />
                   <h2 className="text-base font-semibold text-foreground">

@@ -35,7 +35,7 @@ export default function SystemRequirements({ minReqs }) {
   };
 
   return (
-    <section className="rounded-xl border border-border/40 bg-card p-5">
+    <section className="rounded-xl bg-card p-5 shadow">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Cpu className="h-4 w-4 text-primary" />

@@ -2204,7 +2204,7 @@ function PublicDownloadPage() {
           <aside className="min-w-0 space-y-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
             {macCompat && (
               <section
-                className={`space-y-2 rounded-xl border bg-card p-5 ${macCompat.downloadWarning ? "border-red-500/40" : "border-border/40"}`}
+                className={`space-y-2 rounded-xl p-5 shadow ${macCompat.downloadWarning ? "bg-red-500/5" : "bg-card"}`}
               >
                 <div className="flex items-center gap-2">
                   <Wine className="h-4 w-4 text-primary" />

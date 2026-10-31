@@ -85,7 +85,7 @@ const FILES_UNAVAILABLE_DOCS_URL =
 function FilesUnavailable() {
   const { t } = useLanguage();
   return (
-    <section className="rounded-xl border border-yellow-500/30 bg-card p-5 shadow-sm">
+    <section className="rounded-xl bg-card p-5 shadow">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-500/10">
           <FileX className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
@@ -251,7 +251,7 @@ export default function DownloadPanel({
 
   return (
     <div className="space-y-3">
-      <section className="rounded-xl border border-border/40 bg-card p-5 shadow-sm">
+      <section className="rounded-xl bg-card p-5 shadow">
         {/* Header */}
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">

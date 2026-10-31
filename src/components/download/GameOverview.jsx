@@ -22,7 +22,7 @@ export default function GameOverview({ gameData, steamData, steamLoading, steamE
 
   if (steamLoading) {
     return (
-      <section className="flex items-center justify-center rounded-xl border border-border/40 bg-card px-6 py-16 text-sm text-muted-foreground">
+      <section className="flex items-center justify-center rounded-xl bg-card px-6 py-16 text-sm text-muted-foreground shadow">
         <Loader className="mr-2 h-4 w-4 animate-spin text-primary" />
         {t("download.steamLoading")}
       </section>
@@ -31,7 +31,7 @@ export default function GameOverview({ gameData, steamData, steamLoading, steamE
 
   if (!steamData) {
     return (
-      <section className="rounded-xl border border-border/40 bg-card p-6 text-center">
+      <section className="rounded-xl bg-card p-6 text-center shadow">
         {steamError ? (
           <>
             <p className="font-medium text-foreground">
@@ -55,7 +55,7 @@ export default function GameOverview({ gameData, steamData, steamLoading, steamE
   return (
     <>
       {(description || hasDetails) && (
-        <section className="rounded-xl border border-border/40 bg-card p-6">
+        <section className="rounded-xl bg-card p-6 shadow">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
             {description && (
               <div className="min-w-0">
@@ -108,7 +108,7 @@ export default function GameOverview({ gameData, steamData, steamLoading, steamE
       )}
 
       {screenshots && (
-        <section className="rounded-xl border border-border/40 bg-card p-6">
+        <section className="rounded-xl bg-card p-6 shadow">
           <h2 className="mb-4 text-xl font-semibold text-foreground">
             {t("download.screenshots")}
           </h2>

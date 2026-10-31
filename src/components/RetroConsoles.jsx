@@ -48,7 +48,7 @@ export default function RetroConsoles({
       (!configuredOnly || profiles[platform.id]?.executable)
   );
   return (
-    <aside className="min-w-0 self-start rounded-2xl border border-border bg-card lg:sticky lg:top-6">
+    <aside className="min-w-0 self-start rounded-2xl bg-card shadow lg:sticky lg:top-6">
       <div className="space-y-3 p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">{t("retro.consoles.label")}</h2>

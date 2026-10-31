@@ -50,7 +50,7 @@ export default function HighballGameOptions({ game, steamAppId }) {
   };
 
   return (
-    <section className="space-y-3 rounded-xl border border-border/40 bg-card p-5">
+    <section className="space-y-3 rounded-xl bg-card p-5 shadow">
       <div className="flex items-center gap-2">
         <Wine className="h-4 w-4 text-primary" />
         <span className="text-sm font-medium">{t("settings.macCompat.gameTitle")}</span>

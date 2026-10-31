@@ -202,7 +202,7 @@ const SmartCollectionsCenter = () => {
                         key={`${game.isCustom ? "custom" : "installed"}:${gameName}`}
                         type="button"
                         onClick={() => openGame(game)}
-                        className="rounded-xl border border-border bg-card/60 p-4 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="rounded-xl bg-card/60 p-4 text-left shadow transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <div className="flex items-start gap-3">
                           <Gamepad2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />

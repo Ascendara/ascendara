@@ -1036,10 +1036,8 @@ const Downloads = () => {
             <section
               data-tour="downloads-speed"
               className={cn(
-                "relative overflow-hidden rounded-2xl border bg-card transition-colors duration-500",
-                highSpeed
-                  ? "border-primary/40 shadow-lg shadow-primary/10"
-                  : "border-border/60"
+                "relative overflow-hidden rounded-2xl bg-card shadow transition-colors duration-500",
+                highSpeed && "shadow-lg shadow-primary/10"
               )}
             >
               <div className="relative flex flex-wrap items-end justify-between gap-4 px-6 pt-5">
@@ -1181,7 +1179,7 @@ const Downloads = () => {
                   {t("downloads.queuedDownloads", "Queued Downloads")} ·{" "}
                   {queuedDownloads.length}
                 </h2>
-                <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/60 bg-card">
+                <div className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card shadow">
                   {queuedDownloads.map((item, index) => {
                     const startsNext = index === 0 && queueStartsNext;
                     return (
@@ -1784,15 +1782,8 @@ const DownloadCard = ({
     <div
       data-tour="downloads-card"
       className={cn(
-        "group relative overflow-hidden rounded-xl border bg-card transition-all duration-500",
-        isFading && "scale-95 opacity-0",
-        isCompleted
-          ? "border-green-500/30"
-          : hasError
-            ? "border-red-500/30"
-            : needsAction
-              ? "border-amber-500/30"
-              : "border-border/60 hover:border-primary/30"
+        "group relative overflow-hidden rounded-xl bg-card shadow transition-all duration-500",
+        isFading && "scale-95 opacity-0"
       )}
     >
       {/* Game artwork, faded in from the right so text stays readable */}

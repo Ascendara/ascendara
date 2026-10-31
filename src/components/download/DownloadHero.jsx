@@ -99,7 +99,7 @@ export default function DownloadHero({
 
   return (
     <TooltipProvider>
-      <section className="relative overflow-hidden rounded-xl border border-border/40 bg-card">
+      <section className="relative overflow-hidden rounded-xl bg-card shadow">
         {/* Banner */}
         <div className="relative h-52 w-full overflow-hidden">
           {bannerImage && <BannerImage key={bannerImage} src={bannerImage} />}

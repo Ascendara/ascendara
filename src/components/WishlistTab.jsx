@@ -223,7 +223,7 @@ export default function WishlistTab({ hasAscend, steamAccount, onConnectSteam, o
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border/60 bg-card p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl bg-card shadow p-3">
         <div className="flex rounded-lg bg-muted/60 p-0.5 text-xs font-medium">
           {["all", "available"].map(id => (
             <button

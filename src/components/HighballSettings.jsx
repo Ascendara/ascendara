@@ -219,7 +219,7 @@ export function HighballWelcomeSetup({ fallback }) {
   if (!status.supported) return fallback;
 
   return (
-    <div className="space-y-4 rounded-xl border bg-card p-6">
+    <div className="space-y-4 rounded-xl bg-card p-6 shadow">
       <h3 className="text-xl font-semibold">{t("settings.macCompat.welcomeTitle")}</h3>
       <p>{t("settings.macCompat.welcomeDescription")}</p>
       <HighballSetupCard highball={highball} />

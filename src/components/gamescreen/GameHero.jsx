@@ -181,7 +181,7 @@ export default function GameHero({
 
   return (
     <TooltipProvider>
-      <section className="relative rounded-xl border border-border/40 bg-card">
+      <section className="relative rounded-xl bg-card shadow">
         {/* Banner */}
         <div className="relative h-56 w-full overflow-hidden rounded-t-xl">
           {bannerImage && (
