@@ -190,6 +190,19 @@ def _wanted(name):
     return not name.lower().endswith('.url') and '_commonredist' not in name.lower()
 
 
+def _skip_link(name):
+    # Repacks can carry stray symlinks (for example a source tree's test links).
+    # Links are never written, so they cannot redirect output; skip them rather
+    # than fail the whole game.
+    logging.warning('Skipping archive link: %r', name)
+
+
+def _rar_header_link(header):
+    return bool(getattr(header, 'RedirType', 0)
+                or header.HostOS == 3 and stat.S_ISLNK(header.FileAttr)
+                or header.HostOS != 3 and header.FileAttr & 0x400)
+
+
 class StopSignal:
     """One shared byte; no semaphore can be left locked by a crashed decoder."""
     def __init__(self, context):
@@ -464,8 +477,10 @@ def _unrar_manifest(tool, archive, destination, listing_path, cancelled, activit
             continue
         _check_archive_target(archive, _member_path(destination, name))
         # Links and file references must not bypass staging path validation.
+        # Left out of the manifest, they are also left out of the -n@ selection.
         if values.get('Type') not in ('File', 'Directory') or values.get('Attributes', '').startswith('l'):
-            raise ValueError(f'Refusing archive link or unsupported entry: {name}')
+            _skip_link(name)
+            continue
         if values['Type'] == 'File' and values.get('Size', '').isdigit():
             manifest[name.replace('\\', '/')] = {'size': int(values['Size'])}
     return manifest
@@ -635,14 +650,13 @@ def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
             expected_size = header.UnpSize + (header.UnpSizeHigh << 32)
             normalized = name.replace('\\', '/')
             skip = not test and (not _wanted(name) or members is not None and normalized not in members)
+            if not skip and not test and _rar_header_link(header):
+                _skip_link(name)
+                skip = True
             directory = bool(header.Flags & 0x20) or name.endswith(('/', '\\'))
             extracting_file = not skip and not directory
             if not skip and not test:
                 target = _member_path(root, name)
-                if (getattr(header, 'RedirType', 0)
-                        or header.HostOS == 3 and stat.S_ISLNK(header.FileAttr)
-                        or header.HostOS != 3 and header.FileAttr & 0x400):
-                    raise ValueError(f'Refusing archive link: {name!r}')
                 _check_archive_target(archive_path, target)
                 try:
                     os.makedirs(target if directory else os.path.dirname(target), exist_ok=True)
@@ -675,7 +689,8 @@ def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
             _native_error(code, 'Closing archive')
 
 
-def _zip_files(archive, destination, wanted=_wanted):
+def _zip_files(archive, destination, wanted=_wanted, links=None):
+    """Manifest of regular entries; link entries are left out and appended to `links`."""
     manifest = {}
     with zipfile.ZipFile(archive) as source:
         for item in source.infolist():
@@ -683,13 +698,17 @@ def _zip_files(archive, destination, wanted=_wanted):
                 continue
             _check_archive_target(archive, _member_path(destination, item.filename))
             if stat.S_ISLNK(item.external_attr >> 16):
-                raise ValueError(f'Refusing archive link: {item.filename}')
+                _skip_link(item.filename)
+                if links is not None:
+                    links.append(item.filename)
+                continue
             if not item.is_dir():
                 manifest[item.filename.replace('\\', '/')] = {'size': item.file_size}
     return manifest
 
 
-def _7z_files(tool, archive, destination, listing_path, cancelled, activity, wanted=_wanted):
+def _7z_files(tool, archive, destination, listing_path, cancelled, activity, wanted=_wanted, links=None):
+    """Manifest of regular entries; link entries are left out and appended to `links`."""
     # Stream the full listing to disk; large manifests must not be kept in a pipe tail.
     with open(listing_path, 'w', encoding='utf-8', newline='') as listing:
         def listing_activity(text):
@@ -706,7 +725,10 @@ def _7z_files(tool, archive, destination, listing_path, cancelled, activity, wan
             continue
         _check_archive_target(archive, _member_path(destination, name))
         if values.get('Symbolic Link') or values.get('Hard Link') or 'l' in values.get('Attributes', '').split(' ')[-1][:1]:
-            raise ValueError(f'Refusing archive link: {name}')
+            _skip_link(name)
+            if links is not None:
+                links.append(name)
+            continue
         if values.get('Folder') != '+' and not values.get('Attributes', '').startswith('D'):
             manifest[name.replace('\\', '/')] = {'size': int(values['Size'])}
     return manifest
@@ -793,14 +815,18 @@ def _extract_inplace(tool, kind, archive, destination, listing_path, state, repo
         if os.path.isdir(output):
             shutil.rmtree(output, onerror=lambda function, path, error: (
                 os.chmod(path, stat.S_IWRITE | stat.S_IREAD), function(path)))
+        links = []
         if kind == 'zip':
-            files = _zip_files(archive, output, wanted=lambda name: True)
+            files = _zip_files(archive, output, wanted=lambda name: True, links=links)
         else:
             seven = _find_7z()
             if not seven:
                 raise RuntimeError('7z extraction requires a bundled or installed 7-Zip command-line tool')
             files = _7z_files(seven, archive, output, listing_path, cancelled,
-                              lambda text: report(), wanted=lambda name: True)
+                              lambda text: report(), wanted=lambda name: True, links=links)
+        if links:
+            # HatchZip extracts every entry; callers route linked archives elsewhere.
+            raise ValueError(f'Refusing archive link for in-place extraction: {links[0]}')
         saved = {'files': {name: info['size'] for name, info in files.items()}, 'complete': False}
         _save_inplace_state(state_path, saved)
     elif saved is None:
@@ -895,6 +921,20 @@ def _volume_fingerprint(layout):
             for path, info in ((path, os.stat(path)) for path in layout.volumes)]
 
 
+def _has_links(kind, archive, destination, listing_path, cancelled, report):
+    """True when a ZIP or 7z archive holds link entries, which HatchZip cannot skip."""
+    links = []
+    if kind == 'zip':
+        _zip_files(archive, destination, wanted=lambda name: True, links=links)
+    elif kind == '7z':
+        tool = _find_7z()
+        if not tool:
+            return False  # In-place extraction lists with 7-Zip too and reports its absence.
+        _7z_files(tool, archive, destination, listing_path, cancelled, lambda text: report(),
+                  wanted=lambda name: True, links=links)
+    return bool(links)
+
+
 def _fits_beside(kind, archive, destination, listing_path, cancelled, report):
     """True when the whole output fits next to the archive, so none of it must be released.
 
@@ -929,8 +969,8 @@ def rar_inplace_layout(archive):
     except (RarLayoutError, OSError) as exc:
         logging.info('RAR extracts without releasing space (%s): %s', exc, archive)
         return None
-    # Links are refused by the extractors with a clear error; a hard-linked
-    # volume shares its bytes with another copy that freeing would damage.
+    # Linked archives take the ordinary path, which skips their links; a
+    # hard-linked volume shares its bytes with another copy that freeing would damage.
     if any(entry.link for entry in layout.entries) or any(
             os.stat(volume).st_nlink > 1 for volume in layout.volumes):
         return None
@@ -1405,8 +1445,12 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
                 allow_inplace, hatchzip = False, None
             # A hard-linked archive shares its bytes with another retained copy,
             # which truncation would destroy.
+            # HatchZip writes every entry, so archives with links take the
+            # ordinary extractors, which skip them.
             kind = ('inplace' if hatchzip and source_kind in ('zip', '7z')
-                    and os.stat(archive).st_nlink == 1 else source_kind)
+                    and os.stat(archive).st_nlink == 1 and not _has_links(
+                        source_kind, archive, destination, manifest_path + '.listing', cancelled, report)
+                    else source_kind)
             if kind == 'rar' and (allow_inplace or rar_saved):
                 layout = rar_inplace_layout(archive)
                 if layout is not None or rar_saved and (saved.get('freed') or saved.get('unresumable')):
@@ -1437,7 +1481,8 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
                     target = _member_path(destination, item.filename)
                     _check_archive_target(archive, target)
                     if stat.S_ISLNK(item.external_attr >> 16):
-                        raise ValueError(f'Refusing archive link: {item.filename}')
+                        _skip_link(item.filename)
+                members = [i for i in members if not stat.S_ISLNK(i.external_attr >> 16)]
                 files = [i for i in members if not i.is_dir()]
                 total_bytes = sum(i.file_size for i in files)
                 if total_bytes > shutil.disk_usage(destination).free:
@@ -1487,7 +1532,7 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
                     name = header.FileNameW or header.FileName.decode('utf-8')
                     if _wanted(name):
                         _member_path(destination, name)
-                        if not header.Flags & 0x20:
+                        if not header.Flags & 0x20 and not _rar_header_link(header):
                             state['total'] += 1
                             total_bytes += header.UnpSize + (header.UnpSizeHigh << 32)
                     _native_error(api.process(handle, 0, None, None), 'Listing archive')
@@ -1529,8 +1574,9 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
             tool = _find_7z()
             if not tool:
                 raise RuntimeError(f'{kind.upper()} extraction requires a bundled or installed 7-Zip command-line tool')
+            links = []
             manifest = _7z_files(tool, archive, destination, manifest_path + '.listing',
-                                 cancelled, lambda text: report())
+                                 cancelled, lambda text: report(), links=links)
             total_bytes = sum(v['size'] for v in manifest.values())
             if total_bytes > shutil.disk_usage(destination).free:
                 raise OSError('Insufficient disk space for extraction')
@@ -1544,8 +1590,25 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
                     state['name'] = names[-1]
                 state['files'] = min(state['total'], state['files'] + len(names))
                 report()
-            _run_cli([tool, 'x', '-y', '-aoa', '-psteamrip.com', '-bsp1', '-bb1', '-sccUTF-8', '-ssc-',
-                      '-xr!*.url', '-xr!*_commonredist*', '-o' + destination, '--', archive], cancelled, cli_activity)
+            # Exclude listed links by full path; a UTF-8 list avoids command-line limits.
+            exclusions = None
+            if links:
+                with NamedTemporaryFile(mode='w', encoding='utf-8', suffix='.7z-exclude',
+                                        delete=False) as excluded:
+                    exclusions = excluded.name
+                    for name in links:
+                        excluded.write(name + '\n')
+            try:
+                _run_cli([tool, 'x', '-y', '-aoa', '-psteamrip.com', '-bsp1', '-bb1', '-sccUTF-8', '-scsUTF-8',
+                          '-ssc-', '-xr!*.url', '-xr!*_commonredist*',
+                          *(['-x@' + exclusions] if exclusions else []),
+                          '-o' + destination, '--', archive], cancelled, cli_activity)
+            finally:
+                if exclusions:
+                    try:
+                        os.remove(exclusions)
+                    except OSError:
+                        pass
         elif kind == 'exe' or not archive.lower().endswith(('.zip', '.rar', '.7z')):
             # Anything that is not an archive is installed as the file itself.
             name = os.path.basename(archive)

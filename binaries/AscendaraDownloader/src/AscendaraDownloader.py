@@ -1783,7 +1783,10 @@ class AscendaraDownloader:
                 self._check_cancelled()
                 if any(part.lower().endswith('.ascendara.json') or part.lower().startswith(('.ascendara-', '.ascendara_')) for part in name.split('/')):
                     raise ValueError(f'Archive conflicts with Ascendara metadata: {name}')
-                target = _member_path(_extended_path(self.download_dir), name)
+                # An installed file may still be hard-linked to a retained in-place
+                # output from an earlier run. It is moved to rollback below, never
+                # written through, so its other names cannot be reached.
+                target = _member_path(_extended_path(self.download_dir), name, replacing=True)
                 source = _member_path(payload, name)
                 backup = None
                 os.makedirs(os.path.dirname(target), exist_ok=True)
