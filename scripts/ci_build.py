@@ -50,6 +50,20 @@ def configure():
         raise RuntimeError('ASCENDARA_SECRET_SEED is required for production API authentication')
     config = {field: os.environ[key] for key, field in CONFIG_FIELDS.items() if os.environ.get(key)}
     (ROOT / 'electron/config.prod.js').write_text('module.exports = ' + json.dumps(config) + ';\n')
+    # Testing builds identify as public-testing so the app shows it and checks that channel
+    build = os.environ.get('TESTING_BUILD')
+    if build:
+        if os.environ.get('RELEASE_MODE') == 'true':
+            raise RuntimeError('A testing build cannot be a release')
+        path = ROOT / 'electron/modules/core/config.js'
+        source = path.read_text()
+        for name, value in (('appBranch', 'public-testing'), ('testingVersion', f'{version()}-{build}')):
+            source, count = re.subn(rf'^const {name} = "[^"]*";$', f'const {name} = "{value}";', source,
+                                    flags=re.MULTILINE)
+            if count != 1:
+                raise RuntimeError(f'Could not set {name} in {path.name}')
+        path.write_text(source)
+        print(f'Configured public-testing build {version()}-{build}')
 
 
 def collect(target):

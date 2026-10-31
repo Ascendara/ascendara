@@ -3,8 +3,15 @@ on:
   push:
     # Tags are the bare version (11.4.0): the macOS updater downloads from that tag name
     tags: ['[0-9]+.[0-9]+.[0-9]+']
+    # Every push to development replaces the rolling "testing" prerelease
+    branches: [development]
+    paths-ignore: ['**/*.md']
   workflow_dispatch:
     inputs:
+      testing:
+        description: 'Publish as the rolling "testing" prerelease (never registered or offered to live users)'
+        type: boolean
+        default: false
       release:
         description: 'Create a draft and register builds (select a matching version tag)'
         type: boolean
@@ -17,12 +24,14 @@ permissions:
   contents: read
 concurrency:
   group: ascendara-release-${{ github.ref }}
-  cancel-in-progress: false
+  # A newer development push supersedes an unfinished testing build
+  cancel-in-progress: ${{ github.ref == 'refs/heads/development' }}
 jobs:
   prepare:
     runs-on: ubuntu-22.04
     outputs:
       release: ${{ steps.mode.outputs.release }}
+      testing: ${{ steps.mode.outputs.testing }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,9 +44,13 @@ jobs:
       - id: mode
         env:
           TAG: ${{ steps.validate.outputs.release }}
-          REQUEST: ${{ github.event_name == 'push' || inputs.release }}
+          REQUEST: ${{ startsWith(github.ref, 'refs/tags/') || inputs.release }}
           PUBLISH: ${{ inputs.publish }}
+          TESTING: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/development') || inputs.testing }}
         run: |
+          if [ "$TESTING" = true ] && [ "$REQUEST" = true ]; then
+            echo 'A testing build cannot also be a release'; exit 1
+          fi
           if [ "$REQUEST" = true ] && [ "$TAG" != true ]; then
             echo 'Release mode requires a version tag matching package.json'; exit 1
           fi
@@ -45,6 +58,7 @@ jobs:
             echo 'publish requires release'; exit 1
           fi
           echo "release=$REQUEST" >> "$GITHUB_OUTPUT"
+          echo "testing=$TESTING" >> "$GITHUB_OUTPUT"
   build:
     needs: prepare
     strategy:
@@ -112,6 +126,7 @@ jobs:
       - name: Configure application
         env:
           RELEASE_MODE: ${{ needs.prepare.outputs.release }}
+          TESTING_BUILD: ${{ needs.prepare.outputs.testing == 'true' && github.run_number || '' }}
           ASCENDARA_SECRET_SEED: ${{ secrets.ASCENDARA_SECRET_SEED }}
           REACT_APP_DISCKEY: ${{ vars.REACT_APP_DISCKEY }}
         run: python scripts/ci_build.py configure
@@ -255,3 +270,36 @@ jobs:
           # A pushed tag stops at a registered draft; only the manual toggle publishes
           PUBLISH_RELEASE: ${{ inputs.publish == true }}
         run: python scripts/ci_release.py
+  testing:
+    needs: [prepare, verify]
+    if: needs.prepare.outputs.testing == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    concurrency:
+      group: ascendara-testing-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-x64'
+          path: release-artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          name: mac-arm64
+          path: release-artifacts/mac-arm64
+      - name: Replace the testing prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # The tag is not x.y.z, so it never starts the release path, and a
+          # prerelease is skipped by releases/latest and the recovery list
+          # The app reads the version from the title to tell when a testing update is published
+          VERSION="$(jq -r .version release-artifacts/windows-x64/manifest.json)-$GITHUB_RUN_NUMBER"
+          gh release delete testing --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+          printf 'Automated test build of `%s` from `%s` (run #%s).\n\nNot a release: it may be unstable and is never offered as an update to live users.\n\n%s\n' \
+            "${GITHUB_SHA::7}" "$GITHUB_REF_NAME" "$GITHUB_RUN_NUMBER" "$RUN_URL" > notes.md
+          find release-artifacts -type f ! -name manifest.json -print0 |
+            xargs -0 gh release create testing --repo "$GITHUB_REPOSITORY" --prerelease --latest=false \
+              --target "$GITHUB_SHA" --title "Testing build $VERSION" --notes-file notes.md

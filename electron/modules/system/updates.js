@@ -39,6 +39,10 @@ let availableVersion = null;
 // Portable copies update by downloading the new portable build from the release.
 const PORTABLE_RELEASES_URL = "https://github.com/Ascendara/ascendara/releases/latest";
 
+// Public-testing builds are published by CI as the rolling "testing" prerelease
+const TESTING_RELEASE_URL =
+  "https://api.github.com/repos/Ascendara/ascendara/releases/tags/testing";
+
 // A stalled connection is retried from where it stopped; the timeout is for
 // inactivity, not for the whole download
 const UPDATE_STALL_TIMEOUT = 30000;
@@ -48,6 +52,32 @@ function macUpdateName(version) {
   const arch = process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "x64" : null;
   if (!arch) throw new Error(`Unsupported macOS architecture: ${process.arch}`);
   return `Ascendara-${version}-mac-${arch}.zip`;
+}
+
+/**
+ * Find this platform's installer in the "testing" prerelease. With minVersion,
+ * refuse a build older than it, so a version announced before CI finished
+ * publishing doesn't install an older build and prompt again.
+ */
+async function testingInstallerUrl(minVersion) {
+  const { data: release } = await axios.get(TESTING_RELEASE_URL, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      "User-Agent": `Ascendara/${appVersion}`,
+    },
+    timeout: 15000,
+  });
+  // CI names the release "Testing build <version>"
+  const releaseVersion = String(release.name || "")
+    .split(" ")
+    .pop();
+  if (minVersion && isVersionLower(releaseVersion, minVersion)) {
+    throw new Error(`Testing build ${minVersion} has not been published yet.`);
+  }
+  const pattern = isWindows ? /Setup.*\.exe$/i : /\.AppImage$/i;
+  const asset = (release.assets || []).find(item => pattern.test(item.name));
+  if (!asset) throw new Error("The testing build has no installer for this platform.");
+  return asset.browser_download_url;
 }
 
 /**
@@ -375,6 +405,8 @@ async function downloadUpdateInBackground() {
       updateUrl = `https://github.com/Ascendara/ascendara/releases/download/${encodeURIComponent(availableVersion)}/${fileName}`;
     } else if (currentBranch === "live") {
       updateUrl = `https://lfs.ascendara.app/download?update`;
+    } else if (currentBranch === "public-testing") {
+      updateUrl = await testingInstallerUrl(availableVersion);
     } else {
       updateUrl = `https://lfs.ascendara.app/download?branch=${currentBranch}`;
     }
@@ -567,14 +599,14 @@ function registerUpdateHandlers() {
       };
     const branchUrls = {
       live: "https://lfs.ascendara.app/download?update",
-      "public-testing": "https://lfs.ascendara.app/download?branch=public-testing",
+      "public-testing": null,
       experimental: "https://lfs.ascendara.app/download?branch=experimental",
     };
 
-    const url = branchUrls[branch];
-    if (!url) return { success: false, error: "Unknown branch" };
+    if (!(branch in branchUrls)) return { success: false, error: "Unknown branch" };
 
     try {
+      const url = branchUrls[branch] || (await testingInstallerUrl());
       // Use testingVersion for testing branches, appVersion for live
       const versionToSend =
         branch === "public-testing" || branch === "experimental"
