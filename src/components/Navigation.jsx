@@ -15,6 +15,7 @@ import {
   AtSign,
 } from "lucide-react";
 import { useAscendNotificationCount } from "@/services/ascend/ascendNotificationBadgeService";
+import { useNewSecurityFeature } from "@/services/ascend/newFeatureBadgeService";
 
 const Navigation = memo(({ items }) => {
   const { t } = useLanguage();
@@ -26,7 +27,9 @@ const Navigation = memo(({ items }) => {
     return savedSize ? parseFloat(savedSize) : 100;
   });
   const [downloadCount, setDownloadCount] = useState(0);
-  const ascendNotificationCount = useAscendNotificationCount();
+  // Unseen notifications, plus one while two-step verification is new to this member
+  const ascendNotificationCount =
+    useAscendNotificationCount() + (useNewSecurityFeature() ? 1 : 0);
   const [dockVisible, setDockVisible] = useState(true);
   const downloadCountRef = useRef(0);
   const pointerYRef = useRef(Number.NEGATIVE_INFINITY);

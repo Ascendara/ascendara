@@ -6,7 +6,11 @@ import AccountActionsCard from "./settings/AccountActionsCard";
 import DllSharingSettingsCard from "./settings/DllSharingSettingsCard";
 import TwoFactorSettingsCard from "./settings/TwoFactorSettingsCard";
 import SectionHeader from "./SectionHeader";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  markSecurityFeatureSeen,
+  useNewSecurityFeature,
+} from "@/services/ascend/newFeatureBadgeService";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   User,
@@ -62,6 +66,11 @@ function NavItem({ item, active, onSelect }) {
         <item.icon className="h-3.5 w-3.5" />
       </span>
       <span className="relative truncate">{item.label}</span>
+      {item.isNew && (
+        <span className="relative ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-secondary">
+          {item.newLabel}
+        </span>
+      )}
     </button>
   );
 }
@@ -115,6 +124,7 @@ export default function SettingsSection({
   setDeleteHoldProgress,
 }) {
   const reduceMotion = useReducedMotion();
+  const newSecurityFeature = useNewSecurityFeature();
   // Custom review card backgrounds are a paid perk
   const canCustomizeReviewCard = Boolean(
     ascendAccess?.isSubscribed || userData?.verified
@@ -149,6 +159,8 @@ export default function SettingsSection({
         id: "security",
         icon: ShieldCheck,
         label: t("account.twoFactor.settings.title"),
+        isNew: newSecurityFeature,
+        newLabel: t("ascend.settings.newFeature"),
       },
       ...(ascendAccess?.hasAccess
         ? [{ id: "dllSharing", icon: Share2, label: t("ascend.settings.dllSharing") }]
@@ -165,6 +177,11 @@ export default function SettingsSection({
     setSelectedId(id);
     saveLastPage(id);
   };
+
+  // Looking at Security clears the new-feature badges everywhere
+  useEffect(() => {
+    if (activeId === "security") markSecurityFeatureSeen(user?.uid);
+  }, [activeId, user?.uid]);
 
   const photoURL = userData?.photoURL || user?.photoURL;
   const displayName = userData?.displayName || user?.displayName || "";

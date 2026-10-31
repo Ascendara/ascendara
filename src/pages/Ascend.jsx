@@ -35,6 +35,7 @@ import VerifyEmailScreen from "./ascend/VerifyEmailScreen";
 import TwoFactorScreen from "./ascend/TwoFactorScreen";
 import { useAuth } from "@/context/AuthContext";
 import { useAscendNotificationCount } from "@/services/ascend/ascendNotificationBadgeService";
+import { useNewSecurityFeature } from "@/services/ascend/newFeatureBadgeService";
 const HomeSection = lazy(() => import("./ascend/HomeSection"));
 const SearchSection = lazy(() => import("./ascend/SearchSection"));
 const FriendsSection = lazy(() => import("./ascend/FriendsSection"));
@@ -54,6 +55,7 @@ const AuthSection = lazy(() => import("./ascend/AuthSection"));
 
 const Ascend = () => {
   const ascendNotificationCount = useAscendNotificationCount();
+  const newSecurityFeature = useNewSecurityFeature();
   const { twoFactorUser, completeTwoFactor } = useAuth();
   // Dev screen trigger in Settings previews the verification screen once
   const [previewVerification, setPreviewVerification] = useState(() => {
@@ -894,6 +896,7 @@ const Ascend = () => {
               requests: incomingRequests.length,
               messages: conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0),
               notifications: ascendNotificationCount,
+              settings: newSecurityFeature ? 1 : 0,
             }}
           />
 

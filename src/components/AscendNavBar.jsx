@@ -121,8 +121,15 @@ const AscendNavBar = ({
       badge: badges.notifications,
     },
     { id: "reports", icon: Flag, label: t("ascend.nav.reports") },
-    { id: "settings", icon: Settings, label: t("ascend.nav.settings") },
+    {
+      id: "settings",
+      icon: Settings,
+      label: t("ascend.nav.settings"),
+      badge: badges.settings,
+    },
   ];
+
+  const menuBadgeCount = (badges.notifications || 0) + (badges.settings || 0);
 
   const isItemActive = item => (item.matches || [item.id]).includes(activeSection);
 
@@ -264,15 +271,15 @@ const AscendNavBar = ({
                   <span
                     className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${currentStatusOption.color}`}
                   />
-                  {/* Notifications live in this menu, so the avatar carries their count */}
-                  {badges.notifications > 0 && (
+                  {/* Notifications and Settings live in this menu, so the avatar carries their count */}
+                  {menuBadgeCount > 0 && (
                     <span
                       className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-card bg-primary px-1 text-[9px] font-bold leading-none text-secondary"
                       aria-label={t("ascend.notifications.unread", {
-                        count: badges.notifications,
+                        count: menuBadgeCount,
                       })}
                     >
-                      {badges.notifications > 99 ? "99+" : badges.notifications}
+                      {menuBadgeCount > 99 ? "99+" : menuBadgeCount}
                     </span>
                   )}
                 </span>
