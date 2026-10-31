@@ -1884,20 +1884,37 @@ def retry_local_extraction(metadata_path):
                              if '.ascendara-receipts' not in root.split(os.sep)
                              and not any(part.startswith('.ascendara-inplace-') for part in root.split(os.sep)))
             for root in roots:
-                for name in os.listdir(root):
-                    if name.lower().endswith(('.zip', '.rar', '.7z')):
-                        archives.append(source_path(os.path.relpath(os.path.join(root, name), worker.download_dir)))
+                received = set()
                 receipts = os.path.join(root, '.ascendara-receipts')
                 if os.path.isdir(receipts):
                     for name in os.listdir(receipts):
                         with open(os.path.join(receipts, name), encoding='utf-8') as stream:
                             item = json.load(stream)
                         filename = item['filename']
+                        received.add(filename.lower())
                         if not filename.lower().endswith(('.zip', '.rar', '.7z')) and not re.search(r'\.[r-z]\d{2}$', filename, re.I) and _wanted(filename):
                             loose.append(dict(filename=filename, size=item['size'], source=source_path(
                                 os.path.relpath(os.path.join(root, filename), worker.download_dir))))
+                for name in os.listdir(root):
+                    lower = name.lower()
+                    path = os.path.join(root, name)
+                    if lower.endswith(('.zip', '.rar', '.7z')):
+                        archives.append(source_path(os.path.relpath(path, worker.download_dir)))
+                    elif (root != worker.download_dir and lower not in received and os.path.isfile(path)
+                            and not lower.startswith('.ascendara')
+                            and not lower.endswith(('.partial', '.json', '.tmp'))
+                            and not re.search(r'\.[r-z]\d{2}$', name, re.I)):
+                        # A finished download that failed before it was renamed by
+                        # type (the error came before extraction recorded its sources).
+                        # The type check renames archives and rejects web pages;
+                        # other files (desktop.ini, for example) are left alone.
+                        typed = worker._fix_file_extension(
+                            source_path(os.path.relpath(path, worker.download_dir)))
+                        if typed.lower().endswith(('.zip', '.rar', '.7z', '.exe')):
+                            archives.append(typed)
         if not archives and not loose:
-            raise RuntimeError('No retained archives were found. Choose another download source.')
+            raise RuntimeError('The downloaded files for this game are no longer on disk. '
+                               'Download the game again or choose another download source.')
         info['downloadingData'] = dict(downloading=False, extracting=True, verifying=False,
                                       updating=worker.updateFlow, progressCompleted='100.00',
                                       progressDownloadSpeeds='0.00 KB/s', timeUntilComplete='Preparing extraction...')
