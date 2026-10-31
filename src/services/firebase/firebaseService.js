@@ -2156,8 +2156,8 @@ export const getUserPublicProfile = async userId => {
     // Check if profile is private
     const isPrivate = userData.private || false;
 
-    // If profile is private, only return minimal public info
-    if (isPrivate) {
+    // A private profile shows only minimal public info, except to friends
+    if (isPrivate && !isFriend) {
       return {
         data: {
           uid: userId,
@@ -2204,7 +2204,7 @@ export const getUserPublicProfile = async userId => {
         unlockedAchievements,
         isFriend,
         preventFriendRequests: userData.preventFriendRequests === true,
-        private: false,
+        private: isPrivate,
       },
       error: null,
     };
@@ -2622,9 +2622,12 @@ export const getFriendsList = async () => {
           owner: userData.owner || false,
           contributor: userData.contributor || false,
           bugCatcher: userData.bugCatcher || false,
+          private: userData.private || false,
+          isFriend: true,
           reviewCount: userData.reviewCount,
           discordLinked: Boolean(userData.socials?.linkedDiscord),
-          level: userData.private ? 0 : userData.profileStats?.level || 1,
+          // Friends see a private account's level too
+          level: userData.profileStats?.level || 1,
           verified: userData.verified || false,
         };
       })
@@ -2679,9 +2682,12 @@ export const subscribeToFriendsList = onUpdate => {
             owner: userData.owner || false,
             contributor: userData.contributor || false,
             bugCatcher: userData.bugCatcher || false,
+            private: userData.private || false,
+            isFriend: true,
             reviewCount: userData.reviewCount,
             discordLinked: Boolean(userData.socials?.linkedDiscord),
-            level: userData.private ? 0 : userData.profileStats?.level || 1,
+            // Friends see a private account's level too
+            level: userData.profileStats?.level || 1,
             verified: userData.verified || false,
           };
         })

@@ -951,6 +951,7 @@
       "playtime": "Playtime",
       "private": "Private",
       "privateAccount": "Private Account",
+      "privateAccountFriendMessage": "This account is private. Only friends can see its details, games, and achievements.",
       "privateAccountMessage": "This user has set their account to private. Their profile details, games, and achievements are hidden.",
       "recentAchievements": "Recent Achievements",
       "resync": "Resync",

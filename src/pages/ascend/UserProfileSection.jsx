@@ -57,6 +57,8 @@ export default function UserProfileSection({
   setReportUserDetails,
   isReportingUser,
 }) {
+  // Friends still see a private account's details; badges stay hidden either way
+  const detailsHidden = viewingProfile?.private && !viewingProfile?.isFriend;
   return (
     <div className="mb-20 space-y-6">
       {/* Back Button */}
@@ -94,8 +96,9 @@ export default function UserProfileSection({
                     {t("ascend.profile.privateAccount") || "Private Account"}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {t("ascend.profile.privateAccountMessage") ||
-                      "This user has set their account to private. Their profile details, games, and achievements are hidden."}
+                    {detailsHidden
+                      ? t("ascend.profile.privateAccountMessage")
+                      : t("ascend.profile.privateAccountFriendMessage")}
                   </p>
                 </div>
               </div>
@@ -145,7 +148,7 @@ export default function UserProfileSection({
                   </div>
 
                   {/* Level Badge & Status - only show if not private */}
-                  {!viewingProfile.private && (
+                  {!detailsHidden && (
                     <div className="mb-3 flex items-center gap-3">
                       <div className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5">
                         <Star className="h-4 w-4 text-primary" />
@@ -179,14 +182,14 @@ export default function UserProfileSection({
                   )}
 
                   {/* Bio - only show if not private */}
-                  {!viewingProfile.private && viewingProfile.bio && (
+                  {!detailsHidden && viewingProfile.bio && (
                     <p className="mb-4 max-w-lg text-muted-foreground">
                       {viewingProfile.bio}
                     </p>
                   )}
 
                   {/* Country & Socials - only show if not private */}
-                  {!viewingProfile.private && (
+                  {!detailsHidden && (
                     <div className="flex flex-wrap items-center gap-3">
                       {viewingProfile.country && (
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -390,7 +393,7 @@ export default function UserProfileSection({
           </div>
 
           {/* Stats - only show if not private */}
-          {!viewingProfile.private && (
+          {!detailsHidden && (
             <StatStrip
               stats={[
                 {
@@ -428,7 +431,7 @@ export default function UserProfileSection({
           )}
 
           {/* Top Games - only show if not private */}
-          {!viewingProfile.private && viewingProfile.games?.length > 0 && (
+          {!detailsHidden && viewingProfile.games?.length > 0 && (
             <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
               <div className="flex items-center justify-between border-b border-border/50 p-5">
                 <div className="flex items-center gap-2">
@@ -485,7 +488,7 @@ export default function UserProfileSection({
           )}
 
           {/* Recent Achievements - only show if not private */}
-          {!viewingProfile.private &&
+          {!detailsHidden &&
             viewingProfile.achievements?.some(g =>
               g.achievements?.some(a => a.achieved)
             ) && (
