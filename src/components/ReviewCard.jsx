@@ -16,14 +16,22 @@ const toThemeColor = hex =>
     ? [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16)).join(" ")
     : null;
 
+const isLight = themeColor => {
+  const [red, green, blue] = themeColor.split(" ").map(Number);
+  return (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255 > 0.6;
+};
+
+// A custom text color is picked against the reviewer's theme, so the card's
+// surface follows the text color instead of the viewer's theme. Otherwise dark
+// text would land on a dark surface for viewers on dark themes, and vice versa
+const surfaceColor = textColor => (isLight(textColor) ? "12 12 18" : "250 250 252");
+
 // Outline color that keeps text and icons legible over a background image:
 // the card's own background, or whichever of black/white contrasts with a
 // custom text color
 const haloColor = textColor => {
   if (!textColor) return "rgb(var(--color-background) / 0.85)";
-  const [red, green, blue] = textColor.split(" ").map(Number);
-  const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
-  return luminance > 0.6 ? "rgb(0 0 0 / 0.65)" : "rgb(255 255 255 / 0.8)";
+  return isLight(textColor) ? "rgb(0 0 0 / 0.65)" : "rgb(255 255 255 / 0.8)";
 };
 
 // One review on the game page. Also rendered as the live preview in Ascend's
@@ -66,13 +74,16 @@ export default function ReviewCard({ review, username, isGuest, liked, onLike })
       className={`relative min-w-0 overflow-hidden rounded-lg p-5 ${
         isGuest
           ? "border-none bg-background/50"
-          : "border border-primary/30 bg-gradient-to-br from-primary/15 via-primary/5 to-background/50 shadow-[0_0_24px_-12px_rgb(var(--color-primary))]"
+          : `border border-primary/30 bg-gradient-to-br from-primary/15 via-primary/5 to-background/50 shadow-[0_0_24px_-12px_rgb(var(--color-primary))] ${
+              textColor && !cardBackground ? "bg-background/85" : ""
+            }`
       }`}
       style={{
         ...(auraColor && { "--color-primary": auraColor }),
         ...(textColor && {
           "--color-foreground": textColor,
           "--color-muted-foreground": textColor,
+          "--color-background": surfaceColor(textColor),
         }),
         // Inherited by every line of text in the card
         ...(halo && {
