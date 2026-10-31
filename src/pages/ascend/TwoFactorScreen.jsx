@@ -107,7 +107,7 @@ const TwoFactorScreen = ({ t, email, onVerified, onSignOut }) => {
 
           <motion.div
             {...fadeUp(0.1)}
-            className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3"
+            className="mt-6 flex items-center justify-between gap-3 rounded-xl bg-card/50 px-4 py-3 shadow"
           >
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">
@@ -127,7 +127,7 @@ const TwoFactorScreen = ({ t, email, onVerified, onSignOut }) => {
 
         <motion.section
           {...fadeUp(0.15)}
-          className="min-w-0 rounded-2xl border border-border/60 bg-card/40 p-6"
+          className="min-w-0 rounded-2xl bg-card/40 p-6 shadow"
         >
           <form
             onSubmit={event => {

@@ -53,7 +53,7 @@ function PlaytimeFlagCard({ t, flag, onReport }) {
   const reviewed = flag.status !== "flagged" && flag.status !== "disputed";
 
   return (
-    <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-6">
+    <div className="rounded-2xl bg-yellow-500/5 p-6">
       <div className="flex items-start gap-3">
         <Timer className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
         <div className="min-w-0 flex-1">
@@ -72,7 +72,7 @@ function PlaytimeFlagCard({ t, flag, onReport }) {
           )}
 
           {flag.response && (
-            <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
+            <div className="mt-3 rounded-xl bg-primary/5 p-3">
               <p className="flex items-center gap-1.5 text-xs font-medium text-primary">
                 <MessageSquareReply className="h-3.5 w-3.5" />
                 {t("ascend.notifications.playtime.response")}
@@ -114,7 +114,7 @@ function PlaytimeFlagCard({ t, flag, onReport }) {
 
 function ReviewLikeCard({ t, notification }) {
   return (
-    <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6">
+    <div className="rounded-2xl bg-red-500/5 p-6">
       <div className="flex items-start gap-3">
         <Heart className="mt-0.5 h-4 w-4 shrink-0 fill-red-500 text-red-500" />
         <div className="min-w-0 flex-1">
@@ -155,7 +155,7 @@ function WishlistMatchCard({ t, match }) {
   };
 
   return (
-    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6">
+    <div className="rounded-2xl bg-primary/5 p-6">
       <div className="flex items-start gap-3">
         <Bookmark className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <div className="min-w-0 flex-1">
@@ -264,7 +264,7 @@ function ReportFlagDialog({ t, flag, onClose, onReported }) {
 
 function AnnouncementCard({ notification }) {
   return (
-    <div className="rounded-2xl border border-border/50 bg-card/60 p-6 transition-colors hover:border-primary/30 hover:bg-card">
+    <div className="rounded-2xl bg-card/60 p-6 shadow transition-colors hover:bg-card">
       <p className="pr-8 text-sm leading-relaxed">{notification.message}</p>
       <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
         <span>—</span>
@@ -522,7 +522,7 @@ export default function NotificationsSection({ t, loadingNotifications, notifica
               }
             />
           ) : (
-            <div className="flex items-center gap-3 rounded-2xl border border-border/50 bg-card/40 p-5 text-sm text-muted-foreground">
+            <div className="flex items-center gap-3 rounded-2xl bg-card/40 p-5 text-sm text-muted-foreground shadow">
               <CheckCheck className="h-4 w-4 shrink-0 text-primary" />
               {t("ascend.notifications.caughtUp")}
             </div>

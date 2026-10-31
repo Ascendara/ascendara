@@ -286,7 +286,7 @@ export default function AuthSection({
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="border-destructive/30 bg-destructive/10 rounded-xl border p-3"
+                    className="bg-destructive/10 rounded-xl p-3"
                   >
                     <div className="flex items-start gap-3">
                       <div className="bg-destructive/20 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
@@ -342,7 +342,7 @@ export default function AuthSection({
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="border-destructive/30 bg-destructive/10 rounded-xl border p-3"
+                    className="bg-destructive/10 rounded-xl p-3"
                   >
                     <div className="flex items-start gap-3">
                       <div className="bg-destructive/20 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">

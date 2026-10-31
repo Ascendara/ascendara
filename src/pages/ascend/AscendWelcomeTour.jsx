@@ -48,7 +48,7 @@ function PerkGrid({ t }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 * index }}
           title={t(`account.features.${name}Desc`)}
-          className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/60 px-2.5 py-2 text-left"
+          className="flex items-center gap-2 rounded-lg bg-card/60 px-2.5 py-2 text-left shadow"
         >
           <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
           <span className="truncate text-xs font-medium text-foreground">

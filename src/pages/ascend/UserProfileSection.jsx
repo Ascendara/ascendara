@@ -76,7 +76,7 @@ export default function UserProfileSection({
           </p>
         </div>
       ) : profileError ? (
-        <div className="border-destructive/50 bg-destructive/10 rounded-2xl border p-8 text-center">
+        <div className="bg-destructive/10 rounded-2xl p-8 text-center">
           <X className="text-destructive mx-auto mb-4 h-12 w-12" />
           <h3 className="mb-1 text-lg font-semibold">
             {t("ascend.profile.error") || "Error loading profile"}
@@ -87,7 +87,7 @@ export default function UserProfileSection({
         <>
           {/* Private Account Warning */}
           {viewingProfile.private && (
-            <div className="rounded-2xl border border-border/50 bg-card/60 p-5">
+            <div className="rounded-2xl bg-card/60 p-5 shadow">
               <div className="flex items-center gap-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
                   <LockIcon className="h-5 w-5 text-muted-foreground" />
@@ -107,7 +107,7 @@ export default function UserProfileSection({
           )}
 
           {/* Profile Header */}
-          <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/60">
+          <div className="relative overflow-hidden rounded-2xl bg-card/60 shadow">
             <div className="relative p-6 sm:p-8">
               <div className="flex flex-col items-start gap-6 md:flex-row">
                 {/* Avatar */}
@@ -430,7 +430,7 @@ export default function UserProfileSection({
 
           {/* Top Games - only show if not private */}
           {!detailsHidden && viewingProfile.games?.length > 0 && (
-            <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
+            <div className="overflow-hidden rounded-2xl bg-card/60 shadow">
               <div className="flex items-center justify-between border-b border-border/50 p-5">
                 <div className="flex items-center gap-2">
                   <Gamepad2 className="h-5 w-5 text-primary" />
@@ -490,7 +490,7 @@ export default function UserProfileSection({
             viewingProfile.achievements?.some(g =>
               g.achievements?.some(a => a.achieved)
             ) && (
-              <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
+              <div className="overflow-hidden rounded-2xl bg-card/60 shadow">
                 <div className="flex items-center gap-2 border-b border-border/50 p-5">
                   <Trophy className="h-5 w-5 text-amber-500" />
                   <h2 className="font-semibold">
@@ -531,7 +531,7 @@ export default function UserProfileSection({
 
           {/* Empty state if no games */}
           {(!viewingProfile.games || viewingProfile.games.length === 0) && (
-            <div className="rounded-2xl border border-dashed border-border/50 bg-card/30 p-12 text-center">
+            <div className="rounded-2xl bg-card/30 p-12 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/50">
                 <Gamepad2 className="h-8 w-8 text-muted-foreground/50" />
               </div>

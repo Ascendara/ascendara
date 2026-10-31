@@ -36,7 +36,7 @@ export default function DllSharingSettingsCard({ t }) {
       >
         <label
           htmlFor="contributeRepairDlls"
-          className="flex max-w-xl cursor-pointer items-center justify-between gap-4 rounded-xl border border-border/60 px-4 py-3 transition-colors hover:bg-muted/30"
+          className="flex max-w-xl cursor-pointer items-center justify-between gap-4 rounded-xl bg-card/60 px-4 py-3 shadow transition-colors hover:bg-card"
         >
           <span className="text-sm font-medium">
             {t("ascend.settings.pages.dllSharing.toggle")}

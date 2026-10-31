@@ -153,7 +153,7 @@ export default function SubscriptionSettingsCard({
           // Active Subscription - Premium Design
           <div className="space-y-6">
             {!userData?.ascendSubscription?.lifetime && (
-              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+              <div className="rounded-xl bg-primary/5 p-4">
                 <p className="mb-3 text-sm text-muted-foreground">
                   {t("ascend.settings.lifetimeUpgradeDescription", {
                     defaultValue: "Keep Ascend forever with a one-time payment. Your current subscription will stop renewing after your lifetime purchase succeeds.",

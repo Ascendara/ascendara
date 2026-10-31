@@ -55,7 +55,7 @@ function ToolCard({ icon: Icon, title, description, meta, onClick, delay, large 
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
       onClick={onClick}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-border/50 bg-card/60 text-left outline-none transition-colors hover:border-primary/30 hover:bg-card focus-visible:ring-2 focus-visible:ring-primary ${
+      className={`group relative flex flex-col overflow-hidden rounded-2xl bg-card/60 text-left shadow outline-none transition-colors hover:bg-card focus-visible:ring-2 focus-visible:ring-primary ${
         large ? "p-5" : "p-4"
       }`}
     >
@@ -154,7 +154,7 @@ export default function HomeSection({
       <motion.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/60 p-6 sm:p-8"
+        className="relative overflow-hidden rounded-2xl bg-card/60 p-6 shadow sm:p-8"
       >
         <div
           aria-hidden="true"
@@ -325,7 +325,7 @@ export default function HomeSection({
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + index * 0.04 }}
-                className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/60 p-2.5"
+                className="flex items-center gap-3 rounded-xl bg-card/60 p-2.5 shadow"
               >
                 <div className="h-12 w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
                   <AscendGameImage name={game.name || game.game} />
@@ -347,7 +347,7 @@ export default function HomeSection({
       <section className="grid gap-3 lg:grid-cols-5">
         <div className="lg:col-span-3">
           {loadingLocalStats ? (
-            <div className="flex h-full min-h-32 items-center justify-center rounded-xl border border-border/50 bg-card/60">
+            <div className="flex h-full min-h-32 items-center justify-center rounded-xl bg-card/60 shadow">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           ) : (
@@ -359,7 +359,7 @@ export default function HomeSection({
             />
           )}
         </div>
-        <div className="rounded-xl border border-border/50 bg-card/60 p-4 lg:col-span-2">
+        <div className="rounded-xl bg-card/60 p-4 shadow lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold">
               {t("ascend.overview.communityTitle")}

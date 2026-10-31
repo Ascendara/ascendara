@@ -44,7 +44,7 @@ export default function CommunityTabs({
       <div
         role="tablist"
         aria-label={t("ascend.nav.community")}
-        className="flex gap-1 overflow-x-auto rounded-xl border border-border/50 bg-card/50 p-1"
+        className="flex gap-1 overflow-x-auto rounded-xl bg-card/50 p-1 shadow"
       >
         {tabs.map(tab => {
           const isActive = activeSection === tab.id;

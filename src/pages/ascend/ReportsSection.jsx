@@ -81,7 +81,7 @@ function ReportCard({ t, report, index }) {
         )}
 
         {report.response && (
-          <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-3">
+          <div className="mt-4 rounded-xl bg-primary/5 p-3">
             <p className="flex items-center gap-1.5 text-xs font-medium text-primary">
               <MessageSquareReply className="h-3.5 w-3.5" />
               {t("ascend.myReports.response")}

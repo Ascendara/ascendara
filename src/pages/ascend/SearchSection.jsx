@@ -76,7 +76,7 @@ export default function SearchSection({
           {[0, 1, 2].map(index => (
             <div
               key={index}
-              className="flex animate-pulse items-center gap-4 rounded-2xl border border-border/50 bg-card/60 p-5 motion-reduce:animate-none"
+              className="flex animate-pulse items-center gap-4 rounded-2xl bg-card/60 p-5 shadow motion-reduce:animate-none"
             >
               <div className="h-12 w-12 rounded-xl bg-muted" />
               <div className="flex-1 space-y-3">

@@ -49,7 +49,7 @@ export default function UpcomingSection({
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/60 p-6 sm:p-8"
+            className="relative overflow-hidden rounded-2xl bg-card/60 p-6 shadow sm:p-8"
           >
             <div className="relative">
               <div className="flex items-start justify-between gap-4">
@@ -130,13 +130,13 @@ export default function UpcomingSection({
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: tagIndex * 0.1 }}
-                      className="rounded-2xl border border-border/50 bg-card/60 p-6"
+                      className="rounded-2xl bg-card/60 p-6 shadow"
                     >
                       <h3 className="mb-4 text-xl font-semibold">{parentTag}</h3>
                       <div className="space-y-4">
                         {/* Additions */}
                         {hasAdditions && (
-                          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                          <div className="rounded-xl bg-emerald-500/5 p-4">
                             <div className="mb-3 flex items-center gap-2">
                               <Zap className="h-4 w-4 text-emerald-500" />
                               <h4 className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
@@ -171,7 +171,7 @@ export default function UpcomingSection({
 
                         {/* Fixes */}
                         {hasFixes && (
-                          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                          <div className="rounded-xl bg-amber-500/5 p-4">
                             <div className="mb-3 flex items-center gap-2">
                               <Shield className="h-4 w-4 text-amber-500" />
                               <h4 className="text-sm font-semibold text-amber-600 dark:text-amber-400">
@@ -206,7 +206,7 @@ export default function UpcomingSection({
 
                         {/* Improvements */}
                         {hasImprovements && (
-                          <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+                          <div className="rounded-xl bg-blue-500/5 p-4">
                             <div className="mb-3 flex items-center gap-2">
                               <Star className="h-4 w-4 text-blue-500" />
                               <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-400">
@@ -241,7 +241,7 @@ export default function UpcomingSection({
 
                         {/* Removals */}
                         {hasRemovals && (
-                          <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+                          <div className="rounded-xl bg-red-500/5 p-4">
                             <div className="mb-3 flex items-center gap-2">
                               <X className="h-4 w-4 text-red-500" />
                               <h4 className="text-sm font-semibold text-red-600 dark:text-red-400">

@@ -70,7 +70,7 @@ export default function LeaderboardSection({
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5"
+              className="rounded-2xl bg-red-500/10 p-5"
             >
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500/20">
@@ -96,12 +96,12 @@ export default function LeaderboardSection({
                 key={player.uid}
                 type="button"
                 onClick={() => handleViewProfile(player.uid)}
-                className={`group relative min-w-0 overflow-hidden rounded-2xl border p-5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                className={`group relative min-w-0 overflow-hidden rounded-2xl p-5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   index === 0
-                    ? "border-primary/40 bg-card/60 sm:order-2 sm:py-7"
+                    ? "bg-primary/10 shadow sm:order-2 sm:py-7"
                     : index === 1
-                      ? "border-border/60 bg-card/60 hover:border-primary/30 sm:order-1"
-                      : "border-border/60 bg-card/60 hover:border-primary/30 sm:order-3"
+                      ? "bg-card/60 shadow hover:bg-card sm:order-1"
+                      : "bg-card/60 shadow hover:bg-card sm:order-3"
                 }`}
               >
                 <div className="mb-5 flex items-center justify-between">
@@ -122,7 +122,9 @@ export default function LeaderboardSection({
                       src={player.photoURL}
                       className="h-full w-full object-cover"
                       fallback={
-                        <span className="text-2xl font-semibold">{getInitial(player.displayName)}</span>
+                        <span className="text-2xl font-semibold">
+                          {getInitial(player.displayName)}
+                        </span>
                       }
                     />
                   </div>
@@ -167,7 +169,7 @@ export default function LeaderboardSection({
                 <Award className="h-3.5 w-3.5" />
                 Runner-ups
               </h2>
-              <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
+              <div className="overflow-hidden rounded-2xl bg-card/60 shadow">
                 {leaderboardData.runnerUps.map((user, index) => (
                   <motion.button
                     type="button"

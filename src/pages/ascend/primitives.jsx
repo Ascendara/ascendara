@@ -3,10 +3,7 @@
 
 export function Panel({ as: Component = "div", className = "", children, ...props }) {
   return (
-    <Component
-      className={`rounded-2xl border border-border/50 bg-card/60 ${className}`}
-      {...props}
-    >
+    <Component className={`rounded-2xl bg-card/60 shadow ${className}`} {...props}>
       {children}
     </Component>
   );
@@ -16,7 +13,7 @@ export function Panel({ as: Component = "div", className = "", children, ...prop
 export function StatStrip({ stats, className = "" }) {
   return (
     <dl
-      className={`grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border/50 bg-border/50 sm:grid-cols-4 ${className}`}
+      className={`grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-border/50 shadow sm:grid-cols-4 ${className}`}
     >
       {stats.map(stat => (
         <div key={stat.label} className="bg-card/80 px-4 py-3">
@@ -27,7 +24,9 @@ export function StatStrip({ stats, className = "" }) {
           <dd className="mt-1 flex items-baseline gap-1 text-xl font-semibold tabular-nums">
             {stat.value}
             {stat.suffix && (
-              <span className="text-sm font-normal text-muted-foreground">{stat.suffix}</span>
+              <span className="text-sm font-normal text-muted-foreground">
+                {stat.suffix}
+              </span>
             )}
           </dd>
           {stat.footer}
@@ -40,7 +39,7 @@ export function StatStrip({ stats, className = "" }) {
 export function EmptyState({ icon: Icon, title, description, action, className = "" }) {
   return (
     <div
-      className={`flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 px-6 py-16 text-center ${className}`}
+      className={`flex flex-col items-center justify-center rounded-2xl bg-card/30 px-6 py-16 text-center ${className}`}
     >
       {Icon && (
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground">

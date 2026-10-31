@@ -139,7 +139,7 @@ export default function DiscordSection({
           {!isConnected && isTrial && (
             <motion.div
               {...fadeIn(0.05)}
-              className="flex flex-wrap items-start gap-3 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-4"
+              className="flex flex-wrap items-start gap-3 rounded-2xl bg-yellow-500/10 p-4"
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-yellow-500/20">
                 <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />

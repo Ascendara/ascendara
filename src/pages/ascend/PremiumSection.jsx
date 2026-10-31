@@ -33,11 +33,9 @@ function FeatureCard({ feature, t, delay, featured }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
       onClick={feature.onOpen}
-      className={`group relative flex h-full w-full flex-col rounded-2xl border text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
-        featured
-          ? "border-primary/20 bg-card/70 p-5 hover:border-primary/40 hover:bg-card"
-          : "border-border/50 bg-card/40 p-4"
-      } ${feature.onOpen && !featured ? "hover:border-primary/30 hover:bg-card" : ""}`}
+      className={`group relative flex h-full w-full flex-col rounded-2xl text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
+        featured ? "bg-card/70 p-5 shadow hover:bg-card" : "bg-card/40 p-4"
+      } ${feature.onOpen && !featured ? "hover:bg-card" : ""}`}
     >
       <div className="flex items-start gap-3">
         <div
@@ -173,7 +171,7 @@ export default function PremiumSection({ t, setActiveSection }) {
           key={group.id}
           className={
             group.featured
-              ? "relative overflow-hidden rounded-2xl border border-border/50 bg-card/60 p-5 sm:p-6"
+              ? "relative overflow-hidden rounded-2xl bg-card/60 p-5 shadow sm:p-6"
               : ""
           }
         >

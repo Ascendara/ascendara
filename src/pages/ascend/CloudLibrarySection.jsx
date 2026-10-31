@@ -156,7 +156,8 @@ export default function CloudLibrarySection({
               icon: Play,
               label: t("ascend.cloudLibrary.totalLaunches"),
               value:
-                cloudLibrary.games?.reduce((acc, g) => acc + (g.launchCount || 0), 0) || 0,
+                cloudLibrary.games?.reduce((acc, g) => acc + (g.launchCount || 0), 0) ||
+                0,
             },
           ]}
         />
@@ -211,7 +212,7 @@ export default function CloudLibrarySection({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(index, 8) * 0.03 }}
-                className="group overflow-hidden rounded-2xl border border-border/50 bg-card/60 transition-colors hover:border-primary/30"
+                className="group overflow-hidden rounded-2xl bg-card/60 shadow transition-colors hover:bg-card"
               >
                 {/* Main Game Row */}
                 <div
@@ -343,10 +344,10 @@ export default function CloudLibrarySection({
                             {gameAchievements.achievements.map((ach, i) => (
                               <div
                                 key={ach.achID || i}
-                                className={`relative flex flex-col items-center rounded-xl border p-3 transition-all ${
+                                className={`relative flex flex-col items-center rounded-xl p-3 transition-all ${
                                   ach.achieved
-                                    ? "border-yellow-500/30 bg-yellow-500/5"
-                                    : "border-border/50 bg-muted/50 opacity-60"
+                                    ? "bg-yellow-500/5"
+                                    : "bg-muted/50 opacity-60"
                                 }`}
                               >
                                 {ach.icon ? (
