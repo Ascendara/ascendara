@@ -250,6 +250,34 @@ export const checkGoogleRedirectResult = async () => {
 };
 
 /**
+ * Send a branded verification email through the Ascendara API,
+ * falling back to Firebase's built-in email if the API can't send it.
+ * @param {object} user - Firebase user
+ * @returns {Promise<{success: boolean, error: string|null}>}
+ */
+const sendVerificationEmail = async user => {
+  try {
+    const response = await userAuthenticatedFetch(
+      user,
+      `${API_URL}/account/send-verification`,
+      { method: "POST" }
+    );
+    const result = await response.json().catch(() => ({}));
+    if (response.ok) return { success: true, error: null };
+    if (response.status === 429) {
+      return {
+        success: false,
+        error: result.error || getErrorMessage("auth/too-many-requests"),
+      };
+    }
+  } catch (error) {
+    console.warn("Branded verification email failed, using Firebase:", error);
+  }
+  await sendEmailVerification(user);
+  return { success: true, error: null };
+};
+
+/**
  * Register a new user with email and password
  * @param {string} email - User email
  * @param {string} password - User password
@@ -266,7 +294,7 @@ export const registerUser = async (email, password, displayName, hardwareId = nu
     await updateProfile(user, { displayName });
 
     // Send email verification
-    await sendEmailVerification(user);
+    await sendVerificationEmail(user);
 
     // Create user document in Firestore with retry logic
     const maxRetries = 3;
@@ -410,6 +438,20 @@ export const logoutUser = async () => {
  */
 export const resetPassword = async email => {
   try {
+    try {
+      const response = await fetch(`${API_URL}/account/send-password-reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok) return { success: true, error: null };
+      if (response.status === 400 || response.status === 429) {
+        return { success: false, error: result.error || "An unexpected error occurred" };
+      }
+    } catch (error) {
+      console.warn("Branded password reset email failed, using Firebase:", error);
+    }
     await sendPasswordResetEmail(auth, email);
     return { success: true, error: null };
   } catch (error) {
@@ -778,8 +820,7 @@ export const resendVerificationEmail = async () => {
       return { success: false, error: "No user logged in" };
     }
 
-    await sendEmailVerification(user);
-    return { success: true, error: null };
+    return await sendVerificationEmail(user);
   } catch (error) {
     console.error("Resend verification error:", error);
     return { success: false, error: getErrorMessage(error.code) };
