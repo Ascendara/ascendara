@@ -830,6 +830,13 @@ def main():
 
     logger.info(f"Starting notification helper with args: {args}")
 
+    # Wayland compositors ignore client-side window positioning, so the toast
+    # lands wherever the compositor puts it (usually centered). Run through
+    # XWayland where move() is honored, falling back to native Wayland.
+    if sys.platform.startswith("linux") and os.environ.get("WAYLAND_DISPLAY") \
+            and os.environ.get("DISPLAY") and not os.environ.get("QT_QPA_PLATFORM"):
+        os.environ["QT_QPA_PLATFORM"] = "xcb;wayland"
+
     try:
         QGuiApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
         app = QApplication(sys.argv)
