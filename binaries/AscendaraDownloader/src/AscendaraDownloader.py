@@ -274,39 +274,42 @@ def can_keep_install_for_dll_repair(directory, errors, update_flow, old_map, pri
         return False
 
 class SmoothETA:
-    """Smooth the predicted finish time while letting seconds count down normally."""
+    """Estimate the finish time from a smoothed transfer rate.
+
+    The rate is smoothed, not the time: remaining time is bytes / rate, so a
+    brief dip toward 0 B/s (a disk flush, a reconnecting stream) would add
+    minutes to a time average, while it only nudges a rate average.
+    """
+    RATE_SMOOTHING = 8.0  # seconds
+
     def __init__(self):
-        self.remaining = None
+        self.rate = None
         self.updated_at = None
         self.previous_done = 0
         self.previous_total = None
 
     def update(self, done, total, speed, now):
         if total != self.previous_total or done < self.previous_done:
-            self.remaining = None
+            self.rate = None
             self.updated_at = None
         self.previous_done, self.previous_total = done, total
         if not total or done >= total:
-            self.remaining = None
+            self.rate = None
             self.updated_at = None
             return 0
-        if speed <= 0:
-            return math.ceil(self.remaining) if self.remaining is not None else 0
-        measured = max(0, (total - done) / speed)
-        if self.remaining is None:
-            self.remaining = measured
+        if self.rate is None:
+            if speed <= 0:
+                return 0
+            self.rate = speed
         else:
-            elapsed = max(0, now - self.updated_at)
-            predicted = max(0, self.remaining - elapsed)
-            # Filter corrections to the finish time, not the countdown itself.
-            # Ten seconds of smoothing absorbs brief speed dips, but a sustained
-            # slowdown can still move the estimate upward instead of reaching 0 early.
-            correction = measured - predicted
-            weight = -math.expm1(-elapsed / 10.0)
-            self.remaining = predicted + correction * weight
+            # Stalls count as 0 B/s, so a lasting stall raises the estimate.
+            weight = -math.expm1(-max(0, now - self.updated_at) / self.RATE_SMOOTHING)
+            self.rate += (max(0, speed) - self.rate) * weight
         self.updated_at = now
+        if self.rate <= 0:
+            return 0
         # Reserve 0s for actual completion, including the final partial second.
-        return max(1, math.ceil(self.remaining))
+        return max(1, math.ceil((total - done) / self.rate))
 
 
 class ChunkedDownloader:
