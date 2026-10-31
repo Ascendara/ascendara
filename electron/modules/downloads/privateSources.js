@@ -2,6 +2,7 @@ const { app, ipcMain, dialog, safeStorage, shell } = require("electron");
 const fs = require("fs-extra");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const os = require("node:os");
 const core = require("./privateSourceCore");
 const { getSettingsManager } = require("../core/settings");
 const { sanitizeGameName } = require("../core/utils");
@@ -97,10 +98,54 @@ async function matchAutomatic(s) {
     try {
       const candidates = await steamSearch(g.title);
       if (candidates[0]?.confidence === 1 && (candidates[1]?.confidence || 0) < 0.9)
-        s.overrides[g.id] = { ...await steamDetails(candidates[0].id), match: "automatic" };
-      else s.overrides[g.id] = { match: "needs-review" };
+        s.overrides[g.id] = { ...await steamDetails(candidates[0].id), match: "automatic", ...stamp() };
+      else s.overrides[g.id] = { match: "needs-review", ...stamp() };
     } catch { break; } // Provider outage must not take the source offline.
   }
+}
+const stamp = () => ({ updatedAt: new Date().toISOString(), updatedBy: os.hostname().slice(0, 100) });
+// Art-only edits from before sharing have no match status; treat them as manual so they aren't replaced.
+const toShared = o => core.sharedEntry({ ...o, match: o.match || (o.uploadedArt ? "manual" : undefined),
+  art: o.uploadedArt ? `art/${o.uploadedArt}` : o.sharedArt });
+const fromShared = e => ({ title: e.title, identifiers: e.identifiers, metadata: e.metadata, match: e.match,
+  updatedAt: e.updatedAt, updatedBy: e.updatedBy, ...(e.art ? { sharedArt: e.art, artRevision: e.art } : {}) });
+// Pull newer matches from the folder's shared library, then push local ones the share doesn't have yet.
+async function syncShared(s) {
+  if (!s.shareMatches || s.type === "http" || !s.index) return 0;
+  let shared;
+  try { shared = (await core.readShared(s.location)) || {}; }
+  catch (e) { s.sharedError = e.message; return 0; } // Never overwrite a file this version can't read.
+  s.overrides ||= {};
+  const ids = s.index.games.map(g => g.id);
+  let pulled = 0, changed = false;
+  for (const id of ids) {
+    const local = s.overrides[id] && toShared(s.overrides[id]);
+    if (shared[id] && core.newer(local, shared[id]) !== local) { s.overrides[id] = fromShared(shared[id]); pulled++; }
+  }
+  const out = { ...shared };
+  try {
+    for (const id of ids) {
+      const o = s.overrides[id], local = o && toShared(o);
+      if (!local || core.newer(shared[id], local) !== local) continue;
+      if (o.uploadedArt) {
+        const art = path.join(s.location, core.SHARED_DIR, "art", o.uploadedArt);
+        await fs.ensureDir(path.dirname(art));
+        await fs.copy(path.join(root(), "artwork", o.uploadedArt), art, { overwrite: false, errorOnExist: false });
+      }
+      out[id] = local; changed = true;
+    }
+    if (changed) await core.writeShared(s.location, out);
+    s.sharedError = null;
+  } catch (e) { s.sharedError = e.message; } // Read-only shares still get the shared matches.
+  s.sharedGames = ids.filter(id => out[id]).length;
+  return pulled;
+}
+async function refreshAndSync(s) {
+  await refresh(s);
+  let pulled = await syncShared(s);
+  await matchAutomatic(s);
+  pulled += await syncShared(s);
+  return pulled;
 }
 function catalog(s) {
   return { games: (s.index?.games || []).map(raw => {
@@ -126,6 +171,11 @@ async function artwork(s, g, kind = "cover") {
   let buffer;
   try { buffer = await fs.readFile(file); } catch {
     if (g.uploadedArt) buffer = await fs.readFile(path.join(root(), "artwork", g.uploadedArt));
+    else if (g.sharedArt && s.type !== "http") {
+      const local = await core.confined(path.join(s.location, core.SHARED_DIR), g.sharedArt);
+      if ((await fs.stat(local)).size > 2 * 1024 ** 2) throw core.fail("artworkTooLarge");
+      buffer = await fs.readFile(local);
+    }
     else if (ref) {
       if (s.type === "http") buffer = await core.fetchBuffer(core.resolveReference(s.location, ref), { token: token(s) }, 2 * 1024 ** 2);
       else {
@@ -229,9 +279,10 @@ function registerPrivateSourceHandlers() {
     if (!Array.isArray(exclude) || !Array.isArray(ignore) || exclude.length + ignore.length > 1000) throw core.fail("invalidExclusions");
     [...exclude, ...ignore].forEach(core.relativePath);
     const s = { ...previous, id: previous?.id || crypto.randomUUID(), name: input.name.trim().slice(0, 100),
-      type: input.type, location: input.location, exclude, ignore, metadataEnabled: input.metadataEnabled === true };
+      type: input.type, location: input.location, exclude, ignore, metadataEnabled: input.metadataEnabled === true,
+      shareMatches: input.shareMatches === true && input.type !== "http" };
     if (previous && (s.location !== previous.location || s.type !== previous.type)) {
-      delete s.index; delete s.overrides; delete s.secret;
+      delete s.index; delete s.overrides; delete s.secret; delete s.sharedGames; delete s.sharedError;
     }
     if (input.token) {
       if (s.type !== "http" || !safeStorage.isEncryptionAvailable() || safeStorage.getSelectedStorageBackend?.() === "basic_text")
@@ -240,11 +291,12 @@ function registerPrivateSourceHandlers() {
       s.secret = safeStorage.encryptString(input.token).toString("base64");
     }
     if (input.clearToken) delete s.secret;
-    await refresh(s); await matchAutomatic(s);
-    await write([...sources.filter(v => v.id !== s.id), s]); return publicSource(s);
+    const sharedPulled = await refreshAndSync(s);
+    await write([...sources.filter(v => v.id !== s.id), s]); return { ...publicSource(s), sharedPulled };
   }));
   ipcMain.handle("private-source-refresh", (_, id) => serial(async () => {
-    const sources = await read(), s = find(sources, id); await refresh(s); await matchAutomatic(s); await write(sources); return publicSource(s);
+    const sources = await read(), s = find(sources, id); const sharedPulled = await refreshAndSync(s);
+    await write(sources); return { ...publicSource(s), sharedPulled };
   }));
   // Probes run outside the queue so a dead share can't stall saves and refreshes
   ipcMain.handle("private-sources-check", async () => {
@@ -271,8 +323,8 @@ function registerPrivateSourceHandlers() {
     const update = override.steamId ? await steamDetails(override.steamId) : {};
     if (typeof override.title === "string" && override.title.trim()) update.title = override.title.trim().slice(0, 300);
     if (typeof override.description === "string") update.metadata = { ...(update.metadata || entry(s, game).metadata), description: override.description.slice(0, 20000) };
-    s.overrides ||= {}; s.overrides[game] = { ...s.overrides[game], ...update, match: "manual" };
-    await write(sources); return catalog(s);
+    s.overrides ||= {}; s.overrides[game] = { ...s.overrides[game], ...update, match: "manual", ...stamp() };
+    await syncShared(s); await write(sources); return catalog(s);
   }));
   ipcMain.handle("private-source-upload-art", (_, id, game) => serial(async () => {
     const sources = await read(), s = find(sources, id); entry(s, game);
@@ -282,8 +334,9 @@ function registerPrivateSourceHandlers() {
     const buffer = await fs.readFile(choice.filePaths[0]); imageMime(buffer);
     const key = crypto.randomUUID(); await fs.ensureDir(path.join(root(), "artwork"));
     await fs.writeFile(path.join(root(), "artwork", key), buffer);
-    s.overrides ||= {}; s.overrides[game] = { ...s.overrides[game], uploadedArt: key, artRevision: key };
-    await write(sources); return true;
+    const { sharedArt: _sharedArt, ...previous } = s.overrides?.[game] || {};
+    s.overrides ||= {}; s.overrides[game] = { ...previous, uploadedArt: key, artRevision: key, match: "manual", ...stamp() };
+    await syncShared(s); await write(sources); return true;
   }));
   ipcMain.handle("private-source-folder", async () => {
     const choice = await dialog.showOpenDialog({ properties: ["openDirectory"] }); return choice.canceled ? null : choice.filePaths[0];

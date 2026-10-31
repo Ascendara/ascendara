@@ -91,7 +91,7 @@ async function scan(root, sourceId, { exclude = [], ignore = [] } = {}) {
     for (const entry of entries) {
       if (++visited > 100000) throw fail("tooManyEntries");
       const ref = prefix + entry.name;
-      if (entry.isSymbolicLink() || exclude.some(e => ref === e || ref.startsWith(e + "/")) || ignore.includes(ref)) continue;
+      if (entry.isSymbolicLink() || ref === ".ascendara" || exclude.some(e => ref === e || ref.startsWith(e + "/")) || ignore.includes(ref)) continue;
       if (entry.isDirectory()) await walk(await confined(root, ref), ref + "/", depth + 1);
       else if (entry.isFile() && TYPES.has(path.extname(entry.name).slice(1).toLowerCase())) {
         const stat = await fs.promises.stat(await confined(root, ref));
@@ -196,5 +196,71 @@ function rankCandidates(title, candidates) {
     return { ...c, confidence: key === other ? 1 : 2 * overlap / (a.size + b.size) };
   }).sort((a, b) => b.confidence - a.confidence);
 }
+// Shared library: matches saved inside a folder source so every device using it reads them
+// instead of matching again. Game IDs hash the relative path, so they agree across mount points.
+const SHARED_DIR = ".ascendara";
+const SHARED_FILE = "library.json";
+const MATCH_RANK = { "needs-review": 0, automatic: 1, manual: 2 };
+function sharedEntry(g) {
+  if (!g || typeof g !== "object" || !(g.match in MATCH_RANK)) return null;
+  const steam = /^\d+$/.test(String(g.identifiers?.steam)) ? String(g.identifiers.steam) : undefined;
+  const m = g.metadata;
+  const metadata = m && typeof m === "object" ? { description: text(m.description, 20000),
+    releaseDate: text(m.releaseDate), developer: text(m.developer), publisher: text(m.publisher),
+    genres: Array.isArray(m.genres) ? m.genres.slice(0, 30).map(v => text(v, 100)) : [],
+    screenshots: Array.isArray(m.screenshots) ? m.screenshots.slice(0, 12).filter(v => {
+      try { const u = httpUrl(v); return u.protocol === "https:" && /\.(steamstatic|steamusercontent)\.com$/.test(u.hostname); } catch { return false; }
+    }) : [] } : undefined;
+  let art;
+  if (g.art) { relativePath(g.art); if (!/^art\/[a-z0-9-]{1,64}$/i.test(g.art)) throw fail("unsafePath"); art = g.art; }
+  const updatedAt = Number.isFinite(Date.parse(g.updatedAt)) ? new Date(g.updatedAt).toISOString() : undefined;
+  return Object.fromEntries(Object.entries({ title: text(g.title, 300) || undefined, identifiers: steam ? { steam } : undefined,
+    metadata, match: g.match, art, updatedAt, updatedBy: text(g.updatedBy, 100) || undefined })
+    .filter(([, v]) => v !== undefined));
+}
+function validateShared(raw) {
+  if (!raw || raw.version !== 1 || raw.kind !== "ascendara-shared-library" ||
+      !raw.games || typeof raw.games !== "object" || Array.isArray(raw.games) || Object.keys(raw.games).length > 10000)
+    throw fail("invalidSharedLibrary");
+  const games = {};
+  for (const [id, g] of Object.entries(raw.games)) {
+    if (!/^[a-f0-9]{24}$/.test(id)) continue;
+    const entry = sharedEntry(g);
+    if (entry) games[id] = entry;
+  }
+  return games;
+}
+// Manual matches beat automatic guesses; within a rank the newer edit wins and ties keep `a`.
+function newer(a, b) {
+  if (!b) return a; if (!a) return b;
+  const rank = MATCH_RANK[b.match] - MATCH_RANK[a.match];
+  if (rank) return rank > 0 ? b : a;
+  return (Date.parse(b.updatedAt) || 0) > (Date.parse(a.updatedAt) || 0) ? b : a;
+}
+async function readShared(root) {
+  const file = path.join(root, SHARED_DIR, SHARED_FILE);
+  let buffer;
+  try {
+    const stat = await fs.promises.lstat(file);
+    if (!stat.isFile()) throw fail("invalidSharedLibrary");
+    if (stat.size > MAX_INDEX) throw fail("responseTooLarge");
+    buffer = await fs.promises.readFile(file);
+  } catch (e) { if (e.code === "ENOENT") return null; throw e; }
+  let raw;
+  try { raw = JSON.parse(buffer.toString("utf8")); } catch { throw fail("invalidSharedLibrary"); }
+  return validateShared(raw);
+}
+async function writeShared(root, games) {
+  const dir = path.join(root, SHARED_DIR);
+  await fs.promises.mkdir(dir, { recursive: true });
+  const file = path.join(dir, SHARED_FILE);
+  const tmp = `${file}.${process.pid}-${crypto.randomBytes(4).toString("hex")}.tmp`;
+  const entries = Object.entries(games).sort((a, b) => (Date.parse(b[1].updatedAt) || 0) - (Date.parse(a[1].updatedAt) || 0));
+  const body = { version: 1, kind: "ascendara-shared-library", games: Object.fromEntries(entries.slice(0, 10000)) };
+  await fs.promises.writeFile(tmp, JSON.stringify(body, null, 2));
+  try { await fs.promises.rename(tmp, file); }
+  catch (e) { await fs.promises.unlink(tmp).catch(() => {}); throw e; }
+}
 module.exports = { TYPES, fail, relativePath, httpUrl, resolveReference, confined, cleanTitle, validateIndex,
-  scan, request, fetchBuffer, fetchIndex, checksum, transfer, rankCandidates };
+  scan, request, fetchBuffer, fetchIndex, checksum, transfer, rankCandidates,
+  SHARED_DIR, MATCH_RANK, sharedEntry, validateShared, newer, readShared, writeShared };

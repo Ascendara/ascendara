@@ -51,6 +51,7 @@ const empty = {
   exclude: [],
   ignore: [],
   metadataEnabled: false,
+  shareMatches: true,
 };
 const learnMore = () =>
   window.electron.openURL(
@@ -130,11 +131,22 @@ export default function PrivateSources() {
     gameService.notifySourceChanged();
     navigate("/search");
   };
+  const report = result => {
+    if (result.error) toast.error(privateSourceMessage(t, result.error));
+    else if (result.sharedError)
+      toast.warning(
+        t("privateSources.sharedFailed", {
+          error: privateSourceMessage(t, result.sharedError),
+        })
+      );
+    if (result.sharedPulled)
+      toast.success(t("privateSources.sharedLoaded", { count: result.sharedPulled }));
+  };
   const refresh = s =>
     run(async () => {
       const result = await window.electron.privateSources.refresh(s.id);
       gameService.notifySourceChanged();
-      if (result.error) toast.error(privateSourceMessage(t, result.error));
+      report(result);
     });
   const remove = s =>
     run(async () => {
@@ -460,6 +472,40 @@ export default function PrivateSources() {
                   </p>
                 </div>
               </div>
+              {draft.type !== "http" && (
+                <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 p-4">
+                  <Checkbox
+                    id="private-share"
+                    aria-labelledby="private-share-label"
+                    aria-describedby="private-share-help"
+                    disabled={busy}
+                    className="mt-0.5 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    checked={!!draft.shareMatches}
+                    onCheckedChange={checked =>
+                      setDraft({ ...draft, shareMatches: checked })
+                    }
+                  />
+                  <div>
+                    <button
+                      id="private-share-label"
+                      type="button"
+                      disabled={busy}
+                      className="text-left text-sm font-medium"
+                      onClick={() =>
+                        setDraft({ ...draft, shareMatches: !draft.shareMatches })
+                      }
+                    >
+                      {t("privateSources.shareLabel")}
+                    </button>
+                    <p
+                      id="private-share-help"
+                      className="mt-1 text-xs leading-relaxed text-muted-foreground"
+                    >
+                      {t("privateSources.shareHelp")}
+                    </p>
+                  </div>
+                </div>
+              )}
               <details
                 className="group rounded-xl border border-border/60"
                 open={draft.hasToken || undefined}
@@ -572,7 +618,9 @@ export default function PrivateSources() {
               </details>
               <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
                 <Shield className="mt-0.5 h-4 w-4 shrink-0" />
-                {t("privateSources.privacyNote")}
+                {draft.type !== "http" && draft.shareMatches
+                  ? t("privateSources.privacyNoteShared")
+                  : t("privateSources.privacyNote")}
               </p>
             </div>
           )}
@@ -600,7 +648,7 @@ export default function PrivateSources() {
                   });
                   gameService.notifySourceChanged();
                   setDraft(null);
-                  if (result.error) toast.error(privateSourceMessage(t, result.error));
+                  report(result);
                 })
               }
             >
