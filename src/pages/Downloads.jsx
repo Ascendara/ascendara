@@ -1608,6 +1608,8 @@ const DownloadCard = ({
     "Connection broken",
     "IncompleteRead",
     "HTTP 410",
+    "No download link was provided",
+    "Unable to fetch GOFile content information (HTTP 401",
   ];
 
   const isPredefinedError = message => {

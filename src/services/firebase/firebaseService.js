@@ -1,5 +1,5 @@
 // Firebase SDK initialization for Ascendara account management
-import { userAuthenticatedFetch } from "@/utils/authHelper";
+import { getClientVersionHeaders, userAuthenticatedFetch } from "@/utils/authHelper";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -3168,17 +3168,19 @@ export const listBackups = async (gameName = null) => {
 };
 
 /**
- * Header that links a report to the signed-in member so they can track it in Ascend
- * @returns {Promise<object>} Empty when signed out or the token can't be read
+ * Headers for a report: the app version (reports are only accepted from the
+ * latest release) and, when signed in, the member so they can track it in Ascend
+ * @returns {Promise<object>}
  */
 export const getReporterHeaders = async () => {
+  const headers = getClientVersionHeaders();
   const user = auth?.currentUser;
-  if (!user) return {};
+  if (!user) return headers;
   try {
-    return { "X-Ascend-Token": await user.getIdToken() };
+    return { ...headers, "X-Ascend-Token": await user.getIdToken() };
   } catch (error) {
     console.warn("Could not attach Ascend account to report:", error);
-    return {};
+    return headers;
   }
 };
 
