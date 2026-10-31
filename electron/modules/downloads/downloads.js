@@ -1346,6 +1346,10 @@ function registerDownloadHandlers() {
     dllRepair.setAscendToken(token);
   });
 
+  ipcMain.handle("set-ascend-repair-access", (_, member) => {
+    dllRepair.setAscendMember(member === true);
+  });
+
   ipcMain.handle("repair-game-dlls", async (_, game, libraryDirectory) => {
     try {
       const name = sanitizeGameName(sanitizeText(game));

@@ -20,8 +20,19 @@ function setAscendToken(value) {
       : null;
 }
 
+// Contributing is an Ascend feature. The renderer reports whether the signed-in
+// account has Ascend access; memory only, so nothing uploads until it confirms,
+// and sign-out or an ended trial or plan stops contributions.
+let ascendMember = false;
+
+function setAscendMember(value) {
+  ascendMember = value === true;
+  if (!ascendMember) stopContributions();
+}
+
 function contributionAllowed() {
   return (
+    ascendMember &&
     require("../core/settings")
       .getSettingsManager()
       .getSetting("contributeRepairDlls") === true
@@ -457,6 +468,7 @@ function scheduleContribution(info, directory, metadataName) {
 
 module.exports = {
   setAscendToken,
+  setAscendMember,
   stopContributions,
   run,
   resolveTarget,

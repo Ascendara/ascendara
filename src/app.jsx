@@ -1033,7 +1033,33 @@ const DownloadStallNotifier = () => {
 
 // Initialize download sync service when user is authenticated with Ascend access
 const DownloadSyncInitializer = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, userData, isAuthenticated } = useAuth();
+  const subscriptionKey = JSON.stringify(userData?.ascendSubscription ?? null);
+
+  // DLL contributions are an Ascend feature: the main process only uploads
+  // while this reports access. Rechecked when the subscription changes and
+  // hourly, so a trial or plan that ends mid-session stops them.
+  useEffect(() => {
+    let canceled = false;
+    const shareAccess = async () => {
+      let member = false;
+      if (isAuthenticated && user) {
+        try {
+          const access = await verifyAscendAccess();
+          member = Boolean(access.hasAccess || access.isSubscribed || access.isVerified);
+        } catch (error) {
+          console.error("[App] Error checking Ascend access for DLL sharing:", error);
+        }
+      }
+      if (!canceled) await window.electron?.setAscendRepairAccess?.(member);
+    };
+    shareAccess();
+    const interval = setInterval(shareAccess, 60 * 60 * 1000);
+    return () => {
+      canceled = true;
+      clearInterval(interval);
+    };
+  }, [isAuthenticated, user, subscriptionKey]);
 
   useEffect(() => {
     initializeDesktopLibrarySync(isAuthenticated ? user : null);
