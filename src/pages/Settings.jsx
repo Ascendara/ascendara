@@ -1208,6 +1208,12 @@ function Settings() {
           // App swaps to the welcome flow as if this were a new install
           window.dispatchEvent(new CustomEvent("ascendara:show-welcome"));
           break;
+
+        case "verification":
+          // Ascend shows the email verification screen once, regardless of account state
+          localStorage.setItem("forceVerificationScreen", "true");
+          navigate("/ascend");
+          break;
       }
     } catch (error) {
       console.error("Error triggering screen:", error);
@@ -4549,6 +4555,9 @@ function Settings() {
                               <SelectItem value="crashscreen">Crash Screen</SelectItem>
                               <SelectItem value="finishingup">Finishing Up</SelectItem>
                               <SelectItem value="welcome">Welcome Flow</SelectItem>
+                              <SelectItem value="verification">
+                                Email Verification
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <Button

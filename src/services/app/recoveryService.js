@@ -66,6 +66,7 @@ export function clearTransientUiState() {
   const transientKeys = [
     "forceLoading",
     "forceInstalling",
+    "forceVerificationScreen",
     "finishingUp",
     "ascendara:startTour",
   ];

@@ -14,10 +14,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
 import {
   User,
-  Mail,
   Loader2,
   ArrowRight,
   Clock,
@@ -28,11 +26,12 @@ import {
   Hammer,
   BadgeDollarSign,
 } from "lucide-react";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import useAscendPage from "./ascend/useAscendPage";
 import SectionLoading from "./ascend/SectionLoading";
 import CommunityTabs, { COMMUNITY_SECTIONS } from "./ascend/CommunityTabs";
 import AscendWelcomeTour from "./ascend/AscendWelcomeTour";
+import VerifyEmailScreen from "./ascend/VerifyEmailScreen";
 import { useAscendNotificationCount } from "@/services/ascend/ascendNotificationBadgeService";
 const HomeSection = lazy(() => import("./ascend/HomeSection"));
 const SearchSection = lazy(() => import("./ascend/SearchSection"));
@@ -53,6 +52,12 @@ const AuthSection = lazy(() => import("./ascend/AuthSection"));
 
 const Ascend = () => {
   const ascendNotificationCount = useAscendNotificationCount();
+  // Dev screen trigger in Settings previews the verification screen once
+  const [previewVerification, setPreviewVerification] = useState(() => {
+    if (!localStorage.getItem("forceVerificationScreen")) return false;
+    localStorage.removeItem("forceVerificationScreen");
+    return true;
+  });
   const {
     checkingVersion,
     t,
@@ -376,65 +381,21 @@ const Ascend = () => {
   }
 
   // Email verification required screen (only for email/password users)
-  if (user && !user.emailVerified && user.providerData?.[0]?.providerId === "password") {
+  if (
+    previewVerification ||
+    (user && !user.emailVerified && user.providerData?.[0]?.providerId === "password")
+  ) {
     return (
-      <div className="container mx-auto flex min-h-[80vh] max-w-md items-center px-6 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full space-y-6"
-        >
-          <div className="space-y-2 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-              <Mail className="h-8 w-8 text-primary" />
-            </div>
-            <h1 className="text-3xl font-bold">{t("account.verification.title")}</h1>
-            <p className="text-muted-foreground">{t("account.verification.subtitle")}</p>
-          </div>
-
-          <div className="rounded-xl border border-border/50 bg-card/50 p-4 text-center">
-            <p className="text-sm text-muted-foreground">
-              {t("account.verification.sentTo")}
-            </p>
-            <p className="mt-1 font-medium">{user.email}</p>
-          </div>
-
-          <div className="space-y-3">
-            <Button
-              onClick={async () => {
-                const result = await reloadUser();
-                if (result.success && result.user?.emailVerified) {
-                  toast.success(t("account.verification.verified"));
-                } else {
-                  toast.error(t("account.verification.notYet"));
-                }
-              }}
-              className="h-11 w-full text-secondary"
-            >
-              <ArrowRight className="mr-2 h-4 w-4" />
-              {t("account.verification.checkNow")}
-            </Button>
-
-            <Button
-              onClick={handleResendVerification}
-              variant="outline"
-              className="h-11 w-full"
-              disabled={isResendingEmail}
-            >
-              {isResendingEmail ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Mail className="mr-2 h-4 w-4" />
-              )}
-              {t("account.verification.resend")}
-            </Button>
-          </div>
-
-          <p className="text-center text-xs text-muted-foreground">
-            {t("account.verification.checking")}
-          </p>
-        </motion.div>
-      </div>
+      <VerifyEmailScreen
+        t={t}
+        email={user?.email || "preview@example.com"}
+        preview={previewVerification}
+        reloadUser={reloadUser}
+        onResend={handleResendVerification}
+        isResending={isResendingEmail}
+        onSignOut={handleLogout}
+        onExitPreview={() => setPreviewVerification(false)}
+      />
     );
   }
 
