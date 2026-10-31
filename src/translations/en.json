@@ -1149,7 +1149,7 @@
         },
         "profile": {
           "signatureAlt": "Santiago's signature",
-          "thanksBody": "Being part of Ascend is what keeps Ascendara growing, and it genuinely means a lot to me. If there's ever something you'd like to see, or something that could work better, I'd love to hear about it.",
+          "thanksBody": "Ascendara started in 2024 as a small personal project. Back then, I never imagined it would grow into what it is today, reaching tens of thousands of downloads and building a community of people from around the world. Over the years, I've spent countless hours working on Ascendara, adding new features, improving the experience, and turning what started as a simple idea into something much bigger. Seeing people actually use and enjoy something I've built still feels surreal to me. And knowing that people like you believe in the project enough to support it through Ascend genuinely means more than you might think. Your support helps me keep developing Ascendara, exploring new ideas, and making it better for everyone.",
           "thanksEyebrow": "A note from the developer",
           "thanksGreeting": "Thank you, {{name}}."
         },
