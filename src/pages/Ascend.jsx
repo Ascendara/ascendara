@@ -207,6 +207,7 @@ const Ascend = () => {
     loadingProfile,
     profileError,
     viewingProfile,
+    profileReturnSection,
     reportDialogOpen,
     setReportDialogOpen,
     handleSubmitUserReport,
@@ -825,6 +826,7 @@ const Ascend = () => {
           return (
             <UserProfileSection
               handleBackFromProfile={handleBackFromProfile}
+              returnSection={profileReturnSection}
               t={t}
               loadingProfile={loadingProfile}
               profileError={profileError}

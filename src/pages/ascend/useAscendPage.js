@@ -2985,6 +2985,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     loadingProfile,
     profileError,
     viewingProfile,
+    profileReturnSection,
     reportDialogOpen,
     setReportDialogOpen,
     handleSubmitUserReport,

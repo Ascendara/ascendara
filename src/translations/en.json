@@ -963,6 +963,10 @@
     "profile": {
       "achievements": "Achievements",
       "back": "Back to Search",
+      "backGeneric": "Back",
+      "backToFriends": "Back to Friends",
+      "backToLeaderboard": "Back to Leaderboard",
+      "backToMessages": "Back to Messages",
       "cloudSynced": "Cloud Synced",
       "error": "Error loading profile",
       "games": "Games",

@@ -40,8 +40,17 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import EarnedBadges from "@/components/EarnedBadges";
 
+// Label for the back button, named after the section the profile was opened from
+const BACK_LABEL_KEYS = {
+  search: "ascend.profile.back",
+  friends: "ascend.profile.backToFriends",
+  messages: "ascend.profile.backToMessages",
+  leaderboard: "ascend.profile.backToLeaderboard",
+};
+
 export default function UserProfileSection({
   handleBackFromProfile,
+  returnSection,
   t,
   loadingProfile,
   profileError,
@@ -65,7 +74,7 @@ export default function UserProfileSection({
       {/* Back Button */}
       <Button variant="ghost" onClick={handleBackFromProfile} className="-ml-2 gap-2">
         <ArrowLeft className="h-4 w-4" />
-        {t("ascend.profile.back") || "Back to Search"}
+        {t(BACK_LABEL_KEYS[returnSection] || "ascend.profile.backGeneric")}
       </Button>
 
       {loadingProfile ? (
