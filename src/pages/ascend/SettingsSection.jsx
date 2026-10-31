@@ -4,10 +4,19 @@ import ReviewCardSettingsCard from "./settings/ReviewCardSettingsCard";
 import SubscriptionSettingsCard from "./settings/SubscriptionSettingsCard";
 import AccountActionsCard from "./settings/AccountActionsCard";
 import DllSharingSettingsCard from "./settings/DllSharingSettingsCard";
+import TwoFactorSettingsCard from "./settings/TwoFactorSettingsCard";
 import SectionHeader from "./SectionHeader";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { User, Crown, Image as ImageIcon, Shield, LogOut, Wrench } from "lucide-react";
+import {
+  User,
+  Crown,
+  Image as ImageIcon,
+  Shield,
+  ShieldCheck,
+  LogOut,
+  Wrench,
+} from "lucide-react";
 export default function SettingsSection({
   t,
   isEditingProfile,
@@ -73,6 +82,7 @@ export default function SettingsSection({
       : []),
     { id: "subscription", icon: Crown, label: t("ascend.settings.subscription") },
     { id: "privacy", icon: Shield, label: t("ascend.settings.privacy") },
+    { id: "security", icon: ShieldCheck, label: t("account.twoFactor.settings.title") },
     ...(ascendAccess?.hasAccess
       ? [{ id: "dllSharing", icon: Wrench, label: t("ascend.settings.dllSharing") }]
       : []),
@@ -198,6 +208,10 @@ export default function SettingsSection({
 
           <section {...sectionProps("privacy")}>
             <PrivacySettingsCard t={t} userData={userData} updateData={updateData} />
+          </section>
+
+          <section {...sectionProps("security")}>
+            <TwoFactorSettingsCard t={t} />
           </section>
 
           {ascendAccess?.hasAccess && (

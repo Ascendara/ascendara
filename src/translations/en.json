@@ -146,6 +146,38 @@
       "loggedOut": "Signed out successfully",
       "registered": "Account created! Please check your email to verify."
     },
+    "twoFactor": {
+      "codeSent": "Code sent. Check your inbox.",
+      "enterCode": "Enter the 6-digit code",
+      "expires": "The code expires 10 minutes after it's sent.",
+      "eyebrow": "Two-step verification",
+      "from": "Sent from {{sender}}",
+      "notYou": "Not you?",
+      "resend": "Send a new code",
+      "resendIn": "New code in {{seconds}}s",
+      "sendFailed": "Couldn't send the code. Try again in a moment.",
+      "sentTo": "Code sent to",
+      "settings": {
+        "description": "Ask for a code sent to your email every time you sign in, so your password alone can't get into your account.",
+        "dialogDescription": "Ascendara sent a 6-digit code to {{email}}. Enter it below to confirm.",
+        "disableTitle": "Turn off two-step verification",
+        "disabled": "Two-step verification is off",
+        "enableTitle": "Turn on two-step verification",
+        "enabled": "Two-step verification is on. You'll get a code by email each time you sign in.",
+        "label": "Two-step verification",
+        "off": "Off",
+        "on": "On",
+        "title": "Security",
+        "turnOff": "Turn off",
+        "turnOn": "Turn on"
+      },
+      "spamTip": "Can't find it? Check your spam or promotions folder, or send a new code.",
+      "subtitle": "Your account has two-step verification on. Enter the code Ascendara just emailed you to finish signing in.",
+      "title": "Check your email for a code",
+      "verified": "You're signed in",
+      "verify": "Verify and sign in",
+      "verifyFailed": "That code didn't work. Try again."
+    },
     "verification": {
       "checkNow": "I've verified my email",
       "checking": "Checking for verification automatically",

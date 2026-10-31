@@ -164,6 +164,12 @@ export const signInWithGoogle = async () => {
       isNewUser
     );
 
+    // Accounts with two-step verification can't touch Firestore until the
+    // code is entered, and they already have their documents
+    if ((await getTwoFactorStatus(user)).pending) {
+      return { user, error: null, isNewUser: false };
+    }
+
     // Check if user document exists, create if new
     const userDoc = await getDoc(doc(db, "users", user.uid));
     console.log("[signInWithGoogle] User document exists:", userDoc.exists());
@@ -548,7 +554,7 @@ export const changePassword = async (currentPassword, newPassword) => {
 
     // Reauthenticate user
     const credential = EmailAuthProvider.credential(user.email, currentPassword);
-    await reauthenticateWithCredential(user, credential);
+    await reauthenticate(user, credential);
 
     // Update password
     await updatePassword(user, newPassword);
@@ -574,7 +580,7 @@ export const deleteAccount = async (password, reason) => {
 
     // Reauthenticate user to verify password
     const credential = EmailAuthProvider.credential(user.email, password);
-    await reauthenticateWithCredential(user, credential);
+    await reauthenticate(user, credential);
 
     // Get user data for the request
     const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -844,6 +850,75 @@ export const reloadCurrentUser = async () => {
     console.error("Reload user error:", error);
     return { success: false, user: null, error: getErrorMessage(error.code) };
   }
+};
+
+/**
+ * Read two-step verification state from the ID token's custom claims
+ * @param {object} user - Firebase user
+ * @param {boolean} forceRefresh - Fetch fresh claims instead of the cached token
+ * @returns {Promise<{enabled: boolean, pending: boolean}>} pending means this
+ * sign-in still needs the emailed code
+ */
+export const getTwoFactorStatus = async (user, forceRefresh = false) => {
+  const { claims } = await user.getIdTokenResult(forceRefresh);
+  const enabled = claims.tfa === true;
+  const sessions = Array.isArray(claims.tfa_sessions) ? claims.tfa_sessions : [];
+  return { enabled, pending: enabled && !sessions.includes(claims.auth_time) };
+};
+
+const twoFactorRequest = async (path, body) => {
+  const user = auth?.currentUser;
+  if (!user) return { success: false, error: "No user logged in" };
+  try {
+    const response = await userAuthenticatedFetch(
+      user,
+      `${API_URL}/account/2fa/${path}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return {
+        success: false,
+        error: result.error || "An unexpected error occurred",
+        retryAfter: result.retryAfter,
+      };
+    }
+    // The API changes custom claims, which only arrive with a fresh token
+    if (path !== "send-code") await user.getIdToken(true);
+    return { ...result, success: true, error: null };
+  } catch (error) {
+    console.error(`Two-step verification ${path} error:`, error);
+    return { success: false, error: getErrorMessage("auth/network-request-failed") };
+  }
+};
+
+/**
+ * Email a two-step verification code
+ * @param {"signin"|"enable"|"disable"} purpose
+ * @returns {Promise<{success: boolean, error: string|null, retryAfter?: number}>}
+ */
+export const sendTwoFactorCode = purpose => twoFactorRequest("send-code", { purpose });
+
+/** Finish signing in with the emailed code */
+export const verifyTwoFactorCode = code => twoFactorRequest("verify", { code });
+
+/** Turn on two-step verification with a code sent for "enable" */
+export const enableTwoFactor = code => twoFactorRequest("enable", { code });
+
+/** Turn off two-step verification with a code sent for "disable" */
+export const disableTwoFactor = code => twoFactorRequest("disable", { code });
+
+// Reauthenticating gives the token a new auth_time, which two-step verification
+// treats as a new sign-in. A token from before proves this session was verified.
+const reauthenticate = async (user, credential) => {
+  const previousToken = await user.getIdToken();
+  await reauthenticateWithCredential(user, credential);
+  if (!(await getTwoFactorStatus(user)).pending) return;
+  await twoFactorRequest("carry-session", { previousToken });
 };
 
 // Serialize writes so lifecycle and manual changes reach Firestore in order.

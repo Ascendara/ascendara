@@ -32,6 +32,8 @@ import SectionLoading from "./ascend/SectionLoading";
 import CommunityTabs, { COMMUNITY_SECTIONS } from "./ascend/CommunityTabs";
 import AscendWelcomeTour from "./ascend/AscendWelcomeTour";
 import VerifyEmailScreen from "./ascend/VerifyEmailScreen";
+import TwoFactorScreen from "./ascend/TwoFactorScreen";
+import { useAuth } from "@/context/AuthContext";
 import { useAscendNotificationCount } from "@/services/ascend/ascendNotificationBadgeService";
 const HomeSection = lazy(() => import("./ascend/HomeSection"));
 const SearchSection = lazy(() => import("./ascend/SearchSection"));
@@ -52,6 +54,7 @@ const AuthSection = lazy(() => import("./ascend/AuthSection"));
 
 const Ascend = () => {
   const ascendNotificationCount = useAscendNotificationCount();
+  const { twoFactorUser, completeTwoFactor } = useAuth();
   // Dev screen trigger in Settings previews the verification screen once
   const [previewVerification, setPreviewVerification] = useState(() => {
     if (!localStorage.getItem("forceVerificationScreen")) return false;
@@ -377,6 +380,18 @@ const Ascend = () => {
           </p>
         </motion.div>
       </div>
+    );
+  }
+
+  // Signed in, but this sign-in still needs the emailed two-step code
+  if (twoFactorUser) {
+    return (
+      <TwoFactorScreen
+        t={t}
+        email={twoFactorUser.email}
+        onVerified={completeTwoFactor}
+        onSignOut={handleLogout}
+      />
     );
   }
 

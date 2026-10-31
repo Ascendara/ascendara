@@ -15,6 +15,8 @@ import {
   resendVerificationEmail,
   reloadCurrentUser,
   signInWithGoogle,
+  getCurrentUser,
+  getTwoFactorStatus,
 } from "@/services/firebase/firebaseService";
 import { track } from "@/services/app/analyticsService";
 
@@ -46,6 +48,8 @@ export const useAuth = () => {
         error: "Auth not available",
       }),
       reloadUser: async () => ({ success: false, error: "Auth not available" }),
+      twoFactorUser: null,
+      completeTwoFactor: async () => {},
       clearError: () => {},
     };
   }
@@ -57,14 +61,21 @@ export const AuthProvider = ({ children }) => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Signed in with a password or Google but still owes the emailed two-step
+  // code. Until then user stays null, since Firestore and the API refuse
+  // everything for this sign-in.
+  const [twoFactorUser, setTwoFactorUser] = useState(null);
   const userDataUnsubscribeRef = useRef(() => {});
+  const handleAuthUserRef = useRef(null);
+  const userRef = useRef(null);
+  userRef.current = user;
 
   // Subscribe to auth state changes
   useEffect(() => {
     let unsubscribe = () => {};
 
     try {
-      unsubscribe = subscribeToAuthChanges(async firebaseUser => {
+      const handleAuthUser = async firebaseUser => {
         // Tear down any existing real-time user data listener before
         // handling the new auth state (login, logout, or user switch).
         userDataUnsubscribeRef.current();
@@ -76,6 +87,17 @@ export const AuthProvider = ({ children }) => {
               "[AuthContext] Auth state changed - user logged in:",
               firebaseUser.uid
             );
+
+            const { pending } = await getTwoFactorStatus(firebaseUser).catch(() => ({
+              pending: false,
+            }));
+            if (pending) {
+              setTwoFactorUser(firebaseUser);
+              setUser(null);
+              setUserData(null);
+              return;
+            }
+            setTwoFactorUser(null);
 
             // Fetch additional user data from Firestore
             const { data, error: fetchError } = await getUserData(firebaseUser.uid);
@@ -169,6 +191,7 @@ export const AuthProvider = ({ children }) => {
             );
           } else {
             console.log("[AuthContext] Auth state changed - user logged out");
+            setTwoFactorUser(null);
             setUser(null);
             setUserData(null);
           }
@@ -180,7 +203,9 @@ export const AuthProvider = ({ children }) => {
         } finally {
           setLoading(false);
         }
-      });
+      };
+      handleAuthUserRef.current = handleAuthUser;
+      unsubscribe = subscribeToAuthChanges(handleAuthUser);
     } catch (err) {
       console.error("Error subscribing to auth changes:", err);
       setLoading(false);
@@ -190,6 +215,23 @@ export const AuthProvider = ({ children }) => {
       unsubscribe();
       userDataUnsubscribeRef.current();
     };
+  }, []);
+
+  // A signed-in session can fall back to needing the code: two-step
+  // verification turned on from another device, or an older sign-in pushed
+  // out of the verified list. Both show up on the next token refresh.
+  useEffect(() => {
+    const unsubscribe = subscribeToIdTokenChanges(async firebaseUser => {
+      if (!firebaseUser || userRef.current?.uid !== firebaseUser.uid) return;
+      try {
+        if ((await getTwoFactorStatus(firebaseUser)).pending) {
+          handleAuthUserRef.current?.(firebaseUser);
+        }
+      } catch (err) {
+        console.error("[AuthContext] Two-step verification check failed:", err);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   // DLL repair reports run in the main process and are counted per Ascend member
@@ -348,6 +390,12 @@ export const AuthProvider = ({ children }) => {
     return result;
   };
 
+  // Load the account once the emailed code is accepted and the token refreshed
+  const completeTwoFactor = async () => {
+    const current = getCurrentUser();
+    if (current) await handleAuthUserRef.current?.(current);
+  };
+
   // Clear error
   const clearError = () => setError(null);
 
@@ -372,6 +420,8 @@ export const AuthProvider = ({ children }) => {
     updateData,
     resendVerificationEmail: resendVerification,
     reloadUser,
+    twoFactorUser,
+    completeTwoFactor,
     clearError,
   };
 
