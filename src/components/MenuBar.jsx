@@ -499,13 +499,13 @@ const MenuBar = () => {
             title={isFullscreen ? t("exitFullscreen") : t("enterFullscreen")}
           >
             <Minimize
-              className={`absolute h-4 w-4 transition-opacity ${
-                isFullscreen ? "bg-background opacity-100" : "opacity-0"
+              className={`absolute inset-0 h-4 w-4 transition-opacity ${
+                isFullscreen ? "opacity-100" : "opacity-0"
               }`}
             />
             <Maximize
               className={`h-4 w-4 transition-opacity ${
-                isFullscreen ? "opacity-0" : "bg-background opacity-100"
+                isFullscreen ? "opacity-0" : "opacity-100"
               }`}
             />
           </button>
