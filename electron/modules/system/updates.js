@@ -10,6 +10,13 @@ const axios = require("axios");
 const { pipeline } = require("stream/promises");
 const installUpdate = require("./install-update");
 const { downloadDifferentialUpdate } = require("./differential-update");
+const {
+  resolveMacUpdate,
+  downloadMacDelta,
+  cacheMacBuild,
+  pruneMacCache,
+  sha256File,
+} = require("./mac-updates");
 const { ipcMain, BrowserWindow, app, powerSaveBlocker, shell } = require("electron");
 const {
   API_URL,
@@ -48,10 +55,22 @@ const TESTING_RELEASE_URL =
 const UPDATE_STALL_TIMEOUT = 30000;
 const UPDATE_DOWNLOAD_ATTEMPTS = 5;
 
-function macUpdateName(version) {
-  const arch = process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "x64" : null;
-  if (!arch) throw new Error(`Unsupported macOS architecture: ${process.arch}`);
-  return `Ascendara-${version}-mac-${arch}.zip`;
+const isMac = process.platform === "darwin";
+
+// macOS builds are published for live and public-testing only
+const branchHasMacBuilds = branch => branch === "live" || branch === "public-testing";
+
+/**
+ * Wrap a progress callback so it only fires when the percentage changes,
+ * instead of once per received chunk
+ */
+function progressSender(window, channel) {
+  let last = -1;
+  return progress => {
+    if (progress === last) return;
+    last = progress;
+    window?.webContents.send(channel, progress);
+  };
 }
 
 /**
@@ -189,21 +208,16 @@ async function checkVersionAndUpdate() {
       `Version check [${currentBranch}]: Current=${currentVersion}, Latest=${latestVersion}, Is Latest=${isLatest}`
     );
     if (!isLatest) {
+      const canAutoUpdate = !isPortable && (!isMac || branchHasMacBuilds(currentBranch));
       if (
         settings.autoUpdate &&
-        !isPortable &&
-        (process.platform !== "darwin" || currentBranch === "live") &&
+        canAutoUpdate &&
         !updateDownloadInProgress &&
         !updateDownloaded
       ) {
         // Start background download
         downloadUpdatePromise = downloadUpdateInBackground();
-      } else if (
-        (!settings.autoUpdate ||
-          isPortable ||
-          (process.platform === "darwin" && currentBranch !== "live")) &&
-        !notificationShown
-      ) {
+      } else if ((!settings.autoUpdate || !canAutoUpdate) && !notificationShown) {
         // Show update available notification
         notificationShown = true;
         BrowserWindow.getAllWindows().forEach(window => {
@@ -293,6 +307,37 @@ async function isCompleteZip(file) {
   } finally {
     await fs.close(handle);
   }
+}
+
+/**
+ * Download the macOS zip for branch to zipPath, rebuilding it from the cached
+ * installed build when possible, and keep it as the base for the next update
+ */
+async function downloadMacBuild(branch, version, zipPath, headers, onProgress) {
+  const target = await resolveMacUpdate(branch, version);
+  await fs.remove(zipPath);
+  let rebuilt = false;
+  try {
+    await downloadMacDelta(target, zipPath, onProgress);
+    rebuilt = true;
+  } catch (error) {
+    console.warn(
+      "Differential macOS update unavailable, downloading full zip:",
+      error.message
+    );
+  }
+  if (!rebuilt) {
+    await downloadUpdateFile(target.url, zipPath, headers, onProgress);
+    if (target.digest && (await sha256File(zipPath)) !== target.digest) {
+      await fs.remove(zipPath);
+      throw new Error("The downloaded macOS update failed sha256 verification.");
+    }
+  }
+  if (!(await isCompleteZip(zipPath))) {
+    await fs.remove(zipPath);
+    throw new Error("The downloaded macOS update is incomplete.");
+  }
+  await cacheMacBuild(target, zipPath);
 }
 
 /**
@@ -395,14 +440,9 @@ async function downloadUpdateInBackground() {
 
     // Determine update URL based on branch
     let updateUrl;
-    if (process.platform === "darwin") {
-      if (currentBranch !== "live")
-        throw new Error("Automatic updates for macOS testing branches are unavailable.");
-      if (!availableVersion || !/^\d+(?:\.\d+)*(?:-\d+)?$/.test(availableVersion)) {
-        throw new Error("No valid macOS update version is available.");
-      }
-      const fileName = macUpdateName(availableVersion);
-      updateUrl = `https://github.com/Ascendara/ascendara/releases/download/${encodeURIComponent(availableVersion)}/${fileName}`;
+    if (isMac) {
+      if (!branchHasMacBuilds(currentBranch))
+        throw new Error("Automatic updates for this branch are unavailable on macOS.");
     } else if (currentBranch === "live") {
       updateUrl = `https://lfs.ascendara.app/download?update`;
     } else if (currentBranch === "public-testing") {
@@ -427,6 +467,7 @@ async function downloadUpdateInBackground() {
     // Keep macOS from suspending the app while it downloads in the background
     blockerId = powerSaveBlocker.start("prevent-app-suspension");
     await fs.remove(installerPath);
+    const onProgress = progressSender(mainWindow, "update-download-progress");
 
     // Live Windows releases ship blockmaps, so only the changed blocks need
     // downloading; any failure falls back to the full installer below.
@@ -441,7 +482,7 @@ async function downloadUpdateInBackground() {
           appVersion,
           availableVersion,
           installerPath,
-          progress => mainWindow?.webContents.send("update-download-progress", progress)
+          onProgress
         );
         rebuilt = true;
       } catch (error) {
@@ -452,14 +493,16 @@ async function downloadUpdateInBackground() {
       }
     }
 
-    if (!rebuilt) {
-      await downloadUpdateFile(updateUrl, installerPath, headers, progress =>
-        mainWindow?.webContents.send("update-download-progress", progress)
+    if (isMac) {
+      await downloadMacBuild(
+        currentBranch,
+        availableVersion,
+        installerPath,
+        headers,
+        onProgress
       );
-    }
-    if (process.platform === "darwin" && !(await isCompleteZip(installerPath))) {
-      await fs.remove(installerPath);
-      throw new Error("The downloaded macOS update is incomplete.");
+    } else if (!rebuilt) {
+      await downloadUpdateFile(updateUrl, installerPath, headers, onProgress);
     }
 
     updateDownloaded = true;
@@ -499,6 +542,9 @@ function registerUpdateHandlers() {
     .catch(error =>
       console.warn("Could not remove leftover macOS updates:", error.message)
     );
+  pruneMacCache().catch(error =>
+    console.warn("Could not prune cached macOS updates:", error.message)
+  );
   ipcMain.handle("check-for-updates", async () => {
     if (isDev) return true;
     try {
@@ -591,12 +637,6 @@ function registerUpdateHandlers() {
         success: false,
         error: "Branch switching needs the installed version of Ascendara.",
       };
-    if (process.platform === "darwin")
-      return {
-        success: false,
-        error:
-          "Install the macOS DMG for the desired branch. Automatic macOS branch switching is not configured.",
-      };
     const branchUrls = {
       live: "https://lfs.ascendara.app/download?update",
       "public-testing": null,
@@ -604,8 +644,46 @@ function registerUpdateHandlers() {
     };
 
     if (!(branch in branchUrls)) return { success: false, error: "Unknown branch" };
+    const platform = isWindows ? "Windows" : isMac ? "macOS" : "Linux";
+    if (isMac && !branchHasMacBuilds(branch))
+      return {
+        success: false,
+        errorType: "notAvailable",
+        errorData: { branch, platform },
+      };
 
     try {
+      const mainWindow = BrowserWindow.getAllWindows()[0];
+      const onProgress = progressSender(mainWindow, "branch-switch-progress");
+      const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
+      await fs.ensureDir(tempDir);
+
+      if (isMac) {
+        const zipPath = path.join(tempDir, "AscendaraBranchInstaller.zip");
+        const version =
+          branch === "live"
+            ? (await axios.get(`${API_URL}/`, { timeout: 15000 })).data.appVer
+            : null;
+        const blockerId = powerSaveBlocker.start("prevent-app-suspension");
+        try {
+          await downloadMacBuild(
+            branch,
+            version,
+            zipPath,
+            {
+              "X-Ascendara-Client": "app",
+              "X-Ascendara-Version": testingVersion || appVersion,
+              "X-Ascendara-Platform": "macos",
+            },
+            onProgress
+          );
+        } finally {
+          powerSaveBlocker.stop(blockerId);
+        }
+        await installUpdate(zipPath, false);
+        return { success: true };
+      }
+
       const url = branchUrls[branch] || (await testingInstallerUrl());
       // Use testingVersion for testing branches, appVersion for live
       const versionToSend =
@@ -619,17 +697,10 @@ function registerUpdateHandlers() {
         "X-Ascendara-Platform": isWindows ? "windows" : "linux",
       };
 
-      const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
       const installerFileName = isWindows
         ? "AscendaraBranchInstaller.exe"
         : "AscendaraBranchInstaller.AppImage";
       const installerPath = path.join(tempDir, installerFileName);
-
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir);
-      }
-
-      const mainWindow = BrowserWindow.getAllWindows()[0];
 
       const response = await axios({
         url,
@@ -650,10 +721,7 @@ function registerUpdateHandlers() {
 
       response.data.on("data", chunk => {
         downloadedSize += chunk.length;
-        if (totalSize > 0) {
-          const progress = Math.round((downloadedSize * 100) / totalSize);
-          mainWindow?.webContents.send("branch-switch-progress", progress);
-        }
+        if (totalSize > 0) onProgress(Math.round((downloadedSize * 100) / totalSize));
       });
 
       await pipeline(response.data, fs.createWriteStream(installerPath));
@@ -666,7 +734,6 @@ function registerUpdateHandlers() {
 
       // Return error type and metadata for frontend translation
       if (error.response?.status === 404) {
-        const platform = isWindows ? "Windows" : "Linux";
         return {
           success: false,
           errorType: "notAvailable",

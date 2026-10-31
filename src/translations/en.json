@@ -4736,7 +4736,7 @@
         "description": "The stable release. Recommended for all users.",
         "label": "Live"
       },
-      "macUnsupported": "App branches are not supported on macOS.",
+      "macExperimentalUnsupported": "The experimental branch is not available on macOS.",
       "publicTesting": {
         "description": "Get early access to upcoming features before they ship to Live.",
         "label": "Public Testing"

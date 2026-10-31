@@ -4374,8 +4374,13 @@ function Settings() {
                         disabled={isActive}
                         onClick={() => {
                           if (isActive) return;
-                          if (navigator.userAgent.toLowerCase().includes("macintosh")) {
-                            toast.warning(t("settings.appBranch.macUnsupported"));
+                          if (
+                            branch.id === "experimental" &&
+                            navigator.userAgent.toLowerCase().includes("macintosh")
+                          ) {
+                            toast.warning(
+                              t("settings.appBranch.macExperimentalUnsupported")
+                            );
                             return;
                           }
 
