@@ -486,6 +486,32 @@ def _clean_pyinstaller_env(env):
             env.pop(var, None)
     return env
 
+def _create_ssl_context():
+    """Build an SSL context that can find CA certificates even in a PyInstaller bundle."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        pass
+
+    ca_files = (
+        os.environ.get('SSL_CERT_FILE'),
+        '/etc/ssl/certs/ca-certificates.crt',
+        '/etc/pki/tls/certs/ca-bundle.crt',
+        '/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem',
+        '/etc/ssl/ca-bundle.pem',
+        '/etc/ssl/cert.pem',
+    )
+    for ca_file in ca_files:
+        if ca_file and os.path.isfile(ca_file):
+            try:
+                return ssl.create_default_context(cafile=ca_file)
+            except Exception:
+                continue
+
+    return ssl.create_default_context()
+
+
 def install_vcredist(prefix_path, env, umu_bin=None):
     """Install Visual C++ redistributables (x86 + x64) using umu-run directly"""
     
@@ -512,7 +538,7 @@ def install_vcredist(prefix_path, env, umu_bin=None):
         try:
             import urllib.request
             # Installers must be authenticated before they are executed.
-            ssl_ctx = ssl.create_default_context()
+            ssl_ctx = _create_ssl_context()
             with urllib.request.urlopen(url, context=ssl_ctx, timeout=60) as response:
                 with open(dest_path, 'wb') as f:
                     f.write(response.read())
