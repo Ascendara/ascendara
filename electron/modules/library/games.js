@@ -943,7 +943,7 @@ function registerGameHandlers() {
             };
 
             try {
-              const scanned = await parseOnlineFix(gameDirectory);
+              const scanned = await parseOnlineFix(gameDirectory, { executable });
               if (scanned) {
                 // Preserve user's useProtonDirect choice if any
                 if (onlineFix && typeof onlineFix.useProtonDirect === "boolean") {
@@ -2373,6 +2373,7 @@ function registerGameHandlers() {
     try {
       const settings = settingsManager.getSettings();
       let gameDir = null;
+      let executable = null;
       if (!isCustom) {
         for (const dir of [
           settings.downloadDirectory,
@@ -2381,15 +2382,25 @@ function registerGameHandlers() {
           const p = path.join(dir, sanitizeGameName(game));
           if (fs.existsSync(p)) {
             gameDir = p;
+            try {
+              const gi = JSON.parse(
+                fs.readFileSync(
+                  path.join(p, `${sanitizeGameName(game)}.ascendara.json`),
+                  "utf8"
+                )
+              );
+              executable = gi.executable || null;
+            } catch {}
             break;
           }
         }
       } else {
         const info = findCustomGame(game, settings);
         gameDir = info?.executable ? path.dirname(info.executable) : null;
+        executable = info?.executable || null;
       }
       if (!gameDir) return { success: false, error: "Game directory not found" };
-      const result = await parseOnlineFix(gameDir);
+      const result = await parseOnlineFix(gameDir, { executable });
       if (result) {
         // Preserve user's useProtonDirect choice if they had one
         let existing = null;
