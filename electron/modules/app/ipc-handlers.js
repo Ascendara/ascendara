@@ -1145,8 +1145,26 @@ function registerMiscHandlers() {
     }
   });
 
+  // Steam schemas may store achievement icons as bare hash filenames, which the
+  // renderer would resolve against its own origin and 404. Expand them to CDN URLs.
+  const resolveAchievementIcons = data => {
+    if (!data || !Array.isArray(data.achievements)) return data;
+    const appid = data.appid;
+    if (!appid) return data;
+    const resolve = icon => {
+      if (!icon || typeof icon !== "string") return icon;
+      if (/^(https?|file|data):/i.test(icon) || path.isAbsolute(icon)) return icon;
+      const file = /\.\w+$/.test(icon) ? icon : `${icon}.jpg`;
+      return `https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/${appid}/${file}`;
+    };
+    return {
+      ...data,
+      achievements: data.achievements.map(a => (a ? { ...a, icon: resolve(a.icon) } : a)),
+    };
+  };
+
   // Read game achievements
-  ipcMain.handle("read-game-achievements", async (_, game, isCustom = false) => {
+  const readGameAchievements = (game, isCustom = false) => {
     const settings = settingsManager.getSettings();
     if (!settings.downloadDirectory || !settings.additionalDirectories) {
       return null;
@@ -1215,7 +1233,11 @@ function registerMiscHandlers() {
       }
       return null;
     }
-  });
+  };
+
+  ipcMain.handle("read-game-achievements", async (_, game, isCustom = false) =>
+    resolveAchievementIcons(readGameAchievements(game, isCustom))
+  );
 
   // Compute achievements leaderboard (main process)
   // Expects games as an array of strings or objects: { gameName|game, isCustom }

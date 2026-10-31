@@ -95,6 +95,15 @@ async function existsAndIsYoungerThan(filePath, { timeUnit = "M", time = 6 }) {
   }
 }
 
+// Steam schemas may return icons as bare hash filenames; expand them to CDN URLs
+function resolveIconUrl(icon, appID) {
+  if (!icon || typeof icon !== "string") return icon;
+  if (/^(https?|file|data):/i.test(icon) || path.isAbsolute(icon)) return icon;
+  const file = /\.\w+$/.test(icon) ? icon : `${icon}.jpg`;
+  return `https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/${appID}/${file}`;
+}
+module.exports.resolveIconUrl = resolveIconUrl;
+
 module.exports.loadSteamData = async (appID, lang, key = null) => {
   if (!steamLang.some(language => language.api === lang)) {
     throw "Unsupported API language code";
@@ -116,6 +125,13 @@ module.exports.loadSteamData = async (appID, lang, key = null) => {
       fs.writeFile(filePath, JSON.stringify(result, null, 2)).catch(err => {
         console.log(err);
       });
+    }
+
+    if (Array.isArray(result?.achievement?.list)) {
+      for (const ach of result.achievement.list) {
+        ach.icon = resolveIconUrl(ach.icon, appID);
+        ach.icongray = resolveIconUrl(ach.icongray, appID);
+      }
     }
 
     return result;
