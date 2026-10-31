@@ -14,11 +14,14 @@ import {
   ExternalLink,
   ChevronDown,
   MoreHorizontal,
+  Layers,
+  X,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { privateSourceMessage } from "@/lib/privateSourceMessages";
+import { activePrivateSourceIds, privateSourceSetting } from "@/lib/activePrivateSources";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -117,18 +120,23 @@ export default function PrivateSources() {
       setBusy(false);
     }
   };
-  const activate = async source => {
-    await updateSetting("customSourcesMode", true);
-    await updateSetting("activeCustomList", null);
-    await updateSetting("customSource", {
-      id: source.id,
-      name: source.name,
-      url: `private:${source.id}`,
-      privateSourceId: source.id,
-      userProvided: true,
-      gameCount: source.count,
-    });
+  const activeIds = settings.customSourcesMode
+    ? activePrivateSourceIds(settings.customSource)
+    : [];
+  const setActive = async ids => {
+    const value = privateSourceSetting(
+      ids.map(id => sources.find(s => s.id === id)).filter(Boolean)
+    );
+    if (value) {
+      await updateSetting("customSourcesMode", true);
+      await updateSetting("activeCustomList", null);
+    } else await updateSetting("customSourcesMode", false);
+    await updateSetting("customSource", value);
     gameService.notifySourceChanged();
+  };
+  const activate = async source => {
+    // Browsing an active source keeps the rest of the set
+    if (!activeIds.includes(source.id)) await setActive([source.id]);
     navigate("/search");
   };
   const report = result => {
@@ -151,11 +159,7 @@ export default function PrivateSources() {
   const remove = s =>
     run(async () => {
       await window.electron.privateSources.remove(s.id);
-      if (settings.customSource?.privateSourceId === s.id) {
-        await updateSetting("customSource", null);
-        await updateSetting("customSourcesMode", false);
-        gameService.notifySourceChanged();
-      }
+      if (activeIds.includes(s.id)) await setActive(activeIds.filter(id => id !== s.id));
     });
   return (
     <section className="overflow-hidden rounded-xl bg-card shadow">
@@ -191,9 +195,7 @@ export default function PrivateSources() {
           <p className="p-5 text-sm text-muted-foreground">{t("privateSources.empty")}</p>
         )}
         {sources.map(s => {
-          const inUse =
-            !!settings.customSourcesMode &&
-            settings.customSource?.privateSourceId === s.id;
+          const inUse = activeIds.includes(s.id);
           const online = s.status === "online";
           const statusLabel = online
             ? t("privateSources.online")
@@ -273,6 +275,27 @@ export default function PrivateSources() {
                       <RefreshCw className="h-4 w-4" />
                       {t("privateSources.rescan")}
                     </DropdownMenuItem>
+                    {!inUse && activeIds.length > 0 && (
+                      <DropdownMenuItem
+                        className="gap-2"
+                        disabled={!s.count}
+                        onSelect={() => run(() => setActive([...activeIds, s.id]))}
+                      >
+                        <Layers className="h-4 w-4" />
+                        {t("privateSources.useTogether")}
+                      </DropdownMenuItem>
+                    )}
+                    {inUse && activeIds.length > 1 && (
+                      <DropdownMenuItem
+                        className="gap-2"
+                        onSelect={() =>
+                          run(() => setActive(activeIds.filter(id => id !== s.id)))
+                        }
+                      >
+                        <X className="h-4 w-4" />
+                        {t("privateSources.stopUsing")}
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                       className="gap-2"
                       onSelect={() => setDraft({ ...s, token: "" })}

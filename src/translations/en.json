@@ -4113,6 +4113,7 @@
       "packageVerified": "Package verified. Review it before extracting, mounting, or importing. No installer was run.",
       "transferCancelled": "Transfer cancelled. Retry to continue."
     },
+    "stopUsing": "Stop using this source",
     "title": "Self-hosted sources",
     "tokenKeepPlaceholder": "Leave blank to keep your saved token",
     "tokenLabel": "Bearer token",
@@ -4127,6 +4128,7 @@
     "urlHelp": "Use the full URL of your server's index.json file, not its home page.",
     "urlLabel": "Index URL",
     "urlPlaceholder": "http://localhost:8080/index.json",
+    "useTogether": "Use with active sources",
     "whereStored": "Where are your games stored?"
   },
   "profile": {

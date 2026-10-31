@@ -1,6 +1,7 @@
 import { sanitizeText } from "@/lib/utils";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { API_URL } from "@/config/api";
+import { activePrivateSourceIds } from "@/lib/activePrivateSources";
 
 const CACHE_KEY = "ascendara_games_cache";
 const CACHE_TIMESTAMP_KEY = "local_ascendara_games_timestamp";
@@ -468,10 +469,34 @@ const gameService = {
    * Uses a 12h localStorage cache keyed by source URL; force=true bypasses the cache.
    */
   async _loadCustomSourceData(customSource, { force = false, refetch = false } = {}) {
-    if (customSource?.privateSourceId) {
-      if (refetch)
-        await window.electron.privateSources.refresh(customSource.privateSourceId);
-      return window.electron.privateSources.catalog(customSource.privateSourceId);
+    const privateIds = activePrivateSourceIds(customSource);
+    if (privateIds.length === 1) {
+      if (refetch) await window.electron.privateSources.refresh(privateIds[0]);
+      return window.electron.privateSources.catalog(privateIds[0]);
+    }
+    if (privateIds.length > 1) {
+      // One unreachable or removed source shouldn't hide the others' games
+      const results = await Promise.allSettled(
+        privateIds.map(async id => {
+          if (refetch) await window.electron.privateSources.refresh(id);
+          return window.electron.privateSources.catalog(id);
+        })
+      );
+      const loaded = results.filter(r => r.status === "fulfilled").map(r => r.value);
+      if (!loaded.length) throw results[0].reason;
+      results
+        .filter(r => r.status === "rejected")
+        .forEach(r => console.warn("[GameService] Self-hosted source failed:", r.reason));
+      const games = loaded.flatMap(catalog => catalog.games || []);
+      return {
+        games,
+        metadata: {
+          customSource: true,
+          privateSource: true,
+          source: customSource.name,
+          games: games.length,
+        },
+      };
     }
     const url = customSource?.url;
     if (!url) throw new Error("Missing custom source URL");
