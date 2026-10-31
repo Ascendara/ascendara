@@ -63,7 +63,10 @@ const DllSharingConsentDialog = ({ open, onOpenChange }) => {
           <Checkbox
             id="dll-sharing-policies"
             checked={policiesRead}
-            onClick={event => event.stopPropagation()}
+            onClick={event => {
+              event.stopPropagation();
+              setPoliciesRead(checked => !checked);
+            }}
             onCheckedChange={setPoliciesRead}
             className="mt-0.5"
           />
