@@ -54,11 +54,14 @@ import {
   subscribeToIncomingRequests,
   subscribeToOutgoingRequests,
   cleanupMessageListeners,
+  getAscendUiState,
+  saveAscendUiState,
 } from "@/services/firebase/firebaseService";
 import { syncFavoritesNow } from "@/services/cloud/favoritesCloudSync";
 import { API_URL } from "@/config/api";
 
-// Per account, so a second account on this PC still gets offered the tour
+// Per account, so a second account on this PC still gets offered the tour.
+// Also saved to the account, so a new device or reinstall doesn't replay it.
 const welcomeTourSeenKey = uid => `ascendara:ascendTourSeen:${uid}`;
 
 const hasSeenWelcomeTour = uid => {
@@ -69,11 +72,28 @@ const hasSeenWelcomeTour = uid => {
   }
 };
 
-const markWelcomeTourSeen = uid => {
-  if (!uid) return;
+const markWelcomeTourSeenLocally = uid => {
   try {
     localStorage.setItem(welcomeTourSeenKey(uid), "true");
   } catch {}
+};
+
+// Accounts whose local flag was checked against the cloud this session
+const welcomeTourUploadChecked = new Set();
+
+// Tours seen before syncing existed only have the local flag; upload it once
+const uploadLocalWelcomeTourSeen = async uid => {
+  if (welcomeTourUploadChecked.has(uid)) return;
+  welcomeTourUploadChecked.add(uid);
+  const { ok, state } = await getAscendUiState(uid);
+  if (!ok) welcomeTourUploadChecked.delete(uid);
+  else if (!state?.ascendTourSeen) saveAscendUiState(uid, { ascendTourSeen: true });
+};
+
+const markWelcomeTourSeen = uid => {
+  if (!uid) return;
+  markWelcomeTourSeenLocally(uid);
+  saveAscendUiState(uid, { ascendTourSeen: true });
 };
 
 export default function useAscendPage({ cloudOnly = false } = {}) {
@@ -2150,6 +2170,10 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const needsEmailVerification =
     !!user && !user.emailVerified && user.providerData?.[0]?.providerId === "password";
   useEffect(() => {
+    if (user?.uid && hasSeenWelcomeTour(user.uid)) uploadLocalWelcomeTourSeen(user.uid);
+  }, [user?.uid]);
+
+  useEffect(() => {
     if (
       !user?.uid ||
       verifyingAccess ||
@@ -2162,16 +2186,31 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     ) {
       return;
     }
+    const uid = user.uid;
     const subscribed = ascendAccess.isSubscribed;
-    const timer = setTimeout(() => {
-      if (subscribed) {
-        setShowWelcomeTourPrompt(true);
-      } else {
-        markWelcomeTourSeen(user.uid);
-        setShowWelcomeTour(true);
+    let cancelled = false;
+    let timer;
+    // Seen on another device counts too. If the account can't be read, wait
+    // for the next visit rather than risk replaying the tour.
+    getAscendUiState(uid).then(({ ok, state }) => {
+      if (cancelled || !ok) return;
+      if (state?.ascendTourSeen) {
+        markWelcomeTourSeenLocally(uid);
+        return;
       }
-    }, 1500);
-    return () => clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (subscribed) {
+          setShowWelcomeTourPrompt(true);
+        } else {
+          markWelcomeTourSeen(uid);
+          setShowWelcomeTour(true);
+        }
+      }, 1500);
+    });
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [
     user?.uid,
     verifyingAccess,

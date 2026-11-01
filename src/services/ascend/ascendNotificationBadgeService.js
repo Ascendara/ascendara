@@ -6,8 +6,9 @@
  * shows counts: announcements, playtime flags, review likes and wishlist
  * matches. Opening that section marks everything in it as seen.
  *
- * Seen and archived ids live in `ascend-notifications-state:{uid}`; archived
- * notifications never count. The first time it runs,
+ * Seen and archived ids live in `ascend-notifications-state:{uid}` and are
+ * mirrored to the account (users/{uid}/private/uiState), so they follow the
+ * user to other devices; archived notifications never count. The first time it runs,
  * announcements older than two weeks are treated as seen, so long-time users
  * aren't greeted with a badge for every announcement ever posted.
  */
@@ -15,9 +16,11 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
+  getAscendUiState,
   getNotifications,
   listMemberNotifications,
   listPlaytimeFlags,
+  saveAscendUiState,
 } from "@/services/firebase/firebaseService";
 import { getWishlistMatches, WISHLIST_MATCHES_EVENT } from "./wishlistWatchService";
 
@@ -26,6 +29,7 @@ export const NOTIFICATIONS_SEEN_EVENT = "ascend-notifications-seen";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const FOCUS_MIN_INTERVAL_MS = 60 * 1000;
 const BASELINE_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+const CLOUD_SAVE_DELAY_MS = 2000;
 
 const stateKey = uid => `ascend-notifications-state:${uid}`;
 
@@ -51,16 +55,69 @@ export function readNotificationState(uid) {
   }
 }
 
-function writeNotificationState(uid, state) {
+function writeLocalState(uid, state) {
   try {
     localStorage.setItem(
       stateKey(uid),
       JSON.stringify({ seen: [...state.seen], archived: [...state.archived] })
     );
   } catch {
-    /* The badge just comes back next time. */
+    /* The cloud copy still has it. */
   }
   window.dispatchEvent(new Event(NOTIFICATIONS_SEEN_EVENT));
+}
+
+// Opening the section writes on every list change, so cloud saves are batched
+const pendingCloudSaves = new Map();
+
+function saveCloudState(uid, state) {
+  clearTimeout(pendingCloudSaves.get(uid));
+  pendingCloudSaves.set(
+    uid,
+    setTimeout(() => {
+      pendingCloudSaves.delete(uid);
+      saveAscendUiState(uid, {
+        notificationsSeen: [...state.seen],
+        notificationsArchived: [...state.archived],
+      });
+    }, CLOUD_SAVE_DELAY_MS)
+  );
+}
+
+function writeNotificationState(uid, state) {
+  writeLocalState(uid, state);
+  saveCloudState(uid, state);
+}
+
+const cloudPulls = new Map();
+
+/**
+ * Bring this device's state in line with the account's, once per session.
+ * The account copy wins; a device that has state the account lacks (from
+ * before syncing existed) uploads it instead. A failed read is retried on
+ * the next call.
+ */
+export function syncNotificationState(uid) {
+  if (!uid) return Promise.resolve();
+  if (!cloudPulls.has(uid)) {
+    const pull = getAscendUiState(uid).then(({ ok, state: cloud }) => {
+      if (!ok) {
+        cloudPulls.delete(uid);
+        return;
+      }
+      if (Array.isArray(cloud?.notificationsSeen)) {
+        writeLocalState(uid, {
+          seen: new Set(cloud.notificationsSeen),
+          archived: new Set(cloud.notificationsArchived || []),
+        });
+      } else {
+        const local = readNotificationState(uid);
+        if (local) saveCloudState(uid, local);
+      }
+    });
+    cloudPulls.set(uid, pull);
+  }
+  return cloudPulls.get(uid);
 }
 
 const emptyState = () => ({ seen: new Set(), archived: new Set() });
@@ -86,7 +143,10 @@ async function currentNotifications() {
 }
 
 async function unseenCount(uid) {
-  const notifications = await currentNotifications();
+  const [notifications] = await Promise.all([
+    currentNotifications(),
+    syncNotificationState(uid),
+  ]);
   let state = readNotificationState(uid);
   if (!state) {
     const cutoff = Date.now() - BASELINE_AGE_MS;

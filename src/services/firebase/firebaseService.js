@@ -1711,6 +1711,43 @@ const getPrivateHardwareId = async uid => {
   }
 };
 
+// What the user has already seen (Ascend tour, notifications), kept in the
+// owner-only users/{uid}/private/uiState so it survives new devices,
+// reinstalls and cleared browser data.
+const privateUiStateRef = uid => doc(db, "users", uid, "private", "uiState");
+
+/**
+ * Read the user's synced UI state
+ * @param {string} uid - User ID
+ * @returns {Promise<{ok: boolean, state: object|null}>} ok is false when the read failed
+ */
+export const getAscendUiState = async uid => {
+  try {
+    const snap = await getDoc(privateUiStateRef(uid));
+    return { ok: true, state: snap.exists() ? snap.data() : null };
+  } catch (error) {
+    console.warn("Get UI state error:", error);
+    return { ok: false, state: null };
+  }
+};
+
+/**
+ * Merge fields into the user's synced UI state
+ * @param {string} uid - User ID
+ * @param {object} data - ascendTourSeen, notificationsSeen and/or notificationsArchived
+ */
+export const saveAscendUiState = async (uid, data) => {
+  try {
+    await setDoc(
+      privateUiStateRef(uid),
+      { ...data, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  } catch (error) {
+    console.warn("Save UI state error:", error);
+  }
+};
+
 /**
  * Register hardware ID for trial tracking
  * @param {string} hardwareId - The hardware ID to register

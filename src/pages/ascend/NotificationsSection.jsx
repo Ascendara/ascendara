@@ -40,6 +40,7 @@ import {
   notificationKeys,
   readNotificationState,
   setNotificationsArchived,
+  syncNotificationState,
 } from "@/services/ascend/ascendNotificationBadgeService";
 import gameService from "@/services/games/gameService";
 import { useAuth } from "@/context/AuthContext";
@@ -395,12 +396,13 @@ export default function NotificationsSection({ t, loadingNotifications, notifica
   const [memberNotifications, setMemberNotifications] = useState(null);
   const [reporting, setReporting] = useState(null);
   const [wishlistMatches, setWishlistMatches] = useState(getWishlistMatches);
-  const [archivedKeys, setArchivedKeys] = useState(
-    () => (uid && readNotificationState(uid)?.archived) || new Set()
-  );
+  const [archivedKeys, setArchivedKeys] = useState(() => new Set());
   // What was unseen when the section opened stays "New" while it is open,
   // even though opening it marks everything as seen right away
-  const [seenAtOpen] = useState(() => (uid ? readNotificationState(uid)?.seen : null));
+  const [seenAtOpen, setSeenAtOpen] = useState(null);
+  // The account's copy is pulled first, so marking things seen here can't
+  // overwrite what another device archived
+  const [synced, setSynced] = useState(false);
   const [showEarlier, setShowEarlier] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
@@ -409,6 +411,21 @@ export default function NotificationsSection({ t, loadingNotifications, notifica
     window.addEventListener(WISHLIST_MATCHES_EVENT, refresh);
     return () => window.removeEventListener(WISHLIST_MATCHES_EVENT, refresh);
   }, []);
+
+  useEffect(() => {
+    if (!uid) return;
+    let cancelled = false;
+    syncNotificationState(uid).then(() => {
+      if (cancelled) return;
+      const state = readNotificationState(uid);
+      setArchivedKeys(state?.archived || new Set());
+      setSeenAtOpen(state?.seen || null);
+      setSynced(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [uid]);
 
   useEffect(() => {
     listPlaytimeFlags().then(result => setFlags(result.flags || []));
@@ -422,7 +439,11 @@ export default function NotificationsSection({ t, loadingNotifications, notifica
     setReporting(null);
   };
 
-  const loaded = !loadingNotifications && flags !== null && memberNotifications !== null;
+  const loaded =
+    (synced || !uid) &&
+    !loadingNotifications &&
+    flags !== null &&
+    memberNotifications !== null;
 
   const items = useMemo(() => {
     if (!loaded) return [];
