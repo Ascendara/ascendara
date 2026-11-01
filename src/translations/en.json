@@ -848,6 +848,12 @@
         "latest": "Latest: {{game}}",
         "title": "Save Backups"
       },
+      "secure": {
+        "action": "Turn on two-step verification",
+        "description": "Your membership, cloud library and save backups are tied to this account. Two-step verification asks for a code from your email when you sign in, so a leaked password alone can't get anyone in.",
+        "dismiss": "Not now",
+        "title": "Protect your membership"
+      },
       "stats": {
         "achievements": "Achievements",
         "games": "Games synced",
@@ -4096,11 +4102,11 @@
     "remove": "Remove",
     "removeToken": "Remove saved token",
     "rescan": "Rescan library",
+    "saveChanges": "Save changes",
     "shareHelp": "Saves matches, details and artwork in a hidden .ascendara folder inside this library. Other devices using the same folder load them instead of matching every game again.",
     "shareLabel": "Share matches with other devices",
     "sharedFailed": "Matches couldn't be saved to the shared library. {{error}}",
     "sharedLoaded": "Loaded {{count}} matches from the shared library",
-    "saveChanges": "Save changes",
     "skipFiles": "Skip files",
     "skipFilesPlaceholder": "Tools/setup.exe",
     "skipFolders": "Skip folders",

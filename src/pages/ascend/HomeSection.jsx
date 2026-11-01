@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import AscendGameImage from "@/components/AscendGameImage";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -6,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import LevelingCard from "@/components/LevelingCard";
 import { useLibraryBackupStore } from "@/services/library/libraryBackupStore";
 import { StatStrip } from "./primitives";
+import { getCurrentUser, getTwoFactorStatus } from "@/services/firebase/firebaseService";
 import {
+  ShieldCheck,
   Users,
   Loader2,
   CloudUpload,
@@ -47,6 +50,51 @@ const formatBytes = bytes => {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
   return `${Math.max(bytes / 1024 ** 2, 0.1).toFixed(1)} MB`;
 };
+
+// "Not now" hides the two-step prompt for a while, then it asks again
+const SECURE_SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
+const secureSnoozeKey = uid => `ascend-secure-prompt-snoozed:${uid}`;
+
+const isSecurePromptSnoozed = uid => {
+  try {
+    const until = Number(localStorage.getItem(secureSnoozeKey(uid)));
+    return Number.isFinite(until) && until > Date.now();
+  } catch {
+    return false;
+  }
+};
+
+/** True when a paying member hasn't turned on two-step verification */
+function useSecureAccountPrompt(uid, isPaid) {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (!uid || !isPaid || isSecurePromptSnoozed(uid)) {
+      setShow(false);
+      return;
+    }
+    let cancelled = false;
+    const current = getCurrentUser();
+    if (!current) return;
+    getTwoFactorStatus(current)
+      .then(status => !cancelled && setShow(!status.enabled))
+      .catch(() => !cancelled && setShow(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [uid, isPaid]);
+
+  const snooze = () => {
+    setShow(false);
+    try {
+      localStorage.setItem(secureSnoozeKey(uid), String(Date.now() + SECURE_SNOOZE_MS));
+    } catch {
+      // It just shows again next visit
+    }
+  };
+
+  return [show, snooze];
+}
 
 function ToolCard({ icon: Icon, title, description, meta, onClick, delay, large }) {
   return (
@@ -104,6 +152,19 @@ export default function HomeSection({
   const hasCloudAccess = ascendAccess?.isSubscribed || ascendAccess?.isVerified;
   const lastSynced = cloudLibrary?.lastSynced;
   const busy = isSyncingLibrary || isRestoringFromCloud;
+  // Paid plans only: trials and verified/contributor accounts don't get the nudge
+  const [showSecurePrompt, snoozeSecurePrompt] = useSecureAccountPrompt(
+    user?.uid,
+    ascendAccess?.isSubscribed === true
+  );
+  const openSecuritySettings = () => {
+    try {
+      localStorage.setItem("ascendSettingsPage", "security");
+    } catch {
+      // Settings opens on its default page instead
+    }
+    setActiveSection("settings");
+  };
 
   const backupBytes = backups.reduce((sum, b) => sum + (b.size || 0), 0);
   const latestBackup = backups.reduce(
@@ -234,6 +295,36 @@ export default function HomeSection({
           <StatStrip stats={stats} className="mt-8" />
         </div>
       </motion.section>
+
+      {/* Nudge paying members toward two-step verification */}
+      {showSecurePrompt && (
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="flex flex-col gap-4 rounded-2xl border border-primary/20 bg-primary/5 p-5 sm:flex-row sm:items-center"
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold">
+              {t("ascend.overview.secure.title")}
+            </h2>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              {t("ascend.overview.secure.description")}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button variant="ghost" onClick={snoozeSecurePrompt}>
+              {t("ascend.overview.secure.dismiss")}
+            </Button>
+            <Button className="text-secondary" onClick={openSecuritySettings}>
+              {t("ascend.overview.secure.action")}
+            </Button>
+          </div>
+        </motion.section>
+      )}
 
       {/* Cloud tools */}
       <section className="space-y-3">
