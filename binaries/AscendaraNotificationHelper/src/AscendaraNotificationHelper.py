@@ -718,6 +718,14 @@ class NotificationWindow(QWidget):
         self.move(target + QPoint(28, 0))
         self.setWindowOpacity(0.0)
         self.show()
+        screen = self.screen()
+        logger.info(
+            f"Presenting on platform={QGuiApplication.platformName()} "
+            f"screen={screen.name() if screen else None} "
+            f"available={screen.availableGeometry() if screen else None} "
+            f"dpr={screen.devicePixelRatio() if screen else None} "
+            f"target={target} geometry={self.geometry()}"
+        )
 
         self.slide = QPropertyAnimation(self, b"pos", self)
         self.slide.setDuration(320)
@@ -836,6 +844,15 @@ def main():
     if sys.platform.startswith("linux") and os.environ.get("WAYLAND_DISPLAY") \
             and os.environ.get("DISPLAY") and not os.environ.get("QT_QPA_PLATFORM"):
         os.environ["QT_QPA_PLATFORM"] = "xcb;wayland"
+    if sys.platform.startswith("linux"):
+        logger.info(
+            "Display env: "
+            f"XDG_SESSION_TYPE={os.environ.get('XDG_SESSION_TYPE')} "
+            f"XDG_CURRENT_DESKTOP={os.environ.get('XDG_CURRENT_DESKTOP')} "
+            f"WAYLAND_DISPLAY={os.environ.get('WAYLAND_DISPLAY')} "
+            f"DISPLAY={os.environ.get('DISPLAY')} "
+            f"QT_QPA_PLATFORM={os.environ.get('QT_QPA_PLATFORM')}"
+        )
 
     try:
         QGuiApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
