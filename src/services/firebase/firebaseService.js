@@ -166,8 +166,9 @@ export const signInWithGoogle = async () => {
 
     // Accounts with two-step verification can't touch Firestore until the
     // code is entered, and they already have their documents
-    if ((await getTwoFactorStatus(user)).pending) {
-      return { user, error: null, isNewUser: false };
+    const { pending } = await getTwoFactorStatus(user).catch(() => ({ pending: true }));
+    if (pending) {
+      return { user, error: null, isNewUser: false, twoFactorPending: true };
     }
 
     // Check if user document exists, create if new
@@ -219,6 +220,11 @@ export const checkGoogleRedirectResult = async () => {
     if (result) {
       const user = result.user;
       const isNewUser = result._tokenResponse?.isNewUser ?? false;
+
+      const { pending } = await getTwoFactorStatus(user).catch(() => ({ pending: true }));
+      if (pending) {
+        return { user, error: null, isNewUser: false, twoFactorPending: true };
+      }
 
       // Check if user document exists, create if new
       const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -415,7 +421,10 @@ export const registerUser = async (email, password, displayName, hardwareId = nu
 export const loginUser = async (email, password) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    return { user: userCredential.user, error: null };
+    const user = userCredential.user;
+    // Unknown status counts as pending so a failed check never skips the code
+    const { pending } = await getTwoFactorStatus(user).catch(() => ({ pending: true }));
+    return { user, error: null, twoFactorPending: pending };
   } catch (error) {
     console.error("Login error:", error);
     return { user: null, error: getErrorMessage(error.code) };

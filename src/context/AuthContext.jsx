@@ -81,6 +81,9 @@ export const AuthProvider = ({ children }) => {
         userDataUnsubscribeRef.current();
         userDataUnsubscribeRef.current = () => {};
 
+        // Only set once the two-step check has passed, so no error path below
+        // can hand out the account before the code is entered
+        let twoFactorCleared = false;
         try {
           if (firebaseUser) {
             console.log(
@@ -88,15 +91,20 @@ export const AuthProvider = ({ children }) => {
               firebaseUser.uid
             );
 
-            const { pending } = await getTwoFactorStatus(firebaseUser).catch(() => ({
-              pending: false,
-            }));
+            // An unreadable status counts as pending: the check fails closed
+            const { pending } = await getTwoFactorStatus(firebaseUser)
+              .catch(() => getTwoFactorStatus(firebaseUser, true))
+              .catch(err => {
+                console.error("[AuthContext] Two-step status unavailable:", err);
+                return { pending: true };
+              });
             if (pending) {
               setTwoFactorUser(firebaseUser);
               setUser(null);
               setUserData(null);
               return;
             }
+            twoFactorCleared = true;
             setTwoFactorUser(null);
 
             // Fetch additional user data from Firestore
@@ -197,8 +205,14 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (err) {
           console.error("[AuthContext] Error in auth state change handler:", err);
-          // Don't log out on error - keep the user logged in
-          setUser(firebaseUser);
+          // Don't log out on error - keep the user logged in, but only once
+          // two-step verification has been passed for this sign-in
+          if (firebaseUser && !twoFactorCleared) {
+            setTwoFactorUser(firebaseUser);
+            setUser(null);
+          } else {
+            setUser(firebaseUser);
+          }
           setUserData(null);
         } finally {
           setLoading(false);
@@ -373,7 +387,8 @@ export const AuthProvider = ({ children }) => {
   // Reload user to refresh emailVerified status
   const reloadUser = async () => {
     const result = await reloadCurrentUser();
-    if (result.success && result.user) {
+    // Never surface an account that still owes its two-step code
+    if (result.success && result.user && userRef.current) {
       const u = result.user;
       // Create a plain object with user properties to trigger React state update
       setUser({

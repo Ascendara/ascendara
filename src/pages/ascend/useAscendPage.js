@@ -2284,7 +2284,10 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       isNewUser: result.isNewUser,
       error: result.error,
     });
-    if (result.user) {
+    if (result.user && result.twoFactorPending) {
+      // Not signed in yet: the two-step screen takes over until the code is entered
+      console.log("[handleGoogleSignIn] Two-step verification code required");
+    } else if (result.user) {
       console.log("[handleGoogleSignIn] User signed in successfully");
       if (result.isNewUser) {
         console.log("[handleGoogleSignIn] New user detected, checking hardware ID...");
@@ -2461,7 +2464,9 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     } else {
       // Login
       const result = await login(formData.email, formData.password);
-      if (result.user) {
+      if (result.user && result.twoFactorPending) {
+        // Not signed in yet: the two-step screen takes over until the code is entered
+      } else if (result.user) {
         // Check if this hardware ID belongs to a deleted account
         let hardwareId = null;
         if (window.electron?.getHardwareId) {
