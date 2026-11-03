@@ -64,6 +64,7 @@ export function ClassicHome({
       focus={focus}
     >
       <div
+        key={artwork || "none"}
         className="bp-classic-art"
         style={artwork ? { backgroundImage: `url("${artwork}")` } : undefined}
         aria-hidden="true"
@@ -71,7 +72,7 @@ export function ClassicHome({
       <section className="bp-classic-content" aria-label="Your games">
         <div className="bp-classic-heading">
           <span>HOME</span>
-          <h1>
+          <h1 key={selected?.key || "empty"}>
             {selected ? gameName(selected.game) : "Your next adventure starts here"}
           </h1>
           {selected && (

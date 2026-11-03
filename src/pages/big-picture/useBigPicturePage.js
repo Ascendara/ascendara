@@ -560,7 +560,7 @@ function useBigPicturePage() {
       setTimeout(() => {
         setIsTransitioning(false);
       }, 50);
-    }, 200);
+    }, 140);
   };
 
   const handleCloseInstalledGameDetails = useCallback(() => {
@@ -887,7 +887,7 @@ function useBigPicturePage() {
         setTimeout(() => {
           setIsTransitioning(false);
         }, 50);
-      }, 200);
+      }, 140);
     },
     [isTransitioning]
   );

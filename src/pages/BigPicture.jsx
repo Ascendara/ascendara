@@ -21,6 +21,7 @@ import { IndexSurface } from "./big-picture/IndexSurface";
 import { PreferencesSurface } from "./big-picture/PreferencesSurface";
 import "./big-picture/big-picture.css";
 import "./big-picture/design-system.css";
+import "./big-picture/motion.css";
 import { StoreSearchBar } from "./big-picture/StoreSearchBar";
 import { StoreGameCard } from "./big-picture/StoreGameCard";
 import { FloatingContextMenu } from "./big-picture/FloatingContextMenu";
@@ -33,6 +34,31 @@ import { ProviderSelectionDialog } from "./big-picture/ProviderSelectionDialog";
 import { QueuePromptDialog } from "./big-picture/QueuePromptDialog";
 import "@/components/ui/input";
 import "@/components/GamesBackupDialog";
+import { useState } from "react";
+
+// Tab order drives which way a page slides in; pages outside it fade and settle.
+const pageOrder = [
+  "carousel",
+  "library",
+  "store",
+  "downloads",
+  "retro",
+  "cloud",
+  "profile",
+  "preferences",
+];
+
+function usePageDirection(view) {
+  const [state, setState] = useState({ view, direction: 0 });
+  if (state.view !== view) {
+    const from = pageOrder.indexOf(state.view);
+    const to = pageOrder.indexOf(view);
+    const direction = from < 0 || to < 0 ? 0 : Math.sign(to - from);
+    setState({ view, direction });
+    return direction;
+  }
+  return state.direction;
+}
 
 function BigPicture() {
   const {
@@ -140,6 +166,10 @@ function BigPicture() {
     assetSearchGame,
     showWelcomeAnimation,
   } = useBigPicturePage();
+  const pageDirection = usePageDirection(view);
+  const detailsOpen = installedGameView || view === "details";
+  // The page recedes while a game opens and comes back forward as it closes.
+  const stageHidden = detailsOpen ? !isTransitioning : isTransitioning;
   const HomeStyle =
     settings.bigPictureHomeStyle === "classic" ? ClassicHome : HomeDashboard;
   return (
@@ -275,153 +305,158 @@ function BigPicture() {
             hideChrome: installedGameView,
           }}
         >
-          {view === "indexes" && (
-            <IndexSurface
-              navigation={surfaceNavigation}
-              onBack={() => {
-                refreshStore();
-                changeView("store");
-              }}
-              t={t}
-              controllerType={controllerType}
-              keyboardLayout={keyboardLayout}
-            />
-          )}
-          {view === "power" && (
-            <PowerSurface
-              navigation={surfaceNavigation}
-              downloads={downloadingGames.length}
-              active={!isMenuOpen}
-              onBack={() => changeView("carousel")}
-              onDesktop={() => navigate("/")}
-            />
-          )}
-          {view === "carousel" && (
-            <HomeStyle
-              navigation={surfaceNavigation}
-              active={
-                !isMenuOpen &&
-                !installedGameView &&
-                !showControllerSettings &&
-                !isKeyboardOpen &&
-                !showExitBigPictureDialog
-              }
-              search={() => setIsKeyboardOpen(true)}
-              openMenu={() => setIsMenuOpen(true)}
-              pause={handlePauseDownload}
-              resume={handleResumeDownload}
-              stopping={stoppingDownloads}
-              resuming={resumingDownloads}
-              playGame={game => handleShowInstalledGameDetails(game, true)}
-              games={allGames}
-              downloads={downloadingGames}
-              queue={queuedDownloads}
-              discover={filteredStoreGames}
-              openGame={handleShowInstalledGameDetails}
-              openStore={game => handleSelectStoreGame(game, 0)}
-              changeView={changeView}
-              openSettings={() => changeView("preferences")}
-            />
-          )}
-          {view === "library" && (
-            <LibrarySurface
-              navigation={surfaceNavigation}
-              active={!isMenuOpen && !installedGameView}
-              games={allGames}
-              openGame={handleShowInstalledGameDetails}
-              refresh={refreshLibrary}
-              reviewDuplicates={reviewLibraryConflicts}
-              pendingCount={libraryPendingCount}
-              onBack={() => changeView("carousel")}
-              t={t}
-              controllerType={controllerType}
-              keyboardLayout={keyboardLayout}
-            />
-          )}
-          {view === "retro" && (
-            <RetroSurface
-              navigation={surfaceNavigation}
-              active={!isMenuOpen}
-              onBack={() => changeView("carousel")}
-            />
-          )}
-          {view === "cloud" && (
-            <CloudSurface
-              navigation={surfaceNavigation}
-              inputLock={surfaceInputLock}
-              active={
-                !isMenuOpen &&
-                !isKeyboardOpen &&
-                !showExitBigPictureDialog &&
-                !showControllerSettings
-              }
-              games={allGames}
-              refreshLibrary={refreshLibrary}
-              onBack={() => changeView("carousel")}
-              onAccount={() => navigate("/ascend")}
-              t={t}
-              controllerType={controllerType}
-              keyboardLayout={keyboardLayout}
-            />
-          )}
-          {["preferences", "profile"].includes(view) && (
-            <PreferencesSurface
-              key={view}
-              navigation={surfaceNavigation}
-              active={!isMenuOpen && !showControllerSettings}
-              profile={view === "profile"}
-              onBack={() => changeView("carousel")}
-              openController={() => setShowControllerSettings(true)}
-              openIndexes={() => changeView("indexes")}
-            />
-          )}
+          <div
+            className="bp-stage"
+            data-hidden={stageHidden}
+            style={{
+              "--bp-enter-x": `${pageDirection * 56}px`,
+              "--bp-enter-scale": pageDirection ? 1 : 0.985,
+            }}
+          >
+            {view === "indexes" && (
+              <IndexSurface
+                navigation={surfaceNavigation}
+                onBack={() => {
+                  refreshStore();
+                  changeView("store");
+                }}
+                t={t}
+                controllerType={controllerType}
+                keyboardLayout={keyboardLayout}
+              />
+            )}
+            {view === "power" && (
+              <PowerSurface
+                navigation={surfaceNavigation}
+                downloads={downloadingGames.length}
+                active={!isMenuOpen}
+                onBack={() => changeView("carousel")}
+                onDesktop={() => navigate("/")}
+              />
+            )}
+            {view === "carousel" && (
+              <HomeStyle
+                navigation={surfaceNavigation}
+                active={
+                  !isMenuOpen &&
+                  !installedGameView &&
+                  !showControllerSettings &&
+                  !isKeyboardOpen &&
+                  !showExitBigPictureDialog
+                }
+                search={() => setIsKeyboardOpen(true)}
+                openMenu={() => setIsMenuOpen(true)}
+                pause={handlePauseDownload}
+                resume={handleResumeDownload}
+                stopping={stoppingDownloads}
+                resuming={resumingDownloads}
+                playGame={game => handleShowInstalledGameDetails(game, true)}
+                games={allGames}
+                downloads={downloadingGames}
+                queue={queuedDownloads}
+                discover={filteredStoreGames}
+                openGame={handleShowInstalledGameDetails}
+                openStore={game => handleSelectStoreGame(game, 0)}
+                changeView={changeView}
+                openSettings={() => changeView("preferences")}
+              />
+            )}
+            {view === "library" && (
+              <LibrarySurface
+                navigation={surfaceNavigation}
+                active={!isMenuOpen && !installedGameView}
+                games={allGames}
+                openGame={handleShowInstalledGameDetails}
+                refresh={refreshLibrary}
+                reviewDuplicates={reviewLibraryConflicts}
+                pendingCount={libraryPendingCount}
+                onBack={() => changeView("carousel")}
+                t={t}
+                controllerType={controllerType}
+                keyboardLayout={keyboardLayout}
+              />
+            )}
+            {view === "retro" && (
+              <RetroSurface
+                navigation={surfaceNavigation}
+                active={!isMenuOpen}
+                onBack={() => changeView("carousel")}
+              />
+            )}
+            {view === "cloud" && (
+              <CloudSurface
+                navigation={surfaceNavigation}
+                inputLock={surfaceInputLock}
+                active={
+                  !isMenuOpen &&
+                  !isKeyboardOpen &&
+                  !showExitBigPictureDialog &&
+                  !showControllerSettings
+                }
+                games={allGames}
+                refreshLibrary={refreshLibrary}
+                onBack={() => changeView("carousel")}
+                onAccount={() => navigate("/ascend")}
+                t={t}
+                controllerType={controllerType}
+                keyboardLayout={keyboardLayout}
+              />
+            )}
+            {["preferences", "profile"].includes(view) && (
+              <PreferencesSurface
+                key={view}
+                navigation={surfaceNavigation}
+                active={!isMenuOpen && !showControllerSettings}
+                profile={view === "profile"}
+                onBack={() => changeView("carousel")}
+                openController={() => setShowControllerSettings(true)}
+                openIndexes={() => changeView("indexes")}
+              />
+            )}
 
-          {view === "store" && (
-            <BrowseSurface
-              navigation={surfaceNavigation}
-              active={!isMenuOpen && !isKeyboardOpen}
-              games={filteredStoreGames}
-              loading={storeLoading}
-              query={storeSearchQuery}
-              search={() => setIsKeyboardOpen(true)}
-              clearSearch={() => setStoreSearchQuery("")}
-              sort={selectedSort}
-              setSort={setSelectedSort}
-              openGame={handleSelectStoreGame}
-              onBack={() => changeView("carousel")}
-              retry={refreshStore}
-              openIndexes={() => changeView("indexes")}
-            />
-          )}
+            {view === "store" && (
+              <BrowseSurface
+                navigation={surfaceNavigation}
+                active={!isMenuOpen && !isKeyboardOpen}
+                games={filteredStoreGames}
+                loading={storeLoading}
+                query={storeSearchQuery}
+                search={() => setIsKeyboardOpen(true)}
+                clearSearch={() => setStoreSearchQuery("")}
+                sort={selectedSort}
+                setSort={setSelectedSort}
+                openGame={handleSelectStoreGame}
+                onBack={() => changeView("carousel")}
+                retry={refreshStore}
+                openIndexes={() => changeView("indexes")}
+              />
+            )}
 
-          {view === "downloads" && (
-            <DownloadsSurface
-              navigation={surfaceNavigation}
-              active={!isMenuOpen && !showKillDialog && !showExitBigPictureDialog}
-              downloads={downloadingGames}
-              queue={queuedDownloads}
-              torboxStates={torboxStates}
-              stopping={stoppingDownloads}
-              resuming={resumingDownloads}
-              pause={handlePauseDownload}
-              resume={handleResumeDownload}
-              retryExtraction={retryExtraction}
-              cancel={handleKillDownload}
-              openFolder={handleOpenFolder}
-              onBack={() => changeView("carousel")}
-              browse={() => changeView("store")}
-              t={t}
-              buttons={buttons}
-            />
-          )}
+            {view === "downloads" && (
+              <DownloadsSurface
+                navigation={surfaceNavigation}
+                active={!isMenuOpen && !showKillDialog && !showExitBigPictureDialog}
+                downloads={downloadingGames}
+                queue={queuedDownloads}
+                torboxStates={torboxStates}
+                stopping={stoppingDownloads}
+                resuming={resumingDownloads}
+                pause={handlePauseDownload}
+                resume={handleResumeDownload}
+                retryExtraction={retryExtraction}
+                cancel={handleKillDownload}
+                openFolder={handleOpenFolder}
+                onBack={() => changeView("carousel")}
+                browse={() => changeView("store")}
+                t={t}
+                buttons={buttons}
+              />
+            )}
+          </div>
         </PageNavigationContext.Provider>
 
         {view === "details" && selectedStoreGame && (
-          <div
-            className={`absolute inset-0 transition-all duration-300 ease-out ${
-              isTransitioning ? "scale-95 opacity-0" : "scale-100 opacity-100"
-            }`}
-          >
+          <div className="bp-detail-layer" data-hidden={isTransitioning}>
             <GameDetailsView
               game={selectedStoreGame}
               onBack={() => {
@@ -454,11 +489,7 @@ function BigPicture() {
         )}
 
         {installedGameView && selectedInstalledGame && (
-          <div
-            className={`absolute inset-0 transition-all duration-300 ease-out ${
-              isTransitioning ? "scale-95 opacity-0" : "scale-100 opacity-100"
-            }`}
-          >
+          <div className="bp-detail-layer" data-hidden={isTransitioning}>
             <InstalledGameDetailsView
               game={selectedInstalledGame}
               autoLaunch={selectedInstalledGame.bigPictureAutoLaunch}

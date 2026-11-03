@@ -1,0 +1,159 @@
+/* Big Picture motion: page changes, opening games and moving between games.
+   Loaded after design-system.css so these timings win over the base rules. */
+.bp-stage {
+  --bp-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity 0.2s ease,
+    transform 0.32s var(--bp-ease);
+}
+
+/* A game opening pushes the page back; closing it brings the page forward again. */
+.bp-stage[data-hidden="true"] {
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+}
+
+/* Page content slides in from the side of the tab that was picked. The header
+   and footer stay put so the navigation never flickers between pages. Fill mode
+   is backwards only, so no transform lingers to trap fixed-position children. */
+.bp-stage .bp-surface > :not(.bp-navigation):not(.bp-home-footer) {
+  animation: bp-page-in 0.38s var(--bp-ease) backwards;
+}
+.bp-stage .bp-surface > :nth-child(3) {
+  animation-delay: 45ms;
+}
+.bp-stage .bp-surface > :nth-child(4) {
+  animation-delay: 90ms;
+}
+.bp-stage .bp-surface > :nth-child(n + 5) {
+  animation-delay: 135ms;
+}
+
+@keyframes bp-page-in {
+  from {
+    opacity: 0;
+    transform: translate3d(var(--bp-enter-x, 0px), 0, 0) scale(var(--bp-enter-scale, 1));
+  }
+}
+
+/* Game details sit "in front" of the page: they settle in from slightly
+   larger and grow away again when closed. */
+.bp-detail-layer {
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity 0.24s ease,
+    transform 0.36s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.bp-detail-layer[data-hidden="true"] {
+  opacity: 0;
+  transform: scale(1.04);
+}
+
+.bp-detail .bp-detail-bg {
+  animation: bp-detail-bg-in 1.1s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.bp-detail .bp-detail-art {
+  animation: bp-detail-art-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.12s backwards;
+}
+.bp-detail .bp-detail-hero > * {
+  animation: bp-rise-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.bp-detail .bp-detail-hero > :nth-child(1) {
+  animation-delay: 0.08s;
+}
+.bp-detail .bp-detail-hero > :nth-child(2) {
+  animation-delay: 0.14s;
+}
+.bp-detail .bp-detail-hero > :nth-child(3) {
+  animation-delay: 0.2s;
+}
+.bp-detail .bp-detail-hero > :nth-child(4) {
+  animation-delay: 0.26s;
+}
+.bp-detail .bp-detail-hero > :nth-child(n + 5) {
+  animation-delay: 0.32s;
+}
+
+@keyframes bp-detail-bg-in {
+  from {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+@keyframes bp-detail-art-in {
+  from {
+    opacity: 0;
+    transform: translate3d(40px, 0, 0) scale(0.96);
+  }
+}
+@keyframes bp-rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+}
+
+/* Focus ring glides in around the game or button being moved to instead of
+   snapping on. */
+.bp-stage .bp-surface :is(.bp-action, .bp-game):not([data-selected="true"]):not(:focus-visible) {
+  outline: 3px solid transparent;
+  outline-offset: 10px;
+}
+.bp-stage .bp-surface .bp-action,
+.bp-stage .bp-surface .bp-game {
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.24s ease,
+    transform 0.26s var(--bp-ease),
+    outline-color 0.18s ease,
+    outline-offset 0.24s var(--bp-ease);
+}
+.bp-stage .bp-surface .bp-cover img {
+  transition: transform 0.45s var(--bp-ease);
+}
+
+/* Classic home: artwork and title crossfade as the selection moves. */
+.bp-stage .bp-surface > .bp-classic-art {
+  animation: bp-classic-art-in 0.5s ease-out backwards;
+}
+.bp-classic-heading h1 {
+  animation: bp-rise-in 0.32s var(--bp-ease, ease-out) backwards;
+}
+.bp-classic-tile {
+  transition: width 0.34s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes bp-classic-art-in {
+  from {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-stage,
+  .bp-detail-layer,
+  .bp-stage .bp-surface .bp-action,
+  .bp-stage .bp-surface .bp-game,
+  .bp-stage .bp-surface .bp-cover img,
+  .bp-classic-tile {
+    transition: none !important;
+  }
+  .bp-stage[data-hidden="true"],
+  .bp-detail-layer[data-hidden="true"] {
+    transform: none;
+  }
+  .bp-stage .bp-surface > *,
+  .bp-detail .bp-detail-bg,
+  .bp-detail .bp-detail-art,
+  .bp-detail .bp-detail-hero > *,
+  .bp-classic-heading h1 {
+    animation: none !important;
+  }
+}

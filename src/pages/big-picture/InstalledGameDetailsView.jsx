@@ -156,7 +156,7 @@ function InstalledGameDetailsView({
     }
   }, [showManagementMenu, selectedMenuItem]);
   return (
-    <div className="fixed inset-0 z-[9998] flex flex-col overflow-hidden bg-background text-primary">
+    <div className="bp-detail fixed inset-0 z-[9998] flex flex-col overflow-hidden bg-background text-primary">
       <DetailBackButton
         onBack={() => handleInput("BACK")}
         controllerType={controllerType}
@@ -166,7 +166,7 @@ function InstalledGameDetailsView({
         // New layout: Full-screen hero background
         <>
           <div
-            className="absolute inset-0 z-0 transition-opacity duration-1000"
+            className="bp-detail-bg absolute inset-0 z-0 transition-opacity duration-1000"
             style={{
               backgroundImage: bgImage ? `url(${bgImage})` : "none",
               backgroundColor: bgImage ? "transparent" : "#1e293b",
@@ -180,7 +180,7 @@ function InstalledGameDetailsView({
         // Old layout: Blurred background + card-style image on the right
         <>
           <div
-            className="absolute inset-0 z-0 opacity-30 transition-opacity duration-1000"
+            className="bp-detail-bg absolute inset-0 z-0 opacity-30 transition-opacity duration-1000"
             style={{
               backgroundImage: bgImage ? `url(${bgImage})` : "none",
               backgroundColor: bgImage ? "transparent" : "#1e293b",
@@ -191,7 +191,7 @@ function InstalledGameDetailsView({
           />
           <div className="absolute inset-0 z-0 bg-gradient-to-r from-[#0e0e10] via-[#0e0e10]/70 to-transparent" />
           <div
-            className={`absolute right-0 top-0 z-10 flex h-full w-[55%] items-center justify-center p-12 transition-all duration-500 ease-in-out ${
+            className={`bp-detail-art absolute right-0 top-0 z-10 flex h-full w-[55%] items-center justify-center p-12 transition-all duration-500 ease-in-out ${
               showMedia
                 ? "pointer-events-none translate-y-[-10%] scale-95 opacity-0"
                 : "translate-y-0 scale-100 opacity-100"
@@ -222,7 +222,7 @@ function InstalledGameDetailsView({
       >
         {/* VIEW 1: DETAILS */}
         <div className="relative h-full w-full flex-shrink-0">
-          <div className="flex h-full w-[45%] flex-col justify-center p-16 pl-24">
+          <div className="bp-detail-hero flex h-full w-[45%] flex-col justify-center p-16 pl-24">
             {logoSrc ? (
               <div className="mb-6">
                 <img
