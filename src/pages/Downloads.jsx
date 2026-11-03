@@ -1458,6 +1458,12 @@ const DownloadCard = ({
   const isAwaitingRecovery = downloadingData?.awaitingRecoveryAction;
   const recoverableError = downloadingData?.recoverableError;
   const isArchiveRecovery = recoverableError?.type === "archiveExtractionFailed";
+  const autoRecovery = downloadingData?.autoRecovery;
+  const recoveryReason = ["damaged", "password", "disk", "blocked"].includes(
+    recoverableError?.reason
+  )
+    ? recoverableError.reason
+    : "unknown";
 
   // Determine current status for badge
   const getStatus = () => {
@@ -1978,41 +1984,64 @@ const DownloadCard = ({
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-amber-600">
-                    {t(
-                      isArchiveRecovery
-                        ? "downloads.extractionRecovery.archiveTitle"
-                        : "downloads.extractionRecovery.title"
-                    )}
+                    {isArchiveRecovery
+                      ? t(`downloads.extractionRecovery.reasons.${recoveryReason}.title`)
+                      : t("downloads.extractionRecovery.title")}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {t(
-                      isArchiveRecovery
-                        ? "downloads.extractionRecovery.archiveDescription"
-                        : "downloads.extractionRecovery.description"
-                    )}
+                    {isArchiveRecovery
+                      ? t(`downloads.extractionRecovery.reasons.${recoveryReason}.body`)
+                      : t("downloads.extractionRecovery.description")}
                   </p>
+                  {isArchiveRecovery &&
+                    (recoverableError.redownloaded || recoverableError.autoRetried) && (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {t(
+                          recoverableError.redownloaded
+                            ? "downloads.extractionRecovery.alreadyRedownloaded"
+                            : "downloads.extractionRecovery.alreadyRetried"
+                        )}
+                      </p>
+                    )}
+                  {isArchiveRecovery && (
+                    <p className="mt-1 text-sm font-medium text-foreground">
+                      {t(`downloads.extractionRecovery.reasons.${recoveryReason}.next`)}
+                    </p>
+                  )}
                 </div>
               </div>
-              <div className="max-h-24 overflow-y-auto rounded-md bg-muted/50 p-2 text-xs">
-                {isArchiveRecovery && (
-                  <div className="space-y-1 break-words text-muted-foreground">
+              {isArchiveRecovery ? (
+                <details className="text-xs text-muted-foreground">
+                  <summary className="cursor-pointer select-none">
+                    {t("downloads.extractionRecovery.technicalDetails")}
+                  </summary>
+                  <div className="mt-2 max-h-24 space-y-1 overflow-y-auto break-words rounded-md bg-muted/50 p-2">
                     <p className="font-medium">{recoverableError.archive}</p>
                     <p>{recoverableError.message}</p>
                     {recoverableError.extractionError !== recoverableError.message && (
                       <p>{recoverableError.extractionError}</p>
                     )}
+                    {(recoverableError.files || []).map((error, index) => (
+                      <div key={`${error.file}-${index}`} className="py-0.5">
+                        <span className="font-medium">{error.file}</span>
+                        <span className="ml-2">{error.error}</span>
+                      </div>
+                    ))}
                   </div>
-                )}
-                {(recoverableError.files || []).map((error, index) => (
-                  <div
-                    key={`${error.file}-${index}`}
-                    className="py-0.5 text-muted-foreground"
-                  >
-                    <span className="font-medium">{error.file}</span>
-                    <span className="ml-2">{error.error}</span>
-                  </div>
-                ))}
-              </div>
+                </details>
+              ) : (
+                <div className="max-h-24 overflow-y-auto rounded-md bg-muted/50 p-2 text-xs">
+                  {(recoverableError.files || []).map((error, index) => (
+                    <div
+                      key={`${error.file}-${index}`}
+                      className="py-0.5 text-muted-foreground"
+                    >
+                      <span className="font-medium">{error.file}</span>
+                      <span className="ml-2">{error.error}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
                 {!isArchiveRecovery &&
                   window.electron.getPlatform() === "win32" &&
@@ -2051,7 +2080,9 @@ const DownloadCard = ({
                   onClick={() => handleExtractionRecovery(false, "cancel")}
                   disabled={isSubmittingRecovery}
                 >
-                  {t("common.cancel")}
+                  {isArchiveRecovery
+                    ? t("downloads.extractionRecovery.stopKeepFiles")
+                    : t("common.cancel")}
                 </Button>
               </div>
             </div>
@@ -2398,6 +2429,25 @@ const DownloadCard = ({
             </div>
           </div>
         )}
+
+        {/* Automatic recovery in progress */}
+        {autoRecovery &&
+          !isAwaitingRecovery &&
+          !hasError &&
+          !isStopped &&
+          (isDownloading || isExtracting) && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  autoRecovery.kind === "redownload"
+                    ? "downloads.extractionRecovery.autoRetry.redownload"
+                    : "downloads.extractionRecovery.autoRetry.reextract",
+                  { archive: autoRecovery.archive }
+                )}
+              </p>
+            </div>
+          )}
 
         {/* Downloading */}
         {isDownloading && !isWaiting && !isExtracting && !hasError && !isStopped && (

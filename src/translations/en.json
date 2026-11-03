@@ -2266,16 +2266,51 @@
     "extractingDescription": "Extracting game files may take up to 30 minutes depending on the file size.",
     "extractionFailedError": "Archive extraction failed. The downloaded archive could not be extracted - the download may be corrupted or incomplete.",
     "extractionRecovery": {
+      "alreadyRedownloaded": "Ascendara already downloaded the damaged part again, and it failed the same way. The file is probably damaged where it's hosted.",
+      "alreadyRetried": "Ascendara already tried again automatically, and it failed the same way.",
       "archiveDescription": "Retry extraction of the archive shown below using the retained file. Earlier extraction results are kept, and this action does not restart the download. If the archive is damaged, extraction may fail again and a different source may be needed.",
       "archiveTitle": "Archive extraction failed",
+      "autoRetry": {
+        "redownload": "Part of the download ({{archive}}) arrived damaged. Ascendara is downloading it again. You don't need to do anything.",
+        "reextract": "Unpacking {{archive}} hit a problem. Ascendara is trying again. You don't need to do anything."
+      },
       "continueFailed": "Could not continue extraction.",
       "description": "Windows Security or another antivirus may have removed these files. The source archive is being kept while Ascendara waits for your choice.",
       "enableProtectionAndRetry": "Enable protection and retry",
       "protectionEnabledRetrying": "Directory protection enabled. Retrying the missing files.",
       "protectionFailed": "Could not enable directory protection.",
+      "reasons": {
+        "blocked": {
+          "body": "Windows or another program, often antivirus, stopped Ascendara from reading or writing the game's files.",
+          "next": "Close programs that might be using these files and check your antivirus quarantine, then retry.",
+          "title": "Another program blocked the game files"
+        },
+        "damaged": {
+          "body": "Some of the game's data didn't arrive intact, so it can't be unpacked. This usually happens when a connection drops during a big download. It isn't something you did wrong.",
+          "next": "Retry once more. If it fails again, remove this download and pick a different download source for the game.",
+          "title": "The downloaded files are damaged"
+        },
+        "disk": {
+          "body": "There isn't enough free space on the drive to unpack the game.",
+          "next": "Free up space on the drive, or choose another download folder in Settings, then retry.",
+          "title": "Your drive is out of space"
+        },
+        "password": {
+          "body": "Ascendara couldn't unlock this archive with the password it knows.",
+          "next": "Remove this download and pick a different download source for the game.",
+          "title": "The archive is locked with a password"
+        },
+        "unknown": {
+          "body": "Ascendara couldn't finish unpacking this game.",
+          "next": "Retry. If it keeps failing, report the error so it can be looked into.",
+          "title": "Unpacking the game failed"
+        }
+      },
       "retryMissingFiles": "Retry missing files",
       "retrying": "Retrying the missing files.",
       "retryingArchive": "Retrying extraction of the retained archive.",
+      "stopKeepFiles": "Stop (keep files)",
+      "technicalDetails": "Technical details",
       "title": "Files disappeared after extraction"
     },
     "extractionSpeed": "Extraction",

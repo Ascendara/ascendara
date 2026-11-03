@@ -76,6 +76,23 @@ def is_archive_integrity_error(error):
     ))
 
 
+def extraction_failure_reason(error):
+    """Plain-language category the UI explains to the user."""
+    message = str(error).lower()
+    if any(term in message for term in ('incorrect password', 'bad password', 'password required',
+                                       'password missing')):
+        return 'password'
+    if any(term in message for term in ('disk space', 'no space left', 'not enough space', 'disk full')):
+        return 'disk'
+    if any(term in message for term in ('permission denied', 'access is denied', 'winerror 32',
+                                       'being used by another process', 'file create error',
+                                       'could not be read')):
+        return 'blocked'
+    if is_archive_integrity_error(error):
+        return 'damaged'
+    return 'unknown'
+
+
 def archive_sources(archive, sources):
     archive = os.path.abspath(archive)
     name = os.path.basename(archive)

@@ -1364,6 +1364,15 @@ class AscendaraDownloader:
                 from AscendaraDownloadRecovery import wait_for_retry
                 wait_for_retry(2, self._check_for_stop)
 
+    def _set_auto_recovery(self, kind, archive, error):
+        from AscendaraDownloadRecovery import extraction_failure_reason
+        self.game_info['downloadingData']['autoRecovery'] = {
+            'kind': kind,
+            'archive': os.path.basename(archive),
+            'reason': extraction_failure_reason(error),
+        }
+        safe_write_json(self.game_info_path, self.game_info)
+
     def _await_extraction_recovery(self, details, force=False):
         if not force and getattr(self, '_recovery_prompted', False):
             return 'retry'
@@ -1401,8 +1410,11 @@ class AscendaraDownloader:
 
     def _extract_archive_with_recovery(self, archive, payload, stage, started):
         """Keep the stage alive while the user retries only the failed archive."""
+        from AscendaraDownloadRecovery import extraction_failure_reason, wait_for_retry
         repair_attempted = getattr(self, '_local_extraction_only', False)
         manual_retry = False
+        auto_retried = False
+        redownloaded = False
         while True:
             self._check_cancelled()
             try:
@@ -1414,6 +1426,7 @@ class AscendaraDownloader:
                         inplace=not self.game_info.get('privateSource'))
                 finally:
                     self._end_extraction_io()
+                self.game_info['downloadingData'].pop('autoRecovery', None)
                 safe_write_json(self.game_info_path, self.game_info)
                 trust_inplace_output(archive, payload, result)
                 return result
@@ -1429,13 +1442,34 @@ class AscendaraDownloader:
                         and not inplace_consumed(archive)):
                     repair_attempted = True
                     try:
+                        self._set_auto_recovery('redownload', archive, exc)
                         self._repair_archive(exc, archive, 0)
                     except (InterruptedError, ExtractionRecoveryCancelled):
                         raise
                     except Exception as repair_error:
                         failure = repair_error
                     else:
+                        redownloaded = True
                         continue
+                reason = extraction_failure_reason(exc)
+                # One automatic retry before asking, so a first-time user is not
+                # handed a technical prompt for a failure that may be transient.
+                # Skipped when a fresh download already failed the same way.
+                if not manual_retry and not auto_retried and not redownloaded and reason != 'password':
+                    auto_retried = True
+                    manual_retry = True
+                    logging.warning('Retrying extraction automatically for %s: %s', archive, failure)
+                    self._set_auto_recovery('reextract', archive, exc)
+                    data = self.game_info['downloadingData']
+                    data.update(downloading=False, extracting=True, verifying=False,
+                                progressCompleted='100.00', progressDownloadSpeeds='0.00 KB/s',
+                                timeUntilComplete='Retrying extraction...')
+                    self._extraction_progress({'name': os.path.basename(archive), 'files': 0,
+                                              'total': 0, 'percent': 0}, started)
+                    safe_write_json(self.game_info_path, self.game_info)
+                    wait_for_retry(2, self._check_for_stop)
+                    continue
+                self.game_info['downloadingData'].pop('autoRecovery', None)
                 logging.warning('Extraction needs user action for %s: %s', archive, failure)
                 action = self._await_extraction_recovery({
                     'type': 'archiveExtractionFailed',
@@ -1443,6 +1477,9 @@ class AscendaraDownloader:
                     'message': str(failure),
                     'extractionError': str(exc),
                     'files': getattr(exc, 'errors', []),
+                    'reason': reason,
+                    'autoRetried': auto_retried,
+                    'redownloaded': redownloaded,
                 }, force=True)
                 if action != 'retry':
                     raise ExtractionRecoveryCancelled(
