@@ -18,7 +18,9 @@ export function validateCloudBackupEntries(zip) {
     if (entry.dir || (entry.unsafeOriginalName && entry.unsafeOriginalName !== name) ||
       (name !== "mapping.yaml" && !name.toLowerCase().endsWith(".zip")) ||
       (entry.unixPermissions && (entry.unixPermissions & 0xf000) === 0xa000)) {
-      throw new Error("Unexpected path in backup archive");
+      throw new Error(
+        `Unexpected file "${name}" in backup archive. Only backups created by Ascendara's save backup can be restored automatically; download it instead.`
+      );
     }
     if (names.has(name.toLowerCase())) throw new Error("Duplicate backup filename");
     names.add(name.toLowerCase());

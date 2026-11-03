@@ -250,6 +250,9 @@ function runLudusaviJson(ludusaviPath, args) {
  */
 const LUDUSAVI_FUZZY_MATCH_THRESHOLD = 0.9;
 
+// Must match the prefix restoreCloudSave.js uses for its temp staging folder.
+const CLOUD_RESTORE_PREFIX = "ascendara-cloud-restore-";
+
 /**
  * Resolve a game name to the exact title Ludusavi's manifest expects.
  *
@@ -265,12 +268,15 @@ const LUDUSAVI_FUZZY_MATCH_THRESHOLD = 0.9;
  * @param {string} configDir
  * @param {string} game
  * @param {"backup"|"restore"} context
+ * @param {string} [backupPath] - where restore-context lookups find backups
  */
-async function resolveLudusaviGameName(ludusaviPath, configDir, game, context) {
+async function resolveLudusaviGameName(ludusaviPath, configDir, game, context, backupPath) {
   if (!game) return game;
 
   const contextFlag = context === "restore" ? "--restore" : "--backup";
   const baseArgs = ["--config", configDir, "find", "--api", contextFlag];
+  // Without --path, restore lookups search Ludusavi's default folder, not ours.
+  if (context === "restore" && backupPath) baseArgs.push("--path", backupPath);
 
   // 1. Exact match (cheapest, and avoids any risk of a fuzzy mismatch).
   const exact = await runLudusaviJson(ludusaviPath, [...baseArgs, game]);
@@ -310,7 +316,20 @@ async function resolveLudusaviGameName(ludusaviPath, configDir, game, context) {
 function registerLudusaviHandlers() {
   const settingsManager = getSettingsManager();
 
-  ipcMain.handle("ludusavi", async (_, action, game, backupName) => {
+  ipcMain.handle("ludusavi", async (_, action, game, backupName, options = {}) => {
+    // A cloud restore runs from a temp staging folder so the local backup
+    // folder (and its mapping.yaml history) is never overwritten.
+    const stagingDir =
+      action === "restore" && typeof options?.stagingDir === "string"
+        ? path.resolve(options.stagingDir)
+        : null;
+    if (
+      stagingDir &&
+      (!stagingDir.startsWith(path.join(os.tmpdir(), CLOUD_RESTORE_PREFIX)) ||
+        !fs.existsSync(stagingDir))
+    ) {
+      return { success: false, error: "Invalid restore staging folder" };
+    }
     try {
       let ludusaviPath;
       if (isWindows) {
@@ -332,6 +351,7 @@ function registerLudusaviHandlers() {
 
       const settings = settingsManager.getSettings();
       const ludusaviSettings = settings.ludusavi || {};
+      const backupRoot = stagingDir || ludusaviSettings.backupLocation;
 
       if (!ludusaviPath || !fs.existsSync(ludusaviPath)) {
         return { success: false, error: "Ludusavi executable not found" };
@@ -361,7 +381,8 @@ function registerLudusaviHandlers() {
           ludusaviPath,
           ludusaviConfigDir,
           game,
-          action === "restore" ? "restore" : "backup"
+          action === "restore" ? "restore" : "backup",
+          backupRoot
         );
         if (resolvedGame !== game) {
           console.log(`[Ludusavi] Resolved game name "${game}" -> "${resolvedGame}"`);
@@ -435,8 +456,8 @@ function registerLudusaviHandlers() {
             args.push("--backup", backupName);
           }
 
-          if (ludusaviSettings.backupLocation) {
-            args.push("--path", ludusaviSettings.backupLocation);
+          if (backupRoot) {
+            args.push("--path", backupRoot);
           }
 
           if (ludusaviSettings.preferences?.skipConfirmations) {
@@ -474,7 +495,7 @@ function registerLudusaviHandlers() {
 
       const process = spawn(ludusaviPath, args);
 
-      return new Promise((resolve, reject) => {
+      return await new Promise((resolve, reject) => {
         let stdout = "";
         let stderr = "";
 
@@ -504,12 +525,14 @@ function registerLudusaviHandlers() {
         });
 
         process.on("error", err => {
-          reject({ success: false, error: err.message });
+          resolve({ success: false, error: err.message });
         });
       });
     } catch (error) {
       console.error("Error executing ludusavi command:", error);
       return { success: false, error: error.message };
+    } finally {
+      if (stagingDir) await fs.remove(stagingDir).catch(() => {});
     }
   });
 

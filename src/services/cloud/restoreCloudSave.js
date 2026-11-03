@@ -6,6 +6,22 @@ import {
   validateCloudBackupEntries,
 } from "@/lib/cloudBackupValidation";
 
+// Must match CLOUD_RESTORE_PREFIX in electron/modules/library/ludusavi.js.
+const CLOUD_RESTORE_PREFIX = "ascendara-cloud-restore-";
+
+// Reads the top-level `name:` Ludusavi writes, plain or quoted.
+function readMappingName(yaml) {
+  const raw = /^name:[ \t]*(.+?)[ \t]*$/m.exec(yaml)?.[1];
+  if (!raw) return null;
+  try {
+    if (raw.startsWith('"')) return JSON.parse(raw);
+    if (raw.startsWith("'")) return raw.slice(1, -1).replace(/''/g, "'");
+  } catch {
+    return null;
+  }
+  return raw;
+}
+
 // Cloud uploads contain a Ludusavi zip AND its mapping.yaml, not a raw save zip.
 export async function restoreCloudSave(backup, settings) {
   const platform = retroBackupPlatform(backup.gameName);
@@ -46,17 +62,20 @@ export async function restoreCloudSave(backup, settings) {
   const archives = entries.filter(
     entry => entry.name.endsWith(".zip") && !entry.name.endsWith("_cloud.zip")
   );
-  if (archives.length !== 1 || !entries.some(entry => entry.name === "mapping.yaml")) {
+  const mapping = entries.find(entry => entry.name === "mapping.yaml");
+  if (archives.length !== 1 || !mapping) {
     throw new Error("Backup must contain one save archive and mapping.yaml");
   }
-  // Resolve canonical Ludusavi titles just as the upload service does.
-  const local = await window.electron.ludusavi("list-backups", backup.gameName);
-  if (!local?.success) throw new Error(local?.error || "Unable to locate local backups");
-  const existing = Object.values(local.data?.games || {})[0];
-  const folder = existing?.backupPath || `${location}/${folderName}`;
+  // Ludusavi finds backups by the exact title in mapping.yaml, which can differ
+  // from the cloud entry's name (e.g. "Astroneer" vs "ASTRONEER"), so restore by it.
+  const ludusaviName = readMappingName(await mapping.async("string")) || backup.gameName;
+  // Stage in a temp folder rather than the local backup folder, so the cloud
+  // mapping.yaml never replaces the local one (which lists older local backups).
+  // The main process deletes the staging folder once the restore finishes.
+  const stagingDir = `${await window.electron.getTempPath()}/${CLOUD_RESTORE_PREFIX}${Date.now()}`;
   for (const entry of entries) {
     const written = await window.electron.writeFile(
-      `${folder}/${entry.name}`,
+      `${stagingDir}/${folderName}/${entry.name}`,
       await entry.async("uint8array")
     );
     if (written === false || written?.success === false)
@@ -64,8 +83,9 @@ export async function restoreCloudSave(backup, settings) {
   }
   const restored = await window.electron.ludusavi(
     "restore",
-    backup.gameName,
-    archives[0].name
+    ludusaviName,
+    archives[0].name,
+    { stagingDir }
   );
   if (!restored?.success) throw new Error(restored?.error || "Failed to restore saves");
   return restored;

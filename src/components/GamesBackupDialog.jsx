@@ -1,8 +1,4 @@
-import {
-  MAX_CLOUD_BACKUP_BYTES,
-  validateBackupFolderName,
-  validateCloudBackupEntries,
-} from "@/lib/cloudBackupValidation";
+import { restoreCloudSave } from "@/services/cloud/restoreCloudSave";
 import {
   uploadBackupToCloud,
   hasActiveSubscription,
@@ -42,10 +38,7 @@ import { Switch } from "./ui/switch";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
 import { Card, CardContent } from "./ui/card";
-import {
-  listBackups as listCloudBackups,
-  getBackupDownloadUrl,
-} from "@/services/firebase/firebaseService";
+import { listBackups as listCloudBackups } from "@/services/firebase/firebaseService";
 
 const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false }) => {
   const [activeScreen, setActiveScreen] = useState("options"); // options, backup, restore, restoreConfirm, backupsList
@@ -580,7 +573,6 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
       const gameName = cloudBackup.gameName;
       const backupLocation = settings.ludusavi?.backupLocation;
       let backupFilePath = null;
-      let needsCleanup = false;
 
       // Check if backup exists locally first
       if (backupLocation) {
@@ -604,87 +596,22 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
         }
       }
 
-      // If not found locally, download from cloud
-      let backupFileNameToRestore = null;
-      if (!backupFilePath) {
-        // Get download URL from backend
-        const result = await getBackupDownloadUrl(cloudBackup.backupId);
-        if (!result.downloadUrl) {
-          if (result.code === "SUBSCRIPTION_REQUIRED") {
-            toast.error("Active Ascend subscription required");
-          } else {
-            toast.error(result.error || "Failed to get download URL");
-          }
-          setRestoreFailed(true);
-          setRestoreDetails({ error: result.error || "Failed to get download URL" });
-          setRestoringCloudBackup(null);
-          setIsRestoring(false);
-          return;
-        }
-
-        // Download the backup file
-        toast.info("Downloading backup from cloud...");
-
-        const response = await fetch(result.downloadUrl);
-        if (!response.ok) {
-          throw new Error("Failed to download backup file");
-        }
-
-        const blob = await response.blob();
-        if (blob.size > MAX_CLOUD_BACKUP_BYTES)
-          throw new Error("Cloud backup is too large");
-        const arrayBuffer = await blob.arrayBuffer();
-
-        const gameBackupFolder = `${settings.ludusavi.backupLocation}/${validateBackupFolderName(gameName)}`;
-
-        // Extract the combined archive (contains both .zip and mapping.yaml)
-        toast.info("Extracting backup files...");
-
-        const JSZip = (await import("jszip")).default;
-        const combinedZip = await JSZip.loadAsync(arrayBuffer);
-
-        // Extract all files from the combined archive
-        const files = validateCloudBackupEntries(combinedZip);
-        let extractedBackupName = null;
-
-        for (const file of files) {
-          const filename = file.name;
-          if (!file.dir) {
-            const content = await file.async("uint8array");
-            const filePath = `${gameBackupFolder}/${filename}`;
-
-            // Write each file (both .zip and mapping.yaml)
-            await window.electron.writeFile(filePath, content);
-
-            // Track the backup .zip filename (not the _cloud.zip)
-            if (filename.endsWith(".zip") && !filename.endsWith("_cloud.zip")) {
-              extractedBackupName = filename;
-            }
-          }
-        }
-
-        if (!extractedBackupName) {
-          throw new Error("No backup .zip file found in cloud archive");
-        }
-
-        backupFileNameToRestore = extractedBackupName;
-        needsCleanup = true;
+      let restoreResult;
+      if (backupFilePath) {
+        toast.info("Restoring backup...");
+        restoreResult = await window.electron.ludusavi(
+          "restore",
+          gameName,
+          backupFilePath.split("/").pop().split("\\").pop()
+        );
       } else {
-        // If file already exists
-        backupFileNameToRestore = backupFilePath.split("/").pop().split("\\").pop();
+        // Shared cloud path: downloads, validates and restores from a temp
+        // folder so the local mapping.yaml is left untouched.
+        toast.info("Downloading backup from cloud...");
+        restoreResult = await restoreCloudSave(cloudBackup, settings);
       }
 
-      // Extract and restore using Ludusavi
-      toast.info("Restoring backup...");
-
-      // Giving Ludusavi the exact name of the file to restore
-      const restoreResult = await window.electron.ludusavi(
-        "restore",
-        gameName,
-        backupFileNameToRestore
-      );
-
-      if (restoreResult.success) {
+      if (restoreResult?.success) {
         setRestoreSuccess(true);
         toast.success(t("library.backups.restoreSuccess"), {
           description: t("library.backups.restoreSuccessDesc", {
@@ -693,17 +620,8 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
         });
       } else {
         setRestoreFailed(true);
-        setRestoreDetails({ error: restoreResult.error || "Restore failed" });
-        toast.error(restoreResult.error || "Failed to restore backup");
-      }
-
-      // Clean up temp file if we downloaded it
-      if (needsCleanup) {
-        try {
-          await window.electron.deleteFile(backupFilePath);
-        } catch (cleanupErr) {
-          console.warn("Failed to clean up temp file:", cleanupErr);
-        }
+        setRestoreDetails({ error: restoreResult?.error || "Restore failed" });
+        toast.error(restoreResult?.error || "Failed to restore backup");
       }
     } catch (e) {
       console.error("Failed to restore cloud backup:", e);
