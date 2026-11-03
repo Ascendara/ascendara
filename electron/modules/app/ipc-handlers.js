@@ -25,6 +25,7 @@ const { getSettingsManager } = require("../core/settings");
 const { sanitizeText, getExtensionFromMimeType } = require("../core/utils");
 const { initializeDiscordRPC, destroyDiscordRPC, setRPCState } = require("./discord-rpc");
 const steamgrid = require("../library/steamgrid");
+const { searchAchievementFolders } = require("../library/achievementFolderSearch");
 const { isSafeExternalUrl, isTrustedIpcSender } = require("../core/security");
 const {
   completeOnboarding,
@@ -870,6 +871,41 @@ function registerMiscHandlers() {
       return { success: true, canceled: false, rootPath, games, skipped, inaccessible };
     } catch (error) {
       return { success: false, error: error.message || "Failed to scan folder" };
+    }
+  });
+
+  ipcMain.handle("search-achievement-folders", async (_, appId) => {
+    try {
+      const settings = settingsManager.getSettings();
+      let documentsPath;
+      try {
+        documentsPath = app.getPath("documents");
+      } catch {
+        documentsPath = undefined;
+      }
+      return await searchAchievementFolders({
+        appId,
+        watchedFolders: settings.watchingFolders,
+        platform: process.platform,
+        documentsPath,
+      });
+    } catch (error) {
+      console.error("search-achievement-folders failed:", error);
+      return { success: false, error: error.message || "searchFailed" };
+    }
+  });
+
+  ipcMain.handle("open-folder-path", async (_, targetPath) => {
+    if (typeof targetPath !== "string" || !path.isAbsolute(targetPath)) {
+      return { success: false, error: "invalidPath" };
+    }
+    try {
+      const stat = await fs.promises.stat(targetPath);
+      if (!stat.isDirectory()) return { success: false, error: "notDirectory" };
+      const error = await shell.openPath(targetPath);
+      return error ? { success: false, error } : { success: true };
+    } catch (error) {
+      return { success: false, error: error.message || "openFailed" };
     }
   });
 

@@ -108,6 +108,7 @@ import {
   DownloadFolderCheckResult,
 } from "@/components/DownloadFolderCheck";
 import GameIndexManager from "@/components/GameIndexManager";
+import AchievementFolderSearch from "@/components/AchievementFolderSearch";
 import { API_URL } from "@/config/api";
 
 const themes = [
@@ -3098,6 +3099,7 @@ function Settings() {
                     {t("settings.achievementWatcher.addDir") || "Add Directory"}
                   </Button>
                 </div>
+                <AchievementFolderSearch />
               </Card>
             </SettingsCategory>
 
