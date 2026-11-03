@@ -112,7 +112,8 @@ let sendNotification = async opts => {
           )
         : path.join(path.dirname(process.execPath), helperName);
     let args = [];
-    args.push("--is-achievement");
+    if (opts.isAchievement !== false) args.push("--is-achievement");
+    if (opts.type) args.push("--type", String(opts.type));
     let settings = await getSettings();
     let theme = opts.theme;
     if (!theme && typeof settings === "object" && settings.theme) {
@@ -209,9 +210,93 @@ async function syncAchievements(appID, game, cache) {
   return true;
 }
 
+// Goldberg/GSE drop unlocks for achievements missing from
+// steam_settings/achievements.json, and some repacks ship without it.
+const seededFolders = new Set();
+async function seedEmuSchema(folder, appid, gameName) {
+  if (!appid || seededFolders.has(folder)) return;
+  seededFolders.add(folder);
+  const dirs = await library.findSteamSettingsDirs(folder);
+  const missing = [];
+  for (const dir of dirs) {
+    try {
+      await fs.access(path.join(dir, "achievements.json"));
+    } catch (e) {
+      missing.push(dir);
+    }
+  }
+  if (missing.length === 0) return;
+
+  let game;
+  try {
+    game = await app.load(appid);
+  } catch (err) {
+    console.warn(`No schema to seed emulator achievements for ${appid}:`, err);
+    seededFolders.delete(folder); // retry next rescan
+    return;
+  }
+  const schema = game.achievement.list.map(a => ({
+    name: a.name,
+    displayName: a.displayName,
+    description: a.description || "",
+    hidden: a.hidden || 0,
+    icon: a.icon || "",
+    icongray: a.icongray || "",
+    defaultvalue: a.defaultvalue || 0,
+  }));
+  let seeded = false;
+  for (const dir of missing) {
+    try {
+      // wx: never overwrite a schema that appeared in the meantime
+      await fs.writeFile(
+        path.join(dir, "achievements.json"),
+        JSON.stringify(schema, null, 2),
+        { encoding: "utf8", flag: "wx" }
+      );
+      console.log(`Seeded ${schema.length} achievements into ${dir} (restart game)`);
+      seeded = true;
+    } catch (err) {
+      if (err.code !== "EEXIST") console.warn(`Failed to seed ${dir}:`, err);
+    }
+  }
+
+  if (seeded) {
+    await sendNotification({
+      isAchievement: false,
+      type: "success",
+      title: "Achievements Restored",
+      message: `${gameName || game.name} was missing its achievement data. Restart the game to start tracking all ${schema.length} achievements.`,
+    });
+  }
+}
+
+// Write the full (locked) list before the first unlock so the game screen
+// shows achievements right away instead of "no achievements found".
+// Tried once per folder per session: games without achievements would
+// otherwise hit the schema API every rescan.
+const initialWritten = new Set();
+async function writeInitialAchievements(target, appid) {
+  if (initialWritten.has(target.folder)) return;
+  initialWritten.add(target.folder);
+  try {
+    await fs.access(path.join(target.folder, "achievements.ascendara.json"));
+    return; // an unlock got there first
+  } catch (e) {}
+  let game;
+  try {
+    game = await app.load(appid);
+  } catch (err) {
+    console.log(`No achievements to list for ${target.name} (${appid})`);
+    return;
+  }
+  await writeAchievementsJson(target, game, await track.load(appid));
+}
+
 async function processAchievementFile(name, options, { notify = true } = {}) {
   const filePath = path.parse(name);
   if (!fileMatches(options, filePath.base)) return;
+  // The emulator's schema, not a save
+  if (path.basename(filePath.dir).toLowerCase() === "steam_settings") return;
 
   console.log(`Achievement file change detected: ${name}`);
   const appID = getAppIdForFile(filePath, options);
@@ -342,11 +427,15 @@ var app = {
     for (const game of await library.listGames()) {
       if (game.kind !== "ascendara") continue;
       if (!game.installed && !game.hasEmuConfig && !game.hasAchievements) continue;
-      gameDirList.push({
-        path: game.folder,
-        notify: true,
-        appid: await library.getAppId(game.folder),
-      });
+      const appid = await library.getAppId(game.folder);
+      gameDirList.push({ path: game.folder, notify: true, appid });
+      await seedEmuSchema(game.folder, appid, game.name).catch(err =>
+        console.warn(`Emulator schema seeding failed for ${game.name}:`, err)
+      );
+      if (game.installed && appid && !game.hasAchievements) {
+        // Not awaited: first-time schema fetches shouldn't hold up discovery
+        enqueue(() => writeInitialAchievements(game, appid));
+      }
     }
 
     const tempFile = path.join(

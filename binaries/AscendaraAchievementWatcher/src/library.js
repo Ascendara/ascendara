@@ -175,6 +175,30 @@ async function findAppId(folder) {
   return null;
 }
 
+// Goldberg/GSE config folders, which sit next to steam_api (often a few folders deep)
+async function findSteamSettingsDirs(folder) {
+  const found = [];
+  const queue = [{ dir: folder, depth: 0 }];
+  let visited = 0;
+  while (queue.length && visited < APPID_SEARCH_MAX_DIRS) {
+    const { dir, depth } = queue.shift();
+    visited++;
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch (e) {
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.name.toLowerCase() === "steam_settings") found.push(full);
+      else if (depth < APPID_SEARCH_DEPTH) queue.push({ dir: full, depth: depth + 1 });
+    }
+  }
+  return found;
+}
+
 async function getAppId(folder) {
   const cached = appidCache.get(folder);
   if (cached && Date.now() - cached.checkedAt < APPID_RETRY_MS) {
@@ -212,6 +236,7 @@ module.exports = {
   libraryDirs,
   listGames,
   getAppId,
+  findSteamSettingsDirs,
   resolveGame,
   normalizePath,
 };
