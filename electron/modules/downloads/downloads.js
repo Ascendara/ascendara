@@ -1400,17 +1400,28 @@ function registerDownloadHandlers() {
       ) {
         throw new Error("Wait for the game to finish downloading or running.");
       }
+      // Files the game itself rewrote after installation (logs, update
+      // manifests, settings) differ in size without being damaged.
+      const installedAt = (
+        await fs.promises.stat(
+          await dllRepair.safePath(gameDirectory, "filemap.ascendara.json")
+        )
+      ).mtimeMs;
       const verifyErrors = [];
       for (const filePath in filemap) {
         // Older filemaps list Ascendara's metadata and library artwork
         // (grid/hero/logo/header.ascendara.*), which are not game files.
-        const normalized = filePath.replace(/\\/g, "/");
-        if (!normalized.includes("/") && normalized.toLowerCase().includes(".ascendara."))
+        const normalized = filePath.replace(/\\/g, "/").toLowerCase();
+        if (
+          (!normalized.includes("/") && normalized.includes(".ascendara.")) ||
+          normalized.endsWith(".log")
+        )
           continue;
         try {
           const fullPath = await dllRepair.safePath(gameDirectory, filePath);
           const stat = await fs.promises.lstat(fullPath);
-          if (!stat.isFile() || stat.size !== filemap[filePath].size) {
+          const changedByGame = stat.isFile() && stat.mtimeMs > installedAt + 2000;
+          if (!stat.isFile() || (stat.size !== filemap[filePath].size && !changedByGame)) {
             verifyErrors.push({
               file: filePath,
               error: "File size mismatch",
@@ -1427,21 +1438,27 @@ function registerDownloadHandlers() {
         }
       }
 
+      // Checking a playable game only reports problems; it must not turn the
+      // game into a failed download that can no longer be launched. A download
+      // already marked as failed keeps its state so the Downloads page updates.
       if (verifyErrors.length > 0) {
-        gameInfo.downloadingData = {
-          downloading: false,
-          verifying: false,
-          extracting: false,
-          updating: false,
-          progressCompleted: "100.00",
-          progressDownloadSpeeds: "0.00 B/s",
-          timeUntilComplete: "0s",
-          verifyError: verifyErrors,
-        };
-        fs.writeFileSync(gameInfoPath, JSON.stringify(gameInfo, null, 4));
+        if (data?.verifyError?.length) {
+          gameInfo.downloadingData = {
+            downloading: false,
+            verifying: false,
+            extracting: false,
+            updating: false,
+            progressCompleted: "100.00",
+            progressDownloadSpeeds: "0.00 B/s",
+            timeUntilComplete: "0s",
+            verifyError: verifyErrors,
+          };
+          fs.writeFileSync(gameInfoPath, JSON.stringify(gameInfo, null, 4));
+        }
         return {
           success: false,
           error: `${verifyErrors.length} files failed verification`,
+          errors: verifyErrors,
         };
       } else {
         delete gameInfo.downloadingData;
