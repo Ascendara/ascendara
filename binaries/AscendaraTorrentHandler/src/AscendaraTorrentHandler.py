@@ -548,9 +548,14 @@ class TorrentManager:
                 logging.info(f"[{game}] Found {len(archive_files)} archive(s), extracting directly")
                 self._extract_archives(archive_files, install_dir, game_info, game_info_path)
                 self._flatten_directories(install_dir, game)
+            elif (setup_file := self._find_setup_installer(torrent_folder, game)) is None:
+                # Portable release: the torrent already holds the game files
+                if not self._has_executable(torrent_folder):
+                    raise Exception("The torrent has no archives, installer or game executable")
+                logging.info(f"[{game}] No archives or installer found, using the files as a portable install")
+                self._move_portable_files(torrent_folder, install_dir, game)
+                self._flatten_directories(install_dir, game)
             else:
-                logging.info(f"[{game}] No archives found, falling back to setup.exe installer")
-                setup_file = self._find_setup_installer(torrent_folder, game)
                 logging.info(f"[{game}] Found setup installer, awaiting manual elevation from user: {setup_file}")
                 game_info["downloadingData"] = {
                     "downloading": False,
@@ -861,7 +866,39 @@ class TorrentManager:
 
         raise RuntimeError(f"No suitable extraction tool found for {archive_path}. Please install 7-Zip from https://7-zip.org/")
 
-    def _find_setup_installer(self, torrent_folder: str, game: str) -> str:
+    def _has_executable(self, folder: str) -> bool:
+        for _, _, files in os.walk(folder):
+            if any(f.lower().endswith('.exe') for f in files):
+                return True
+        return False
+
+    def _move_portable_files(self, torrent_folder: str, install_dir: str, game: str):
+        """Move an already-extracted torrent's files into install_dir."""
+        if os.path.normcase(os.path.normpath(torrent_folder)) == os.path.normcase(os.path.normpath(install_dir)):
+            return
+        protected_files = {
+            f"{sanitize_folder_name(game)}.ascendara.json",
+            "filemap.ascendara.json",
+        }
+        for item in list(os.listdir(torrent_folder)):
+            src = os.path.join(torrent_folder, item)
+            if item in protected_files or os.path.normpath(src) == os.path.normpath(install_dir):
+                continue
+            dst = os.path.join(install_dir, item)
+            if os.path.exists(dst):
+                if os.path.isdir(dst):
+                    shutil.rmtree(dst, ignore_errors=True)
+                else:
+                    os.remove(dst)
+            shutil.move(src, dst)
+        if torrent_folder != os.path.dirname(install_dir):
+            try:
+                if not os.listdir(torrent_folder):
+                    shutil.rmtree(torrent_folder, ignore_errors=True)
+            except Exception:
+                pass
+
+    def _find_setup_installer(self, torrent_folder: str, game: str) -> Optional[str]:
         """Search for a setup.exe-style installer inside torrent_folder.
         Does NOT launch it - most repack installers require elevation (UAC),
         which we cannot silently grant from this background process, so the
@@ -873,7 +910,7 @@ class TorrentManager:
                     setup_candidates.append(os.path.join(root, file))
 
         if not setup_candidates:
-            raise Exception("Could not find setup executable and no archives were found")
+            return None
 
         # Prefer the shallowest match (closest to torrent_folder root)
         setup_candidates.sort(key=lambda p: p.count(os.sep))
