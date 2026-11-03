@@ -1098,6 +1098,12 @@ function registerGameHandlers() {
           setPlayingActivity(game, `pc:${game}`);
         });
 
+        // The handler still runs cleanup (trainer, backups) after the game ends,
+        // so show the window as soon as the session is over instead of waiting.
+        runGame.once("session-ended", () => {
+          if (settings.hideOnGameLaunch !== false) showWindow();
+        });
+
         runGame.on("error", error => {
           launchFailed = true;
           console.error(`Failed to start game ${game}:`, error);
@@ -1111,7 +1117,7 @@ function registerGameHandlers() {
         runGame.on("close", code => {
           console.log(`Game ${game} exited with code ${code}`);
           runGameProcesses.delete(game);
-          if (settings.hideOnGameLaunch !== false) {
+          if (settings.hideOnGameLaunch !== false && !runGame.sessionEnded) {
             showWindow();
           }
           updateDiscordRPCToLibrary(`pc:${game}`);

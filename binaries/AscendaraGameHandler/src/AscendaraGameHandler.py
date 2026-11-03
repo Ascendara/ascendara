@@ -1672,11 +1672,14 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
         track_tree = current_platform == 'windows'
         tree_seen = {}
         # How long nothing may be running before the game counts as closed. The
-        # longer startup window bridges launcher -> game handoffs, where the
-        # launcher exits a few seconds before the real game process appears.
-        STARTUP_WINDOW_SECONDS = 300
+        # longer grace bridges launcher -> game handoffs, where the launcher
+        # exits a few seconds before the real game process appears. Only an exe
+        # that quit quickly looks like a launcher; one that ran longer was the
+        # game itself, so its exit is treated as the game closing.
+        LAUNCHER_MAX_SECONDS = 15
         STARTUP_GRACE_SECONDS = 60
         EXIT_GRACE_SECONDS = 5
+        launched_exit_time = None
         while True:
             tree_alive = refresh_process_tree(tree_seen, process.pid) if track_tree else []
             if stop_requested.is_set():
@@ -1721,6 +1724,7 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
                         f"checking for related processes still running under {game_root_dir}"
                     )
                     stub_exited_logged = True
+                    launched_exit_time = time.time()
                 related_processes = get_running_processes_in_dir(game_root_dir, exclude_pids={handler_pid})
                 game_alive = len(related_processes) > 0 or len(tree_alive) > 0
                 if game_alive:
@@ -1732,7 +1736,11 @@ def execute(game_path, is_custom_game, admin, is_shortcut=False, use_ludusavi=Fa
             else:
                 if was_stopped:
                     grace = 0
-                elif last_alive_time - start_time < STARTUP_WINDOW_SECONDS:
+                elif tracked_related_process:
+                    # A launcher handoff already happened and that game has now
+                    # closed, so there is nothing left to wait for.
+                    grace = EXIT_GRACE_SECONDS
+                elif launched_exit_time is not None and launched_exit_time - start_time < LAUNCHER_MAX_SECONDS:
                     grace = STARTUP_GRACE_SECONDS
                 else:
                     grace = EXIT_GRACE_SECONDS
