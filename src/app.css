@@ -808,3 +808,8 @@ html[data-motion="reduced"] .animate-fade-in {
     animation: none;
   }
 }
+
+/* Hide the menu bar logo while the boot splash logo flies into its slot */
+.splash-active [data-app-logo] {
+  opacity: 0;
+}

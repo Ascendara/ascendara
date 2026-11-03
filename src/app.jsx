@@ -33,6 +33,7 @@ import { useGameIndexSearch } from "@/hooks/useGameIndexSearch";
 import { useSettingsSearch } from "@/hooks/useSettingsSearch";
 import { onDownloadStallChange } from "@/hooks/useDownloadStall";
 import { useAppIcon } from "@/hooks/useAppIcon";
+import StartupSplash from "@/components/StartupSplash";
 import { useLibrarySearch } from "@/hooks/useLibrarySearch";
 import {
   initializeStatusService,
@@ -1216,6 +1217,7 @@ const AppRoutes = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const iconData = useAppIcon();
+  const [splashDone, setSplashDone] = useState(false);
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [showPlatformWarning, setShowPlatformWarning] = useState(false);
   const [isBrokenVersion, setIsBrokenVersion] = useState(false);
@@ -1863,45 +1865,20 @@ const AppRoutes = () => {
     return <UpdateOverlay />;
   }
 
+  // Same key in both trees so React keeps the splash mounted (no remount jump)
+  // when loading finishes and the app renders underneath it.
+  const splash = !splashDone ? (
+    <StartupSplash
+      key="startup-splash"
+      iconData={iconData}
+      exiting={!isLoading && !isUpdating}
+      onDone={() => setSplashDone(true)}
+      fallback={<PageLoading />}
+    />
+  ) : null;
+
   if (isLoading || isUpdating) {
-    return (
-      <motion.div
-        className="loading-container"
-        initial={{ opacity: 1 }}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          background:
-            "linear-gradient(135deg, rgb(var(--color-startup-accent, var(--color-primary)) / 0.1) 0%, rgb(var(--color-startup-background, var(--color-background))) 100%)",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 9999,
-        }}
-      >
-        {iconData ? (
-          <motion.img
-            src={iconData}
-            alt="Loading"
-            style={{ width: "128px", height: "128px" }}
-            animate={{
-              scale: [0.95, 1, 0.95],
-              opacity: [0.8, 1, 0.8],
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: "linear",
-            }}
-          />
-        ) : (
-          <PageLoading />
-        )}
-      </motion.div>
-    );
+    return <>{splash}</>;
   }
 
   if (showWelcome === null && isLoading) {
@@ -1914,12 +1891,18 @@ const AppRoutes = () => {
   if (location.pathname === "/welcome" && !effectiveShowWelcome) {
     // Preserve the current query string (e.g. ?tour=true) so the post-welcome
     // tour can still activate on Home after the redirect.
-    return <Navigate to={{ pathname: "/", search: location.search }} replace />;
+    return (
+      <>
+        {splash}
+        <Navigate to={{ pathname: "/", search: location.search }} replace />
+      </>
+    );
   }
 
   if (location.pathname === "/" && effectiveShowWelcome) {
     return (
       <>
+        {splash}
         <PageLoading />
         <Navigate to="/welcome" replace />
       </>
@@ -1928,6 +1911,7 @@ const AppRoutes = () => {
 
   return (
     <>
+      {splash}
       <MenuBar />
       {!effectiveShowWelcome && <BrowserDownloadHandler />}
       {!effectiveShowWelcome && <IndexRecoveryNotice />}

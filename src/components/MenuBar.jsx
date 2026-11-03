@@ -272,7 +272,14 @@ const MenuBar = () => {
       <div className="mt-2 flex h-full flex-1 items-center px-3">
         <div className="flex items-center">
           <div className="flex items-center">
-            {iconData && <img src={iconData} alt="Ascendara" className="mr-2 h-6 w-6" />}
+            {iconData && (
+              <img
+                src={iconData}
+                alt="Ascendara"
+                data-app-logo
+                className="mr-2 h-6 w-6"
+              />
+            )}
             <span className="text-sm font-medium text-foreground">Ascendara</span>
           </div>
         </div>
