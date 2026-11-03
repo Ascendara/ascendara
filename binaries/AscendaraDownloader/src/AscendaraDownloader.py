@@ -743,10 +743,11 @@ class AscendaraDownloader:
             if 'downloadingData' not in self.game_info:
                 self.game_info['downloadingData'] = {}
             self.game_info['downloadingData']['updating'] = True
-            # Update version to the new version being downloaded
+            # The installed files stay at the old version until the update
+            # installs and verifies; a rolled-back update must keep reporting it.
             if version:
                 logging.info(f"[AscendaraDownloader] Updating version from {self.game_info.get('version', 'unknown')} to {version}")
-                self.game_info['version'] = version
+                self.game_info['pendingVersion'] = version
         else:
             self.game_info = {
                 "game": game,
@@ -1834,6 +1835,10 @@ class AscendaraDownloader:
                     raise RepairableDllFailure('Missing listed DLLs; installed files retained for repair')
                 safe_write_json(self.game_info_path, self.game_info)
                 raise VerificationFailure('Installed files failed size verification')
+            pending_version = self.game_info.pop('pendingVersion', None)
+            if pending_version:
+                self.game_info['version'] = pending_version
+                safe_write_json(self.game_info_path, self.game_info)
             self._detect_and_set_executable()
             self._check_cancelled()
         except RepairableDllFailure:

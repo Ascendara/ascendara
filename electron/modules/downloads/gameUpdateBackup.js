@@ -179,6 +179,7 @@ async function abandonInPlace(directory, previous, deleteStaging) {
   }
   delete restored.downloadingData;
   delete restored.extractionSources;
+  delete restored.pendingVersion; // The update never installed.
   await fs.writeJson(metadata, restored, { spaces: 4 });
 }
 
