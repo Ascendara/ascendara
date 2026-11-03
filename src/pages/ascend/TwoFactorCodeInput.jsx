@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 const LENGTH = 6;
 
@@ -6,6 +6,11 @@ const LENGTH = 6;
 // pasting a whole code fills every box. onComplete fires once all are filled.
 const TwoFactorCodeInput = ({ value, onChange, onComplete, disabled, autoFocus }) => {
   const inputs = useRef([]);
+  // Keep the latest code in a ref so focus guards see it before the parent re-renders
+  const valueRef = useRef(value);
+  useLayoutEffect(() => {
+    valueRef.current = value;
+  });
   const digits = Array.from({ length: LENGTH }, (_, i) => value[i] || "");
 
   const focus = index =>
@@ -13,6 +18,7 @@ const TwoFactorCodeInput = ({ value, onChange, onComplete, disabled, autoFocus }
 
   const update = (next, focusIndex) => {
     const code = next.slice(0, LENGTH);
+    valueRef.current = code;
     onChange(code);
     focus(focusIndex);
     if (code.length === LENGTH) onComplete?.(code);
@@ -68,7 +74,9 @@ const TwoFactorCodeInput = ({ value, onChange, onComplete, disabled, autoFocus }
           disabled={disabled}
           autoFocus={autoFocus && index === 0}
           // Only the next empty box takes focus, so digits can't be skipped
-          onFocus={() => index > value.length && focus(value.length)}
+          onFocus={() =>
+            index > valueRef.current.length && focus(valueRef.current.length)
+          }
           onChange={event => handleChange(index, event.target.value)}
           onKeyDown={event => handleKeyDown(index, event)}
           className="h-14 w-full min-w-0 rounded-xl border border-border/70 bg-background/60 text-center font-mono text-2xl font-semibold outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
