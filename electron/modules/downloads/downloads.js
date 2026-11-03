@@ -1390,12 +1390,15 @@ function registerDownloadHandlers() {
         await dllRepair.readBounded(gameDirectory, target.metadataName, 4 * 1024 * 1024)
       );
       const data = gameInfo.downloadingData;
+      // An update that failed verification is finished (its files were rolled
+      // back) but keeps updating: true beside verifyError; it may be re-verified.
+      const failedUpdate = data?.updating && data.verifyError?.length;
       if (
         gameInfo.isRunning ||
         data?.downloading ||
         data?.extracting ||
         data?.verifying ||
-        data?.updating ||
+        (data?.updating && !failedUpdate) ||
         data?.awaitingRecoveryAction
       ) {
         throw new Error("Wait for the game to finish downloading or running.");
@@ -1409,11 +1412,13 @@ function registerDownloadHandlers() {
       ).mtimeMs;
       const verifyErrors = [];
       for (const filePath in filemap) {
-        // Older filemaps list Ascendara's metadata and library artwork
-        // (grid/hero/logo/header.ascendara.*), which are not game files.
+        // Older filemaps list Ascendara's metadata, library artwork
+        // (grid/hero/logo/header.ascendara.*) and its own working folders
+        // (.ascendara_backup from old updates, staging), none of them game files.
         const normalized = filePath.replace(/\\/g, "/").toLowerCase();
         if (
           (!normalized.includes("/") && normalized.includes(".ascendara.")) ||
+          normalized.startsWith(".ascendara") ||
           normalized.endsWith(".log")
         )
           continue;

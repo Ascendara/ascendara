@@ -251,11 +251,12 @@ class RepairableDllFailure(VerificationFailure):
 
 
 def is_ascendara_owned(name):
-    """Ascendara's own files beside the game: metadata and library artwork
-    (grid/hero/logo/header.ascendara.*). They change outside any download, so
-    they are never part of the game's verified file list."""
+    """Ascendara's own files beside the game: metadata, library artwork
+    (grid/hero/logo/header.ascendara.*) and working folders such as the
+    .ascendara_backup older updates left in filemaps. They change outside any
+    download, so they are never part of the game's verified file list."""
     name = name.replace('\\', '/')
-    if name.endswith('.ascendara.json'):
+    if name.endswith('.ascendara.json') or name.lower().startswith('.ascendara'):
         return True
     return '/' not in name and '.ascendara.' in name.lower()
 

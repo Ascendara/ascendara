@@ -1512,7 +1512,7 @@ const DownloadCard = ({
       });
     } catch (error) {
       console.error("Verification failed:", error);
-      toast.error(t("downloads.verificationFailed"));
+      toast.error(t("downloads.verificationFailed"), { description: error.message });
     } finally {
       setIsVerifying(false);
     }
