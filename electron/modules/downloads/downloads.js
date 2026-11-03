@@ -1369,79 +1369,82 @@ function registerDownloadHandlers() {
     }
   });
 
-  // Verify game handler
-  ipcMain.handle("verify-game", async (_, game, libraryDirectory) => {
-    try {
-      const target = await dllRepair.resolveTarget(
-        settingsManager.getSettings(),
-        game,
-        libraryDirectory
-      );
-      const gameDirectory = target.directory;
-      const gameInfoPath = await dllRepair.safePath(gameDirectory, target.metadataName);
-      const filemap = JSON.parse(
-        await dllRepair.readBounded(
-          gameDirectory,
-          "filemap.ascendara.json",
-          16 * 1024 * 1024
-        )
-      );
-      const gameInfo = JSON.parse(
-        await dllRepair.readBounded(gameDirectory, target.metadataName, 4 * 1024 * 1024)
-      );
-      const data = gameInfo.downloadingData;
-      // An update that failed verification is finished (its files were rolled
-      // back) but keeps updating: true beside verifyError; it may be re-verified.
-      const failedUpdate = data?.updating && data.verifyError?.length;
+  // Check an installed game against its filemap. Shared by verify and keep.
+  async function checkInstallation(game, libraryDirectory) {
+    const target = await dllRepair.resolveTarget(
+      settingsManager.getSettings(),
+      game,
+      libraryDirectory
+    );
+    const gameDirectory = target.directory;
+    const gameInfoPath = await dllRepair.safePath(gameDirectory, target.metadataName);
+    const filemapPath = await dllRepair.safePath(gameDirectory, "filemap.ascendara.json");
+    const filemap = JSON.parse(
+      await dllRepair.readBounded(gameDirectory, "filemap.ascendara.json", 16 * 1024 * 1024)
+    );
+    const gameInfo = JSON.parse(
+      await dllRepair.readBounded(gameDirectory, target.metadataName, 4 * 1024 * 1024)
+    );
+    const data = gameInfo.downloadingData;
+    // An update that failed verification is finished (its files were rolled
+    // back) but keeps updating: true beside verifyError; it may be re-verified.
+    const failedUpdate = data?.updating && data.verifyError?.length;
+    if (
+      gameInfo.isRunning ||
+      data?.downloading ||
+      data?.extracting ||
+      data?.verifying ||
+      (data?.updating && !failedUpdate) ||
+      data?.awaitingRecoveryAction
+    ) {
+      throw new Error("Wait for the game to finish downloading or running.");
+    }
+    // Files the game itself rewrote after installation (logs, update
+    // manifests, settings) differ in size without being damaged.
+    const filemapStat = await fs.promises.stat(filemapPath);
+    const installedAt = filemapStat.mtimeMs;
+    const verifyErrors = [];
+    for (const filePath in filemap) {
+      // Older filemaps list Ascendara's metadata, library artwork
+      // (grid/hero/logo/header.ascendara.*) and its own working folders
+      // (.ascendara_backup from old updates, staging), none of them game files.
+      const normalized = filePath.replace(/\\/g, "/").toLowerCase();
       if (
-        gameInfo.isRunning ||
-        data?.downloading ||
-        data?.extracting ||
-        data?.verifying ||
-        (data?.updating && !failedUpdate) ||
-        data?.awaitingRecoveryAction
-      ) {
-        throw new Error("Wait for the game to finish downloading or running.");
-      }
-      // Files the game itself rewrote after installation (logs, update
-      // manifests, settings) differ in size without being damaged.
-      const installedAt = (
-        await fs.promises.stat(
-          await dllRepair.safePath(gameDirectory, "filemap.ascendara.json")
-        )
-      ).mtimeMs;
-      const verifyErrors = [];
-      for (const filePath in filemap) {
-        // Older filemaps list Ascendara's metadata, library artwork
-        // (grid/hero/logo/header.ascendara.*) and its own working folders
-        // (.ascendara_backup from old updates, staging), none of them game files.
-        const normalized = filePath.replace(/\\/g, "/").toLowerCase();
-        if (
-          (!normalized.includes("/") && normalized.includes(".ascendara.")) ||
-          normalized.startsWith(".ascendara") ||
-          normalized.endsWith(".log")
-        )
-          continue;
-        try {
-          const fullPath = await dllRepair.safePath(gameDirectory, filePath);
-          const stat = await fs.promises.lstat(fullPath);
-          const changedByGame = stat.isFile() && stat.mtimeMs > installedAt + 2000;
-          if (!stat.isFile() || (stat.size !== filemap[filePath].size && !changedByGame)) {
-            verifyErrors.push({
-              file: filePath,
-              error: "File size mismatch",
-              expected_size: filemap[filePath].size,
-            });
-          }
-        } catch (error) {
-          if (error.code !== "ENOENT") throw error;
+        (!normalized.includes("/") && normalized.includes(".ascendara.")) ||
+        normalized.startsWith(".ascendara") ||
+        normalized.endsWith(".log")
+      )
+        continue;
+      try {
+        const fullPath = await dllRepair.safePath(gameDirectory, filePath);
+        const stat = await fs.promises.lstat(fullPath);
+        const changedByGame = stat.isFile() && stat.mtimeMs > installedAt + 2000;
+        if (!stat.isFile() || (stat.size !== filemap[filePath].size && !changedByGame)) {
           verifyErrors.push({
             file: filePath,
-            error: "File not found",
+            error: "File size mismatch",
             expected_size: filemap[filePath].size,
           });
         }
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+        verifyErrors.push({
+          file: filePath,
+          error: "File not found",
+          expected_size: filemap[filePath].size,
+        });
       }
+    }
+    return { gameInfo, gameInfoPath, data, filemap, filemapPath, filemapStat, verifyErrors };
+  }
+
+  // Verify game handler
+  ipcMain.handle("verify-game", async (_, game, libraryDirectory) => {
+    try {
+      const { gameInfo, gameInfoPath, data, verifyErrors } = await checkInstallation(
+        game,
+        libraryDirectory
+      );
 
       // Checking a playable game only reports problems; it must not turn the
       // game into a failed download that can no longer be launched. A download
@@ -1472,6 +1475,28 @@ function registerDownloadHandlers() {
       }
     } catch (error) {
       console.error("Error verifying game:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Keep a game whose remaining verification failures the user accepts, such
+  // as patch files the game's own updater removed. Only the files still failing
+  // now leave the filemap; every other file keeps being verified.
+  ipcMain.handle("keep-unverified-game", async (_, game, libraryDirectory) => {
+    try {
+      const { gameInfo, gameInfoPath, filemap, filemapPath, filemapStat, verifyErrors } =
+        await checkInstallation(game, libraryDirectory);
+      for (const { file } of verifyErrors) delete filemap[file];
+      fs.writeFileSync(filemapPath, JSON.stringify(filemap));
+      // The filemap's time marks the installation; files the game rewrote
+      // since then must keep counting as changed by the game.
+      await fs.promises.utimes(filemapPath, filemapStat.atime, filemapStat.mtime);
+      delete gameInfo.downloadingData;
+      delete gameInfo.extractionSources;
+      fs.writeFileSync(gameInfoPath, JSON.stringify(gameInfo, null, 4));
+      return { success: true, ignored: verifyErrors.length };
+    } catch (error) {
+      console.error("Error keeping unverified game:", error);
       return { success: false, error: error.message };
     }
   });

@@ -9,6 +9,16 @@ import {
   clearCachedDownloadData,
 } from "@/services/downloads/retryGameDownloadService";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
@@ -1277,6 +1287,8 @@ const DownloadCard = ({
   const [isReporting, setIsReporting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isRepairingDlls, setIsRepairingDlls] = useState(false);
+  const [isKeepingGame, setIsKeepingGame] = useState(false);
+  const [confirmKeepGame, setConfirmKeepGame] = useState(false);
   const [isLaunchingInstaller, setIsLaunchingInstaller] = useState(false);
   const [installerLaunched, setInstallerLaunched] = useState(false);
   const [isFinishingInstall, setIsFinishingInstall] = useState(false);
@@ -1515,6 +1527,24 @@ const DownloadCard = ({
       toast.error(t("downloads.verificationFailed"), { description: error.message });
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  const handleKeepGame = async () => {
+    setIsKeepingGame(true);
+    try {
+      const result = await window.electron.keepUnverifiedGame(
+        game._folderName || game.game,
+        game._sourceDir
+      );
+      if (!result.success) throw new Error(result.error);
+      toast.success(t("downloads.keepGameDone"));
+    } catch (error) {
+      console.error("Keeping game failed:", error);
+      toast.error(t("downloads.keepGameFailed"), { description: error.message });
+    } finally {
+      setIsKeepingGame(false);
+      setConfirmKeepGame(false);
     }
   };
 
@@ -2204,29 +2234,69 @@ const DownloadCard = ({
                 </div>
               ))}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleVerifyGame}
-              disabled={isVerifying || isRepairingDlls}
-            >
-              {isVerifying ? t("downloads.verifying") : t("downloads.verifyAgain")}
-            </Button>
-            {downloadingData.verifyError.some(error =>
-              /\.dll$/i.test(error.file || "")
-            ) && (
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                className="ml-2"
-                onClick={handleRepairDlls}
-                disabled={isVerifying || isRepairingDlls}
+                onClick={handleVerifyGame}
+                disabled={isVerifying || isRepairingDlls || isKeepingGame}
               >
-                {isRepairingDlls
-                  ? t("downloads.dllRepairing", { defaultValue: "Restoring DLLs…" })
-                  : t("downloads.dllRepair", { defaultValue: "Restore missing DLLs" })}
+                {isVerifying ? t("downloads.verifying") : t("downloads.verifyAgain")}
               </Button>
-            )}
+              {downloadingData.verifyError.some(error =>
+                /\.dll$/i.test(error.file || "")
+              ) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRepairDlls}
+                  disabled={isVerifying || isRepairingDlls || isKeepingGame}
+                >
+                  {isRepairingDlls
+                    ? t("downloads.dllRepairing", { defaultValue: "Restoring DLLs…" })
+                    : t("downloads.dllRepair", { defaultValue: "Restore missing DLLs" })}
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmKeepGame(true)}
+                disabled={isVerifying || isRepairingDlls || isKeepingGame}
+              >
+                {isKeepingGame ? t("downloads.keepingGame") : t("downloads.keepGame")}
+              </Button>
+            </div>
+            <AlertDialog
+              open={confirmKeepGame}
+              onOpenChange={open => !isKeepingGame && setConfirmKeepGame(open)}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-foreground">
+                    {t("downloads.keepGameTitle", { game: game.game })}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t("downloads.keepGameDesc", {
+                      numFailed: downloadingData.verifyError.length,
+                    })}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="text-foreground" disabled={isKeepingGame}>
+                    {t("common.cancel")}
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={isKeepingGame}
+                    onClick={event => {
+                      event.preventDefault();
+                      handleKeepGame();
+                    }}
+                  >
+                    {isKeepingGame ? t("downloads.keepingGame") : t("downloads.keepGame")}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         )}
 

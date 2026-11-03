@@ -341,6 +341,8 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("rename-existing-game-directory", game, additionalDirIndex),
   verifyGame: (game, libraryDirectory) =>
     ipcRenderer.invoke("verify-game", game, libraryDirectory),
+  keepUnverifiedGame: (game, libraryDirectory) =>
+    ipcRenderer.invoke("keep-unverified-game", game, libraryDirectory),
   setAscendRepairToken: token => ipcRenderer.invoke("set-ascend-repair-token", token),
   setAscendRepairAccess: member =>
     ipcRenderer.invoke("set-ascend-repair-access", member === true),
