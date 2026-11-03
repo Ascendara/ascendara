@@ -22,6 +22,34 @@ function readMappingName(yaml) {
   return raw;
 }
 
+const OS_LABELS = { windows: "Windows", mac: "macOS", linux: "Linux" };
+
+// Ludusavi records `os:` on each backup in mapping.yaml. Older mappings lack it,
+// but a lettered drive (e.g. `drive-C: "C:"`) still marks a Windows backup.
+function readBackupOs(yaml, archiveName) {
+  const lines = yaml.split(/\r?\n/);
+  const start = lines.findIndex(
+    line => /^\s*- name:/.test(line) && line.includes(archiveName)
+  );
+  if (start !== -1) {
+    const indent = lines[start].indexOf("-") + 2;
+    for (const line of lines.slice(start + 1)) {
+      const lead = line.search(/\S/);
+      if (lead !== -1 && lead < indent) break;
+      const os = /^\s*os:\s*["']?(\w+)/.exec(line)?.[1];
+      if (os) return os;
+    }
+  }
+  return /^\s*drive-[A-Za-z]:/m.test(yaml) ? "windows" : null;
+}
+
+function currentOs() {
+  const platform = window.electron.getPlatform?.();
+  if (platform === "win32") return "windows";
+  if (platform === "darwin") return "mac";
+  return platform === "linux" ? "linux" : null;
+}
+
 // Cloud uploads contain a Ludusavi zip AND its mapping.yaml, not a raw save zip.
 export async function restoreCloudSave(backup, settings) {
   const platform = retroBackupPlatform(backup.gameName);
@@ -68,7 +96,18 @@ export async function restoreCloudSave(backup, settings) {
   }
   // Ludusavi finds backups by the exact title in mapping.yaml, which can differ
   // from the cloud entry's name (e.g. "Astroneer" vs "ASTRONEER"), so restore by it.
-  const ludusaviName = readMappingName(await mapping.async("string")) || backup.gameName;
+  const mappingYaml = await mapping.async("string");
+  const ludusaviName = readMappingName(mappingYaml) || backup.gameName;
+  // Save paths are OS-specific (e.g. %LOCALAPPDATA% vs ~/Library), so Ludusavi
+  // can't place another OS's files and fails every entry with a vague error.
+  const backupOs = readBackupOs(mappingYaml, archives[0].name);
+  const localOs = currentOs();
+  if (backupOs && localOs && backupOs !== localOs) {
+    const from = OS_LABELS[backupOs] || backupOs;
+    throw new Error(
+      `This backup was made on ${from} and can't be restored on ${OS_LABELS[localOs]}. Restore it on a ${from} computer instead.`
+    );
+  }
   // Stage in a temp folder rather than the local backup folder, so the cloud
   // mapping.yaml never replaces the local one (which lists older local backups).
   // The main process deletes the staging folder once the restore finishes.
