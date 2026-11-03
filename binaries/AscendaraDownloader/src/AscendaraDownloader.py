@@ -250,6 +250,16 @@ class RepairableDllFailure(VerificationFailure):
     pass
 
 
+def is_ascendara_owned(name):
+    """Ascendara's own files beside the game: metadata and library artwork
+    (grid/hero/logo/header.ascendara.*). They change outside any download, so
+    they are never part of the game's verified file list."""
+    name = name.replace('\\', '/')
+    if name.endswith('.ascendara.json'):
+        return True
+    return '/' not in name and '.ascendara.' in name.lower()
+
+
 def can_keep_install_for_dll_repair(directory, errors, update_flow, old_map, private_source):
     if update_flow or old_map is not None or private_source or not errors:
         return False
@@ -1772,8 +1782,9 @@ class AscendaraDownloader:
                 old_map = stream.read()
         installed_manifest = {}
         if self.updateFlow and old_map is not None:
+            # Older filemaps listed library artwork; an update must not fail over it.
             installed_manifest = {name: info for name, info in json.loads(old_map).items()
-                                  if not name.endswith('.ascendara.json')}
+                                  if not is_ascendara_owned(name)}
         installed_manifest.update(manifest)
         # Retain a readable recovery map if the process is killed during installation.
         safe_write_json(os.path.join(rollback, 'paths.json'),

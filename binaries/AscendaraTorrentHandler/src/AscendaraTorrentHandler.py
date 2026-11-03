@@ -1010,6 +1010,9 @@ class TorrentManager:
             for fname in filenames:
                 if fname.endswith('.url') or '_CommonRedist' in dirpath:
                     continue
+                # Ascendara's metadata and library artwork are not game files.
+                if rel_dir == '.' and '.ascendara.' in fname.lower():
+                    continue
                 full_path = os.path.join(dirpath, fname)
                 rel_path = os.path.normpath(os.path.join(rel_dir, fname)) if rel_dir != '.' else fname
                 rel_path = rel_path.replace('\\', '/')
@@ -1044,6 +1047,8 @@ class TorrentManager:
             errors = []
             verified = 0
             for rel_path, info in watching_data.items():
+                if '/' not in rel_path and '.ascendara.' in rel_path.lower():
+                    continue  # Metadata or library artwork from an older filemap.
                 full_path = os.path.join(install_dir, rel_path.replace('/', os.sep))
                 if not os.path.exists(full_path):
                     errors.append({"file": rel_path, "error": "File not found"})

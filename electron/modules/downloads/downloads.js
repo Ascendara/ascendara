@@ -1402,6 +1402,11 @@ function registerDownloadHandlers() {
       }
       const verifyErrors = [];
       for (const filePath in filemap) {
+        // Older filemaps list Ascendara's metadata and library artwork
+        // (grid/hero/logo/header.ascendara.*), which are not game files.
+        const normalized = filePath.replace(/\\/g, "/");
+        if (!normalized.includes("/") && normalized.toLowerCase().includes(".ascendara."))
+          continue;
         try {
           const fullPath = await dllRepair.safePath(gameDirectory, filePath);
           const stat = await fs.promises.lstat(fullPath);
