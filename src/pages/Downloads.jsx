@@ -1459,7 +1459,7 @@ const DownloadCard = ({
   const recoverableError = downloadingData?.recoverableError;
   const isArchiveRecovery = recoverableError?.type === "archiveExtractionFailed";
   const autoRecovery = downloadingData?.autoRecovery;
-  const recoveryReason = ["damaged", "password", "disk", "blocked"].includes(
+  const recoveryReason = ["security", "damaged", "password", "disk", "blocked"].includes(
     recoverableError?.reason
   )
     ? recoverableError.reason
@@ -1641,6 +1641,9 @@ const DownloadCard = ({
     "[Errno 28] No space left on device",
     "Insufficient disk space",
     "[WinError 225]",
+    "Windows error 225",
+    "Windows error 226",
+    "Security software blocked",
     "Connection broken",
     "IncompleteRead",
     "HTTP 410",
@@ -1730,6 +1733,11 @@ const DownloadCard = ({
     }
   }, [hasError, wasReported, downloadingData.message]);
 
+  const isSecurityBlock =
+    /\[WinError 22[56]\]|Windows error 22[56]|Security software blocked/.test(
+      downloadingData?.message || ""
+    );
+
   // Get error message based on type
   const getErrorMessage = () => {
     const msg = downloadingData.message;
@@ -1754,17 +1762,45 @@ const DownloadCard = ({
         "downloads.noSpaceLeftError",
         "No space left on device. Please free up disk space."
       );
-    if (msg.includes("[WinError 225]"))
-      return t(
-        "downloads.windowsDefenderError",
-        "Windows blocked the download. Add an exclusion in Windows Security."
-      );
+    if (isSecurityBlock) return t("downloads.securityBlockedError");
+    if (/crc|corrupt data|bad archive data|unrar error 12/i.test(msg))
+      return `${t("downloads.extractionRecovery.reasons.damaged.body")} ${t(
+        "downloads.extractionRecovery.reasons.damaged.next"
+      )}`;
     if (msg.includes("Connection broken") || msg.includes("IncompleteRead"))
       return t(
         "downloads.connectionBrokenError",
         "Connection interrupted. Try Single Stream Download in Settings."
       );
-    return msg;
+    if (msg.startsWith("Extraction recovery cancelled"))
+      return t("downloads.extractionStoppedError");
+    return msg.length > 200 ? t("downloads.genericDownloadError") : msg;
+  };
+  const errorMessage = getErrorMessage();
+  const offerProtection =
+    isSecurityBlock &&
+    window.electron.getPlatform() === "win32" &&
+    !settings.excludeFolders;
+
+  const handleEnableProtectionAndRetry = async () => {
+    if (isSubmittingRecovery) return;
+    setIsSubmittingRecovery(true);
+    try {
+      const protection = await window.electron.folderExclusion(true);
+      if (!protection?.success) {
+        throw new Error(
+          protection?.error || t("downloads.extractionRecovery.protectionFailed")
+        );
+      }
+      await updateSetting("excludeFolders", true);
+    } catch (error) {
+      toast.error(error.message || t("downloads.extractionRecovery.protectionFailed"));
+      setIsSubmittingRecovery(false);
+      return;
+    }
+    setIsSubmittingRecovery(false);
+    if (canRetryExtraction(game)) await handleRetryExtraction();
+    else onRetry();
   };
 
   const rawProgress = parseFloat(downloadingData?.progressCompleted);
@@ -2043,7 +2079,7 @@ const DownloadCard = ({
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
-                {!isArchiveRecovery &&
+                {(!isArchiveRecovery || recoveryReason === "security") &&
                   window.electron.getPlatform() === "win32" &&
                   !settings.excludeFolders && (
                     <Button
@@ -2358,7 +2394,19 @@ const DownloadCard = ({
             <div className="flex items-start gap-2.5">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
               <div className="min-w-0 flex-1">
-                <p className="break-words text-sm text-foreground">{getErrorMessage()}</p>
+                <p className="line-clamp-4 break-words text-sm text-foreground">
+                  {errorMessage}
+                </p>
+                {downloadingData.message && errorMessage !== downloadingData.message && (
+                  <details className="mt-1 text-xs text-muted-foreground">
+                    <summary className="cursor-pointer select-none">
+                      {t("downloads.extractionRecovery.technicalDetails")}
+                    </summary>
+                    <p className="mt-1 max-h-24 overflow-y-auto break-words rounded-md bg-muted/50 p-2">
+                      {downloadingData.message}
+                    </p>
+                  </details>
+                )}
                 {isPredefinedError(downloadingData.message) && (
                   <a
                     onClick={() =>
@@ -2374,8 +2422,24 @@ const DownloadCard = ({
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
+              {offerProtection && (
+                <Button
+                  size="sm"
+                  onClick={handleEnableProtectionAndRetry}
+                  disabled={isSubmittingRecovery}
+                  className="gap-2 text-secondary"
+                >
+                  {isSubmittingRecovery ? (
+                    <Loader className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ShieldAlert className="h-4 w-4" />
+                  )}
+                  {t("downloads.extractionRecovery.enableProtectionAndRetry")}
+                </Button>
+              )}
               <Button
                 size="sm"
+                variant={offerProtection ? "outline" : "default"}
                 onClick={canRetryExtraction(game) ? handleRetryExtraction : onRetry}
                 disabled={isSubmittingRecovery}
                 className="gap-2 text-secondary"

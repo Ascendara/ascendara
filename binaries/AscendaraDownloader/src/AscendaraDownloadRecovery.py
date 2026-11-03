@@ -79,6 +79,9 @@ def is_archive_integrity_error(error):
 def extraction_failure_reason(error):
     """Plain-language category the UI explains to the user."""
     message = str(error).lower()
+    if any(term in message for term in ('security software', 'windows error 225', 'windows error 226',
+                                       'winerror 225', 'winerror 226')):
+        return 'security'
     if any(term in message for term in ('incorrect password', 'bad password', 'password required',
                                        'password missing')):
         return 'password'

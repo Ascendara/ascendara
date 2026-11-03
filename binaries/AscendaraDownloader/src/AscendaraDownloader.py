@@ -667,8 +667,16 @@ def check_disk_space(path: str, required_bytes: int, operation: str = "operation
         return True
 
 
+# Nested recovery failures repeat their causes; the full text stays in the log.
+MAX_ERROR_LENGTH = 600
+
+
 def handleerror(game_info: Dict, game_info_path: str, error: Any):
     """Handle download errors by updating game info."""
+    message = str(error)
+    if len(message) > MAX_ERROR_LENGTH:
+        logging.error(f"[handleerror] Full error: {message}")
+        message = message[:MAX_ERROR_LENGTH - 3].rstrip() + '...'
     game_info['online'] = ""
     game_info['dlc'] = ""
     game_info['isRunning'] = False
@@ -677,7 +685,7 @@ def handleerror(game_info: Dict, game_info_path: str, error: Any):
         prev_data = game_info['downloadingData'] or {}
         game_info['downloadingData'] = {
             "error": True,
-            "message": str(error),
+            "message": message,
             # Preserve the last known progress/speed so error reports reflect
             # how far the download/extraction actually got instead of showing 0%/N-A.
             "progressCompleted": prev_data.get("progressCompleted", "0.00"),

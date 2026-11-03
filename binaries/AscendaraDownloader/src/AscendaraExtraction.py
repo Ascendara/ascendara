@@ -120,14 +120,18 @@ def detect_file_type(filepath: str, check_cancelled=lambda: None) -> Tuple[str, 
                 logging.exception('Archive header read failed: path=%r errno=%s winerror=%s',
                                   filepath, exc.errno, winerror)
                 if blocked:
-                    reason = ('Security software blocked the downloaded archive. Check its '
-                              'protection history and add an exclusion for the download folder')
+                    reason = ('Security software blocked the downloaded archive, usually a false '
+                              'positive. Add an exclusion for the download folder')
                 elif device:
                     reason = ('The drive reported an error while reading the downloaded archive. '
                               'Check the drive for errors or download to another drive')
                 else:
                     reason = exc.strerror or str(exc)
-                if winerror:
+                # Windows' own text for 225/226 says the file contains a virus,
+                # which reads as a confirmed infection rather than a false positive.
+                if winerror and blocked:
+                    reason += f' (Windows error {winerror})'
+                elif winerror:
                     reason += f' (Windows error {winerror}: {ctypes.FormatError(winerror).strip()})'
                 raise OSError(exc.errno, f'Cannot read downloaded archive header: {reason}. '
                               'The source file was retained.', filepath) from exc

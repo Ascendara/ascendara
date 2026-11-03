@@ -2300,6 +2300,11 @@
           "next": "Remove this download and pick a different download source for the game.",
           "title": "The archive is locked with a password"
         },
+        "security": {
+          "body": "This happens a lot with game downloads and is almost always a false alarm, so it doesn't mean your PC is infected.",
+          "next": "Turn on folder protection so Windows stops blocking Ascendara's downloads, then retry.",
+          "title": "Windows Security blocked the game files"
+        },
         "unknown": {
           "body": "Ascendara couldn't finish unpacking this game.",
           "next": "Retry. If it keeps failing, report the error so it can be looked into.",
@@ -2314,6 +2319,7 @@
       "title": "Files disappeared after extraction"
     },
     "extractionSpeed": "Extraction",
+    "extractionStoppedError": "Unpacking was stopped. Your downloaded files were kept, so retrying won't download the game again.",
     "files": "files",
     "filesLabel": "Files",
     "finishedInstalling": "I've Finished Installing",
@@ -2322,6 +2328,7 @@
       "title": "Downloading on Ascendara",
       "understand": "I understand"
     },
+    "genericDownloadError": "Something went wrong with this download. Try again, and if it keeps happening, report it so it can be looked into.",
     "hideLog": "Hide log",
     "installComplete": "Installation Complete",
     "installCompleteDesc": "Your game is ready to play",
@@ -2376,6 +2383,7 @@
     "retryExtraction": "Retry Extraction",
     "retryRetainedDescription": "Retry extraction using the files already downloaded for this game.",
     "runAsAdmin": "Run Installer as Admin",
+    "securityBlockedError": "Windows Security blocked the game files. This happens a lot with game downloads and is almost always a false alarm, so it doesn't mean your PC is infected. Turn on folder protection so Windows stops blocking Ascendara's downloads, then retry.",
     "setInstallLocationDescription": "In the installer, set the destination folder to the path below. This must match the game's existing folder so Ascendara can detect it.",
     "setInstallLocationTitle": "Set the Install Location",
     "speedHistory": "Download Speeds",
