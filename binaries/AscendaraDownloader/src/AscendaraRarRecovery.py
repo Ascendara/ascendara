@@ -69,6 +69,40 @@ def trust_link(path):
     _trusted_links.add((info.st_dev, info.st_ino))
 
 
+def trusted_links():
+    """Snapshot for handing the trust to an extraction worker process."""
+    return set(_trusted_links)
+
+
+def adopt_trusted_links(links):
+    _trusted_links.update(tuple(link) for link in links)
+
+
+def release_trusted_link(path):
+    """Unlink a trusted hard link before new output replaces it.
+
+    A later archive may ship a file an earlier in-place archive already linked
+    into the stage. Writing through the link would also rewrite that archive's
+    retained copy, so the stage name is detached first and written fresh.
+    """
+    path = _extended_path(path)
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return
+    if (stat.S_ISREG(info.st_mode) and info.st_nlink > 1
+            and (info.st_dev, info.st_ino) in _trusted_links):
+        os.remove(path)
+
+
+def output_path(root, name):
+    """Validated write target for `name`, with any trusted hard link detached."""
+    target = _member_path(root, name, replacing=True)
+    release_trusted_link(target)
+    _check_path(root, target)
+    return target
+
+
 def _check_path(root, target, replacing=False):
     # Native extraction and Python inspection must resolve the same long paths.
     # `replacing` callers remove the target rather than write through it, so a

@@ -23,7 +23,8 @@ from typing import Optional, Tuple
 
 from AscendaraRarRecovery import (
     _load_api, _extended_path, _check_path, _member_path, _native_error,
-    _file_error, _check_archive_target, trust_link,
+    _file_error, _check_archive_target, trust_link, trusted_links, adopt_trusted_links,
+    release_trusted_link, output_path,
 )
 
 
@@ -475,7 +476,8 @@ def _unrar_manifest(tool, archive, destination, listing_path, cancelled, activit
         name = values.get('Name')
         if name is None or not _wanted(name):
             continue
-        _check_archive_target(archive, _member_path(destination, name))
+        # Listing only: the extraction pass detaches trusted links it replaces.
+        _check_archive_target(archive, _member_path(destination, name, replacing=True))
         # Links and file references must not bypass staging path validation.
         # Left out of the manifest, they are also left out of the -n@ selection.
         if values.get('Type') not in ('File', 'Directory') or values.get('Attributes', '').startswith('l'):
@@ -656,7 +658,7 @@ def extract_rar_stream(archive_path, dest_dir, password='steamrip.com',
             directory = bool(header.Flags & 0x20) or name.endswith(('/', '\\'))
             extracting_file = not skip and not directory
             if not skip and not test:
-                target = _member_path(root, name)
+                target = output_path(root, name)
                 _check_archive_target(archive_path, target)
                 try:
                     os.makedirs(target if directory else os.path.dirname(target), exist_ok=True)
@@ -696,7 +698,7 @@ def _zip_files(archive, destination, wanted=_wanted, links=None):
         for item in source.infolist():
             if not wanted(item.filename):
                 continue
-            _check_archive_target(archive, _member_path(destination, item.filename))
+            _check_archive_target(archive, _member_path(destination, item.filename, replacing=True))
             if stat.S_ISLNK(item.external_attr >> 16):
                 _skip_link(item.filename)
                 if links is not None:
@@ -723,7 +725,7 @@ def _7z_files(tool, archive, destination, listing_path, cancelled, activity, wan
         name = values.get('Path')
         if not name or not wanted(name):
             continue
-        _check_archive_target(archive, _member_path(destination, name))
+        _check_archive_target(archive, _member_path(destination, name, replacing=True))
         if values.get('Symbolic Link') or values.get('Hard Link') or 'l' in values.get('Attributes', '').split(' ')[-1][:1]:
             _skip_link(name)
             if links is not None:
@@ -1323,10 +1325,10 @@ def _retry_archive_members(kind, archive, destination, names, cancelled, activit
                 item = members.get(name)
                 if item is None or item.is_dir():
                     raise IncompleteArchiveOutput(f'Archive member is unavailable for recovery: {name}')
-                target = _member_path(destination, item.filename)
-                _check_archive_target(archive, target)
                 if stat.S_ISLNK(item.external_attr >> 16):
                     raise ValueError(f'Refusing archive link: {item.filename}')
+                target = output_path(destination, item.filename)
+                _check_archive_target(archive, target)
                 os.makedirs(os.path.dirname(target), exist_ok=True)
                 with source.open(item, pwd=b'steamrip.com') as incoming, open(target, 'wb', buffering=1024*1024) as output:
                     while True:
@@ -1345,12 +1347,14 @@ def _retry_archive_members(kind, archive, destination, names, cancelled, activit
         from AscendaraDownloadRecovery import find_unrar
         tool = find_unrar()
         if tool:
+            _release_outputs(destination, selected)
             _extract_unrar(tool, archive, destination, selected, cancelled, activity)
             return
     if kind in ('7z', 'rar', 'zip'):
         tool = _find_7z()
         if not tool:
             raise RuntimeError(f'{kind.upper()} recovery requires a bundled or installed 7-Zip command-line tool')
+        _release_outputs(destination, selected)
         _run_cli([tool, 'x', '-y', '-aoa', '-psteamrip.com', '-bb1', '-sccUTF-8',
                   '-o' + destination, '--', archive, *sorted(selected)], cancelled, activity)
         return
@@ -1364,14 +1368,23 @@ def _retry_archive_members(kind, archive, destination, names, cancelled, activit
     raise RuntimeError(f'{kind.upper()} files do not support targeted extraction recovery')
 
 
+def _release_outputs(destination, names):
+    """Detach trusted hard links an external extractor is about to overwrite."""
+    for name in names:
+        release_trusted_link(_member_path(destination, name, replacing=True))
+
+
 def _cancelled_value(cancelled):
     cancelled()
     return False
 
 
-def extraction_worker(archive, destination, manifest_path, connection, stop, allow_inplace=True):
+def extraction_worker(archive, destination, manifest_path, connection, stop, allow_inplace=True,
+                      trusted=()):
     """Only this process touches archive decoders. No frontend JSON writes here."""
     archive, destination, manifest_path = map(_extended_path, (archive, destination, manifest_path))
+    # Earlier archives' in-place output was linked into the stage by other workers.
+    adopt_trusted_links(trusted)
     last_sent = 0
     state = {'name': 'Preparing...', 'files': 0, 'total': 0, 'percent': 0}
     manifest = {}
@@ -1478,7 +1491,7 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
                 members = [i for i in source.infolist() if _wanted(i.filename)]
                 # Validate every path before creating any output, including links.
                 for item in members:
-                    target = _member_path(destination, item.filename)
+                    target = _member_path(destination, item.filename, replacing=True)
                     _check_archive_target(archive, target)
                     if stat.S_ISLNK(item.external_attr >> 16):
                         _skip_link(item.filename)
@@ -1492,11 +1505,12 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
                 done_bytes = 0
                 for item in members:
                     cancelled()
-                    target = _member_path(destination, item.filename)
                     if item.is_dir():
+                        target = _member_path(destination, item.filename)
                         os.makedirs(target, exist_ok=True)
                         continue
                     state['name'] = item.filename
+                    target = output_path(destination, item.filename)
                     os.makedirs(os.path.dirname(target), exist_ok=True)
                     with source.open(item, pwd=b'steamrip.com') as incoming, open(target, 'wb', buffering=1024*1024) as output:
                         while True:
@@ -1531,7 +1545,8 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
                     _native_error(code, 'Reading archive header')
                     name = header.FileNameW or header.FileName.decode('utf-8')
                     if _wanted(name):
-                        _member_path(destination, name)
+                        # Listing only; extract_rar_stream detaches trusted links it replaces.
+                        _member_path(destination, name, replacing=True)
                         if not header.Flags & 0x20 and not _rar_header_link(header):
                             state['total'] += 1
                             total_bytes += header.UnpSize + (header.UnpSizeHigh << 32)
@@ -1568,6 +1583,7 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
             def unrar_activity(text):
                 progress.feed(text)
                 report()
+            _release_outputs(destination, manifest)
             _extract_unrar(unrar, archive, destination, manifest, cancelled, unrar_activity)
         elif kind in ('7z', 'rar', 'zip'):
             state['engine'] = '7-Zip CLI'
@@ -1581,6 +1597,7 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
             if total_bytes > shutil.disk_usage(destination).free:
                 raise OSError('Insufficient disk space for extraction')
             state['total'] = len(manifest)
+            _release_outputs(destination, manifest)
             def cli_activity(text):
                 percentages = re.findall(r'(\d+)%', text)
                 if percentages:
@@ -1668,7 +1685,8 @@ def supervise_extraction(archive, destination, check_cancelled, progress, recove
     stop = StopSignal(context)
     manifest_path = os.path.join(workdir, 'worker-manifest.json')
     process = context.Process(target=extraction_worker,
-                              args=(archive, destination, manifest_path, sender, stop, inplace), daemon=True)
+                              args=(archive, destination, manifest_path, sender, stop, inplace,
+                                    trusted_links()), daemon=True)
     process.start()
     sender.close()
     last_activity = time.monotonic()
