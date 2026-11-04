@@ -221,6 +221,13 @@ function readTestingBranch() {
 
 const runningBranch = appBranch === "public-testing" ? readTestingBranch() : appBranch;
 
+// The GitHub prerelease each testing branch installs from. Experimental follows
+// "testing", which CI replaces on every development push; public-testing
+// follows "public-testing", a copy of a testing build made only when one is
+// promoted (.github/workflows/promote-testing.yml)
+const testingReleaseTag = branch =>
+  branch === "public-testing" ? "public-testing" : "testing";
+
 // The Ascendara API every main-process request goes to. VITE_API_URL points
 // both this and the renderer (src/config/api.js) at another server.
 const API_URL = (process.env.VITE_API_URL || "https://api.ascendara.app").replace(
@@ -234,6 +241,7 @@ module.exports = {
   appBranch: runningBranch,
   testingVersion,
   TESTING_BRANCH_FILE,
+  testingReleaseTag,
   isDev,
   isWindows,
   isPortable,

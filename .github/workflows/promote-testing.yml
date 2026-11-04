@@ -1,0 +1,42 @@
+name: Promote testing build to public testing
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Testing build to promote, as its title shows it (e.g. 11.9.1-412). Leave empty to promote whatever "testing" is now.'
+        type: string
+        required: false
+permissions:
+  contents: write
+# Same group as the testing job in release.yml, so a development push can't
+# replace "testing" while it is being copied
+concurrency:
+  group: ascendara-testing-release
+  cancel-in-progress: false
+jobs:
+  promote:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Copy the testing prerelease to public-testing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EXPECTED: ${{ inputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TITLE="$(gh release view testing --repo "$REPO" --json name --jq .name)"
+          SHA="$(gh release view testing --repo "$REPO" --json targetCommitish --jq .targetCommitish)"
+          VERSION="${TITLE##* }"
+          # A newer development push may have replaced the build that was tested
+          if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$VERSION" ]; then
+            echo "testing is now $VERSION, not $EXPECTED"; exit 1
+          fi
+          mkdir assets
+          gh release download testing --repo "$REPO" --dir assets
+          gh release delete public-testing --repo "$REPO" --yes --cleanup-tag || true
+          printf 'Public testing build of `%s` (testing build %s).\n\nNot a release: it is offered only to users on the Public Testing branch.\n\n%s\n' \
+            "${SHA::7}" "$VERSION" "$RUN_URL" > notes.md
+          # The app reads the version from the last word of the title
+          gh release create public-testing assets/* --repo "$REPO" --prerelease --latest=false \
+            --target "$SHA" --title "Public testing build $VERSION" --notes-file notes.md

@@ -29,6 +29,7 @@ const {
   isLinux,
   TIMESTAMP_FILE,
   TESTING_BRANCH_FILE,
+  testingReleaseTag,
   LANG_DIR,
 } = require("../core/config");
 const { updateTimestampFile } = require("../core/utils");
@@ -47,10 +48,9 @@ let availableVersion = null;
 // Portable copies update by downloading the new portable build from the release.
 const PORTABLE_RELEASES_URL = "https://github.com/Ascendara/ascendara/releases/latest";
 
-// Public-testing and experimental both install the rolling "testing" prerelease
-// that CI publishes; the API only announces their versions on different schedules
-const TESTING_RELEASE_URL =
-  "https://api.github.com/repos/Ascendara/ascendara/releases/tags/testing";
+// Each testing branch installs from its own prerelease (see testingReleaseTag)
+const testingReleaseUrl = branch =>
+  `https://api.github.com/repos/Ascendara/ascendara/releases/tags/${testingReleaseTag(branch)}`;
 
 // A stalled connection is retried from where it stopped; the timeout is for
 // inactivity, not for the whole download
@@ -73,12 +73,12 @@ function progressSender(window, channel) {
 }
 
 /**
- * Find this platform's installer in the "testing" prerelease. With minVersion,
- * refuse a build older than it, so a version announced before CI finished
- * publishing doesn't install an older build and prompt again.
+ * Find this platform's installer in the branch's testing prerelease. With
+ * minVersion, refuse a build older than it, so a version announced before the
+ * build was published doesn't install an older build and prompt again.
  */
-async function testingInstallerUrl(minVersion) {
-  const { data: release } = await axios.get(TESTING_RELEASE_URL, {
+async function testingInstallerUrl(branch, minVersion) {
+  const { data: release } = await axios.get(testingReleaseUrl(branch), {
     headers: {
       Accept: "application/vnd.github+json",
       "User-Agent": `Ascendara/${appVersion}`,
@@ -452,7 +452,7 @@ async function downloadUpdateInBackground() {
       updateUrl =
         currentBranch === "live"
           ? `https://lfs.ascendara.app/download?update`
-          : await testingInstallerUrl(availableVersion);
+          : await testingInstallerUrl(currentBranch, availableVersion);
     }
     const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
     const installerFileName =
@@ -681,7 +681,7 @@ function registerUpdateHandlers() {
       const url =
         branch === "live"
           ? "https://lfs.ascendara.app/download?update"
-          : await testingInstallerUrl();
+          : await testingInstallerUrl(branch);
       // Use testingVersion for testing branches, appVersion for live
       const versionToSend =
         branch === "public-testing" || branch === "experimental"

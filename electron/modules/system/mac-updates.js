@@ -10,7 +10,7 @@ const path = require("path");
 const os = require("os");
 const crypto = require("crypto");
 const axios = require("axios");
-const { appVersion, testingVersion } = require("../core/config");
+const { appVersion, testingVersion, testingReleaseTag } = require("../core/config");
 const {
   rebuildFromBase,
   parseBlockmap,
@@ -72,7 +72,7 @@ async function resolveMacUpdate(branch, version) {
       console.warn("Could not read the macOS release:", error.message);
     }
   } else if (branch === "public-testing" || branch === "experimental") {
-    ({ data: release } = await axios.get(`${RELEASE_API}/testing`, {
+    ({ data: release } = await axios.get(`${RELEASE_API}/${testingReleaseTag(branch)}`, {
       headers: githubHeaders,
       timeout: 15000,
     }));
