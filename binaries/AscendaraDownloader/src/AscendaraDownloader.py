@@ -28,7 +28,10 @@ from urllib.parse import urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
-from AscendaraTransfer import Transfer, validate_download_url, connection_count, resolve_share_url
+from AscendaraTransfer import (
+    Transfer, validate_download_url, connection_count, resolve_share_url,
+    completed_partial, publish_partial,
+)
 from AscendaraGofile import GofileClient, content_id as gofile_content_id
 from AscendaraRarRecovery import _extended_path, _check_path, _member_path
 from AscendaraExtraction import (
@@ -671,12 +674,21 @@ def check_disk_space(path: str, required_bytes: int, operation: str = "operation
 MAX_ERROR_LENGTH = 600
 
 
-def handleerror(game_info: Dict, game_info_path: str, error: Any):
-    """Handle download errors by updating game info."""
-    message = str(error)
+def _clip_error(message: str) -> str:
     if len(message) > MAX_ERROR_LENGTH:
         logging.error(f"[handleerror] Full error: {message}")
         message = message[:MAX_ERROR_LENGTH - 3].rstrip() + '...'
+    return message
+
+
+def handleerror(game_info: Dict, game_info_path: str, error: Any, previous_error: Any = None):
+    """Handle download errors by updating game info.
+
+    previous_error keeps the failure a retry was recovering from, so a later
+    error cannot hide the original cause.
+    """
+    message = _clip_error(str(error))
+    previous = _clip_error(str(previous_error)) if previous_error else None
     game_info['online'] = ""
     game_info['dlc'] = ""
     game_info['isRunning'] = False
@@ -692,6 +704,8 @@ def handleerror(game_info: Dict, game_info_path: str, error: Any):
             "progressDownloadSpeeds": prev_data.get("progressDownloadSpeeds", "0.00 KB/s"),
             "timeUntilComplete": prev_data.get("timeUntilComplete", "0s"),
         }
+        if previous and previous != message:
+            game_info['downloadingData']['previousError'] = previous
     else:
         logging.error(f"[handleerror] downloadingData missing. Exception: {error}")
     safe_write_json(game_info_path, game_info)
@@ -1922,6 +1936,9 @@ def retry_local_extraction(metadata_path):
     worker.game = info['game']
     worker.withNotification = None
     worker._local_extraction_only = True
+    # Keep the earliest failure across repeated retries.
+    prior = info.get('downloadingData') or {}
+    previous_error = prior.get('previousError') or (prior.get('message') if prior.get('error') else None)
     plan = info.get('extractionSources')
     worker.updateFlow = bool((plan or {}).get('updating', info.get('downloadingData', {}).get('updating', False)))
     prevent_sleep()
@@ -1949,6 +1966,18 @@ def retry_local_extraction(metadata_path):
                              if '.ascendara-receipts' not in root.split(os.sep)
                              and not any(part.startswith('.ascendara-inplace-') for part in root.split(os.sep)))
             for root in roots:
+                if root != worker.download_dir:
+                    # A transfer that received every byte but could not rename its
+                    # partial file (a scanner held it open) is a finished download.
+                    for name in os.listdir(root):
+                        partial = os.path.join(root, name)
+                        if name.lower().endswith('.partial') and completed_partial(partial):
+                            target = partial[:-len('.partial')]
+                            if os.path.exists(target):
+                                continue
+                            logging.info('Finishing retained download %s', name)
+                            publish_partial(partial, target, lambda: False)
+                            cleanup_temporary(partial + '.json', worker.download_dir)
                 received = set()
                 receipts = os.path.join(root, '.ascendara-receipts')
                 if os.path.isdir(receipts):
@@ -1991,7 +2020,7 @@ def retry_local_extraction(metadata_path):
         logging.exception('Local extraction verification failed')
     except Exception as exc:
         logging.exception('Local extraction failed')
-        handleerror(worker.game_info, metadata_path, str(exc))
+        handleerror(worker.game_info, metadata_path, str(exc), previous_error)
     finally:
         allow_sleep()
 

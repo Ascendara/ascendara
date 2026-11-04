@@ -94,6 +94,44 @@ class _Pieces:
         return sum(piece[2] - piece[0] for piece in self.pieces)
 
 
+def publish_partial(partial, destination, stopped, timeout=180):
+    """Rename a finished parallel download into place.
+
+    Security software scans a large file as soon as it is written and holds it
+    open meanwhile; a multi-GB archive can take minutes, so keep retrying.
+    """
+    deadline = time.monotonic() + timeout
+    attempt = 0
+    while True:
+        try:
+            os.replace(partial, destination)
+            return
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                raise PermissionError(
+                    f'The finished download is still locked by another program (often security software '
+                    f'scanning it) after {timeout} seconds: {os.path.basename(destination)}. '
+                    'The downloaded data was retained; retry extraction once the scan finishes.')
+            wait_for_retry(min(.1 * 2 ** attempt, 2), stopped)
+            attempt += 1
+
+
+def completed_partial(partial):
+    """True when a parallel download's saved state shows every byte arrived."""
+    try:
+        with open(partial + '.json', encoding='utf-8') as stream:
+            state = json.load(stream)
+        total, pieces = state['total'], state['pieces']
+        position = 0
+        for start, end, done in pieces:
+            if start != position or done != end:
+                return False
+            position = end
+        return isinstance(total, int) and total > 0 and position == total and os.path.getsize(partial) == total
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
 class Transfer:
     def __init__(self, url, destination, session, progress, stopped, limit=0, retry=None,
                  expected_size=None, connections=1):
@@ -373,15 +411,7 @@ class Transfer:
         if shared.done() != shared.total or os.path.getsize(partial) != shared.total:
             raise RuntimeError('Download stopped after repeated connection failures; partial data was retained: '
                                f'Incomplete download: {shared.done()}/{shared.total} bytes')
-        for attempt in range(8):
-            try:
-                os.replace(partial, self.destination)
-                break
-            except PermissionError:
-                # A scanner may briefly hold the finished file open.
-                if attempt == 7:
-                    raise
-                wait_for_retry(min(.1 * 2 ** attempt, 1), self.stopped)
+        publish_partial(partial, self.destination, self.stopped)
         self._discard(state_path, self.destination + '.resume.json')
         self.progress(shared.total, shared.total, 0)
         return True

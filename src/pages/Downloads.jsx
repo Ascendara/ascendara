@@ -1680,6 +1680,9 @@ const DownloadCard = ({
         ...(downloadingData.message && downloadingData.message !== getErrorMessage()
           ? ["", "**Original Error**", "```", downloadingData.message, "```"]
           : []),
+        ...(downloadingData.previousError
+          ? ["", "**Error Before Retry**", "```", downloadingData.previousError, "```"]
+          : []),
         "",
         "**Download State**",
         `• Progress: ${downloadingData.progressCompleted || "0"}%`,
