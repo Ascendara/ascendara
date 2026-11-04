@@ -2195,7 +2195,6 @@
       "downloadTitle": "The check couldn't finish"
     },
     "passed": "All good. Games can download to this folder without being touched.",
-    "retry": "Try again",
     "stage": {
       "basic": "Making sure Ascendara can save files here...",
       "cleanup": "Tidying up...",
@@ -5119,12 +5118,8 @@
     "loadingSettings": "Loading your settings",
     "localIndexDescription": "Your game collection is stored locally for fast browsing and offline access. Use Ascendara's curated index or connect external sources. Refresh anytime to get the latest games.",
     "locationCheck": {
-      "dismiss": "Dismiss",
       "duplicate": "That folder is already one of your download locations.",
       "noPermission": "Ascendara can't create files in that folder. Pick a different one.",
-      "protect": "Protect folder",
-      "protectFailed": "Windows Security couldn't protect this folder.",
-      "protecting": "Waiting for Windows...",
       "saveFailed": "Couldn't save this download location. Please try again."
     },
     "logUploadPurpose": "This debug log helps tago assist you with your issue. Your data will be deleted after support is complete.",

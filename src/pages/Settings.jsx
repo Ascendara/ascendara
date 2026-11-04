@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/select";
 import {
   ShieldAlert,
-  ShieldCheck,
   Languages,
   Loader,
   Hand,
@@ -97,11 +96,6 @@ import { useSettings } from "@/context/SettingsContext";
 import { verifyAscendAccess } from "@/services/firebase/firebaseService";
 import ProtonOptionsDialog from "@/components/ProtonOptionsDialog";
 import HighballSettings from "@/components/HighballSettings";
-import { useDownloadFolderCheck } from "@/hooks/useDownloadFolderCheck";
-import {
-  DownloadFolderCheckProgress,
-  DownloadFolderCheckResult,
-} from "@/components/DownloadFolderCheck";
 import GameIndexManager from "@/components/GameIndexManager";
 import AchievementFolderSearch from "@/components/AchievementFolderSearch";
 import AppBranchPicker, { getAppBranch } from "@/components/AppBranchPicker";
@@ -289,11 +283,6 @@ function Settings() {
   const [testingVersion, setTestingVersion] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [exclusionLoading, setExclusionLoading] = useState(false);
-  // Download location that was just picked ({ directory, isDefault }); its
-  // check shows under the default folder field or in its additional row
-  const locationCheck = useDownloadFolderCheck();
-  const [checkingLocation, setCheckingLocation] = useState(null);
-  const [protectingLocation, setProtectingLocation] = useState(false);
   const [controllerConnected, setControllerConnected] = useState(false);
   const [runners, setRunners] = useState([]);
   const [selectedRunner, setSelectedRunner] = useState("auto");
@@ -620,33 +609,23 @@ function Settings() {
     [settings.ludusavi, setSettingsLocal]
   );
 
-  const dismissLocationCheck = useCallback(() => {
-    setCheckingLocation(null);
-    locationCheck.reset();
-  }, [locationCheck.reset]);
-
-  // Start checking a picked folder straight away; confirming Ascendara can write
-  // there and saving it run alongside, and undo the pick if either fails
+  // Make sure Ascendara can write to a picked folder before saving it. Each
+  // online download checks its folder for security software on its own.
   const handleDirectorySelect = useCallback(async () => {
     try {
       const directory = await window.electron.openDirectoryDialog();
       if (!directory) return;
-      const previousPath = downloadPath;
-      setDownloadPath(directory);
-      setCheckingLocation({ directory, isDefault: true });
-      locationCheck.run(directory);
       if (!(await window.electron.canCreateFiles(directory))) {
-        setDownloadPath(previousPath);
-        dismissLocationCheck();
         toast.error(t("settings.locationCheck.noPermission"));
         return;
       }
+      setDownloadPath(directory);
       handleSettingChange("downloadDirectory", directory);
     } catch (error) {
       console.error("Error selecting directory:", error);
       toast.error(t("settings.errors.directorySelect"));
     }
-  }, [downloadPath, handleSettingChange, locationCheck.run, dismissLocationCheck, t]);
+  }, [handleSettingChange, t]);
 
   const handleAddLocationSelect = useCallback(async () => {
     try {
@@ -665,112 +644,21 @@ function Settings() {
         toast.error(t("settings.locationCheck.duplicate"));
         return;
       }
-      const newPaths = [...(settings.additionalDirectories || []), directory];
-      const undo = message => {
-        setSettingsLocal(prev => ({
-          ...prev,
-          additionalDirectories: (prev.additionalDirectories || []).filter(
-            path => path !== directory
-          ),
-        }));
-        dismissLocationCheck();
-        toast.error(message);
-      };
-      setSettingsLocal({ additionalDirectories: newPaths });
-      setCheckingLocation({ directory, isDefault: false });
-      locationCheck.run(directory);
       if (!(await window.electron.canCreateFiles(directory))) {
-        undo(t("settings.locationCheck.noPermission"));
+        toast.error(t("settings.locationCheck.noPermission"));
         return;
       }
+      const newPaths = [...(settings.additionalDirectories || []), directory];
       if (!(await window.electron.updateSetting("additionalDirectories", newPaths))) {
-        undo(t("settings.locationCheck.saveFailed"));
+        toast.error(t("settings.locationCheck.saveFailed"));
+        return;
       }
+      setSettingsLocal({ additionalDirectories: newPaths });
     } catch (error) {
       console.error("Error selecting directory:", error);
       toast.error(t("settings.errors.directorySelect"));
     }
-  }, [
-    settings.downloadDirectory,
-    settings.additionalDirectories,
-    setSettingsLocal,
-    locationCheck.run,
-    dismissLocationCheck,
-    t,
-  ]);
-
-  // A passed check folds away on its own after a moment
-  useEffect(() => {
-    if (!locationCheck.passed) return;
-    const timeout = setTimeout(dismissLocationCheck, 4000);
-    return () => clearTimeout(timeout);
-  }, [locationCheck.passed, dismissLocationCheck]);
-
-  // Windows Security excludes every saved download folder, including the new one
-  const handleProtectLocation = async () => {
-    setProtectingLocation(true);
-    try {
-      const result = await window.electron.folderExclusion(true);
-      if (result?.success) {
-        setSettingsLocal({ excludeFolders: true });
-        locationCheck.run(checkingLocation.directory);
-      } else {
-        toast.error(result?.error || t("settings.locationCheck.protectFailed"));
-      }
-    } catch (error) {
-      console.error("Failed to protect download location:", error);
-      toast.error(t("settings.locationCheck.protectFailed"));
-    } finally {
-      setProtectingLocation(false);
-    }
-  };
-
-  // Check progress and outcome, shown under whichever location was just picked
-  const renderLocationCheck = () => (
-    <div className="space-y-2 pt-1">
-      <DownloadFolderCheckProgress check={locationCheck} />
-      <DownloadFolderCheckResult check={locationCheck}>
-        <div className="flex flex-wrap gap-2 pt-1">
-          {isOnWindows && locationCheck.antivirusIssue && (
-            <Button
-              size="sm"
-              className="h-8 text-secondary"
-              onClick={handleProtectLocation}
-              disabled={protectingLocation}
-            >
-              {protectingLocation ? (
-                <Loader size={14} className="mr-1 animate-spin" />
-              ) : (
-                <ShieldCheck size={14} className="mr-1" />
-              )}
-              {protectingLocation
-                ? t("settings.locationCheck.protecting")
-                : t("settings.locationCheck.protect")}
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8"
-            onClick={() => locationCheck.run(checkingLocation.directory)}
-            disabled={protectingLocation}
-          >
-            <RefreshCw size={14} className="mr-1" />
-            {t("downloadFolderCheck.retry")}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 text-muted-foreground"
-            onClick={dismissLocationCheck}
-            disabled={protectingLocation}
-          >
-            {t("settings.locationCheck.dismiss")}
-          </Button>
-        </div>
-      </DownloadFolderCheckResult>
-    </div>
-  );
+  }, [settings.downloadDirectory, settings.additionalDirectories, setSettingsLocal, t]);
 
   const handleDirectoryChangeBackups = useCallback(async () => {
     try {
@@ -1931,11 +1819,6 @@ function Settings() {
                         {t("settings.selectDirectory")}
                       </Button>
                     </div>
-                    {checkingLocation?.isDefault && (
-                      <div className="mt-2 rounded-md bg-accent/30 p-3">
-                        {renderLocationCheck()}
-                      </div>
-                    )}
                   </div>
 
                   {/* Additional Download Paths Section */}
@@ -1984,23 +1867,12 @@ function Settings() {
                                   const newPaths = [...settings.additionalDirectories];
                                   newPaths.splice(index, 1);
                                   handleSettingChange("additionalDirectories", newPaths);
-                                  if (
-                                    checkingLocation &&
-                                    !checkingLocation.isDefault &&
-                                    checkingLocation.directory === path
-                                  ) {
-                                    dismissLocationCheck();
-                                  }
                                 }}
                                 className={`h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100 ${isDownloaderRunning ? "opacity-50" : ""}`}
                               >
                                 <X size={16} />
                               </Button>
                             </div>
-                            {checkingLocation &&
-                              !checkingLocation.isDefault &&
-                              checkingLocation.directory === path &&
-                              renderLocationCheck()}
                           </div>
                         ))
                       )}

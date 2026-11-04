@@ -135,6 +135,30 @@ async function verifyTestDownload(url, testDir, onPhase) {
 }
 
 /**
+ * Before a download, fetch one of the online-fix test files into the game
+ * folder and make sure security software leaves it alone. A failed network
+ * request only means the check could not run, so it does not block the download.
+ * Resolves to { ok, reason?, error? } like verifyTestDownload.
+ */
+async function checkDownloadFolder(directory) {
+  const url =
+    VERIFY_DOWNLOAD_FILES[Math.floor(Math.random() * VERIFY_DOWNLOAD_FILES.length)];
+  const testDir = path.join(directory, `.ascendara-check-${crypto.randomUUID()}`);
+  try {
+    const result = await verifyTestDownload(url, testDir, () => {});
+    if (!result.ok && result.reason === "downloadFailed") {
+      console.warn(`[Folder check] Skipped, test file unavailable: ${result.error}`);
+      return { ok: true, skipped: true };
+    }
+    return result;
+  } finally {
+    await fs.remove(testDir).catch(error => {
+      console.error("Failed to remove download folder check:", error);
+    });
+  }
+}
+
+/**
  * Get disk space using Node.js built-in fs.statfs
  */
 async function getDiskSpace(directory) {
@@ -1285,6 +1309,7 @@ function registerSystemHandlers() {
 
 module.exports = {
   registerSystemHandlers,
+  checkDownloadFolder,
   getDirectorySize,
   checkGameDependencies,
 };

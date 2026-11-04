@@ -574,6 +574,24 @@ function registerDownloadHandlers() {
         let updatePrepared = false;
         let previousGameInfo = null;
         try {
+          // Security software that removes online-fix files breaks the game after
+          // the whole download, so check this folder first, on every download.
+          if (online === true || String(online).toLowerCase() === "true") {
+            const { checkDownloadFolder } = require("../system/system");
+            const folderCheck = await checkDownloadFolder(gameDirectory);
+            if (!folderCheck.ok) {
+              console.error(
+                `[Folder check] ${folderCheck.reason} in ${gameDirectory}: ${folderCheck.error}`
+              );
+              const action =
+                process.platform === "win32"
+                  ? "Turn on folder protection in Settings > Downloads, or add the folder as an exclusion in your antivirus"
+                  : "Add the folder as an exclusion in your security software";
+              throw new Error(
+                `Security software ${{ locked: "locked", blocked: "blocked" }[folderCheck.reason] || "removed"} an online-fix test file in ${targetDirectory}, so it would also delete this game's online-fix files. ${action}, then download again.`
+              );
+            }
+          }
           if (updateFlow && isTorrentLink) {
             // Torrents write straight into the game folder, so copy it first.
             await gameUpdateBackup.prepare(gameDirectory, () =>
