@@ -135,15 +135,17 @@ const StartupSplash = ({ iconData, exiting, onDone, fallback = null }) => {
       }
 
       // Once the logo has come to rest in its slot, the rest of the menu bar
-      // pops in (CSS in app.css). Wait a frame so those animations exist,
-      // then let them finish too.
+      // pops in and the dock slides up (CSS in app.css). Wait a frame so those
+      // animations exist, then let them finish too.
       await flight?.finished.catch(() => {});
       if (cancelled) return;
       root.classList.add("boot-reveal");
       await waitFrame();
       const popIns = document
         .getAnimations()
-        .filter(a => a.animationName === "boot-pop-in");
+        .filter(
+          a => a.animationName === "boot-pop-in" || a.animationName === "boot-dock-in"
+        );
       await Promise.all([...animations, ...popIns].map(a => a.finished.catch(() => {})));
       if (cancelled) return;
       root.classList.remove("splash-active", "boot-reveal");

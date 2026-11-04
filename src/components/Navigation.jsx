@@ -357,8 +357,10 @@ const Navigation = memo(({ items }) => {
         style={navStyle}
         data-tour="navigation"
       >
+        {/* data-boot-dock: slides up from the window edge as the boot logo lands (app.css) */}
         <div
           className="pointer-events-auto relative flex items-center justify-center gap-2 rounded-2xl border border-border p-3 shadow-lg backdrop-blur-lg"
+          data-boot-dock
           style={{
             backgroundColor:
               "rgb(var(--color-nav-background, var(--color-background)) / 0.8)",

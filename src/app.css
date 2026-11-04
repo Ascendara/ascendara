@@ -870,12 +870,30 @@ html[data-motion="reduced"] .animate-fade-in {
 .boot-reveal .window-controls button:nth-child(3) {
   --boot-i: 4;
 }
+
+/* The dock slides up from below the window edge alongside the menu bar */
+.splash-active [data-boot-dock] {
+  translate: 0 calc(100% + 3rem);
+}
+@keyframes boot-dock-in {
+  from {
+    translate: 0 calc(100% + 3rem);
+  }
+  to {
+    translate: none;
+  }
+}
+.boot-reveal [data-boot-dock] {
+  animation: boot-dock-in 560ms cubic-bezier(0.22, 1.2, 0.36, 1) 60ms both;
+}
+html[data-motion="reduced"].boot-reveal [data-boot-dock],
 html[data-motion="reduced"].boot-reveal [data-boot-pop],
 html[data-motion="reduced"].boot-reveal [data-boot-row] > *,
 html[data-motion="reduced"].boot-reveal .window-controls button {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
+  .boot-reveal [data-boot-dock],
   .boot-reveal [data-boot-pop],
   .boot-reveal [data-boot-row] > *,
   .boot-reveal .window-controls button {
