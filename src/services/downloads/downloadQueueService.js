@@ -1,6 +1,7 @@
 // Download Queue Service for Ascend users
 // Manages a queue of downloads that start automatically when the previous one finishes
 
+import { resolveHost } from "@/services/downloads/debridService";
 import pendingLibrarySwapService from "@/services/downloads/pendingLibrarySwapService";
 
 const QUEUE_STORAGE_KEY = "ascendDownloadQueue";
@@ -142,8 +143,25 @@ const _processNextInQueueInternal = async () => {
 
   // Start the download
   try {
+    let url = nextItem.url;
+    const debridLink = nextItem.debridLink || nextItem.realDebridLink;
+    if (debridLink) {
+      const settings = await window.electron.getSettings();
+      if (settings.debridEnabled !== true) return null;
+      const resolved = await resolveHost(
+        settings,
+        debridLink,
+        null,
+        null,
+        0,
+        nextItem.debridProviderId || "realdebrid"
+      );
+      if (!resolved.url)
+        throw new Error("This debrid download is still processing in the cloud.");
+      url = resolved.url;
+    }
     const result = await window.electron.downloadFile(
-      nextItem.url,
+      url,
       nextItem.gameName,
       nextItem.online || false,
       nextItem.dlc || false,
@@ -154,7 +172,7 @@ const _processNextInQueueInternal = async () => {
       nextItem.size || "",
       nextItem.additionalDirIndex || 0,
       nextItem.gameID || "",
-      nextItem.browserDirect === true,
+      nextItem.browserDirect === true || Boolean(debridLink),
       nextItem.browserAssetGameId,
       nextItem.browserAssetLogoId
     );

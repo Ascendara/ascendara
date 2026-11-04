@@ -65,6 +65,7 @@ import gameService from "@/services/games/gameService";
 import PrivateSources from "@/components/PrivateSources";
 import { cn } from "@/lib/utils";
 import { API_URL } from "@/config/api";
+import { canDownloadTorrents } from "@/services/downloads/debridService";
 
 // The shared index refresh finishes almost instantly, so hold the busy state
 // long enough to be seen and then confirm the result on the button itself.
@@ -720,7 +721,7 @@ const GameIndexManager = ({
       const torrentOnly = isSourceMetaTorrentOnly(source) || isTorrentOnlyDataset(games);
       if (!torrentOnly) return;
       const current = await window.electron.getSettings();
-      if (current?.torrentEnabled) return;
+      if (canDownloadTorrents(current)) return;
       setTorrentWarningSource({ ...source, torrentOnly: true });
       setTorrentWarningOpen(true);
       // Mark the source so the UI can decorate it later
@@ -753,13 +754,12 @@ const GameIndexManager = ({
     };
     payload.lastUsed = Date.now();
 
-    // Hard-block torrent-only sources when torrenting is disabled. We show
-    // the warning dialog (which links to Settings) but do NOT commit the
-    // selection -- the user has to enable torrenting first.
+    // A torrent-only source needs either local torrenting or the selected
+    // debrid service's magnet support before committing the selection.
     if (isSourceMetaTorrentOnly(payload)) {
       try {
         const current = await window.electron.getSettings();
-        if (!current?.torrentEnabled) {
+        if (!canDownloadTorrents(current)) {
           setTorrentWarningSource({ ...payload, torrentOnly: true, blocked: true });
           setTorrentWarningOpen(true);
           return;
@@ -2508,12 +2508,9 @@ const GameIndexManager = ({
               </AlertDialogTitle>
               <AlertDialogDescription className="space-y-2 text-muted-foreground">
                 <span className="block">
-                  {(torrentWarningSource?.blocked
-                    ? t("localRefresh.torrentOnlyDialogBlocked") ||
-                      "{{name}} only publishes magnet links, so you can't select it until torrenting is enabled in Settings."
-                    : t("localRefresh.torrentOnlyDialogBody") ||
-                      "{{name}} only publishes magnet links. To download anything from it you'll need to enable torrenting in Settings."
-                  ).replace("{{name}}", torrentWarningSource?.name || "This source")}
+                  {t("localRefresh.torrentHandlerRequired", {
+                    name: torrentWarningSource?.name || "This source",
+                  })}
                 </span>
                 <span className="block rounded-md border border-orange-500/30 bg-orange-500/5 p-2 text-xs text-orange-700 dark:text-orange-300">
                   {t("localRefresh.torrentOnlyDialogVpn") ||

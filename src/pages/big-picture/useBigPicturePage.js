@@ -10,6 +10,7 @@ import {
   hasActiveDownloads,
 } from "@/services/downloads/downloadQueueService";
 import { toast } from "sonner";
+import * as debrid from "@/services/downloads/debridService";
 import * as torboxService from "@/services/downloads/torboxService";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { sanitizeText } from "@/lib/utils";
@@ -312,15 +313,29 @@ function useBigPicturePage() {
       if (catalogGame) game = { ...game, ...catalogGame };
     }
 
-    // Determine torbox providers based on prioritizeTorboxOverSeamless setting
-    const prioritizeTorbox = settings.prioritizeTorboxOverSeamless;
-    const torboxProviders = prioritizeTorbox
-      ? Object.keys(links || {}).filter(provider => links[provider]?.length > 0)
-      : ["1fichier", "megadb"];
-
-    // Check if we should use TorBox for this provider
-    const shouldUseTorbox = provider =>
-      torboxProviders.includes(provider) && torboxService.isEnabled(settings);
+    const debridProvider = debrid.getPreferredProvider(settings);
+    const debridHosts = await debrid.getSupportedHosts(settings);
+    const firstLink = host => {
+      const candidates = links[host];
+      return Array.isArray(candidates)
+        ? candidates.find(link => typeof link === "string" && link.trim())
+        : candidates;
+    };
+    const debridHostsInGame = Object.keys(links).filter(host =>
+      debrid.canUseForHost(settings, host, firstLink(host), debridHosts)
+    );
+    const torrentOnly = Object.keys(links).every(
+      host => host === "torrent" || !firstLink(host)
+    );
+    if (
+      debrid.canUseCloudTorrents(settings) &&
+      firstLink("torrent") &&
+      (preferredProvider === "torrent" || (!preferredProvider && torrentOnly))
+    ) {
+      setDownloadingGame(game);
+      setShowExitDialog(true);
+      return;
+    }
 
     // Find the provider to use (preferred or first available)
     let selectedProvider = null;
@@ -337,11 +352,15 @@ function useBigPicturePage() {
           : null;
     }
 
-    // Otherwise find first available provider (seamless or torbox based on settings)
+    // Otherwise find first available provider (seamless or debrid based on settings)
     if (!downloadUrl) {
-      // If TorBox is prioritized and enabled, check for torbox providers first
-      if (prioritizeTorbox && torboxService.isEnabled(settings)) {
-        for (const provider of torboxProviders) {
+      // If the selected debrid provider is prioritized, check its hosts first
+      if (
+        debrid
+          .getConfiguredProviders(settings)
+          .some(provider => settings[provider.prioritizeSetting])
+      ) {
+        for (const provider of debridHostsInGame) {
           if (links[provider]) {
             selectedProvider = provider;
             const providerLinks = links[provider];
@@ -370,9 +389,9 @@ function useBigPicturePage() {
       }
     }
 
-    // TorBox-only hosts need the same desktop handoff as an explicitly selected host.
-    if (!downloadUrl && torboxService.isEnabled(settings)) {
-      for (const provider of torboxProviders) {
+    // Debrid-only hosts need the same desktop handoff as an explicitly selected host.
+    if (!downloadUrl && Boolean(debridProvider)) {
+      for (const provider of debridHostsInGame) {
         const candidates = links[provider];
         const link = Array.isArray(candidates)
           ? candidates.find(value => typeof value === "string" && value.trim())
@@ -392,11 +411,12 @@ function useBigPicturePage() {
       return;
     }
 
-    // Check if this is a seamless provider that should NOT use TorBox
-    const isSeamlessWithoutTorbox =
-      seamlessProviders.includes(selectedProvider) && !shouldUseTorbox(selectedProvider);
+    // Check if the selected host should download without debrid
+    const isSeamlessWithoutDebrid =
+      seamlessProviders.includes(selectedProvider) &&
+      !debrid.canUseForHost(settings, selectedProvider, downloadUrl, debridHosts);
 
-    if (isSeamlessWithoutTorbox) {
+    if (isSeamlessWithoutDebrid) {
       // Check if there's an active download
       const hasActive = await hasActiveDownloads();
 
@@ -461,7 +481,7 @@ function useBigPicturePage() {
         toast.error(error.message || t("bigPicture.downloadError"));
       }
     } else {
-      // Non-seamless or TorBox download - show exit dialog
+      // Non-seamless or cloud download - show exit dialog
       setDownloadingGame(game);
       setShowExitDialog(true);
     }

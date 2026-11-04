@@ -43,13 +43,14 @@ import {
   AlertDialogDescription,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
-import TorboxIcon from "./TorboxIcon";
+import DebridIcon from "./DebridIcon";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
-import torboxService from "@/services/downloads/torboxService";
+import useDebridHosts from "@/hooks/useDebridHosts";
+import * as debrid from "@/services/downloads/debridService";
 import { sanitizeText, formatLatestUpdate, formatCompactNumber } from "@/lib/utils";
 import ratingQueueService from "@/services/games/ratingQueueService";
 import installedGamesService from "@/services/library/installedGamesService";
@@ -57,11 +58,7 @@ import { useImageLoader } from "@/hooks/useImageLoader";
 import usePrivateArtwork from "@/hooks/usePrivateArtwork";
 import verifiedGamesService from "@/services/games/verifiedGamesService";
 import gamePagePreparer from "@/services/games/gamePagePreparer";
-import {
-  SEAMLESS_PROVIDERS,
-  TORBOX_PROVIDERS,
-  TORBOX_ELIGIBLE_SEAMLESS,
-} from "@/config/providers";
+import { SEAMLESS_PROVIDERS } from "@/config/providers";
 
 const MAX_VISIBLE_TAGS = 3;
 const RECENT_UPDATE_DAYS = 14;
@@ -131,6 +128,7 @@ function GameCardContent({ game, compact, viewCount }) {
   const dialogJustClosed = useRef(false);
   const { t } = useLanguage();
   const { settings } = useSettings();
+  const debridHosts = useDebridHosts(settings);
 
   // Check if game is in Play Later list
   useEffect(() => {
@@ -388,35 +386,29 @@ function GameCardContent({ game, compact, viewCount }) {
 
   // --- RENDER CARD MODE ---
   // Pick the host the download page will use so the button can hint at the provider
-  const seamlessHosts = SEAMLESS_PROVIDERS;
-  const torboxHosts = TORBOX_PROVIDERS;
-  const prioritizedTorbox = settings.prioritizeTorboxOverSeamless;
   const allHosts = Object.keys(game.download_links || {});
-
-  let host;
-  if (allHosts.includes("buzzheavier")) {
-    host = "buzzheavier";
-  } else {
-    host =
-      allHosts.find(h =>
-        prioritizedTorbox
-          ? ["gofile", "datanodes", ...torboxHosts].includes(h)
-          : seamlessHosts.concat(torboxHosts).includes(h)
-      ) || allHosts[0];
-  }
-
-  let provider = "default";
-  if (prioritizedTorbox && TORBOX_ELIGIBLE_SEAMLESS.includes(host)) {
-    provider = "torbox";
-  } else if (seamlessHosts.includes(host)) {
-    provider = "seamless";
-  } else if (torboxHosts.includes(host)) {
-    provider = "torbox";
-  }
-
-  // Only show provider badge for download state
-  const showProviderBadge = !isLoading && !isInstalled && provider !== "default";
-  const torboxEnabled = provider === "torbox" && torboxService.isEnabled(settings);
+  const firstHostUrl = host => {
+    const links = game.download_links?.[host];
+    return Array.isArray(links)
+      ? links.find(link => typeof link === "string" && link.trim())
+      : links;
+  };
+  const host = allHosts.includes("gofile")
+    ? "gofile"
+    : allHosts.includes("buzzheavier")
+      ? "buzzheavier"
+      : allHosts.find(h =>
+          debrid.canUseForHost(settings, h, firstHostUrl(h), debridHosts)
+        ) || allHosts[0];
+  const debridProvider = debrid.getHostProvider(
+    settings,
+    host,
+    firstHostUrl(host),
+    debridHosts
+  );
+  const debridAvailable = Boolean(debridProvider);
+  const seamless = !debridAvailable && SEAMLESS_PROVIDERS.includes(host);
+  const showProviderBadge = !isLoading && !isInstalled && (debridAvailable || seamless);
 
   const specs = [
     // The measured install size once players have reported it, else the download
@@ -748,12 +740,12 @@ function GameCardContent({ game, compact, viewCount }) {
                       : t("gameCard.viewDetails")}
               </span>
 
-              {showProviderBadge && (torboxEnabled || provider === "seamless") && (
+              {showProviderBadge && (
                 <div className="ml-auto flex items-center gap-1">
-                  {torboxEnabled && <TorboxIcon className="h-4 w-4" />}
-                  {provider === "seamless" && (
-                    <Zap fill="currentColor" className="h-3 w-3" />
+                  {debridAvailable && (
+                    <DebridIcon provider={debridProvider} className="h-4 w-4" />
                   )}
+                  {seamless && <Zap fill="currentColor" className="h-3 w-3" />}
                 </div>
               )}
             </Button>

@@ -1,5 +1,37 @@
 const featureCenterResources = {
   en: {
+    debrid: {
+      settingsTitle: "Debrid services",
+      settingsDescription: "Manage your accounts and choose the order used for downloads.",
+      priorityOrder: "Service priority",
+      dragHint: "Drag services to reorder, or use the arrow buttons.",
+      priorityDescription: "Configured, enabled services are checked from top to bottom. Hosted links use the first compatible service; magnets use the first with torrent support enabled.",
+      configured: "API key saved",
+      notConfigured: "Needs an API key",
+      disabled: "Disabled",
+      moveUp: "Move {{provider}} up",
+      moveDown: "Move {{provider}} down",
+      useService: "Use service",
+      apiKey: "API key",
+      getApiKey: "Get an API key",
+      saveKey: "Save key",
+      keyDescription: "Keys are validated when saved. Clear and save the field to disconnect.",
+      useMagnets: "Cloud torrents",
+      useMagnetsDescription: "Allow this service to handle magnet links without qBittorrent.",
+      preferSeamless: "Prefer over direct downloads",
+      preferSeamlessDescription: "Use this service for supported hosts that can also download directly.",
+      localFallback: "Fall back to qBittorrent",
+      localFallbackDescription: "Use local torrenting if this service cannot submit a magnet. Requires local torrenting to be enabled.",
+      preferredProvider: "Preferred debrid service",
+      preferenceDescription: "Choose which configured service handles eligible downloads. If it is not configured, the first configured service is used.",
+      hostInstructions: "Process this host link with {{provider}}.",
+      enable: "Enable {{provider}} for this download",
+      disable: "Disable {{provider}} for this download",
+      torrentFallback: "Cloud torrent submission failed. Falling back to qBittorrent.",
+    },
+    localRefresh: {
+      torrentHandlerRequired: "{{name}} only publishes magnet links. Enable local torrenting or configure a debrid service with torrent support in Settings to use this source.",
+    },
     featureCenters: {
       common: {
         refresh: "Refresh",

@@ -9,7 +9,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import TorboxIcon from "@/components/TorboxIcon";
+import { canUseCloudTorrents } from "@/services/downloads/debridService";
+import DebridIcon from "@/components/DebridIcon";
 import { useLanguage } from "@/context/LanguageContext";
 import { VERIFIED_PROVIDERS } from "@/config/providers";
 import {
@@ -137,10 +138,10 @@ export default function DownloadPanel({
   providers,
   selectedProvider,
   onProviderChange,
-  torboxAvailable,
-  torboxDisabledForSession,
-  onTorboxDisabledChange,
-  torboxEnabled,
+  debridProvider,
+  debridAvailable,
+  debridDisabledForSession,
+  onDebridDisabledChange,
   torrentRunning,
   isStartingDownload,
   isDev,
@@ -164,9 +165,10 @@ export default function DownloadPanel({
   const { t } = useLanguage();
   if (filesUnavailable) return <FilesUnavailable />;
 
-  const usingTorbox = torboxAvailable && !torboxDisabledForSession;
+  const usingDebrid = debridAvailable && !debridDisabledForSession;
+  const cloudTorrent = !debridDisabledForSession && canUseCloudTorrents(settings);
   const opensInBrowser =
-    selectedProvider === "buzzheavier" || selectedProvider === "megadb";
+    !usingDebrid && (selectedProvider === "buzzheavier" || selectedProvider === "megadb");
   // Buzzheavier downloads in a hidden window, so only MegaDB needs the click tip
   const showsBrowserTip = selectedProvider === "megadb";
   const isTorrentMode = mode === "fitgirl" || mode === "torrent";
@@ -183,11 +185,11 @@ export default function DownloadPanel({
         t("download.downloadOptions.torrentInstructions.title") || "Torrent Download",
       description: t("download.downloadOptions.torrentInstructions.description"),
     },
-    seamless: usingTorbox
+    seamless: usingDebrid
       ? {
-          icon: <TorboxIcon className="h-5 w-5 text-primary" />,
-          title: t("download.downloadOptions.torboxInstructions.title"),
-          description: t("download.downloadOptions.torboxInstructions.description"),
+          icon: <DebridIcon provider={debridProvider} className="h-5 w-5 text-primary" />,
+          title: debridProvider.name,
+          description: t("debrid.hostInstructions", { provider: debridProvider.name }),
         }
       : {
           icon: <Zap fill="currentColor" className="h-5 w-5 text-primary" />,
@@ -202,13 +204,15 @@ export default function DownloadPanel({
   }[mode];
 
   const downloadDisabled =
-    mode === "fitgirl"
-      ? isStartingDownload || !torrentRunning
-      : mode === "torrent"
-        ? isStartingDownload || !settings.torrentEnabled || !torrentRunning
-        : mode === "seamless"
-          ? isStartingDownload || !!linkStage
-          : isStartingDownload || !selectedProvider || !inputLink || !isValidLink;
+    isTorrentMode && cloudTorrent
+      ? isStartingDownload
+      : mode === "fitgirl"
+        ? isStartingDownload || !torrentRunning
+        : mode === "torrent"
+          ? isStartingDownload || !settings.torrentEnabled || !torrentRunning
+          : mode === "seamless"
+            ? isStartingDownload || !!linkStage
+            : isStartingDownload || !selectedProvider || !inputLink || !isValidLink;
 
   const linkStageLabel = {
     opening: t("download.downloadOptions.openingDownloadPage"),
@@ -297,15 +301,15 @@ export default function DownloadPanel({
                     {providers.map(provider => (
                       <SelectItem key={provider} value={provider}>
                         <div className="flex items-center gap-2">
-                          {getProviderLabel(
-                            provider,
-                            settings.prioritizeTorboxOverSeamless
-                          )}
+                          {getProviderLabel(provider, usingDebrid)}
                           {VERIFIED_PROVIDERS.includes(provider.toLowerCase()) && (
                             <BadgeCheckIcon className="h-4 w-4" />
                           )}
-                          {provider === "1fichier" && torboxEnabled && (
-                            <TorboxIcon className="h-4 w-4 text-primary" />
+                          {provider === selectedProvider && debridAvailable && (
+                            <DebridIcon
+                              provider={debridProvider}
+                              className="h-4 w-4 text-primary"
+                            />
                           )}
                         </div>
                       </SelectItem>
@@ -321,22 +325,26 @@ export default function DownloadPanel({
           )}
 
           {/* Torrent flows */}
-          {mode === "torrent" && !settings.torrentEnabled && (
+          {mode === "torrent" && !cloudTorrent && !settings.torrentEnabled && (
             <Warning>
               {t("download.toast.torrentDisabled") ||
                 "Enable torrenting in Settings to download this game."}
             </Warning>
           )}
           {isTorrentMode &&
+            !cloudTorrent &&
             (mode === "fitgirl" || settings.torrentEnabled) &&
             !torrentRunning && (
               <Warning>
                 {t("download.downloadOptions.torrentInstructions.noTorrent")}
               </Warning>
             )}
+          {isTorrentMode && cloudTorrent && (
+            <p className="text-sm text-muted-foreground">{debridProvider?.name}</p>
+          )}
           {isTorrentMode && downloadButton}
 
-          {/* Seamless / TorBox flow */}
+          {/* Hosted download flow */}
           {mode === "seamless" && (
             <>
               {showsBrowserTip && (
@@ -345,14 +353,14 @@ export default function DownloadPanel({
                 </div>
               )}
               {downloadButton}
-              {torboxAvailable && (
+              {debridAvailable && (
                 <button
-                  onClick={() => onTorboxDisabledChange(!torboxDisabledForSession)}
+                  onClick={() => onDebridDisabledChange(!debridDisabledForSession)}
                   className="block w-full text-center text-xs text-muted-foreground underline transition-colors hover:text-foreground"
                 >
-                  {torboxDisabledForSession
-                    ? t("download.downloadOptions.torboxInstructions.enableForDownload")
-                    : t("download.downloadOptions.torboxInstructions.disableForDownload")}
+                  {t(debridDisabledForSession ? "debrid.enable" : "debrid.disable", {
+                    provider: debridProvider?.name,
+                  })}
                 </button>
               )}
             </>
