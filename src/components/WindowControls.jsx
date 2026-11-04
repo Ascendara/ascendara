@@ -1,16 +1,56 @@
 import { Maximize, Minimize, Minus, X } from "lucide-react";
 
 const TRAFFIC_LIGHTS = [
-  { id: "close", color: "#FF5F57", ring: "#E0443E", Glyph: X },
-  { id: "minimize", color: "#FEBC2E", ring: "#DEA123", Glyph: Minus },
-  { id: "fullscreen", color: "#28C840", ring: "#1AAB29", Glyph: Maximize },
+  { id: "close", color: "#FF5F57", ring: "#E0443E" },
+  { id: "minimize", color: "#FEBC2E", ring: "#DEA123" },
+  { id: "fullscreen", color: "#28C840", ring: "#1AAB29" },
 ];
+
+// Glyphs drawn on the light's own 12px grid so they sit dead center, sized
+// like the native ones (about half the light)
+function TrafficGlyph({ id, isFullscreen }) {
+  let shape;
+  if (id === "close") {
+    shape = (
+      <path
+        d="M4 4l4 4M8 4l-4 4"
+        stroke="currentColor"
+        strokeWidth="1.1"
+        strokeLinecap="round"
+      />
+    );
+  } else if (id === "minimize") {
+    shape = (
+      <path d="M3.5 6h5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+    );
+  } else if (isFullscreen) {
+    // Two triangles pointing in toward the center
+    shape = <path d="M6.6 2.9v2.5h2.5zM5.4 9.1V6.6H2.9z" fill="currentColor" />;
+  } else {
+    // Two triangles pointing out to the corners
+    shape = <path d="M3.6 3.6h3.6L3.6 7.2zM8.4 8.4H4.8l3.6-3.6z" fill="currentColor" />;
+  }
+  return (
+    <svg
+      viewBox="0 0 12 12"
+      className="h-full w-full text-black/55 opacity-0 transition-opacity duration-100 group-hover/traffic:opacity-100"
+      aria-hidden
+    >
+      {shape}
+    </svg>
+  );
+}
+
+const ICON_BUTTON =
+  "flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors";
+const ICON_HOVER = "hover:bg-accent/60 hover:text-foreground";
 
 /**
  * The window's minimize / fullscreen / close buttons, drawn either as plain
- * icons or as macOS-style traffic lights (close, minimize, fullscreen; the
- * glyphs show when the group is hovered). Mirrored reverses the order so the
- * close button stays at the window edge when the menu bar is flipped.
+ * icons or as macOS-style traffic lights. Traffic lights always run close,
+ * minimize, fullscreen like the native ones (glyphs show when the group is
+ * hovered); mirrored reverses the icons so close stays at the window edge
+ * when the menu bar is flipped.
  */
 export function WindowControls({
   variant = "icons",
@@ -26,71 +66,64 @@ export function WindowControls({
     fullscreen: onToggleFullscreen,
   };
 
-  const order = mirrored ? "flex-row-reverse" : "";
+  const fullscreenTitle = isFullscreen ? t("exitFullscreen") : t("enterFullscreen");
 
   if (variant === "traffic") {
     return (
       <div
-        className={`window-controls group/traffic flex items-center gap-2 ${order} ${className}`}
+        className={`window-controls group/traffic flex items-center gap-2 ${className}`}
       >
-        {TRAFFIC_LIGHTS.map(({ id, color, ring, Glyph }) => {
-          const Icon = id === "fullscreen" && isFullscreen ? Minimize : Glyph;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={actions[id]}
-              title={
-                id === "fullscreen"
-                  ? isFullscreen
-                    ? t("exitFullscreen")
-                    : t("enterFullscreen")
-                  : undefined
-              }
-              className="flex h-3 w-3 items-center justify-center rounded-full active:brightness-90"
-              style={{ backgroundColor: color, boxShadow: `inset 0 0 0 0.5px ${ring}` }}
-            >
-              <Icon
-                className="h-2 w-2 text-black/60 opacity-0 transition-opacity group-hover/traffic:opacity-100"
-                strokeWidth={3}
-              />
-            </button>
-          );
-        })}
+        {TRAFFIC_LIGHTS.map(({ id, color, ring }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={actions[id]}
+            title={id === "fullscreen" ? fullscreenTitle : undefined}
+            className="h-3 w-3 shrink-0 overflow-hidden rounded-full active:brightness-90"
+            style={{ backgroundColor: color, boxShadow: `inset 0 0 0 0.5px ${ring}` }}
+          >
+            <TrafficGlyph id={id} isFullscreen={isFullscreen} />
+          </button>
+        ))}
       </div>
     );
   }
 
   return (
     <div className={`window-controls flex items-center ${className}`}>
-      <div className={`flex items-center gap-2 ${order}`}>
+      <div className={`flex items-center gap-0.5 ${mirrored ? "flex-row-reverse" : ""}`}>
         <button
-          className="text-muted-foreground transition-colors hover:text-foreground"
+          type="button"
+          className={`${ICON_BUTTON} ${ICON_HOVER}`}
           onClick={actions.minimize}
         >
-          <Minus className="h-4 w-4" />
+          <Minus className="h-4 w-4" strokeWidth={2} />
         </button>
         <button
-          className="relative text-muted-foreground transition-colors hover:text-foreground"
+          type="button"
+          className={`relative ${ICON_BUTTON} ${ICON_HOVER}`}
           onClick={actions.fullscreen}
-          title={isFullscreen ? t("exitFullscreen") : t("enterFullscreen")}
+          title={fullscreenTitle}
         >
           <Minimize
-            className={`absolute inset-0 h-4 w-4 transition-opacity ${
+            className={`absolute h-3.5 w-3.5 transition-opacity ${
               isFullscreen ? "opacity-100" : "opacity-0"
             }`}
+            strokeWidth={2}
           />
           <Maximize
-            className={`h-4 w-4 transition-opacity ${
+            className={`h-3.5 w-3.5 transition-opacity ${
               isFullscreen ? "opacity-0" : "opacity-100"
             }`}
+            strokeWidth={2}
           />
         </button>
         <button
-          className="text-muted-foreground transition-colors hover:text-foreground"
+          type="button"
+          className={`${ICON_BUTTON} hover:bg-red-500/15 hover:text-red-500`}
           onClick={actions.close}
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4" strokeWidth={2} />
         </button>
       </div>
     </div>

@@ -269,12 +269,12 @@ const MenuBar = () => {
 
   return (
     <div
-      className="fixed z-50 flex h-10 w-full select-none items-center"
+      className="fixed z-50 flex h-12 w-full select-none items-center"
       style={{ WebkitAppRegion: "drag" }}
     >
       {/* data-boot-row / data-boot-pop: staggered pop-in as the boot logo lands (app.css) */}
       <div
-        className={`mt-2 flex h-full flex-1 items-center gap-2 px-3 ${
+        className={`flex h-full flex-1 items-center gap-2 px-3 ${
           mirrored ? "flex-row-reverse" : ""
         }`}
         data-boot-row
@@ -506,7 +506,16 @@ const MenuBar = () => {
         onToggleFullscreen={handleFullscreenToggle}
         mirrored={mirrored}
         t={t}
-        className={`mt-2 ${mirrored ? "order-first ml-2" : "mr-2"}`}
+        className={
+          // Traffic lights get the native inset; icon buttons carry their own padding
+          controlsStyle === "traffic"
+            ? mirrored
+              ? "order-first ml-4"
+              : "mr-4"
+            : mirrored
+              ? "order-first ml-2"
+              : "mr-2"
+        }
       />
       <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <AlertDialogContent className="max-w-2xl bg-background">
