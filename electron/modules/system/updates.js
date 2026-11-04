@@ -52,7 +52,7 @@ const TESTING_RELEASE_URL =
 
 // A stalled connection is retried from where it stopped; the timeout is for
 // inactivity, not for the whole download
-const UPDATE_STALL_TIMEOUT = 30000;
+const UPDATE_STALL_TIMEOUT = 120000;
 const UPDATE_DOWNLOAD_ATTEMPTS = 5;
 
 const isMac = process.platform === "darwin";
@@ -247,6 +247,7 @@ async function downloadUpdateFile(url, destination, headers, onProgress) {
   const partial = `${destination}.part`;
   await fs.remove(partial);
   let total = 0;
+  const expectedFilename = path.basename(destination);
   for (let attempt = 1; ; attempt++) {
     const resumeFrom = fs.existsSync(partial) ? fs.statSync(partial).size : 0;
     try {
@@ -262,6 +263,13 @@ async function downloadUpdateFile(url, destination, headers, onProgress) {
         maxRedirects: 5,
         timeout: UPDATE_STALL_TIMEOUT,
       });
+      const disposition = response.headers["content-disposition"] || "";
+      if (!disposition.includes(expectedFilename)) {
+        response.data.destroy();
+        throw new Error(
+          `The update server returned an unexpected installer instead of ${expectedFilename}`
+        );
+      }
       // A server that ignores the range sends the whole file again
       const resumed = resumeFrom > 0 && response.status === 206;
       const length = parseInt(response.headers["content-length"], 10) || 0;
