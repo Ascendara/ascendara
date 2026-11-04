@@ -60,6 +60,31 @@ let carouselGamesCache = null;
 // (or switched custom source) while Home was unmounted.
 let gamesCacheSourceKey = null;
 let gamesCacheRevision = -1;
+// Everything else Home derives, so returning to Home paints the finished page
+// on the first frame instead of a skeleton that fills in mid-transition.
+let installedGamesCache = null;
+let recentGamesCache = null;
+let sectionsCache = null; // { source: apiGames array, sections }
+const recentCardImageCache = new Map(); // game name -> image data URL
+
+const hasWarmCache = () => !!(gamesCache && carouselGamesCache);
+// Rebuilt from the live image caches rather than remembered: the cached blob
+// URLs get revoked when imageCacheService evicts them.
+const cachedCarouselImages = () => {
+  const images = {};
+  for (const game of carouselGamesCache || []) {
+    const key = carouselCoverKey(game);
+    if (!key) continue;
+    const url = game?.imgID
+      ? imageCacheService.memoryCache.get(game.imgID)?.url
+      : game?.game &&
+        steamGridImageService.pickUrl(steamGridImageService.peek(game.game), "hero");
+    if (url) images[key] = url;
+  }
+  return images;
+};
+const cachedSections = () =>
+  sectionsCache && sectionsCache.source === gamesCache ? sectionsCache.sections : null;
 
 const computeSourceKey = settings => {
   if (!settings) return "none";
@@ -255,10 +280,12 @@ const MiniGameCard = memo(({ game, onClick, onContextMenu }) => {
 
 // Mini Recent Card for hero sidebar - compact version
 const MiniRecentCard = memo(({ game, onPlay }) => {
-  const [imageData, setImageData] = useState(null);
+  const [imageData, setImageData] = useState(
+    () => recentCardImageCache.get(game.game || game.name) || null
+  );
   const [, setTick] = useState(0);
   const sanitizedGameName = sanitizeText(game.game || game.name);
-  const imageLoadedRef = useRef(false);
+  const imageLoadedRef = useRef(recentCardImageCache.has(game.game || game.name));
   const { cachedImage: fallbackImage, loading: fallbackLoading } = useImageLoader(
     game.imgID,
     {
@@ -282,8 +309,10 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
       try {
         const imageBase64 = await window.electron.getGameImage(gameId);
         if (imageBase64 && isMounted) {
+          const dataUrl = imageDataUrlFromBase64(imageBase64);
+          recentCardImageCache.set(gameId, dataUrl);
           imageLoadedRef.current = true;
-          setImageData(imageDataUrlFromBase64(imageBase64));
+          setImageData(dataUrl);
         }
       } catch (error) {}
     };
@@ -298,6 +327,7 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
     const handleCoverUpdate = event => {
       const { gameName, dataUrl } = event.detail || {};
       if (gameName === gameId && dataUrl && isMounted) {
+        recentCardImageCache.set(gameId, dataUrl);
         imageLoadedRef.current = true;
         setImageData(dataUrl);
       }
@@ -523,23 +553,32 @@ const HorizontalSection = ({
 
 const Home = memo(() => {
   const navigate = useNavigate();
-  const [apiGames, setApiGames] = useState([]);
-  const [installedGames, setInstalledGames] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [carouselGames, setCarouselGames] = useState([]);
-  const [topGames, setTopGames] = useState([]);
-  const [recentlyUpdatedGames, setRecentlyUpdatedGames] = useState([]);
-  const [onlineGames, setOnlineGames] = useState([]);
-  const [actionGames, setActionGames] = useState([]);
-  const [popularCategories, setPopularCategories] = useState({});
+  const [apiGames, setApiGames] = useState(() => gamesCache || []);
+  const [installedGames, setInstalledGames] = useState(() => installedGamesCache || []);
+  const [loading, setLoading] = useState(() => !hasWarmCache());
+  const [carouselGames, setCarouselGames] = useState(() => carouselGamesCache || []);
+  const [topGames, setTopGames] = useState(() => cachedSections()?.topGames || []);
+  const [recentlyUpdatedGames, setRecentlyUpdatedGames] = useState(
+    () => cachedSections()?.recentlyUpdatedGames || []
+  );
+  const [onlineGames, setOnlineGames] = useState(
+    () => cachedSections()?.onlineGames || []
+  );
+  const [actionGames, setActionGames] = useState(
+    () => cachedSections()?.actionGames || []
+  );
+  const [popularCategories, setPopularCategories] = useState(
+    () => cachedSections()?.popularCategories || {}
+  );
   const { t } = useLanguage();
   const { settings } = useSettings();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [carouselImages, setCarouselImages] = useState({});
+  const [carouselImages, setCarouselImages] = useState(cachedCarouselImages);
   const [imageRefreshKey, setImageRefreshKey] = useState(0);
-  const [recentGames, setRecentGames] = useState([]);
+  const [recentGames, setRecentGames] = useState(() => recentGamesCache || []);
+
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -650,7 +689,9 @@ const Home = memo(() => {
   useEffect(() => {
     const loadGames = async (forceRefresh = false) => {
       try {
-        setLoading(true);
+        // With a warm cache the page is already painted; only show the
+        // skeleton when there's genuinely nothing to show yet.
+        if (forceRefresh || !hasWarmCache()) setLoading(true);
 
         // Invalidate the module-level cache if the active source changed
         // while Home was unmounted (e.g. user toggled custom mode on
@@ -672,6 +713,7 @@ const Home = memo(() => {
             carouselGamesCache = null;
             gameService.clearMemoryCache();
             forceRefresh = true;
+            setLoading(true);
           }
           gamesCacheSourceKey = currentKey;
           gamesCacheRevision = imageCacheService.getRevision();
@@ -699,6 +741,7 @@ const Home = memo(() => {
             })),
           ];
 
+          installedGamesCache = actuallyInstalledGames;
           setInstalledGames(actuallyInstalledGames);
           setLoading(false);
           return;
@@ -735,6 +778,7 @@ const Home = memo(() => {
           })),
         ];
 
+        installedGamesCache = actuallyInstalledGames;
         setApiGames(games);
         setInstalledGames(actuallyInstalledGames);
         setCarouselGames(carouselGames);
@@ -856,6 +900,7 @@ const Home = memo(() => {
   useEffect(() => {
     const updateRecentGames = async () => {
       const recent = await getRecentGames([...installedGames, ...apiGames]);
+      recentGamesCache = recent;
       setRecentGames(recent);
     };
     // Only update when games actually change, not on every render
@@ -867,6 +912,9 @@ const Home = memo(() => {
   useEffect(() => {
     // Only recalculate sections when apiGames actually changes
     if (apiGames.length === 0) return;
+    // Already restored from the cache for this exact list: recomputing would
+    // hand every section new arrays and re-render the whole page on mount.
+    if (sectionsCache?.source === apiGames) return;
 
     // Get game sections
     const {
@@ -879,6 +927,17 @@ const Home = memo(() => {
 
     // Then get popular categories, passing the used games set
     const popularCats = getPopularCategories(apiGames, usedGames);
+
+    sectionsCache = {
+      source: apiGames,
+      sections: {
+        topGames: topSection,
+        recentlyUpdatedGames: recentlyUpdatedSection,
+        onlineGames: onlineSection,
+        actionGames: actionSection,
+        popularCategories: popularCats,
+      },
+    };
 
     setTopGames(topSection);
     setRecentlyUpdatedGames(recentlyUpdatedSection);

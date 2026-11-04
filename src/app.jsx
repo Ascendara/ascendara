@@ -32,7 +32,7 @@ import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useGameIndexSearch } from "@/hooks/useGameIndexSearch";
 import { useSettingsSearch } from "@/hooks/useSettingsSearch";
 import { onDownloadStallChange } from "@/hooks/useDownloadStall";
-import { useAppIcon } from "@/hooks/useAppIcon";
+import { markBootComplete, useAppIcon } from "@/hooks/useAppIcon";
 import StartupSplash from "@/components/StartupSplash";
 import { useLibrarySearch } from "@/hooks/useLibrarySearch";
 import {
@@ -120,9 +120,26 @@ function PageLoading() {
   );
 }
 
+const pagePreloads = [];
+
+// Code-split page that renders synchronously once its chunk has loaded.
+// React.lazy alone suspends on every first render, even for a warmed chunk,
+// and React holds a Suspense fallback for ~300ms. Page transitions would then
+// animate the spinner and the real page would pop in afterwards.
 function lazyPage(load) {
-  const Page = React.lazy(load);
+  let Loaded = null;
+  const preload = () =>
+    load().then(module => {
+      Loaded = module.default;
+      return module;
+    });
+  const Page = React.lazy(preload);
+  pagePreloads.push(preload);
   return function LazyPage(props) {
+    // Decided once per mount so a chunk finishing mid-render can't swap the
+    // tree under a page and reset its state.
+    const [Ready] = useState(() => Loaded);
+    if (Ready) return <Ready {...props} />;
     return (
       <React.Suspense fallback={<PageLoading />}>
         <Page {...props} />
@@ -174,7 +191,7 @@ function RetroRedirect() {
 
 // Warm every page chunk in the background while the splash screen is up so
 // navigating between pages renders instantly instead of flashing a fallback.
-Object.values(pageLoaders).forEach(load => load().catch(() => {}));
+pagePreloads.forEach(preload => preload().catch(() => {}));
 
 // Check for trial expiration warning and show dialog
 const TrialWarningChecker = () => {
@@ -1872,7 +1889,10 @@ const AppRoutes = () => {
       key="startup-splash"
       iconData={iconData}
       exiting={!isLoading && !isUpdating}
-      onDone={() => setSplashDone(true)}
+      onDone={() => {
+        setSplashDone(true);
+        markBootComplete();
+      }}
       fallback={<PageLoading />}
     />
   ) : null;

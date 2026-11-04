@@ -4,40 +4,62 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ascendara</title>
+    <script>
+      // Runs before first paint so the boot screen starts out with the
+      // theme, colors and logo from the last launch instead of switching
+      // to them a moment later. Kept in sync by src/lib/bootAppearance.js.
+      (function () {
+        var root = document.documentElement;
+        try {
+          var theme = localStorage.getItem("ascendara-theme");
+          if (theme) root.setAttribute("data-theme", theme);
+          var colors = JSON.parse(
+            localStorage.getItem("ascendara-boot-colors") || "null"
+          );
+          if (colors && colors.background && colors.accent) {
+            root.style.setProperty("--boot-background", colors.background);
+            root.style.setProperty("--boot-accent", colors.accent);
+            if (colors.scheme) root.style.colorScheme = colors.scheme;
+          }
+          window.__ASCENDARA_BOOT_ICON__ =
+            localStorage.getItem("ascendara-logo") || "icon.png";
+        } catch (e) {
+          window.__ASCENDARA_BOOT_ICON__ = "icon.png";
+        }
+      })();
+    </script>
     <style>
       :root {
-        --color-primary: 255, 207, 207;
-        --color-background: 255, 239, 242;
+        /* Default (purple) theme until a launch has recorded the real one */
+        --boot-accent: 124 58 237;
+        --boot-background: 237 233 254;
+        --boot-gradient: linear-gradient(
+          135deg,
+          rgb(var(--boot-accent) / 0.1) 0%,
+          rgb(var(--boot-background)) 100%
+        );
       }
       body {
-        background: linear-gradient(
-          135deg,
-          rgb(var(--color-background)) 0%,
-          rgb(var(--color-background)) 100%
-        );
+        background: rgb(var(--color-background, var(--boot-background)));
         margin: 0;
       }
       .initial-loader {
         position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(
-          135deg,
-          rgb(var(--color-primary) / 0.1) 0%,
-          rgb(var(--color-background)) 100%
-        );
+        inset: 0;
+        background: var(--boot-gradient);
         display: flex;
         justify-content: center;
         align-items: center;
-        z-index: 9999;
+        z-index: 10000;
       }
       .initial-loader img {
-        animation: pulse 2s infinite;
+        width: 128px;
+        height: 128px;
+        animation: boot-pulse 2s ease-in-out infinite;
       }
-      @keyframes pulse {
-        0% {
+      @keyframes boot-pulse {
+        0%,
+        100% {
           transform: scale(0.95);
           opacity: 0.8;
         }
@@ -45,18 +67,17 @@
           transform: scale(1);
           opacity: 1;
         }
-        100% {
-          transform: scale(0.95);
-          opacity: 0.8;
-        }
       }
     </style>
   </head>
   <body>
     <div id="root"></div>
     <div class="initial-loader" id="initial-loader">
-      <img src="icon.png" alt="Loading" style="width: 128px; height: 128px" />
+      <img alt="Loading" />
     </div>
+    <script>
+      document.querySelector("#initial-loader img").src = window.__ASCENDARA_BOOT_ICON__;
+    </script>
     <script type="module" src="/main.jsx"></script>
   </body>
 </html>

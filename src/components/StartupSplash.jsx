@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useLayoutEffect, useRef } from "react";
 
 const SPLASH_SIZE = 128;
 const FLIGHT_MS = 900;
@@ -30,6 +30,31 @@ const StartupSplash = ({ iconData, exiting, onDone, fallback = null }) => {
   const backdropRef = useRef(null);
   const flyerRef = useRef(null);
   const logoRef = useRef(null);
+
+  // Take over from the HTML boot loader (src/index.html) without a visible
+  // seam: same logo, same backdrop, and the pulse continued at the exact
+  // phase the loader's pulse had reached. Then remove the loader.
+  useLayoutEffect(() => {
+    const logo = logoRef.current;
+    const loader = document.getElementById("initial-loader");
+    if (!logo || !loader || loader.style.display === "none") return;
+    const loaderPulse = loader.querySelector("img")?.getAnimations?.()[0];
+    if (typeof loaderPulse?.currentTime === "number") {
+      logo.style.animationDelay = `-${Math.round(loaderPulse.currentTime % 2000)}ms`;
+    }
+    let cancelled = false;
+    const ready = logo.decode ? logo.decode().catch(() => {}) : Promise.resolve();
+    ready.then(() => {
+      if (cancelled) return;
+      // Wait for the splash logo to be painted before uncovering it.
+      requestAnimationFrame(() => {
+        if (!cancelled) loader.style.display = "none";
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!exiting) return;
@@ -139,8 +164,8 @@ const StartupSplash = ({ iconData, exiting, onDone, fallback = null }) => {
           position: "absolute",
           inset: 0,
           willChange: "opacity",
-          background:
-            "linear-gradient(135deg, rgb(var(--color-startup-accent, var(--color-primary)) / 0.1) 0%, rgb(var(--color-startup-background, var(--color-background))) 100%)",
+          // Defined in src/index.html so it matches the boot loader exactly
+          background: "var(--boot-gradient)",
         }}
       />
       <div

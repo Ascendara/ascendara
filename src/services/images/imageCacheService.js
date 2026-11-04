@@ -8,7 +8,7 @@ class ImageCacheService {
     // Core caching
     this.memoryCache = new Map(); // imgID -> { url, quality }
     this.memoryCacheOrder = [];
-    this.maxMemoryCacheSize = 200; // Increased for local index
+    this.maxMemoryCacheSize = 400; // Room for Home plus a Library visit without evicting each other
     this.db = null;
     this.isInitialized = false;
     this.initPromise = null;

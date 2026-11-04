@@ -1,3 +1,4 @@
+import { fixAnimationClock } from "@/lib/animationClock.js";
 import { initializeConsole } from "@/lib/consoleIntro.js";
 import { loadRemoteIcon } from "@/hooks/useAppIcon";
 
@@ -6,9 +7,8 @@ import App from "./app";
 import "./app.css";
 import "./i18n";
 
+fixAnimationClock();
 initializeConsole();
-loadRemoteIcon().then(url => {
-  const loaderIcon = document.querySelector("#initial-loader img");
-  if (url && loaderIcon) loaderIcon.src = url;
-});
+// Start fetching early; the logo itself only changes once boot has finished.
+loadRemoteIcon();
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);

@@ -1,5 +1,13 @@
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import { ThemeProvider as NextThemeProvider } from "next-themes";
+import { readBootTheme, recordBootAppearance } from "@/lib/bootAppearance";
 
 const ThemeContext = createContext();
 
@@ -75,12 +83,16 @@ const clearCustomTheme = () => {
 };
 
 export function ThemeProvider({ children }) {
-  const [theme, setThemeState] = useState("purple");
+  // Start from the last launch's theme (the boot screen already uses it) so the
+  // app doesn't flash the default theme while settings load.
+  const [theme, setThemeState] = useState(() => readBootTheme("purple"));
   const [customColors, setCustomColors] = useState(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
     applyColorScheme(theme, customColors);
-  }, [theme, customColors]);
+    if (settingsLoaded) recordBootAppearance(theme);
+  }, [theme, customColors, settingsLoaded]);
 
   useEffect(() => {
     // Load theme from settings on mount
@@ -103,6 +115,8 @@ export function ThemeProvider({ children }) {
         }
       } catch (error) {
         console.error("Error loading theme from settings:", error);
+      } finally {
+        setSettingsLoaded(true);
       }
     };
     loadTheme();

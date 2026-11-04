@@ -1,6 +1,6 @@
-import { useState, useEffect, memo, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, memo, useRef } from "react";
 import { useOutlet, useSearchParams, useLocation } from "react-router-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "framer-motion";
 import { useSettings } from "@/context/SettingsContext";
 import Navigation from "./Navigation";
 import Tour from "./Tour";
@@ -9,6 +9,7 @@ import { useNaturalDownloadScroll } from "@/hooks/useNaturalDownloadScroll";
 import Search from "@/pages/Search";
 
 const EASE_OUT = [0.22, 1, 0.36, 1];
+const EASE_EXIT = [0.4, 0, 1, 1];
 
 // Pages that show a single game (opened from a card on Library, Search, Home...)
 const isDetailPath = path => path === "/gamescreen" || path === "/download";
@@ -21,52 +22,113 @@ const getTransitionKind = (from, to) => {
   return "page";
 };
 
-// Small, quick motions: enough to show where you're going without slowing
-// navigation down. Exits stay short because AnimatePresence waits on them.
+// Transforms are written as full `transform` strings (always the same
+// function list) instead of x/y/scale so framer-motion can hand them to the
+// compositor via WAAPI. That keeps the motion smooth even while the incoming
+// page is busy mounting and loading data on the main thread.
+const tf = (x = 0, y = 0, s = 1) => `translate3d(${x}px, ${y}px, 0px) scale(${s})`;
+const REST = tf();
+
+// The old and new page crossfade: the new page starts immediately while the
+// old one fades out on top of nothing (it is pinned in place, out of flow).
+// Exits are shorter than enters so the old page is gone before the new one
+// settles.
 const routeVariants = {
   enter: kind => {
     switch (kind) {
-      // Folders slide without scaling: scaling a full library grid forces a
-      // costly re-raster of every card and made the switch stutter.
       case "folder-in":
-        return { opacity: 0, x: 28 };
+        return { opacity: 0, transform: tf(36, 0) };
       case "folder-out":
-        return { opacity: 0, x: -28 };
+        return { opacity: 0, transform: tf(-36, 0) };
       case "detail-in":
-        return { opacity: 0, y: 10, scale: 0.985 };
+        return { opacity: 0, transform: tf(0, 14, 0.98) };
       case "detail-out":
-        return { opacity: 0, scale: 1.01 };
+        return { opacity: 0, transform: tf(0, 0, 1.015) };
       case "none":
-        return { opacity: 1 };
+        return { opacity: 1, transform: "none" };
       default:
-        return { opacity: 0, y: 6 };
+        return { opacity: 0, transform: tf(0, 12) };
     }
   },
   visible: kind => ({
     opacity: 1,
-    x: 0,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: kind === "none" ? 0 : kind === "page" ? 0.2 : 0.24,
-      ease: EASE_OUT,
-    },
+    transform: REST,
+    // Drop the transform once settled: a lingering transform would make this
+    // wrapper the containing block for fixed-position elements inside pages.
+    transitionEnd: { transform: "none" },
+    transition:
+      kind === "none"
+        ? { duration: 0 }
+        : {
+            duration: kind === "page" ? 0.36 : 0.4,
+            ease: EASE_OUT,
+            opacity: { duration: kind === "page" ? 0.28 : 0.3, ease: "easeOut" },
+          },
   }),
+  // Exits start from an explicit keyframe: the settled page sits at
+  // transform: none, which framer would otherwise resolve to scale(0).
   leave: kind => {
+    const transition = { duration: 0.2, ease: EASE_EXIT };
     switch (kind) {
-      // Short opacity-only exit: the next page waits on it, and fading is
-      // the cheapest thing to animate on a large grid.
       case "folder-in":
+        return { opacity: 0, transform: [REST, tf(-24, 0)], transition };
       case "folder-out":
-        return { opacity: 0, transition: { duration: 0.08 } };
+        return { opacity: 0, transform: [REST, tf(24, 0)], transition };
       case "detail-in":
-        return { opacity: 0, scale: 0.99, transition: { duration: 0.12 } };
+        return { opacity: 0, transform: [REST, tf(0, 0, 0.98)], transition };
       case "detail-out":
-        return { opacity: 0, y: 8, scale: 0.99, transition: { duration: 0.12 } };
-      default:
+        return { opacity: 0, transform: [REST, tf(0, 14, 0.98)], transition };
+      case "none":
         return { opacity: 0, transition: { duration: 0 } };
+      default:
+        return {
+          opacity: 0,
+          transform: [REST, tf(0, -6)],
+          transition: { duration: 0.16, ease: EASE_EXIT },
+        };
     }
   },
+};
+
+// One routed page. When it starts leaving, it's pinned with position: fixed at
+// exactly where it sits on screen, so it drops out of the layout (the new page
+// takes its place immediately) and doesn't jump when the window scrolls back
+// to the top for the new page.
+const RoutePage = ({ kind, fixed, children }) => {
+  const ref = useRef(null);
+  const isPresent = useIsPresent();
+
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (isPresent || !node) return;
+    const rect = node.getBoundingClientRect();
+    Object.assign(node.style, {
+      position: "fixed",
+      top: `${rect.top}px`,
+      left: `${rect.left}px`,
+      width: `${rect.width}px`,
+      height: fixed ? `${rect.height}px` : "auto",
+      right: "auto",
+      bottom: "auto",
+      margin: "0",
+      pointerEvents: "none",
+    });
+  }, [isPresent, fixed]);
+
+  return (
+    <motion.div
+      ref={ref}
+      custom={kind}
+      className={fixed ? "fixed inset-0" : undefined}
+      style={{ transformOrigin: "50% 30%" }}
+      variants={routeVariants}
+      initial="enter"
+      animate="visible"
+      exit="leave"
+    >
+      {children}
+    </motion.div>
+  );
 };
 
 const Layout = memo(() => {
@@ -145,8 +207,23 @@ const Layout = memo(() => {
         initial={false}
         animate={
           isSearchPage
-            ? { opacity: 1, y: 0, transition: { duration: animate ? 0.22 : 0, ease: EASE_OUT } }
-            : { opacity: 0, y: animate ? 6 : 0, transition: { duration: 0 } }
+            ? {
+                opacity: 1,
+                transform: REST,
+                transitionEnd: { transform: "none" },
+                transition: animate
+                  ? {
+                      duration: 0.36,
+                      ease: EASE_OUT,
+                      opacity: { duration: 0.28, ease: "easeOut" },
+                    }
+                  : { duration: 0 },
+              }
+            : {
+                opacity: 0,
+                transform: animate ? tf(0, 12) : REST,
+                transition: { duration: 0 },
+              }
         }
       >
         <Search scrollContainerRef={searchScrollRef} isVisible={isSearchPage} />
@@ -158,19 +235,14 @@ const Layout = memo(() => {
       >
         {/* Skipped on /search so the outgoing page unmounts immediately instead of lingering in the hidden container with its listeners */}
         {!isSearchPage && (
-          <AnimatePresence mode="wait" custom={transitionKind}>
-            <motion.div
+          <AnimatePresence custom={transitionKind}>
+            <RoutePage
               key={location.pathname}
-              custom={transitionKind}
-              className={isCollectionPage ? "fixed inset-0" : undefined}
-              style={{ transformOrigin: "50% 30%" }}
-              variants={routeVariants}
-              initial="enter"
-              animate="visible"
-              exit="leave"
+              kind={transitionKind}
+              fixed={isCollectionPage}
             >
               {outlet}
-            </motion.div>
+            </RoutePage>
           </AnimatePresence>
         )}
       </main>

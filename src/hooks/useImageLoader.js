@@ -29,6 +29,26 @@ function processImageQueue() {
   processNext();
 }
 
+// Synchronous cache lookup, so a card whose image is already in memory renders
+// it on its first paint instead of flashing a skeleton for a frame.
+function peekCachedImage(imgID, options) {
+  if (!options.enabled) return null;
+  if (imgID) return imageCacheService.memoryCache?.get(imgID)?.url || null;
+  if (options.fallbackGameName) {
+    const assets = steamGridImageService.peek(options.fallbackGameName);
+    return assets
+      ? steamGridImageService.pickUrl(assets, options.fallbackSlot || "card")
+      : null;
+  }
+  return null;
+}
+
+// Settle on a resolved image without re-rendering when it's already showing.
+const resolvedState = url => prev =>
+  prev.cachedImage === url && !prev.loading && !prev.error
+    ? prev
+    : { cachedImage: url, loading: false, error: null };
+
 // Shared image loading hook to prevent duplicate loading
 export function useImageLoader(
   imgID,
@@ -39,11 +59,11 @@ export function useImageLoader(
     imageCacheService.subscribe,
     imageCacheService.getRevision
   );
-  const [state, setState] = useState({
-    cachedImage: null,
+  const [state, setState] = useState(() => ({
+    cachedImage: peekCachedImage(imgID, options),
     loading: false,
     error: null,
-  });
+  }));
   useEffect(() => {
     // Each effect owns its cancellation flag so an old request cannot update
     // a card after it has switched to a different game.
@@ -58,8 +78,7 @@ export function useImageLoader(
       // Synchronous cache peek for instant render
       const peeked = steamGridImageService.peek(name);
       if (peeked) {
-        const url = steamGridImageService.pickUrl(peeked, slot);
-        setState({ cachedImage: url, loading: false, error: null });
+        setState(resolvedState(steamGridImageService.pickUrl(peeked, slot)));
         return;
       }
 
@@ -100,11 +119,7 @@ export function useImageLoader(
     // Check memory cache synchronously first (instant return)
     const cachedUrl = imageCacheService.memoryCache?.get(imgID)?.url;
     if (cachedUrl) {
-      setState({
-        cachedImage: cachedUrl,
-        loading: false,
-        error: null,
-      });
+      setState(resolvedState(cachedUrl));
       return;
     }
 
