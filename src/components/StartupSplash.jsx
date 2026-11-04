@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef } from "react";
+import { useSettings } from "@/context/SettingsContext";
 
 const SPLASH_SIZE = 128;
 const FLIGHT_MS = 900;
@@ -27,6 +28,12 @@ const waitFrame = () => new Promise(resolve => requestAnimationFrame(resolve));
  * on the compositor and stays smooth while the app mounts underneath.
  */
 const StartupSplash = ({ iconData, exiting, onDone, fallback = null }) => {
+  const { settings } = useSettings();
+  // Same rule as page transitions (Layout): the Smooth Transitions setting,
+  // and the system's reduced-motion preference
+  const animate =
+    settings?.smoothTransitions !== false &&
+    !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const backdropRef = useRef(null);
   const flyerRef = useRef(null);
   const logoRef = useRef(null);
@@ -60,6 +67,25 @@ const StartupSplash = ({ iconData, exiting, onDone, fallback = null }) => {
     if (!exiting) return;
     let cancelled = false;
     const root = document.documentElement;
+
+    // Without motion the splash just fades out over the app, which is already
+    // in place: no logo flight, menu bar pop-in or dock slide.
+    if (!animate) {
+      const fade = [backdropRef.current, flyerRef.current].filter(Boolean).map(el =>
+        el.animate([{ opacity: 1 }, { opacity: 0 }], {
+          duration: 200,
+          easing: "ease-out",
+          fill: "forwards",
+        })
+      );
+      Promise.all(fade.map(a => a.finished.catch(() => {}))).then(() => {
+        if (!cancelled) onDone?.();
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
     root.classList.add("splash-active");
 
     const findTarget = async () => {
