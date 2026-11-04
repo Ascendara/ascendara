@@ -85,6 +85,17 @@ fi
       if (!process.env.APPIMAGE) {
         throw new Error("Automatic updates require running the installed AppImage.");
       }
+      // A wrong-platform installer would replace the AppImage and never launch
+      const magic = Buffer.alloc(4);
+      const handle = await fs.open(installerPath, "r");
+      try {
+        await fs.read(handle, magic, 0, 4, 0);
+      } finally {
+        await fs.close(handle);
+      }
+      if (!magic.equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46]))) {
+        throw new Error("The downloaded update is not a Linux AppImage. Please retry.");
+      }
       const target = fs.realpathSync(process.env.APPIMAGE);
       // Stage beside the installed image so replacement is an atomic rename and
       // permission/disk errors are reported while the app can still show them.
