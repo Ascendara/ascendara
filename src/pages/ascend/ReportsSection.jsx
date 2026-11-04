@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import SectionHeader from "./SectionHeader";
-import SectionLoading from "./SectionLoading";
+import { ReportsListSkeleton } from "./SectionLoading";
 import { EmptyState, Panel, StatStrip } from "./primitives";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -140,7 +140,7 @@ export default function ReportsSection({ t }) {
       />
 
       {loading && reports.length === 0 ? (
-        <SectionLoading />
+        <ReportsListSkeleton />
       ) : error ? (
         <EmptyState
           icon={Flag}

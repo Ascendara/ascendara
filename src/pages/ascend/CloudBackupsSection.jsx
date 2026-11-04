@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { retroBackupPlatform } from "@/services/library/retroService";
 import SectionHeader from "./SectionHeader";
 import { EmptyState, Panel, StatStrip } from "./primitives";
+import { BackupsListSkeleton } from "./SectionLoading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -340,9 +341,7 @@ export default function CloudBackupsSection({
           }
         />
       ) : loadingBackups && backups.length === 0 ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        </div>
+        <BackupsListSkeleton />
       ) : backups.length === 0 ? (
         <EmptyState
           icon={CloudOff}

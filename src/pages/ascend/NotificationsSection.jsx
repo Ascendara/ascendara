@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SectionHeader from "./SectionHeader";
 import { EmptyState } from "./primitives";
+import { NotificationsSkeleton } from "./SectionLoading";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -506,15 +507,7 @@ export default function NotificationsSection({ t, loadingNotifications, notifica
       />
 
       {!loaded ? (
-        <div className="flex flex-col items-center justify-center py-32">
-          <div className="relative">
-            <div className="h-20 w-20 rounded-full border-4 border-primary/20" />
-            <div className="absolute inset-0 h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-primary" />
-          </div>
-          <p className="mt-6 text-muted-foreground">
-            {t("ascend.notifications.loading") || "Loading notifications..."}
-          </p>
-        </div>
+        <NotificationsSkeleton />
       ) : items.length === 0 ? (
         <EmptyState
           icon={Bell}

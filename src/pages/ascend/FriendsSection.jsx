@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { EmptyState, Panel } from "./primitives";
+import { FriendsSkeleton } from "./SectionLoading";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -285,9 +286,7 @@ export default function FriendsSection({
       )}
 
       {loadingFriends ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        </div>
+        <FriendsSkeleton />
       ) : friends.length > 0 ? (
         <section className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">

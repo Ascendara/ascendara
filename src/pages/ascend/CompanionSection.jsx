@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { EmptyState, Panel } from "./primitives";
+import { DevicesSkeleton } from "./SectionLoading";
 import { parseDeviceInfo } from "@/lib/deviceParser";
 import { Button } from "@/components/ui/button";
 import {
@@ -333,7 +334,7 @@ function DeviceRow({ t, locale, device, index, disconnecting, onDisconnect }) {
             variant="ghost"
             size="sm"
             disabled={disconnecting}
-            className="gap-2 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            className="hover:bg-destructive/10 hover:text-destructive gap-2 rounded-lg text-muted-foreground"
           >
             {disconnecting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -388,9 +389,7 @@ export default function CompanionSection({
 
   const sortedDevices = useMemo(
     () =>
-      [...connectedDevices].sort(
-        (a, b) => toTime(b.lastActive) - toTime(a.lastActive)
-      ),
+      [...connectedDevices].sort((a, b) => toTime(b.lastActive) - toTime(a.lastActive)),
     [connectedDevices]
   );
 
@@ -480,13 +479,7 @@ export default function CompanionSection({
         </div>
 
         {loadingDevices && connectedDevices.length === 0 ? (
-          <Panel
-            role="status"
-            className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground"
-          >
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {t("ascend.companion.loadingDevices")}
-          </Panel>
+          <DevicesSkeleton />
         ) : connectedDevices.length === 0 ? (
           <EmptyState
             icon={Smartphone}

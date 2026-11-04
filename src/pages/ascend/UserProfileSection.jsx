@@ -1,4 +1,5 @@
 import { StatStrip } from "./primitives";
+import { UserProfileSkeleton } from "./SectionLoading";
 import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,12 +79,7 @@ export default function UserProfileSection({
       </Button>
 
       {loadingProfile ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <Loader2 className="mb-4 h-10 w-10 animate-spin text-primary" />
-          <p className="text-muted-foreground">
-            {t("ascend.profile.loading") || "Loading profile..."}
-          </p>
-        </div>
+        <UserProfileSkeleton />
       ) : profileError ? (
         <div className="bg-destructive/10 rounded-2xl p-8 text-center">
           <X className="text-destructive mx-auto mb-4 h-12 w-12" />

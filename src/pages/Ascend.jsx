@@ -931,7 +931,11 @@ const Ascend = () => {
               transition={{ duration: 0.2 }}
               className={`mx-auto w-full max-w-6xl ${activeSection === "messages" ? "min-h-0 flex-1" : ""}`}
             >
-              {<Suspense fallback={<SectionLoading />}>{renderContent()}</Suspense>}
+              {
+                <Suspense fallback={<SectionLoading section={activeSection} />}>
+                  {renderContent()}
+                </Suspense>
+              }
             </motion.div>
           </div>
         </div>

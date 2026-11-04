@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { EmptyState } from "./primitives";
+import { LeaderboardSkeleton } from "./SectionLoading";
 import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -58,15 +59,7 @@ export default function LeaderboardSection({
       </div>
 
       {loadingLeaderboard ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="relative">
-            <div className="h-20 w-20 rounded-full border-4 border-primary/20" />
-            <div className="absolute inset-0 h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-primary" />
-          </div>
-          <p className="mt-6 text-muted-foreground">
-            {t("ascend.leaderboard.loading") || "Loading leaderboard..."}
-          </p>
-        </div>
+        <LeaderboardSkeleton />
       ) : leaderboardData?.topThree?.length > 0 ? (
         <>
           {/* User Blocked Warning */}

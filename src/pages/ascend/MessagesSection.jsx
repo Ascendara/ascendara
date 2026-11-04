@@ -24,6 +24,7 @@ import {
   Users,
 } from "lucide-react";
 import EarnedBadges from "@/components/EarnedBadges";
+import { ConversationListSkeleton } from "./SectionLoading";
 
 const statusColors = {
   online: "bg-emerald-500",
@@ -293,13 +294,7 @@ export default function MessagesSection({
         </div>
         <div className="-mx-2 min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3">
           {loadingConversations ? (
-            <div
-              role="status"
-              aria-label={t("common.loading", { defaultValue: "Loading" })}
-              className="flex justify-center py-12"
-            >
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            </div>
+            <ConversationListSkeleton />
           ) : filteredConversations.length ? (
             filteredConversations.map(conversation => {
               const active = selectedConversation?.id === conversation.id;

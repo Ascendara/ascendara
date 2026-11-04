@@ -2,6 +2,7 @@ import AscendGameImage from "@/components/AscendGameImage";
 import { motion } from "framer-motion";
 import SectionHeader from "./SectionHeader";
 import { StatStrip, EmptyState } from "./primitives";
+import { CloudLibraryListSkeleton, StatStripSkeleton } from "./SectionLoading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -123,6 +124,7 @@ export default function CloudLibrarySection({
         )}
       </SectionHeader>
 
+      {!cloudLibrary && loadingCloudLibrary && <StatStripSkeleton />}
       {cloudLibrary && (
         <StatStrip
           stats={[
@@ -192,15 +194,7 @@ export default function CloudLibrarySection({
       </div>
 
       {loadingCloudLibrary ? (
-        <div className="flex flex-col items-center justify-center py-16">
-          <div className="relative">
-            <div className="h-16 w-16 rounded-full border-4 border-primary/20" />
-            <div className="absolute inset-0 h-16 w-16 animate-spin rounded-full border-4 border-transparent border-t-primary" />
-          </div>
-          <p className="mt-4 text-sm text-muted-foreground">
-            {t("ascend.cloudLibrary.loading")}
-          </p>
-        </div>
+        <CloudLibraryListSkeleton />
       ) : cloudLibrary && filteredGames.length > 0 ? (
         <div className="space-y-3">
           {filteredGames.map((game, index) => {

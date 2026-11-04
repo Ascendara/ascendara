@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { motion } from "framer-motion";
 import SectionHeader from "./SectionHeader";
 import { EmptyState } from "./primitives";
+import { UpcomingSkeleton } from "./SectionLoading";
 import { Button } from "@/components/ui/button";
 import {
   Loader2,
@@ -37,15 +38,7 @@ export default function UpcomingSection({
         description={t("ascend.upcoming.pageSubtitle")}
       />
       {loadingUpcoming ? (
-        <div className="flex flex-col items-center justify-center py-32">
-          <div className="relative">
-            <div className="h-20 w-20 rounded-full border-4 border-primary/20" />
-            <div className="absolute inset-0 h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-primary" />
-          </div>
-          <p className="mt-6 text-muted-foreground">
-            {t("ascend.upcoming.loading") || "Loading upcoming changes..."}
-          </p>
-        </div>
+        <UpcomingSkeleton />
       ) : upcomingEntry ? (
         <>
           {/* Hero Header with Version Info */}
