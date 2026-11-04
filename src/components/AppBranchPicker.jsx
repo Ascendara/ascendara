@@ -34,6 +34,39 @@ export const APP_BRANCHES = [
   },
 ];
 
+// Compares versions like "12.0.0" and "11.9.1-51" part by part, numerically
+const compareVersions = (a, b) => {
+  const pa = String(a)
+    .split(/[.+-]/)
+    .map(n => parseInt(n, 10) || 0);
+  const pb = String(b)
+    .split(/[.+-]/)
+    .map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff) return diff;
+  }
+  return 0;
+};
+
+// Each channel is at least as new as the steadier one before it. A channel whose
+// own build has fallen behind shows that version instead, marked as the branch
+// it matches, so switching to it can never be a downgrade.
+const resolveBranchVersions = branchVersions => {
+  const resolved = {};
+  let floor = null;
+  for (const branch of APP_BRANCHES) {
+    const own = branchVersions?.[branch.id];
+    if (floor && (!own || compareVersions(own, floor.version) <= 0)) {
+      resolved[branch.id] = { version: floor.version, sameAs: floor.id };
+    } else {
+      resolved[branch.id] = { version: own, sameAs: null };
+      if (own) floor = { id: branch.id, version: own };
+    }
+  }
+  return resolved;
+};
+
 export const getAppBranch = id =>
   APP_BRANCHES.find(branch => branch.id === id) || APP_BRANCHES[0];
 
@@ -52,7 +85,7 @@ export default function AppBranchPicker({
 }) {
   const current = getAppBranch(currentBranch);
   const currentIndex = APP_BRANCHES.indexOf(current);
-  const liveVersion = branchVersions?.live;
+  const versions = resolveBranchVersions(branchVersions);
 
   return (
     <div className="space-y-8">
@@ -114,10 +147,8 @@ export default function AppBranchPicker({
         {APP_BRANCHES.map((branch, index) => {
           const isActive = branch.id === current.id;
           const isLocked = branch.requiresSubscription && !hasAscendSubscription;
-          const version = branchVersions?.[branch.id];
-          // A testing channel with nothing newer than Live has no build to offer
-          const sameAsLive =
-            branch.id !== "live" && !!version && !!liveVersion && version === liveVersion;
+          // A testing channel with nothing newer than the channel before it has no build to offer
+          const { version, sameAs } = versions[branch.id];
           const isLast = index === APP_BRANCHES.length - 1;
 
           return (
@@ -170,9 +201,13 @@ export default function AppBranchPicker({
                 <p className="mt-1 max-w-xl text-sm text-muted-foreground">
                   {t(branch.descriptionKey)}
                 </p>
-                {sameAsLive && !isActive && (
+                {sameAs && !isActive && (
                   <p className="mt-1.5 text-xs text-muted-foreground/80">
-                    {t("settings.appBranch.sameAsLive")}
+                    {sameAs === "live"
+                      ? t("settings.appBranch.sameAsLive")
+                      : t("settings.appBranch.sameAsBranch", {
+                          branch: t(getAppBranch(sameAs).labelKey),
+                        })}
                   </p>
                 )}
               </div>
@@ -199,7 +234,7 @@ export default function AppBranchPicker({
                     variant="outline"
                     size="sm"
                     className="gap-1.5"
-                    disabled={sameAsLive}
+                    disabled={!!sameAs}
                     onClick={() => onSwitch(branch)}
                   >
                     <Repeat2 className="h-3.5 w-3.5" />

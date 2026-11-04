@@ -4816,6 +4816,7 @@
         "description": "Get early access to upcoming features before they ship to Live.",
         "label": "Public Testing"
       },
+      "sameAsBranch": "No separate build right now. This channel is on the same version as {{branch}}.",
       "sameAsLive": "No separate build right now. This channel is on the same version as Live.",
       "steadier": "More stable",
       "switch": "Switch",
