@@ -22,6 +22,10 @@ import { prefetchAscendData } from "@/services/ascend/ascendPrefetch";
 const Navigation = memo(({ items }) => {
   const { t } = useLanguage();
   const { settings } = useSettings();
+  // One entry for all services, shown only while debrid is on and a key is saved
+  const debridNavVisible =
+    settings.debridEnabled === true &&
+    debridProviders.some(provider => settings[provider.apiKeySetting]?.trim());
   const location = useLocation();
   const navigate = useNavigate();
   const [size, setSize] = useState(() => {
@@ -138,9 +142,7 @@ const Navigation = memo(({ items }) => {
         path: "/debriddownloads",
         label: t("debrid.downloadsTitle"),
         icon: ServerIcon,
-        hidden: !debridProviders.some(provider =>
-          settings[provider.apiKeySetting]?.trim()
-        ),
+        hidden: !debridNavVisible,
         color: "from-orange-500 to-amber-400",
       },
     ];
@@ -429,10 +431,7 @@ const Navigation = memo(({ items }) => {
                     <ChevronRight className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-90 transform text-border" />
                   </div>
                 </Link>
-                {index ===
-                  3 +
-                    (settings.torboxApiKey ? 1 : 0) +
-                    (settings.realDebridApiKey ? 1 : 0) && (
+                {index === (debridNavVisible ? 4 : 3) && (
                   <div className="h-8 w-px bg-border/50" />
                 )}
               </React.Fragment>

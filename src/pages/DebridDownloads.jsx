@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { useSettings } from "@/context/SettingsContext";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -35,6 +35,7 @@ export default function DebridDownloads() {
     providers.find(item => item.id === lastService) ||
     providers.find(item => item.id === getPreferredProvider(settings)?.id) ||
     providers[0];
+  if (settings.debridEnabled !== true) return <Navigate to="/" replace />;
   if (!provider) return null;
   const Page = pages[provider.id];
 
