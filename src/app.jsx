@@ -1335,6 +1335,19 @@ const AppRoutes = () => {
   const [welcomeData, setWelcomeData] = useState(null);
   const [showWatcherWarn, setShowWatcherWarn] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [changelogPreviewVersion, setChangelogPreviewVersion] = useState(null);
+
+  // Dev only: window.showChangelog("12.0.0") opens the changelog for any version, drafts included
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    window.showChangelog = (version = __APP_VERSION__) => {
+      setChangelogPreviewVersion(version);
+      setShowChangelog(true);
+    };
+    return () => {
+      delete window.showChangelog;
+    };
+  }, []);
   const [showDllSharingConsent, setShowDllSharingConsent] = useState(false);
   const [dllSharingPending, setDllSharingPending] = useState(false);
 
@@ -2067,7 +2080,8 @@ const AppRoutes = () => {
       <ChangelogDialog
         open={showChangelog}
         onOpenChange={setShowChangelog}
-        currentVersion={__APP_VERSION__}
+        currentVersion={changelogPreviewVersion || __APP_VERSION__}
+        includeDrafts={!!changelogPreviewVersion}
       />
       {/* Waits until the changelog and any other startup dialog is dismissed */}
       <DllSharingConsentDialog

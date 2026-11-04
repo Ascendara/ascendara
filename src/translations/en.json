@@ -231,14 +231,18 @@
     },
     "changelog": {
       "additions": "Additions",
+      "all": "All",
       "close": "Close",
       "failedToLoad": "Failed to load changelog",
       "fixes": "Fixes",
       "fullChangelog": "Full Changelog",
+      "gotIt": "Got it",
       "improvements": "Improvements",
       "loading": "Loading changelog...",
       "removals": "Removals",
       "retry": "Retry",
+      "showLess": "Show less",
+      "showMore": "Show more",
       "title": "What's New in Ascendara"
     },
     "crashScreen": {
