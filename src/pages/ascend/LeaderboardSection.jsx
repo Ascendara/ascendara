@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { EmptyState } from "./primitives";
 import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { motion } from "framer-motion";
@@ -24,9 +25,12 @@ export default function LeaderboardSection({
   handleViewProfile,
   setActiveSection,
 }) {
-  if (!leaderboardData && !loadingLeaderboard) {
-    loadLeaderboard();
-  }
+  // Load once per visit; a failed request is retried with the Refresh button
+  // rather than on every re-render
+  useEffect(() => {
+    if (!leaderboardData && !loadingLeaderboard) loadLeaderboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const formatPlaytimeHours = seconds => {
     const hours = Math.floor(seconds / 3600);
     if (hours < 1) return "<1h";

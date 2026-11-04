@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import SectionHeader from "./SectionHeader";
 import { EmptyState } from "./primitives";
@@ -22,9 +23,11 @@ export default function UpcomingSection({
   loadUpcomingChangelog,
   t,
 }) {
-  if (!upcomingChangelog && !loadingUpcoming) {
-    loadUpcomingChangelog();
-  }
+  // Load once per visit instead of calling the parent's setState during render
+  useEffect(() => {
+    if (!upcomingChangelog && !loadingUpcoming) loadUpcomingChangelog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const upcomingEntry = upcomingChangelog?.[0];
   return (
     <div className="mb-24 space-y-6">
