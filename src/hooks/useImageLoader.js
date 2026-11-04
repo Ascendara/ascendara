@@ -69,8 +69,8 @@ export function useImageLoader(
     // Each effect owns its cancellation flag so an old request cannot update
     // a card after it has switched to a different game.
     let active = true;
-    // Keeps the splash or page transition waiting until this image is ready
-    // to paint, so a page is never revealed with empty cards.
+    // Keeps the startup splash up until this image is ready to paint (no-op
+    // after boot), so the first page is never revealed with empty cards.
     const releaseLoad = holdLoad();
     const settle = url => releaseWhenDecoded(releaseLoad, url);
 

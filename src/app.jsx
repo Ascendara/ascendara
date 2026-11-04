@@ -36,7 +36,6 @@ import { markBootComplete, useAppIcon } from "@/hooks/useAppIcon";
 import StartupSplash from "@/components/StartupSplash";
 import {
   afterBoot,
-  isPageLoading,
   syncIndexDuringBoot,
   takeBootIndexSync,
   whenBootReady,
@@ -635,9 +634,6 @@ const ScrollToTop = () => {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    // Layout scrolls up itself once a page that loads behind the current one
-    // is revealed; scrolling now would jerk the page still on screen
-    if (isPageLoading()) return;
     window.scrollTo(0, 0);
   }, [pathname]);
 

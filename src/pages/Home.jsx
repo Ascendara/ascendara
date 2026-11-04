@@ -693,7 +693,7 @@ const Home = memo(() => {
 
   useEffect(() => {
     const loadGames = async (forceRefresh = false) => {
-      // Hold the splash / page transition until the games are in
+      // Hold the startup splash until the games are in (no-op after boot)
       const releaseLoad = holdLoad();
       try {
         // With a warm cache the page is already painted; only show the

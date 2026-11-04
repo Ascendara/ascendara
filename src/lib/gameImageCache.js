@@ -69,7 +69,7 @@ export const loadGameCover = game => {
   const gameId = game?.game || game?.name;
   if (!gameId) return Promise.resolve(null);
   if (gameImageCache.get(gameId)) return Promise.resolve(gameImageCache.get(gameId));
-  // A page waiting to be revealed waits for its covers too
+  // The startup splash waits for covers on the first page (no-op after boot)
   const releaseLoad = holdLoad();
   if (!pendingCovers.has(gameId)) {
     pendingCovers.set(
