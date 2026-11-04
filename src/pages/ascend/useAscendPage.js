@@ -58,6 +58,7 @@ import {
   saveAscendUiState,
 } from "@/services/firebase/firebaseService";
 import { syncFavoritesNow } from "@/services/cloud/favoritesCloudSync";
+import { takePrefetched } from "@/services/ascend/ascendPrefetch";
 import { API_URL } from "@/config/api";
 
 // Per account, so a second account on this PC still gets offered the tour.
@@ -96,6 +97,309 @@ const markWelcomeTourSeen = uid => {
   saveAscendUiState(uid, { ascendTourSeen: true });
 };
 
+// Calculate profile statistics based on games data (same logic as Profile.jsx)
+const calculateProfileStats = (games, customGames) => {
+  const allGames = [...(games || []), ...(customGames || [])];
+  const { XP_RULES } = getLevelConstants();
+
+  let totalXP = 0;
+  let totalPlaytime = 0;
+  let gamesPlayedCount = 0;
+
+  allGames.forEach(game => {
+    const playtimeSeconds = typeof game?.playTime === "number" ? game.playTime : 0;
+    const playtimeHours = playtimeSeconds / 3600;
+    const launchCount = typeof game?.launchCount === "number" ? game.launchCount : 0;
+    const isCompleted = !!game?.completed;
+    const hasEngagement = playtimeSeconds > 0 || launchCount > 0 || isCompleted;
+
+    if (playtimeSeconds > 0) {
+      gamesPlayedCount += 1;
+    }
+
+    totalPlaytime += playtimeSeconds;
+
+    if (!hasEngagement) {
+      return;
+    }
+
+    let gameXP = XP_RULES.basePerGame;
+    gameXP += Math.floor(playtimeHours * XP_RULES.perHourPlayed);
+    const launchBonus = Math.min(
+      launchCount * XP_RULES.perLaunch,
+      XP_RULES.launchBonusCap
+    );
+    gameXP += launchBonus;
+
+    if (isCompleted) {
+      gameXP += XP_RULES.completedBonus;
+    }
+
+    totalXP += gameXP;
+  });
+
+  const totalPlaytimeHours = totalPlaytime / 3600;
+  for (const milestone of XP_RULES.playtimeMilestones) {
+    if (totalPlaytimeHours >= milestone.hours) {
+      totalXP += milestone.bonus;
+    }
+  }
+
+  const levelData = calculateLevelFromXP(totalXP);
+
+  return {
+    totalPlaytime,
+    gamesPlayed: allGames.filter(game => game.playTime > 0).length,
+    totalGames: allGames.length,
+    level: levelData.level,
+    xp: levelData.xp,
+    currentXP: levelData.currentXP,
+    nextLevelXp: levelData.nextLevelXp,
+    allGames,
+  };
+};
+
+// Load local stats from Electron — and, for Ascend members, merge with the
+// cloud library so the dashboard reflects the user's full "gaming identity"
+// across devices, not just the games installed on this machine.
+//
+// Merge rules (per game, keyed by lowercased name):
+//   - playTime / launchCount: Math.max(local, cloud) — cloud is the floor
+//   - completed / favorite:   OR-merge
+//   - games not installed locally are still counted toward XP/level
+// Non-premium users get the original local-only behavior.
+// Shared by the page and warmAscendOverview; returns what the overview shows.
+const computeOverviewStats = async ({ uid, hasCloudAccess, getCloud }) => {
+  const games = (await window.electron?.getGames?.()) || [];
+  const customGames = (await window.electron?.getCustomGames?.()) || [];
+
+  let mergedRegular = games;
+  let mergedCustom = customGames;
+  let cloudFloorPlaytime = 0;
+
+  if (hasCloudAccess && uid) {
+    try {
+      const cloudResult = await getCloud();
+      const cloudGames = cloudResult?.data?.games || [];
+      cloudFloorPlaytime = cloudResult?.data?.totalPlaytime || 0;
+
+      if (cloudGames.length > 0) {
+        const localKey = g => (g.game || g.name || "").toLowerCase();
+        const cloudByName = new Map(
+          cloudGames.map(cg => [(cg.name || "").toLowerCase(), cg])
+        );
+
+        const mergeWithCloud = (game, isCustom) => {
+          const cg = cloudByName.get(localKey(game));
+          if (!cg) return game;
+          cloudByName.delete(localKey(game));
+          return {
+            ...game,
+            playTime: Math.max(game.playTime || 0, cg.playTime || 0),
+            launchCount: Math.max(game.launchCount || 0, cg.launchCount || 0),
+            completed: game.completed || cg.completed || false,
+            favorite: game.favorite || cg.favorite || false,
+          };
+        };
+
+        mergedRegular = games.map(g => mergeWithCloud(g, false));
+        mergedCustom = customGames.map(g => mergeWithCloud(g, true));
+
+        // Cloud-only games (not installed on this machine) — synthesize
+        // minimal entries so XP/level/totalPlaytime include them.
+        const cloudOnly = Array.from(cloudByName.values()).map(cg => ({
+          game: cg.name,
+          name: cg.name,
+          playTime: cg.playTime || 0,
+          launchCount: cg.launchCount || 0,
+          completed: cg.completed || false,
+          favorite: cg.favorite || false,
+          isCustom: !!cg.isCustom,
+          cloudOnly: true,
+          gameID: cg.gameID || null,
+        }));
+
+        mergedRegular = [...mergedRegular, ...cloudOnly.filter(g => !g.isCustom)];
+        mergedCustom = [...mergedCustom, ...cloudOnly.filter(g => g.isCustom)];
+      }
+    } catch (e) {
+      console.warn(
+        "[Ascend] Cloud-first stats merge failed, falling back to local:",
+        e?.message || e
+      );
+    }
+  }
+
+  // Local calc is kept only as an offline fallback. When the user has
+  // cloud access, the authoritative level / XP / totals come from the
+  // server at api.ascendara.app via `recomputeProfileStats` — the client
+  // never derives these numbers when online.
+  const localFallback = calculateProfileStats(mergedRegular, mergedCustom);
+
+  // Level/XP must never decrease (e.g. after uninstalling a game or a
+  // stale/lower cloud snapshot). Always take the higher of the
+  // freshly-computed local XP vs. the last persisted local value.
+  let persistedLocalStats = null;
+  try {
+    persistedLocalStats =
+      (await window.electron?.getTimestampValue?.("profileStats")) || null;
+  } catch (e) {
+    persistedLocalStats = null;
+  }
+
+  let bestXP = Math.max(localFallback.xp || 0, persistedLocalStats?.xp || 0);
+  let finalStats = {
+    ...calculateProfileStats(mergedRegular, mergedCustom),
+    totalPlaytime: Math.max(
+      localFallback.totalPlaytime,
+      cloudFloorPlaytime,
+      persistedLocalStats?.totalPlaytime || 0
+    ),
+    gamesPlayed: Math.max(
+      localFallback.gamesPlayed,
+      persistedLocalStats?.gamesPlayed || 0
+    ),
+    totalGames: Math.max(localFallback.totalGames, persistedLocalStats?.totalGames || 0),
+  };
+
+  if (bestXP > localFallback.xp) {
+    const progress = calculateLevelFromXP(bestXP);
+    finalStats = { ...finalStats, ...progress };
+  }
+
+  if (hasCloudAccess && uid) {
+    try {
+      // Ask the server to reconcile from cloudLibrary and write fresh
+      // profileStats. Fire-and-forget its own recomputation is fine;
+      // we still read back whichever is newest.
+      recomputeProfileStats().catch(() => {});
+      const cloudProfile = await getProfileStats();
+      const cs = cloudProfile?.data;
+      if (cs && typeof cs.xp === "number") {
+        // Never let a lower cloud value pull the displayed level/XP down.
+        bestXP = Math.max(cs.xp || 0, bestXP);
+        const progress = calculateLevelFromXP(bestXP);
+
+        finalStats = {
+          ...finalStats,
+          ...progress,
+          totalPlaytime: Math.max(cs.totalPlaytime || 0, finalStats.totalPlaytime),
+          gamesPlayed: Math.max(cs.gamesPlayed || 0, finalStats.gamesPlayed),
+          totalGames: Math.max(cs.totalGames || 0, finalStats.totalGames),
+        };
+      }
+    } catch (e) {
+      console.warn(
+        "[Ascend] Cloud-authoritative stats unavailable, using local:",
+        e?.message || e
+      );
+    }
+  }
+
+  // Persist the resolved (never-decreasing) stats locally so future
+  // loads — and Profile.jsx's own persisted-stats check — see the peak.
+  if (window.electron?.setTimestampValue) {
+    try {
+      await window.electron.setTimestampValue("profileStats", {
+        ...persistedLocalStats,
+        level: finalStats.level,
+        xp: finalStats.xp,
+        totalPlaytime: finalStats.totalPlaytime,
+        gamesPlayed: finalStats.gamesPlayed,
+        totalGames: finalStats.totalGames,
+      });
+    } catch (e) {
+      console.warn("[Ascend] Failed to persist local profileStats:", e);
+    }
+  }
+
+  console.log("[Ascend] Final stats:", {
+    ...finalStats,
+    cloudFirst: hasCloudAccess,
+  });
+
+  // Recent games — show locally installed entries first (so they remain
+  // launchable), but use merged playtime values for accurate ordering.
+  const allLocalGames = [...mergedRegular, ...mergedCustom].filter(g => !g.cloudOnly);
+  const sortedGames = allLocalGames
+    .filter(g => g.playTime && g.playTime >= 60)
+    .sort((a, b) => (b.playTime || 0) - (a.playTime || 0))
+    .slice(0, 4);
+  return {
+    localStats: { ...finalStats, cloudFirst: hasCloudAccess },
+    recentGames: sortedGames,
+  };
+};
+
+// What the overview last showed for each account, so coming back to Ascend
+// paints the finished page at once and refreshes it quietly instead of
+// reloading everything behind spinners.
+let overviewCache = null;
+const cachedOverviewFor = uid =>
+  uid && overviewCache?.uid === uid ? overviewCache : null;
+
+// The conversations list only comes from a live listener; take its first
+// result and stop listening.
+const firstConversations = () =>
+  new Promise(resolve => {
+    let unsubscribe = null;
+    const timeout = setTimeout(() => {
+      unsubscribe?.();
+      resolve([]);
+    }, 8000);
+    unsubscribe = subscribeToConversations(conversations => {
+      clearTimeout(timeout);
+      unsubscribe?.();
+      resolve(conversations);
+    });
+  });
+
+const warming = new Map(); // uid -> promise
+
+/**
+ * Load the overview in the background when the app starts signed in, so the
+ * first visit to Ascend paints finished and only refreshes quietly, instead
+ * of fetching everything once it's opened.
+ */
+export function warmAscendOverview(uid) {
+  if (!uid || cachedOverviewFor(uid)) return Promise.resolve();
+  if (warming.has(uid)) return warming.get(uid);
+  const run = (async () => {
+    const hardwareId = (await window.electron?.getHardwareId?.()) ?? null;
+    const [access, cloudResult, friendsResult, incomingResult, conversations] =
+      await Promise.all([
+        verifyAscendAccess(hardwareId),
+        getCloudLibrary(),
+        getFriendsList(),
+        getIncomingRequests(),
+        firstConversations(),
+      ]);
+    const hasCloudAccess = access.isSubscribed || access.isVerified || access.hasAccess;
+    const [{ localStats, recentGames }, backupsResult] = await Promise.all([
+      computeOverviewStats({ uid, hasCloudAccess, getCloud: async () => cloudResult }),
+      access.isSubscribed || access.isVerified ? listBackups() : null,
+    ]);
+    // The page may have opened and loaded it already
+    if (cachedOverviewFor(uid)) return;
+    overviewCache = {
+      uid,
+      access: { ...access, verified: true },
+      localStats,
+      recentGames,
+      cloudLibrary: cloudResult?.data ?? null,
+      friends: friendsResult?.friends || [],
+      incomingRequests: incomingResult?.requests || [],
+      conversations,
+      notifications: [],
+      backups: backupsResult?.backups || [],
+    };
+  })()
+    .catch(error => console.warn("[Ascend] Background overview load failed:", error))
+    .finally(() => warming.delete(uid));
+  warming.set(uid, run);
+  return run;
+}
+
 export default function useAscendPage({ cloudOnly = false } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -117,6 +421,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     error,
     clearError,
   } = useAuth();
+  const [cached] = useState(() => cachedOverviewFor(user?.uid));
 
   const [isLogin, setIsLogin] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -145,10 +450,13 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [friends, setFriends] = useState([]);
-  const [incomingRequests, setIncomingRequests] = useState([]);
+  const [friends, setFriends] = useState(() => cached?.friends || []);
+  const [incomingRequests, setIncomingRequests] = useState(
+    () => cached?.incomingRequests || []
+  );
   const [outgoingRequests, setOutgoingRequests] = useState([]);
-  const [loadingFriends, setLoadingFriends] = useState(false);
+  // Nothing to show until the first snapshot arrives, unless it was cached
+  const [loadingFriends, setLoadingFriends] = useState(!cached);
   const [loadingRequests, setLoadingRequests] = useState(false);
 
   // Profile editing state
@@ -181,15 +489,18 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [userStatus, setUserStatus] = useState("online");
 
   // Ascend access state (server-verified)
-  const [checkedAccess, setAscendAccess] = useState({
-    hasAccess: true,
-    daysRemaining: 7,
-    isSubscribed: false,
-    isVerified: false,
-    verified: false,
-    noTrial: false,
-    noTrialReason: null,
-  });
+  const [checkedAccess, setAscendAccess] = useState(
+    () =>
+      cached?.access || {
+        hasAccess: true,
+        daysRemaining: 7,
+        isSubscribed: false,
+        isVerified: false,
+        verified: false,
+        noTrial: false,
+        noTrialReason: null,
+      }
+  );
   const ascendAccess = applyAscendEntitlements(checkedAccess, userData);
   const accessRequestRef = useRef(0);
   const [verifyingAccess, setVerifyingAccess] = useState(true);
@@ -203,11 +514,11 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [devSubscriptionState, setDevSubscriptionState] = useState("normal"); // normal, trial, verified, subscribed
 
   // Messaging state
-  const [conversations, setConversations] = useState([]);
+  const [conversations, setConversations] = useState(() => cached?.conversations || []);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
-  const [loadingConversations, setLoadingConversations] = useState(false);
+  const [loadingConversations, setLoadingConversations] = useState(!cached);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const messagesEndRef = React.useRef(null);
@@ -222,22 +533,27 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [loadingProfileStats, setLoadingProfileStats] = useState(true);
 
   // Local profile stats for leveling card
-  const [localStats, setLocalStats] = useState({
-    level: 1,
-    xp: 0,
-    currentXP: 0,
-    nextLevelXp: 100,
-    totalPlaytime: 0,
-    gamesPlayed: 0,
-    totalGames: 0,
-  });
-  const [loadingLocalStats, setLoadingLocalStats] = useState(true);
-  const [recentGames, setRecentGames] = useState([]);
+  const [localStats, setLocalStats] = useState(
+    () =>
+      cached?.localStats || {
+        level: 1,
+        xp: 0,
+        currentXP: 0,
+        nextLevelXp: 100,
+        totalPlaytime: 0,
+        gamesPlayed: 0,
+        totalGames: 0,
+      }
+  );
+  const [loadingLocalStats, setLoadingLocalStats] = useState(!cached);
+  const localStatsShownRef = useRef(!!cached);
+  const [recentGames, setRecentGames] = useState(() => cached?.recentGames || []);
 
   // Cloud Library state
-  const [cloudLibrary, setCloudLibrary] = useState(null);
+  const [cloudLibrary, setCloudLibrary] = useState(() => cached?.cloudLibrary ?? null);
   const [cloudLibraryError, setCloudLibraryError] = useState("");
-  const [loadingCloudLibrary, setLoadingCloudLibrary] = useState(true);
+  const [loadingCloudLibrary, setLoadingCloudLibrary] = useState(!cached);
+  const cloudLibraryShownRef = useRef(!!cached);
   const [isSyncingLibrary, setIsSyncingLibrary] = useState(false);
   const [isRestoringFromCloud, setIsRestoringFromCloud] = useState(false);
   const [localGames, setLocalGames] = useState([]);
@@ -262,11 +578,11 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [profileError, setProfileError] = useState(null);
 
   // Notifications state
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState(() => cached?.notifications || []);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   // Cloud Backups state
-  const [backups, setBackups] = useState([]);
+  const [backups, setBackups] = useState(() => cached?.backups || []);
   const [loadingBackups, setLoadingBackups] = useState(false);
   const [uploadingBackup, setUploadingBackup] = useState(false);
   const [selectedBackupFile, setSelectedBackupFile] = useState(null);
@@ -377,25 +693,57 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     userData?.noTrial,
   ]);
 
-  // Re-run cloud-first stats merge once Ascend access is verified. The first
-  // loadLocalStats call (above) runs before verifyAccess resolves and would
-  // therefore fall back to local-only stats — this ensures the dashboard
-  // promptly upgrades to cloud-merged numbers as soon as access is confirmed.
+  // Re-run the cloud-first stats merge if verifying access grants cloud
+  // access the first load (above) didn't assume. Only on a change: rerunning
+  // for the same answer would reload the stats right after they appear.
+  const hasCloudStatsAccess = !!(
+    ascendAccess?.isSubscribed ||
+    ascendAccess?.isVerified ||
+    ascendAccess?.hasAccess
+  );
+  const cloudStatsAccessRef = useRef(hasCloudStatsAccess);
   useEffect(() => {
-    if (!user?.uid) return;
-    if (
-      ascendAccess?.isSubscribed ||
-      ascendAccess?.isVerified ||
-      ascendAccess?.hasAccess
-    ) {
-      loadLocalStats();
-    }
+    if (cloudStatsAccessRef.current === hasCloudStatsAccess) return;
+    cloudStatsAccessRef.current = hasCloudStatsAccess;
+    if (user?.uid && hasCloudStatsAccess) loadLocalStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid, hasCloudStatsAccess]);
+
+  // Remember the overview for next time once it has loaded
+  useEffect(() => {
+    if (
+      !user?.uid ||
+      loadingLocalStats ||
+      loadingCloudLibrary ||
+      !checkedAccess.verified
+    ) {
+      return;
+    }
+    overviewCache = {
+      uid: user.uid,
+      access: checkedAccess,
+      localStats,
+      recentGames,
+      cloudLibrary,
+      friends,
+      incomingRequests,
+      conversations,
+      notifications,
+      backups,
+    };
   }, [
     user?.uid,
-    ascendAccess?.isSubscribed,
-    ascendAccess?.isVerified,
-    ascendAccess?.hasAccess,
+    loadingLocalStats,
+    loadingCloudLibrary,
+    checkedAccess,
+    localStats,
+    recentGames,
+    cloudLibrary,
+    friends,
+    incomingRequests,
+    conversations,
+    notifications,
+    backups,
   ]);
 
   // Set up real-time listener for friends list
@@ -539,251 +887,26 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       loadBackups();
     } else if (activeSection === "home" && !overviewBackupsLoadedRef.current) {
       overviewBackupsLoadedRef.current = true;
-      loadBackups();
+      // The count from last time stays up while it refreshes
+      loadBackups(null, { quiet: !!cached });
     }
   }, [activeSection, user?.uid, ascendAccess.isSubscribed, ascendAccess.isVerified]);
 
-  // Calculate profile statistics based on games data (same logic as Profile.jsx)
-  const calculateProfileStats = (games, customGames) => {
-    const allGames = [...(games || []), ...(customGames || [])];
-    const { XP_RULES } = getLevelConstants();
-
-    let totalXP = 0;
-    let totalPlaytime = 0;
-    let gamesPlayedCount = 0;
-
-    allGames.forEach(game => {
-      const playtimeSeconds = typeof game?.playTime === "number" ? game.playTime : 0;
-      const playtimeHours = playtimeSeconds / 3600;
-      const launchCount = typeof game?.launchCount === "number" ? game.launchCount : 0;
-      const isCompleted = !!game?.completed;
-      const hasEngagement = playtimeSeconds > 0 || launchCount > 0 || isCompleted;
-
-      if (playtimeSeconds > 0) {
-        gamesPlayedCount += 1;
-      }
-
-      totalPlaytime += playtimeSeconds;
-
-      if (!hasEngagement) {
-        return;
-      }
-
-      let gameXP = XP_RULES.basePerGame;
-      gameXP += Math.floor(playtimeHours * XP_RULES.perHourPlayed);
-      const launchBonus = Math.min(
-        launchCount * XP_RULES.perLaunch,
-        XP_RULES.launchBonusCap
-      );
-      gameXP += launchBonus;
-
-      if (isCompleted) {
-        gameXP += XP_RULES.completedBonus;
-      }
-
-      totalXP += gameXP;
-    });
-
-    const totalPlaytimeHours = totalPlaytime / 3600;
-    for (const milestone of XP_RULES.playtimeMilestones) {
-      if (totalPlaytimeHours >= milestone.hours) {
-        totalXP += milestone.bonus;
-      }
-    }
-
-    const levelData = calculateLevelFromXP(totalXP);
-
-    return {
-      totalPlaytime,
-      gamesPlayed: allGames.filter(game => game.playTime > 0).length,
-      totalGames: allGames.length,
-      level: levelData.level,
-      xp: levelData.xp,
-      currentXP: levelData.currentXP,
-      nextLevelXp: levelData.nextLevelXp,
-      allGames,
-    };
-  };
-
-  // Load local stats from Electron — and, for Ascend members, merge with the
-  // cloud library so the dashboard reflects the user's full "gaming identity"
-  // across devices, not just the games installed on this machine.
-  //
-  // Merge rules (per game, keyed by lowercased name):
-  //   - playTime / launchCount: Math.max(local, cloud) — cloud is the floor
-  //   - completed / favorite:   OR-merge
-  //   - games not installed locally are still counted toward XP/level
-  // Non-premium users get the original local-only behavior.
   const loadLocalStats = async () => {
-    setLoadingLocalStats(true);
+    // Stats already on screen refresh in place instead of behind a spinner
+    if (!localStatsShownRef.current) setLoadingLocalStats(true);
     try {
-      const games = (await window.electron?.getGames?.()) || [];
-      const customGames = (await window.electron?.getCustomGames?.()) || [];
-
-      const hasCloudAccess =
-        ascendAccess?.isSubscribed || ascendAccess?.isVerified || ascendAccess?.hasAccess;
-
-      let mergedRegular = games;
-      let mergedCustom = customGames;
-      let cloudFloorPlaytime = 0;
-
-      if (hasCloudAccess && user?.uid) {
-        try {
-          const cloudResult = await getCloudLibrary();
-          const cloudGames = cloudResult?.data?.games || [];
-          cloudFloorPlaytime = cloudResult?.data?.totalPlaytime || 0;
-
-          if (cloudGames.length > 0) {
-            const localKey = g => (g.game || g.name || "").toLowerCase();
-            const cloudByName = new Map(
-              cloudGames.map(cg => [(cg.name || "").toLowerCase(), cg])
-            );
-
-            const mergeWithCloud = (game, isCustom) => {
-              const cg = cloudByName.get(localKey(game));
-              if (!cg) return game;
-              cloudByName.delete(localKey(game));
-              return {
-                ...game,
-                playTime: Math.max(game.playTime || 0, cg.playTime || 0),
-                launchCount: Math.max(game.launchCount || 0, cg.launchCount || 0),
-                completed: game.completed || cg.completed || false,
-                favorite: game.favorite || cg.favorite || false,
-              };
-            };
-
-            mergedRegular = games.map(g => mergeWithCloud(g, false));
-            mergedCustom = customGames.map(g => mergeWithCloud(g, true));
-
-            // Cloud-only games (not installed on this machine) — synthesize
-            // minimal entries so XP/level/totalPlaytime include them.
-            const cloudOnly = Array.from(cloudByName.values()).map(cg => ({
-              game: cg.name,
-              name: cg.name,
-              playTime: cg.playTime || 0,
-              launchCount: cg.launchCount || 0,
-              completed: cg.completed || false,
-              favorite: cg.favorite || false,
-              isCustom: !!cg.isCustom,
-              cloudOnly: true,
-              gameID: cg.gameID || null,
-            }));
-
-            mergedRegular = [...mergedRegular, ...cloudOnly.filter(g => !g.isCustom)];
-            mergedCustom = [...mergedCustom, ...cloudOnly.filter(g => g.isCustom)];
-          }
-        } catch (e) {
-          console.warn(
-            "[Ascend] Cloud-first stats merge failed, falling back to local:",
-            e?.message || e
-          );
-        }
-      }
-
-      // Local calc is kept only as an offline fallback. When the user has
-      // cloud access, the authoritative level / XP / totals come from the
-      // server at api.ascendara.app via `recomputeProfileStats` — the client
-      // never derives these numbers when online.
-      const localFallback = calculateProfileStats(mergedRegular, mergedCustom);
-
-      // Level/XP must never decrease (e.g. after uninstalling a game or a
-      // stale/lower cloud snapshot). Always take the higher of the
-      // freshly-computed local XP vs. the last persisted local value.
-      let persistedLocalStats = null;
-      try {
-        persistedLocalStats =
-          (await window.electron?.getTimestampValue?.("profileStats")) || null;
-      } catch (e) {
-        persistedLocalStats = null;
-      }
-
-      let bestXP = Math.max(localFallback.xp || 0, persistedLocalStats?.xp || 0);
-      let finalStats = {
-        ...calculateProfileStats(mergedRegular, mergedCustom),
-        totalPlaytime: Math.max(
-          localFallback.totalPlaytime,
-          cloudFloorPlaytime,
-          persistedLocalStats?.totalPlaytime || 0
-        ),
-        gamesPlayed: Math.max(
-          localFallback.gamesPlayed,
-          persistedLocalStats?.gamesPlayed || 0
-        ),
-        totalGames: Math.max(
-          localFallback.totalGames,
-          persistedLocalStats?.totalGames || 0
-        ),
-      };
-
-      if (bestXP > localFallback.xp) {
-        const progress = calculateLevelFromXP(bestXP);
-        finalStats = { ...finalStats, ...progress };
-      }
-
-      if (hasCloudAccess && user?.uid) {
-        try {
-          // Ask the server to reconcile from cloudLibrary and write fresh
-          // profileStats. Fire-and-forget its own recomputation is fine;
-          // we still read back whichever is newest.
-          recomputeProfileStats().catch(() => {});
-          const cloudProfile = await getProfileStats();
-          const cs = cloudProfile?.data;
-          if (cs && typeof cs.xp === "number") {
-            // Never let a lower cloud value pull the displayed level/XP down.
-            bestXP = Math.max(cs.xp || 0, bestXP);
-            const progress = calculateLevelFromXP(bestXP);
-
-            finalStats = {
-              ...finalStats,
-              ...progress,
-              totalPlaytime: Math.max(cs.totalPlaytime || 0, finalStats.totalPlaytime),
-              gamesPlayed: Math.max(cs.gamesPlayed || 0, finalStats.gamesPlayed),
-              totalGames: Math.max(cs.totalGames || 0, finalStats.totalGames),
-            };
-          }
-        } catch (e) {
-          console.warn(
-            "[Ascend] Cloud-authoritative stats unavailable, using local:",
-            e?.message || e
-          );
-        }
-      }
-
-      // Persist the resolved (never-decreasing) stats locally so future
-      // loads — and Profile.jsx's own persisted-stats check — see the peak.
-      if (window.electron?.setTimestampValue) {
-        try {
-          await window.electron.setTimestampValue("profileStats", {
-            ...persistedLocalStats,
-            level: finalStats.level,
-            xp: finalStats.xp,
-            totalPlaytime: finalStats.totalPlaytime,
-            gamesPlayed: finalStats.gamesPlayed,
-            totalGames: finalStats.totalGames,
-          });
-        } catch (e) {
-          console.warn("[Ascend] Failed to persist local profileStats:", e);
-        }
-      }
-
-      console.log("[Ascend] Final stats:", {
-        ...finalStats,
-        cloudFirst: hasCloudAccess,
+      const { localStats: stats, recentGames: recent } = await computeOverviewStats({
+        uid: user?.uid,
+        hasCloudAccess:
+          ascendAccess?.isSubscribed ||
+          ascendAccess?.isVerified ||
+          ascendAccess?.hasAccess,
+        getCloud: () => takePrefetched("cloudLibrary", user.uid, () => getCloudLibrary()),
       });
-
-      setLocalStats({
-        ...finalStats,
-        cloudFirst: hasCloudAccess,
-      });
-
-      // Recent games — show locally installed entries first (so they remain
-      // launchable), but use merged playtime values for accurate ordering.
-      const allLocalGames = [...mergedRegular, ...mergedCustom].filter(g => !g.cloudOnly);
-      const sortedGames = allLocalGames
-        .filter(g => g.playTime && g.playTime >= 60)
-        .sort((a, b) => (b.playTime || 0) - (a.playTime || 0))
-        .slice(0, 4);
-      setRecentGames(sortedGames);
+      setLocalStats(stats);
+      setRecentGames(recent);
+      localStatsShownRef.current = true;
     } catch (e) {
       console.error("Failed to load local stats:", e);
     }
@@ -799,7 +922,9 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       if (window.electron?.getHardwareId) {
         hardwareId = await window.electron.getHardwareId();
       }
-      const result = await verifyAscendAccess(hardwareId);
+      const result = await takePrefetched("access", user?.uid, () =>
+        verifyAscendAccess(hardwareId)
+      );
       if (requestId !== accessRequestRef.current) return;
       setAscendAccess({ ...result, verified: true });
 
@@ -977,12 +1102,12 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
 
   // Cloud Library functions
   const loadCloudLibrary = async () => {
-    setLoadingCloudLibrary(true);
+    if (!cloudLibraryShownRef.current) setLoadingCloudLibrary(true);
     setCloudLibraryError("");
     try {
       // Load both cloud data and local games
       const [cloudResult, games, customGames] = await Promise.all([
-        getCloudLibrary(),
+        takePrefetched("cloudLibrary", user?.uid, () => getCloudLibrary()),
         window.electron?.getGames?.() || [],
         window.electron?.getCustomGames?.() || [],
       ]);
@@ -991,6 +1116,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         setCloudLibrary(cloudResult.data);
       }
       if (cloudOnly && cloudResult.error) throw new Error(cloudResult.error);
+      cloudLibraryShownRef.current = true;
 
       // Combine local games
       const allLocalGames = [
@@ -1450,8 +1576,8 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     setLoadingNotifications(false);
   };
 
-  const loadBackups = async (gameName = null) => {
-    setLoadingBackups(true);
+  const loadBackups = async (gameName = null, { quiet = false } = {}) => {
+    if (!quiet) setLoadingBackups(true);
     try {
       const result = await listBackups(gameName);
       if (!result.error) {

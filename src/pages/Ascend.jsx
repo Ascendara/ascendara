@@ -27,6 +27,9 @@ import {
   BadgeDollarSign,
 } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
+// The overview is what Ascend opens on, so it ships with the page instead of
+// suspending on a placeholder first
+import HomeSection from "./ascend/HomeSection";
 import useAscendPage from "./ascend/useAscendPage";
 import SectionLoading from "./ascend/SectionLoading";
 import CommunityTabs, { COMMUNITY_SECTIONS } from "./ascend/CommunityTabs";
@@ -36,7 +39,7 @@ import TwoFactorScreen from "./ascend/TwoFactorScreen";
 import { useAuth } from "@/context/AuthContext";
 import { useAscendNotificationCount } from "@/services/ascend/ascendNotificationBadgeService";
 import { useNewSecurityFeature } from "@/services/ascend/newFeatureBadgeService";
-const HomeSection = lazy(() => import("./ascend/HomeSection"));
+import { useLoadHold } from "@/hooks/useLoadHold";
 const SearchSection = lazy(() => import("./ascend/SearchSection"));
 const FriendsSection = lazy(() => import("./ascend/FriendsSection"));
 const MessagesSection = lazy(() => import("./ascend/MessagesSection"));
@@ -252,6 +255,9 @@ const Ascend = () => {
     setPendingSignupData,
     handleConfirmSignup,
   } = useAscendPage();
+  // Only the account itself is waited on: once it's known the hub opens
+  // straight away and each section shows placeholders until its data is in
+  useLoadHold(authLoading);
   // Block access if app is outdated
   if (checkingVersion) {
     return (
@@ -619,6 +625,8 @@ const Ascend = () => {
               conversations={conversations}
               localStats={localStats}
               loadingLocalStats={loadingLocalStats}
+              loadingFriends={loadingFriends}
+              loadingConversations={loadingConversations}
               formatPlaytimeDetailed={formatPlaytimeDetailed}
               cloudLibrary={cloudLibrary}
               loadingCloudLibrary={loadingCloudLibrary}

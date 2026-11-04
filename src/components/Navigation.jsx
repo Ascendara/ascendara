@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAscendNotificationCount } from "@/services/ascend/ascendNotificationBadgeService";
 import { useNewSecurityFeature } from "@/services/ascend/newFeatureBadgeService";
+import { prefetchAscendData } from "@/services/ascend/ascendPrefetch";
 
 const Navigation = memo(({ items }) => {
   const { t } = useLanguage();
@@ -373,6 +374,10 @@ const Navigation = memo(({ items }) => {
               <React.Fragment key={item.path}>
                 <Link
                   to={item.path}
+                  // Fetch Ascend's data on the way to the click
+                  onPointerEnter={
+                    item.path === "/ascend" ? prefetchAscendData : undefined
+                  }
                   className={`group relative flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300 ${
                     isActive(item.path)
                       ? "z-10 scale-110 bg-primary text-background"

@@ -40,6 +40,10 @@ const DiscordOutlineIcon = props => <DiscordIcon {...props} outline />;
 // tabbed Community page, so they count as a single destination here
 const COMMUNITY_SECTIONS = ["friends", "search", "leaderboard", "userProfile"];
 
+// Last status seen per account, so reopening Ascend doesn't show "online"
+// until the listener catches up
+let lastStatus = null;
+
 const AscendNavBar = ({
   activeSection,
   onSectionChange,
@@ -51,8 +55,9 @@ const AscendNavBar = ({
   badges = {},
 }) => {
   const { t } = useTranslation();
-  const [currentStatus, setCurrentStatus] = useState("online");
-  const [customMessage, setCustomMessage] = useState("");
+  const remembered = lastStatus?.uid === user?.uid ? lastStatus : null;
+  const [currentStatus, setCurrentStatus] = useState(remembered?.status || "online");
+  const [customMessage, setCustomMessage] = useState(remembered?.customMessage || "");
 
   // Use server-verified access data
   const trialDaysRemaining =
@@ -74,6 +79,11 @@ const AscendNavBar = ({
       setCustomMessage(data.customMessage || "");
       const status = data.status === "offline" ? "invisible" : data.status;
       setCurrentStatus(status || "online");
+      lastStatus = {
+        uid: user.uid,
+        status: status || "online",
+        customMessage: data.customMessage || "",
+      };
       onStatusChange?.(status || "online");
     });
   }, [user?.uid, onStatusChange]);

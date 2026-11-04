@@ -1615,6 +1615,16 @@ const AppRoutes = () => {
     };
   }, []);
 
+  // Signed in: load Ascend's overview in the background once the app is up,
+  // so opening Ascend shows it straight away
+  useEffect(() => {
+    if (!firstPageReady || !user?.uid) return;
+    if (!user.emailVerified && user.providerData?.[0]?.providerId === "password") return;
+    import("@/pages/ascend/useAscendPage")
+      .then(module => module.warmAscendOverview(user.uid))
+      .catch(() => {});
+  }, [firstPageReady, user?.uid]);
+
   useEffect(() => {
     if (isLoading || isUpdating || isInstalling) return;
     let cancelled = false;
