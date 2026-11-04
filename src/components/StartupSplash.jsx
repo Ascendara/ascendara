@@ -80,6 +80,7 @@ const StartupSplash = ({ iconData, exiting, onDone, fallback = null }) => {
       const flyer = flyerRef.current;
       const logo = logoRef.current;
       const animations = [];
+      let flight = null;
       const opts = { fill: "forwards" };
 
       if (logo) {
@@ -104,15 +105,14 @@ const StartupSplash = ({ iconData, exiting, onDone, fallback = null }) => {
         const dx = target.left + target.width / 2 - (from.left + from.width / 2);
         const dy = target.top + target.height / 2 - (from.top + from.height / 2);
         const scale = target.width / from.width;
-        animations.push(
-          flyer.animate(
-            [
-              { transform: "translate(0px, 0px) scale(1)" },
-              { transform: `translate(${dx}px, ${dy}px) scale(${scale})` },
-            ],
-            { ...opts, duration: FLIGHT_MS, easing: FLIGHT_EASE }
-          )
+        flight = flyer.animate(
+          [
+            { transform: "translate(0px, 0px) scale(1)" },
+            { transform: `translate(${dx}px, ${dy}px) scale(${scale})` },
+          ],
+          { ...opts, duration: FLIGHT_MS, easing: FLIGHT_EASE }
         );
+        animations.push(flight);
       } else if (flyer) {
         animations.push(
           flyer.animate([{ opacity: 1 }, { opacity: 0 }], {
@@ -134,9 +134,19 @@ const StartupSplash = ({ iconData, exiting, onDone, fallback = null }) => {
         );
       }
 
-      await Promise.all(animations.map(a => a.finished.catch(() => {})));
+      // Once the logo has come to rest in its slot, the rest of the menu bar
+      // pops in (CSS in app.css). Wait a frame so those animations exist,
+      // then let them finish too.
+      await flight?.finished.catch(() => {});
       if (cancelled) return;
-      root.classList.remove("splash-active");
+      root.classList.add("boot-reveal");
+      await waitFrame();
+      const popIns = document
+        .getAnimations()
+        .filter(a => a.animationName === "boot-pop-in");
+      await Promise.all([...animations, ...popIns].map(a => a.finished.catch(() => {})));
+      if (cancelled) return;
+      root.classList.remove("splash-active", "boot-reveal");
       onDone?.();
     };
 
@@ -144,7 +154,7 @@ const StartupSplash = ({ iconData, exiting, onDone, fallback = null }) => {
 
     return () => {
       cancelled = true;
-      root.classList.remove("splash-active");
+      root.classList.remove("splash-active", "boot-reveal");
     };
   }, [exiting]);
 

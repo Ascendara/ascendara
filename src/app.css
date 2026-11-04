@@ -813,3 +813,72 @@ html[data-motion="reduced"] .animate-fade-in {
 .splash-active [data-app-logo] {
   opacity: 0;
 }
+
+/* Once the boot logo has landed, the rest of the menu bar pops in after it:
+   the name first, then the items to its right, with the window controls
+   alongside. They stay hidden during the flight (.splash-active);
+   StartupSplash adds .boot-reveal when the logo is at rest and waits for these
+   animations before removing both classes. */
+.splash-active [data-boot-pop],
+.splash-active [data-boot-row] > :not(:first-child),
+.splash-active .window-controls button {
+  opacity: 0;
+}
+@keyframes boot-pop-in {
+  from {
+    opacity: 0;
+    translate: 0 -6px;
+    scale: 0.85;
+  }
+  to {
+    opacity: 1;
+    translate: none;
+    scale: none;
+  }
+}
+.boot-reveal [data-boot-pop],
+.boot-reveal [data-boot-row] > :not(:first-child),
+.boot-reveal .window-controls button {
+  --boot-i: 0;
+  animation: boot-pop-in 420ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  animation-delay: calc(var(--boot-i) * 45ms);
+}
+.boot-reveal [data-boot-row] > :nth-child(2) {
+  --boot-i: 1;
+}
+.boot-reveal [data-boot-row] > :nth-child(3) {
+  --boot-i: 2;
+}
+.boot-reveal [data-boot-row] > :nth-child(4) {
+  --boot-i: 3;
+}
+.boot-reveal [data-boot-row] > :nth-child(5) {
+  --boot-i: 4;
+}
+.boot-reveal [data-boot-row] > :nth-child(6) {
+  --boot-i: 5;
+}
+.boot-reveal [data-boot-row] > :nth-child(n + 7) {
+  --boot-i: 6;
+}
+.boot-reveal .window-controls button:nth-child(1) {
+  --boot-i: 2;
+}
+.boot-reveal .window-controls button:nth-child(2) {
+  --boot-i: 3;
+}
+.boot-reveal .window-controls button:nth-child(3) {
+  --boot-i: 4;
+}
+html[data-motion="reduced"].boot-reveal [data-boot-pop],
+html[data-motion="reduced"].boot-reveal [data-boot-row] > *,
+html[data-motion="reduced"].boot-reveal .window-controls button {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-reveal [data-boot-pop],
+  .boot-reveal [data-boot-row] > *,
+  .boot-reveal .window-controls button {
+    animation: none;
+  }
+}

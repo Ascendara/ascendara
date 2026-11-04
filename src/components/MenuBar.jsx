@@ -269,7 +269,8 @@ const MenuBar = () => {
       className="fixed z-50 flex h-10 w-full select-none items-center"
       style={{ WebkitAppRegion: "drag" }}
     >
-      <div className="mt-2 flex h-full flex-1 items-center px-3">
+      {/* data-boot-row / data-boot-pop: staggered pop-in as the boot logo lands (app.css) */}
+      <div className="mt-2 flex h-full flex-1 items-center px-3" data-boot-row>
         <div className="flex items-center">
           <div className="flex items-center">
             {iconData && (
@@ -280,7 +281,9 @@ const MenuBar = () => {
                 className="mr-2 h-6 w-6"
               />
             )}
-            <span className="text-sm font-medium text-foreground">Ascendara</span>
+            <span className="text-sm font-medium text-foreground" data-boot-pop>
+              Ascendara
+            </span>
           </div>
         </div>
 

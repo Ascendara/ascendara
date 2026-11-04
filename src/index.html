@@ -33,11 +33,15 @@
         /* Default (purple) theme until a launch has recorded the real one */
         --boot-accent: 124 58 237;
         --boot-background: 237 233 254;
-        --boot-gradient: linear-gradient(
-          135deg,
-          rgb(var(--boot-accent) / 0.1) 0%,
-          rgb(var(--boot-background)) 100%
-        );
+        /* Solid base under the gradient: its tinted corner is translucent, and
+           the splash must fully hide the app (menu bar included) beneath it */
+        --boot-gradient:
+          linear-gradient(
+            135deg,
+            rgb(var(--boot-accent) / 0.1) 0%,
+            rgb(var(--boot-background)) 100%
+          ),
+          rgb(var(--boot-background));
       }
       body {
         background: rgb(var(--color-background, var(--boot-background)));
