@@ -2038,7 +2038,32 @@ def main():
         raise
 
 
+def pin_bundle():
+    """Hold the packaged runtime's files open for the life of the process.
+
+    A onefile build unpacks into %TEMP%\\_MEI*. Extension modules and tools load
+    lazily, often hours later when extraction starts, and until then temp
+    cleaners or antivirus can delete them ("No module named '_multiprocessing'").
+    Open handles without delete sharing keep every file in place; loading and
+    executing them still works because reads stay shared.
+    """
+    root = getattr(sys, '_MEIPASS', None)
+    if os.name != 'nt' or not getattr(sys, 'frozen', False) or not root:
+        return []
+    handles = []
+    for directory, _, names in os.walk(root):
+        for name in names:
+            try:
+                handles.append(open(os.path.join(directory, name), 'rb'))
+            except OSError:
+                pass
+    return handles
+
+
 if __name__ == '__main__':
-    multiprocessing.freeze_support()
+    multiprocessing.freeze_support()  # Extraction workers return here.
+    _bundle_handles = pin_bundle()
+    # Load the extraction worker's IPC extension now rather than at extraction time.
+    import multiprocessing.connection  # noqa: F401
     main()
 
