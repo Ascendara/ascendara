@@ -4907,6 +4907,8 @@
       }
     },
     "checkConfig": "Check Configuration",
+    "classicThemes": "Classics",
+    "classicThemesDescription": "Earlier Ascendara themes, kept around for anyone who still likes them.",
     "colorSection": {
       "preview": "Live Preview"
     },
@@ -5209,6 +5211,7 @@
     "manageIndex2": "Manage Index",
     "matureContent": "Mature Content",
     "matureContentDescription": "Allow games with mature themes to appear in search results.",
+    "newTheme": "New",
     "noAdditionalLocations": "No additional locations yet...",
     "noBranchDialog": {
       "close": "Close",

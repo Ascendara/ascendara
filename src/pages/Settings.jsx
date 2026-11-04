@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useTheme } from "@/context/ThemeContext";
+import { useTheme, clearCustomTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useLocation } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
@@ -13,12 +13,6 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import SafeHtml from "@/components/SafeHtml";
 import "@/components/ui/tabs";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import checkQbittorrentStatus from "@/services/downloads/qbittorrentCheckService";
 import {
   Select,
@@ -56,19 +50,8 @@ import {
   FileCheck2,
   Database,
   Palette,
-  Download as DownloadIcon,
-  UploadIcon,
-  Globe,
-  Star,
-  Home,
-  CheckCircle,
   Info,
-  Search,
-  Library,
-  Settings2,
   Gamepad2,
-  Bell,
-  Trophy,
   SlidersHorizontal,
   HardDriveDownload,
   Joystick,
@@ -80,6 +63,8 @@ import {
   CircleHelp,
   Heart,
   Gift,
+  Check,
+  History,
 } from "lucide-react";
 import gameService from "@/services/games/gameService";
 import { useNavigate } from "react-router-dom";
@@ -120,20 +105,28 @@ import { API_URL } from "@/config/api";
 
 const themes = [
   // Light themes
-  { id: "light", name: "Arctic Sky", group: "light" },
+  { id: "coral", name: "Coral", group: "light", isNew: true },
   { id: "blue", name: "Ocean Blue", group: "light" },
   { id: "purple", name: "Ascendara Purple", group: "light" },
   { id: "emerald", name: "Emerald", group: "light" },
   { id: "rose", name: "Rose", group: "light" },
-  { id: "amber", name: "Amber Sand", group: "light" },
+  { id: "lagoon", name: "Lagoon", group: "light", isNew: true },
+  { id: "royal-pearl", name: "Royal Pearl", group: "light", isNew: true },
 
   // Dark themes
-  { id: "dark", name: "Dark Blue", group: "dark" },
+  { id: "aurora", name: "Aurora", group: "dark", isNew: true },
   { id: "midnight", name: "Midnight", group: "dark" },
   { id: "cyberpunk", name: "Cyberpunk", group: "dark" },
   { id: "sunset", name: "Sunset", group: "dark" },
   { id: "forest", name: "Forest", group: "dark" },
-  { id: "ocean", name: "Deep Ocean", group: "dark" },
+  { id: "crimson", name: "Crimson", group: "dark", isNew: true },
+  { id: "royal-night", name: "Royal Night", group: "dark", isNew: true },
+
+  // Classics: earlier themes, kept for anyone who still uses them
+  { id: "light", name: "Arctic Sky", group: "classic" },
+  { id: "dark", name: "Dark Blue", group: "classic" },
+  { id: "ocean", name: "Deep Ocean", group: "classic" },
+  { id: "amber", name: "Amber Sand", group: "classic" },
 ];
 
 const getThemeColors = themeId => {
@@ -198,11 +191,41 @@ const getThemeColors = themeId => {
       secondary: "bg-slate-800",
       text: "text-indigo-200",
     },
+    lagoon: {
+      bg: "bg-[#ECFAFA]",
+      primary: "bg-[#0D7480]",
+      secondary: "bg-[#CFF2F3]",
+      text: "text-[#0E3E46]",
+    },
+    coral: {
+      bg: "bg-[#FFF1EC]",
+      primary: "bg-[#CC402C]",
+      secondary: "bg-[#FDE2D8]",
+      text: "text-[#5C1C14]",
+    },
+    "royal-pearl": {
+      bg: "bg-[#F7F6FB]",
+      primary: "bg-[#37228C]",
+      secondary: "bg-[#ECE9F6]",
+      text: "text-[#1E1646]",
+    },
+    "royal-night": {
+      bg: "bg-[#120E26]",
+      primary: "bg-[#E8BA52]",
+      secondary: "bg-[#1C1638]",
+      text: "text-[#F5ECD4]",
+    },
     amber: {
       bg: "bg-amber-50",
       primary: "bg-amber-600",
       secondary: "bg-amber-100",
       text: "text-amber-900",
+    },
+    aurora: {
+      bg: "bg-[#081218]",
+      primary: "bg-[#2DD4BF]",
+      secondary: "bg-[#0E1C24]",
+      text: "text-[#DCFCF6]",
     },
     ocean: {
       bg: "bg-slate-900",
@@ -210,71 +233,15 @@ const getThemeColors = themeId => {
       secondary: "bg-slate-800",
       text: "text-cyan-100",
     },
+    crimson: {
+      bg: "bg-[#160A0E]",
+      primary: "bg-[#F85252]",
+      secondary: "bg-[#241016]",
+      text: "text-[#FEE2E2]",
+    },
   };
 
   return themeMap[themeId] || themeMap.light;
-};
-
-// Helper to convert RGB string to hex
-const rgbToHex = rgbString => {
-  if (!rgbString || typeof rgbString !== "string") return "#000000";
-  const parts = rgbString.split(" ").map(Number);
-  if (parts.length !== 3 || parts.some(isNaN)) return "#000000";
-  return (
-    "#" +
-    parts
-      .map(x => {
-        const hex = x.toString(16);
-        return hex.length === 1 ? "0" + hex : hex;
-      })
-      .join("")
-  );
-};
-
-// Helper to convert hex to RGB string
-const hexToRgb = hex => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return "0 0 0";
-  return `${parseInt(result[1], 16)} ${parseInt(result[2], 16)} ${parseInt(result[3], 16)}`;
-};
-
-// ColorPickerInput component - native color picker with local state for smooth dragging
-const ColorPickerInput = ({ colorKey, label, value, onColorChange }) => {
-  const safeValue = value || "128 128 128";
-  const [localColor, setLocalColor] = useState(rgbToHex(safeValue));
-  const [localRgb, setLocalRgb] = useState(safeValue);
-
-  useEffect(() => {
-    const syncValue = value || "128 128 128";
-    setLocalColor(rgbToHex(syncValue));
-    setLocalRgb(syncValue);
-  }, [value]);
-
-  return (
-    <div className="flex items-center gap-3">
-      <input
-        type="color"
-        value={localColor}
-        onChange={e => {
-          setLocalColor(e.target.value);
-          setLocalRgb(hexToRgb(e.target.value));
-        }}
-        onBlur={() => onColorChange(colorKey, localColor)}
-        style={{
-          width: "56px",
-          height: "40px",
-          padding: 0,
-          border: "1px solid var(--border)",
-          borderRadius: "6px",
-          cursor: "pointer",
-        }}
-      />
-      <div className="min-w-0 flex-1">
-        <Label className="block truncate text-xs text-foreground">{label}</Label>
-        <p className="truncate text-xs text-foreground/60">{localRgb}</p>
-      </div>
-    </div>
-  );
 };
 
 function Settings() {
@@ -323,7 +290,6 @@ function Settings() {
   const locationCheck = useDownloadFolderCheck();
   const [checkingLocation, setCheckingLocation] = useState(null);
   const [protectingLocation, setProtectingLocation] = useState(false);
-  const [showCustomColorsDialog, setShowCustomColorsDialog] = useState(false);
   const [controllerConnected, setControllerConnected] = useState(false);
   const [runners, setRunners] = useState([]);
   const [selectedRunner, setSelectedRunner] = useState("auto");
@@ -343,59 +309,6 @@ function Settings() {
   const [umuProtonUpdateStatus, setUmuProtonUpdateStatus] = useState(null);
   const [latestDevCommit, setLatestDevCommit] = useState(null);
   const [protonOptionsOpen, setProtonOptionsOpen] = useState(false);
-  // Default custom colors for merging with saved themes (handles missing new properties)
-  const defaultCustomColors = {
-    background: "255 255 255",
-    foreground: "15 23 42",
-    primary: "124 58 237",
-    secondary: "221 214 254",
-    muted: "221 214 254",
-    mutedForeground: "88 28 135",
-    accent: "221 214 254",
-    accentForeground: "88 28 135",
-    border: "167 139 250",
-    input: "167 139 250",
-    ring: "88 28 135",
-    card: "255 255 255",
-    cardForeground: "15 23 42",
-    popover: "255 255 255",
-    popoverForeground: "15 23 42",
-    // Navigation colors
-    navBackground: "255 255 255",
-    navActive: "124 58 237",
-    navActiveText: "255 255 255",
-    navHover: "221 214 254",
-    // Status colors
-    success: "34 197 94",
-    warning: "234 179 8",
-    error: "239 68 68",
-    info: "59 130 246",
-    // Star rating
-    starFilled: "250 204 21",
-    starEmpty: "148 163 184",
-    // Startup/Welcome screen
-    startupBackground: "255 255 255",
-    startupAccent: "124 58 237",
-  };
-  const [customColors, setCustomColors] = useState(() => {
-    // Try to load from localStorage
-    try {
-      const savedColors = localStorage.getItem("custom-theme-colors");
-      if (savedColors) {
-        const parsed = JSON.parse(savedColors);
-        return { ...defaultCustomColors, ...parsed };
-      }
-    } catch (e) {
-      console.warn("Failed to load theme from localstorage", e);
-    }
-    // Else use default
-    return defaultCustomColors;
-  });
-  const [originalColorsOnOpen, setOriginalColorsOnOpen] = useState(null);
-  const [showPublicThemesDialog, setShowPublicThemesDialog] = useState(false);
-  const [publicThemes, setPublicThemes] = useState([]);
-  const [loadingPublicThemes, setLoadingPublicThemes] = useState(false);
-  const [selectedThemeVersion, setSelectedThemeVersion] = useState(null);
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [showSupportConfirmDialog, setShowSupportConfirmDialog] = useState(false);
   const [supportCode, setSupportCode] = useState(["", "", "", "", "", ""]);
@@ -873,48 +786,12 @@ function Settings() {
     }
   }, [handleSettingChange, t]);
 
-  // Helper to clear custom theme CSS variables
-  const clearCustomThemeStyles = () => {
-    const root = document.documentElement;
-    root.style.removeProperty("--color-background");
-    root.style.removeProperty("--color-foreground");
-    root.style.removeProperty("--color-primary");
-    root.style.removeProperty("--color-secondary");
-    root.style.removeProperty("--color-muted");
-    root.style.removeProperty("--color-muted-foreground");
-    root.style.removeProperty("--color-accent");
-    root.style.removeProperty("--color-accent-foreground");
-    root.style.removeProperty("--color-border");
-    root.style.removeProperty("--color-input");
-    root.style.removeProperty("--color-ring");
-    root.style.removeProperty("--color-card");
-    root.style.removeProperty("--color-card-foreground");
-    root.style.removeProperty("--color-popover");
-    root.style.removeProperty("--color-popover-foreground");
-    // Navigation colors
-    root.style.removeProperty("--color-nav-background");
-    root.style.removeProperty("--color-nav-active");
-    root.style.removeProperty("--color-nav-active-text");
-    root.style.removeProperty("--color-nav-hover");
-    // Status colors
-    root.style.removeProperty("--color-success");
-    root.style.removeProperty("--color-warning");
-    root.style.removeProperty("--color-error");
-    root.style.removeProperty("--color-info");
-    // Star rating
-    root.style.removeProperty("--color-star-filled");
-    root.style.removeProperty("--color-star-empty");
-    // Startup screen
-    root.style.removeProperty("--color-startup-background");
-    root.style.removeProperty("--color-startup-accent");
-  };
-
   // Theme handling
   const handleThemeChange = useCallback(
     async newTheme => {
       // Apply
       if (newTheme !== "custom") {
-        clearCustomThemeStyles();
+        clearCustomTheme();
       }
       setTheme(newTheme);
       localStorage.setItem("ascendara-theme", newTheme);
@@ -941,219 +818,12 @@ function Settings() {
   const groupedThemes = {
     light: themes.filter(t => t.group === "light"),
     dark: themes.filter(t => t.group === "dark"),
+    classic: themes.filter(t => t.group === "classic"),
   };
-
-  // Load custom colors from settings
-  useEffect(() => {
-    if (
-      settings.customTheme &&
-      Array.isArray(settings.customTheme) &&
-      settings.customTheme.length > 0
-    ) {
-      const customThemeObj = settings.customTheme[0];
-      if (customThemeObj) {
-        // Merge with defaults to ensure all properties exist (handles old saved themes)
-        setCustomColors(prev => ({ ...defaultCustomColors, ...customThemeObj }));
-      }
-    }
-  }, [settings.customTheme]);
-
-  // Apply custom theme CSS variables when custom theme is active
-  useEffect(() => {
-    if (theme !== "custom") return;
-    if (theme === "custom" && customColors) {
-      const root = document.documentElement;
-      root.style.setProperty("--color-background", customColors.background);
-      root.style.setProperty("--color-foreground", customColors.foreground);
-      root.style.setProperty("--color-primary", customColors.primary);
-      root.style.setProperty("--color-secondary", customColors.secondary);
-      root.style.setProperty("--color-muted", customColors.muted);
-      root.style.setProperty("--color-muted-foreground", customColors.mutedForeground);
-      root.style.setProperty("--color-accent", customColors.accent);
-      root.style.setProperty("--color-accent-foreground", customColors.accentForeground);
-      root.style.setProperty("--color-border", customColors.border);
-      root.style.setProperty("--color-input", customColors.input);
-      root.style.setProperty("--color-ring", customColors.ring);
-      root.style.setProperty("--color-card", customColors.card);
-      root.style.setProperty("--color-card-foreground", customColors.cardForeground);
-      root.style.setProperty("--color-popover", customColors.popover);
-      root.style.setProperty(
-        "--color-popover-foreground",
-        customColors.popoverForeground
-      );
-      // Navigation colors
-      root.style.setProperty(
-        "--color-nav-background",
-        customColors.navBackground || customColors.background
-      );
-      root.style.setProperty(
-        "--color-nav-active",
-        customColors.navActive || customColors.primary
-      );
-      root.style.setProperty(
-        "--color-nav-active-text",
-        customColors.navActiveText || customColors.secondary
-      );
-      root.style.setProperty(
-        "--color-nav-hover",
-        customColors.navHover || customColors.secondary
-      );
-      // Status colors
-      root.style.setProperty("--color-success", customColors.success || "34 197 94");
-      root.style.setProperty("--color-warning", customColors.warning || "234 179 8");
-      root.style.setProperty("--color-error", customColors.error || "239 68 68");
-      root.style.setProperty("--color-info", customColors.info || "59 130 246");
-      // Star rating
-      root.style.setProperty(
-        "--color-star-filled",
-        customColors.starFilled || "250 204 21"
-      );
-      root.style.setProperty(
-        "--color-star-empty",
-        customColors.starEmpty || "148 163 184"
-      );
-      // Startup screen
-      root.style.setProperty(
-        "--color-startup-background",
-        customColors.startupBackground || customColors.background
-      );
-      root.style.setProperty(
-        "--color-startup-accent",
-        customColors.startupAccent || customColors.primary
-      );
-    }
-  }, [theme, customColors]);
-
-  // Desktop notification colors fall back to the general theme colors until the
-  // user picks their own, matching how the notification helper resolves them
-  const notificationColorFallbacks = {
-    notificationBackground: "card",
-    notificationForeground: "cardForeground",
-    notificationMuted: "mutedForeground",
-    notificationAccent: "primary",
-    notificationBorder: "border",
-    notificationAchievement: "starFilled",
-  };
-  const notificationColor = key =>
-    customColors[key] || customColors[notificationColorFallbacks[key]];
-
-  const handleSendTestNotification = async achievement => {
-    const result = await window.electron.previewNotification(customColors, achievement);
-    if (!result?.success) {
-      toast.error(result?.error || "Failed to show notification");
-    }
-  };
-
-  // Handle custom color change - only called on blur/change complete
-  const handleCustomColorChange = (colorKey, hexValue) => {
-    const rgbValue = hexToRgb(hexValue);
-    setCustomColors(prev => ({
-      ...prev,
-      [colorKey]: rgbValue,
-    }));
-  };
-
-  // Save custom colors and apply theme
-  const handleSaveCustomColors = async () => {
-    // Create the theme array
-    const themeArray = [{ ...customColors }];
-    console.log("Saving custom theme:", themeArray);
-
-    // Save custom theme array first using dedicated function
-    const success = await window.electron.saveCustomThemeColors(themeArray);
-    console.log("Save success:", success);
-
-    if (success) {
-      // Also save theme to "custom"
-      await window.electron.updateSetting("theme", "custom");
-
-      // Update React state without triggering full save
-      setTheme("custom");
-      localStorage.setItem("ascendara-theme", "custom");
-
-      localStorage.setItem("custom-theme-colors", JSON.stringify(customColors));
-      setSettingsLocal(prev => ({
-        ...prev,
-        theme: "custom",
-        customTheme: [customColors], // Use customColors, not colors
-      }));
-
-      const root = document.documentElement;
-      root.style.setProperty("--color-background", customColors.background);
-      root.style.setProperty("--color-foreground", customColors.foreground);
-
-      setShowCustomColorsDialog(false);
-      toast.success(t("settings.customColorsSaved") || "Custom colors saved!");
-    } else {
-      toast.error("Failed to save custom theme");
-    }
-  };
-
-  // Export custom theme to file
-  const handleExportTheme = async () => {
-    const result = await window.electron.exportCustomTheme([customColors]);
-    if (result.success) {
-      toast.success(t("settings.themeExported") || "Theme exported successfully!");
-    } else if (!result.canceled) {
-      toast.error(
-        result.error || t("settings.themeExportFailed") || "Failed to export theme"
-      );
-    }
-  };
-
-  // Import custom theme from file
-  const handleImportTheme = async () => {
-    const result = await window.electron.importCustomTheme();
-    if (result.success && result.customTheme) {
-      setCustomColors(result.customTheme[0]);
-      toast.success(t("settings.themeImported") || "Theme imported successfully!");
-    } else if (!result.canceled) {
-      toast.error(
-        result.error || t("settings.themeImportFailed") || "Failed to import theme"
-      );
-    }
-  };
-
-  // Browse public themes
-  const handleBrowsePublicThemes = async () => {
-    setShowCustomColorsDialog(false);
-    setShowPublicThemesDialog(true);
-    setLoadingPublicThemes(true);
-    try {
-      const response = await fetch(`${API_URL}/json/publicthemes`);
-      const data = await response.json();
-      // Ensure we always have an array
-      let themesArray = [];
-      if (Array.isArray(data)) {
-        themesArray = data;
-      } else if (data && Array.isArray(data.themes)) {
-        themesArray = data.themes;
-      } else if (data && typeof data === "object") {
-        // If it's an object with theme entries, convert to array
-        themesArray = Object.values(data).filter(
-          item => item && typeof item === "object"
-        );
-      }
-      setPublicThemes(themesArray);
-    } catch (error) {
-      console.error("Error fetching public themes:", error);
-      toast.error(t("settings.publicThemesFailed") || "Failed to load public themes");
-      setPublicThemes([]);
-    } finally {
-      setLoadingPublicThemes(false);
-    }
-  };
-
-  // Apply a public theme
-  const handleApplyPublicTheme = (themeColors, themeVersion) => {
-    setCustomColors(themeColors);
-    setSelectedThemeVersion(themeVersion);
-    setShowPublicThemesDialog(false);
-    setShowCustomColorsDialog(true);
-    toast.success(
-      t("settings.publicThemeApplied") || "Theme applied! Click Apply Colors to save."
-    );
-  };
+  // Opens on the group holding the current theme
+  const [themeGroup, setThemeGroup] = useState(
+    () => themes.find(item => item.id === theme)?.group || "dark"
+  );
 
   // Check if in development mode and fetch latest dev commit
   useEffect(() => {
@@ -1510,95 +1180,103 @@ function Settings() {
               <SettingsSection id="appearance-settings" title={t("settings.appearance")}>
                 <div className="space-y-6">
                   <div id="theme">
-                    <Label>{t("settings.themes")}</Label>
-
-                    {/* Custom Colors Button */}
-                    <div
-                      id="custom-colors"
-                      className={`mt-3 flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-all hover:bg-accent/50 ${theme === "custom" ? "border-primary bg-primary/5" : "border-border"}`}
-                      onClick={() => {
-                        setOriginalColorsOnOpen({ ...customColors });
-                        setSelectedThemeVersion(null);
-                        setShowCustomColorsDialog(true);
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-primary/20 to-accent/20">
-                          <Palette className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-foreground">
-                            {t("settings.customColors") || "Custom Colors"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {t("settings.customColorsSubtitle") ||
-                              "Create your own theme"}
-                          </p>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <Label>{t("settings.themes")}</Label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setThemeGroup("classic")}
+                          aria-pressed={themeGroup === "classic"}
+                          className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                            themeGroup === "classic"
+                              ? "bg-primary/10 text-primary"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <History className="h-3.5 w-3.5" />
+                          {t("settings.classicThemes")}
+                        </button>
+                        <div className="flex rounded-lg bg-muted/50 p-0.5">
+                          {["light", "dark"].map(group => (
+                            <button
+                              key={group}
+                              type="button"
+                              onClick={() => setThemeGroup(group)}
+                              className={`relative rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                                themeGroup === group
+                                  ? "text-foreground"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              {themeGroup === group && (
+                                <motion.span
+                                  layoutId="settings-theme-group"
+                                  className="absolute inset-0 rounded-md bg-background shadow-sm"
+                                  transition={{
+                                    type: "spring",
+                                    stiffness: 400,
+                                    damping: 34,
+                                  }}
+                                />
+                              )}
+                              <span className="relative">
+                                {group === "light"
+                                  ? t("settings.lightThemes")
+                                  : t("settings.darkThemes")}
+                              </span>
+                            </button>
+                          ))}
                         </div>
                       </div>
-                      {theme === "custom" ? (
-                        <div className="flex items-center gap-2 rounded-full bg-primary/10 px-2 py-1">
-                          <div className="h-2 w-2 rounded-full bg-primary" />
-                          <span className="text-xs font-medium text-primary">
-                            {t("settings.active") || "Active"}
-                          </span>
-                        </div>
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+
+                    {themeGroup === "classic" && (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {t("settings.classicThemesDescription")}
+                      </p>
+                    )}
+
+                    <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
+                      {groupedThemes[themeGroup].map(item => (
+                        <ThemeButton
+                          key={item.id}
+                          theme={item}
+                          currentTheme={theme}
+                          onSelect={handleThemeChange}
+                          t={t}
+                        />
+                      ))}
+                      {/* Custom themes are made in their own page */}
+                      {themeGroup !== "classic" && (
+                        <button
+                          id="custom-colors"
+                          type="button"
+                          onClick={() => navigate("/themes")}
+                          className="group text-left outline-none"
+                        >
+                          <div
+                            className={`flex aspect-[16/10] flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed transition-colors ${
+                              theme === "custom"
+                                ? "border-primary bg-primary/5 text-primary"
+                                : "border-border text-muted-foreground group-hover:border-primary/50 group-hover:text-primary"
+                            }`}
+                          >
+                            <Palette className="h-5 w-5" />
+                            <span className="text-xs font-medium">
+                              {t("settings.themeStudio.open")}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex items-center gap-1.5">
+                            <span className="truncate text-sm font-medium">
+                              {t("settings.customColors") || "Custom Theme"}
+                            </span>
+                            {theme === "custom" && (
+                              <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />
+                            )}
+                          </div>
+                        </button>
                       )}
                     </div>
-                    <Accordion
-                      type="single"
-                      collapsible
-                      className="mt-2 w-full border-y border-border/60"
-                    >
-                      <AccordionItem value="light-themes" className="border-0">
-                        <AccordionTrigger className="py-3.5 hover:no-underline">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              {t("settings.lightThemes")}
-                            </span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="pb-4 pt-1">
-                          <div className="grid grid-cols-2 gap-4">
-                            {groupedThemes.light.map(t => (
-                              <ThemeButton
-                                key={t.id}
-                                theme={t}
-                                currentTheme={theme}
-                                onSelect={handleThemeChange}
-                              />
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-
-                      <AccordionItem
-                        value="dark-themes"
-                        className="border-0 border-t border-t-border/40"
-                      >
-                        <AccordionTrigger className="py-3.5 hover:no-underline">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              {t("settings.darkThemes")}
-                            </span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="pb-4 pt-1">
-                          <div className="grid grid-cols-2 gap-4">
-                            {groupedThemes.dark.map(t => (
-                              <ThemeButton
-                                key={t.id}
-                                theme={t}
-                                currentTheme={theme}
-                                onSelect={handleThemeChange}
-                              />
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
                   </div>
 
                   <div
@@ -4687,899 +4365,6 @@ function Settings() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Custom Colors Dialog */}
-      <AlertDialog open={showCustomColorsDialog}>
-        <AlertDialogContent className="flex h-[92vh] max-h-[92vh] w-[95vw] max-w-7xl flex-col gap-4 overflow-hidden">
-          <AlertDialogHeader className="shrink-0">
-            <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-              {t("settings.customColors") || "Customize Theme"}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground">
-              {t("settings.customColorsDescription") ||
-                "Customize each color in your theme."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          {(selectedThemeVersion === 1 || selectedThemeVersion === "1") && (
-            <div className="flex shrink-0 items-center gap-2 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-500">
-              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-              <span>
-                {t("settings.legacyThemeWarning") ||
-                  "This theme uses an older format and may be missing some color options. Some colors will use default values."}
-              </span>
-            </div>
-          )}
-
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
-            <div className="min-h-0 space-y-5 pr-2 lg:overflow-y-auto">
-              {/* Core Colors */}
-              <div>
-                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                  Core
-                </h4>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-                  <ColorPickerInput
-                    colorKey="background"
-                    label="Background"
-                    value={customColors.background}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="foreground"
-                    label="Text"
-                    value={customColors.foreground}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="primary"
-                    label="Primary"
-                    value={customColors.primary}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="secondary"
-                    label="Secondary"
-                    value={customColors.secondary}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="accent"
-                    label="Accent"
-                    value={customColors.accent}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="accentForeground"
-                    label="Accent Text"
-                    value={customColors.accentForeground}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="muted"
-                    label="Muted"
-                    value={customColors.muted}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="mutedForeground"
-                    label="Muted Text"
-                    value={customColors.mutedForeground}
-                    onColorChange={handleCustomColorChange}
-                  />
-                </div>
-              </div>
-
-              {/* Cards & Surfaces */}
-              <div>
-                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                  Surfaces
-                </h4>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-                  <ColorPickerInput
-                    colorKey="card"
-                    label="Card"
-                    value={customColors.card}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="cardForeground"
-                    label="Card Text"
-                    value={customColors.cardForeground}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="popover"
-                    label="Popover"
-                    value={customColors.popover}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="popoverForeground"
-                    label="Popover Text"
-                    value={customColors.popoverForeground}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="border"
-                    label="Border"
-                    value={customColors.border}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="input"
-                    label="Input"
-                    value={customColors.input}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="ring"
-                    label="Focus Ring"
-                    value={customColors.ring}
-                    onColorChange={handleCustomColorChange}
-                  />
-                </div>
-              </div>
-
-              {/* Navigation */}
-              <div>
-                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                  Navigation
-                </h4>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-                  <ColorPickerInput
-                    colorKey="navBackground"
-                    label="Background"
-                    value={customColors.navBackground}
-                    onColorChange={handleCustomColorChange}
-                  />
-                </div>
-              </div>
-
-              {/* Status & Feedback */}
-              <div>
-                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                  Status
-                </h4>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-                  <ColorPickerInput
-                    colorKey="success"
-                    label="Success"
-                    value={customColors.success}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="warning"
-                    label="Warning"
-                    value={customColors.warning}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="error"
-                    label="Error"
-                    value={customColors.error}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="info"
-                    label="Info"
-                    value={customColors.info}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="starFilled"
-                    label="Star Filled"
-                    value={customColors.starFilled}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="starEmpty"
-                    label="Star Empty"
-                    value={customColors.starEmpty}
-                    onColorChange={handleCustomColorChange}
-                  />
-                </div>
-              </div>
-
-              {/* Startup Screen */}
-              <div>
-                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                  Startup
-                </h4>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-                  <ColorPickerInput
-                    colorKey="startupBackground"
-                    label="Background"
-                    value={customColors.startupBackground}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="startupAccent"
-                    label="Accent"
-                    value={customColors.startupAccent}
-                    onColorChange={handleCustomColorChange}
-                  />
-                </div>
-              </div>
-
-              {/* Desktop Notifications */}
-              <div>
-                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                  Desktop Notifications
-                </h4>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-                  <ColorPickerInput
-                    colorKey="notificationBackground"
-                    label="Background"
-                    value={notificationColor("notificationBackground")}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="notificationForeground"
-                    label="Title"
-                    value={notificationColor("notificationForeground")}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="notificationMuted"
-                    label="Message"
-                    value={notificationColor("notificationMuted")}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="notificationAccent"
-                    label="Accent"
-                    value={notificationColor("notificationAccent")}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="notificationBorder"
-                    label="Border"
-                    value={notificationColor("notificationBorder")}
-                    onColorChange={handleCustomColorChange}
-                  />
-                  <ColorPickerInput
-                    colorKey="notificationAchievement"
-                    label="Achievement"
-                    value={notificationColor("notificationAchievement")}
-                    onColorChange={handleCustomColorChange}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Live Preview */}
-            <div className="min-h-0 space-y-3 pr-2 lg:overflow-y-auto">
-              <h4 className="text-sm font-medium text-foreground">
-                {t("settings.colorSection.preview") || "Live Preview"}
-              </h4>
-              <div
-                className="rounded-lg border p-4"
-                style={{
-                  backgroundColor: `rgb(${customColors.background})`,
-                  borderColor: `rgb(${customColors.border})`,
-                }}
-              >
-                {/* Card Preview */}
-                <div
-                  className="rounded-md border p-4"
-                  style={{
-                    backgroundColor: `rgb(${customColors.card})`,
-                    borderColor: `rgb(${customColors.border})`,
-                  }}
-                >
-                  <p
-                    className="text-base font-semibold"
-                    style={{ color: `rgb(${customColors.cardForeground})` }}
-                  >
-                    {t("settings.preview.cardTitle")}
-                  </p>
-                  <p
-                    className="mt-1 text-sm"
-                    style={{ color: `rgb(${customColors.mutedForeground})` }}
-                  >
-                    {t("settings.preview.cardDescription")}
-                  </p>
-
-                  {/* Buttons */}
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      className="rounded-md px-3 py-1.5 text-sm font-medium"
-                      style={{
-                        backgroundColor: `rgb(${customColors.primary})`,
-                        color: `rgb(${customColors.secondary})`,
-                      }}
-                    >
-                      {t("settings.preview.primaryButton")}
-                    </button>
-                    <button
-                      className="rounded-md border px-3 py-1.5 text-sm font-medium"
-                      style={{
-                        backgroundColor: `rgb(${customColors.secondary})`,
-                        borderColor: `rgb(${customColors.border})`,
-                        color: `rgb(${customColors.foreground})`,
-                      }}
-                    >
-                      {t("settings.preview.secondaryButton")}
-                    </button>
-                    <button
-                      className="rounded-md px-3 py-1.5 text-sm font-medium"
-                      style={{
-                        backgroundColor: `rgb(${customColors.accent})`,
-                        color: `rgb(${customColors.accentForeground})`,
-                      }}
-                    >
-                      {t("settings.preview.accentButton")}
-                    </button>
-                  </div>
-
-                  {/* Toggle Preview */}
-                  <div className="mt-4 flex items-center gap-3">
-                    <div
-                      className="h-5 w-9 rounded-full p-0.5"
-                      style={{ backgroundColor: `rgb(${customColors.primary})` }}
-                    >
-                      <div
-                        className="h-4 w-4 rounded-full"
-                        style={{
-                          backgroundColor: `rgb(${customColors.card})`,
-                          marginLeft: "auto",
-                        }}
-                      />
-                    </div>
-                    <span
-                      style={{
-                        color: `rgb(${customColors.foreground})`,
-                        fontSize: "14px",
-                      }}
-                    >
-                      {t("settings.preview.toggleEnabled")}
-                    </span>
-                  </div>
-
-                  {/* Input Preview */}
-                  <div className="mt-4">
-                    <div
-                      className="rounded-md border px-3 py-2 text-sm"
-                      style={{
-                        backgroundColor: `rgb(${customColors.background})`,
-                        borderColor: `rgb(${customColors.input})`,
-                        color: `rgb(${customColors.foreground})`,
-                      }}
-                    >
-                      {t("settings.preview.inputPlaceholder")}
-                    </div>
-                  </div>
-
-                  {/* Badge/Muted Preview */}
-                  <div className="mt-4 flex gap-2">
-                    <span
-                      className="rounded-full px-2 py-0.5 text-xs"
-                      style={{
-                        backgroundColor: `rgb(${customColors.muted})`,
-                        color: `rgb(${customColors.mutedForeground})`,
-                      }}
-                    >
-                      {t("settings.preview.badge")}
-                    </span>
-                    <span
-                      className="rounded-full px-2 py-0.5 text-xs"
-                      style={{
-                        backgroundColor: `rgb(${customColors.accent})`,
-                        color: `rgb(${customColors.accentForeground})`,
-                      }}
-                    >
-                      {t("settings.preview.accentBadge")}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Popover Preview */}
-                <div
-                  className="mt-3 rounded-md border p-3 shadow-sm"
-                  style={{
-                    backgroundColor: `rgb(${customColors.popover})`,
-                    borderColor: `rgb(${customColors.border})`,
-                  }}
-                >
-                  <p
-                    className="text-sm font-medium"
-                    style={{ color: `rgb(${customColors.popoverForeground})` }}
-                  >
-                    {t("settings.preview.popoverTitle")}
-                  </p>
-                  <p
-                    className="text-xs"
-                    style={{ color: `rgb(${customColors.mutedForeground})` }}
-                  >
-                    {t("settings.preview.popoverDescription")}
-                  </p>
-                </div>
-
-                {/* Navigation Bar Preview */}
-                <div
-                  className="mt-3 rounded-xl border p-2"
-                  style={{
-                    backgroundColor: `rgb(${customColors.navBackground} / 0.8)`,
-                    borderColor: `rgb(${customColors.border})`,
-                  }}
-                >
-                  <p
-                    className="mb-2 text-xs font-medium"
-                    style={{ color: `rgb(${customColors.mutedForeground})` }}
-                  >
-                    {t("settings.preview.navBar") || "Navigation Bar"}
-                  </p>
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 text-white">
-                      <Home className="h-4 w-4" />
-                    </div>
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-lg"
-                      style={{
-                        color: `rgb(${customColors.mutedForeground})`,
-                      }}
-                    >
-                      <Search className="h-4 w-4" />
-                    </div>
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-lg"
-                      style={{
-                        color: `rgb(${customColors.mutedForeground})`,
-                      }}
-                    >
-                      <Library className="h-4 w-4" />
-                    </div>
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-lg"
-                      style={{
-                        color: `rgb(${customColors.mutedForeground})`,
-                      }}
-                    >
-                      <Download className="h-4 w-4" />
-                    </div>
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-lg"
-                      style={{
-                        color: `rgb(${customColors.mutedForeground})`,
-                      }}
-                    >
-                      <Settings2 className="h-4 w-4" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Star Rating Preview */}
-                <div className="mt-3">
-                  <p
-                    className="mb-2 text-xs font-medium"
-                    style={{ color: `rgb(${customColors.mutedForeground})` }}
-                  >
-                    {t("settings.preview.starRating") || "Star Rating"}
-                  </p>
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map(i => (
-                      <Star
-                        key={i}
-                        className="h-5 w-5"
-                        style={{
-                          fill:
-                            i <= 3 ? `rgb(${customColors.starFilled})` : "transparent",
-                          color:
-                            i <= 3
-                              ? `rgb(${customColors.starFilled})`
-                              : `rgb(${customColors.starEmpty})`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Toast/Notification Previews */}
-                <div className="mt-3 space-y-2">
-                  <p
-                    className="text-xs font-medium"
-                    style={{ color: `rgb(${customColors.mutedForeground})` }}
-                  >
-                    {t("settings.preview.notifications") || "Notifications"}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <div
-                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1"
-                      style={{
-                        backgroundColor: `rgb(${customColors.background} / 0.85)`,
-                        borderColor: `rgb(${customColors.success} / 0.5)`,
-                      }}
-                    >
-                      <CheckCircle
-                        className="h-3 w-3"
-                        style={{ color: `rgb(${customColors.success})` }}
-                      />
-                      <span
-                        className="text-xs"
-                        style={{ color: `rgb(${customColors.foreground})` }}
-                      >
-                        {t("settings.preview.success") || "Success"}
-                      </span>
-                    </div>
-                    <div
-                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1"
-                      style={{
-                        backgroundColor: `rgb(${customColors.background} / 0.85)`,
-                        borderColor: `rgb(${customColors.warning} / 0.5)`,
-                      }}
-                    >
-                      <AlertTriangle
-                        className="h-3 w-3"
-                        style={{ color: `rgb(${customColors.warning})` }}
-                      />
-                      <span
-                        className="text-xs"
-                        style={{ color: `rgb(${customColors.foreground})` }}
-                      >
-                        {t("settings.preview.warning") || "Warning"}
-                      </span>
-                    </div>
-                    <div
-                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1"
-                      style={{
-                        backgroundColor: `rgb(${customColors.background} / 0.85)`,
-                        borderColor: `rgb(${customColors.error} / 0.5)`,
-                      }}
-                    >
-                      <X
-                        className="h-3 w-3"
-                        style={{ color: `rgb(${customColors.error})` }}
-                      />
-                      <span
-                        className="text-xs"
-                        style={{ color: `rgb(${customColors.foreground})` }}
-                      >
-                        {t("settings.preview.error") || "Error"}
-                      </span>
-                    </div>
-                    <div
-                      className="flex items-center gap-1.5 rounded-lg border px-2 py-1"
-                      style={{
-                        backgroundColor: `rgb(${customColors.background} / 0.85)`,
-                        borderColor: `rgb(${customColors.info} / 0.5)`,
-                      }}
-                    >
-                      <Info
-                        className="h-3 w-3"
-                        style={{ color: `rgb(${customColors.info})` }}
-                      />
-                      <span
-                        className="text-xs"
-                        style={{ color: `rgb(${customColors.foreground})` }}
-                      >
-                        {t("settings.preview.info") || "Info"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Desktop Notification Preview */}
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <p
-                      className="text-xs font-medium"
-                      style={{ color: `rgb(${customColors.mutedForeground})` }}
-                    >
-                      {t("settings.preview.desktopNotification")}
-                    </p>
-                    {isOnWindows && (
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          title={t("settings.preview.sendTestNotification")}
-                          className="rounded-md p-1 opacity-70 transition-opacity hover:opacity-100"
-                          style={{ color: `rgb(${customColors.foreground})` }}
-                          onClick={() => handleSendTestNotification(false)}
-                        >
-                          <Bell className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          title={t("settings.preview.sendTestNotification")}
-                          className="rounded-md p-1 opacity-70 transition-opacity hover:opacity-100"
-                          style={{ color: `rgb(${customColors.foreground})` }}
-                          onClick={() => handleSendTestNotification(true)}
-                        >
-                          <Trophy className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  {[false, true].map(isAchievement => {
-                    const tone = isAchievement
-                      ? notificationColor("notificationAchievement")
-                      : customColors.success;
-                    return (
-                      <div
-                        key={String(isAchievement)}
-                        className="relative flex gap-3 overflow-hidden rounded-xl border p-3 pb-3.5 shadow-lg"
-                        style={{
-                          backgroundColor: `rgb(${notificationColor("notificationBackground")})`,
-                          borderColor: `rgb(${notificationColor("notificationBorder")})`,
-                        }}
-                      >
-                        <div
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
-                          style={{
-                            backgroundColor: `rgb(${tone} / 0.16)`,
-                            color: `rgb(${tone})`,
-                            boxShadow: isAchievement
-                              ? `inset 0 0 0 1.5px rgb(${tone})`
-                              : "none",
-                          }}
-                        >
-                          {isAchievement ? (
-                            <Trophy className="h-4 w-4" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p
-                            className="text-[9px] font-semibold uppercase tracking-wider"
-                            style={{
-                              color: `rgb(${isAchievement ? tone : notificationColor("notificationAccent")})`,
-                            }}
-                          >
-                            {isAchievement
-                              ? `\u2605 ${t("settings.preview.achievementUnlocked")}`
-                              : "Ascendara"}
-                          </p>
-                          <p
-                            className="truncate text-sm font-semibold"
-                            style={{
-                              color: `rgb(${notificationColor("notificationForeground")})`,
-                            }}
-                          >
-                            {isAchievement
-                              ? t("settings.preview.achievementName")
-                              : t("settings.preview.desktopNotificationTitle")}
-                          </p>
-                          <p
-                            className="truncate text-xs"
-                            style={{
-                              color: `rgb(${notificationColor("notificationMuted")})`,
-                            }}
-                          >
-                            {isAchievement
-                              ? t("settings.preview.achievementGame")
-                              : t("settings.preview.desktopNotificationMessage")}
-                          </p>
-                        </div>
-                        <X
-                          className="h-3.5 w-3.5 shrink-0"
-                          style={{
-                            color: `rgb(${notificationColor("notificationMuted")})`,
-                          }}
-                        />
-                        <div
-                          className="absolute bottom-0 left-0 h-[3px] w-full"
-                          style={{ backgroundColor: `rgb(${tone} / 0.15)` }}
-                        >
-                          <div
-                            className="h-full w-3/5"
-                            style={{ backgroundColor: `rgb(${tone})` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Startup Screen Preview */}
-                <div
-                  className="mt-3 rounded-lg border p-3"
-                  style={{
-                    backgroundColor: `rgb(${customColors.startupBackground})`,
-                    borderColor: `rgb(${customColors.border})`,
-                  }}
-                >
-                  <p
-                    className="mb-2 text-xs font-medium"
-                    style={{ color: `rgb(${customColors.mutedForeground})` }}
-                  >
-                    {t("settings.preview.startupScreen") || "Startup Screen"}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="h-6 w-6 rounded-full"
-                      style={{ backgroundColor: `rgb(${customColors.startupAccent})` }}
-                    />
-                    <div className="flex-1">
-                      <div
-                        className="mb-1 h-2 w-16 rounded"
-                        style={{ backgroundColor: `rgb(${customColors.startupAccent})` }}
-                      />
-                      <div
-                        className="h-1.5 w-24 rounded opacity-50"
-                        style={{ backgroundColor: `rgb(${customColors.foreground})` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Browse Public Themes Button */}
-              <Button
-                variant="outline"
-                className="mt-3 w-full gap-2 text-primary"
-                onClick={handleBrowsePublicThemes}
-              >
-                <Globe className="h-4 w-4" />
-                {t("settings.browsePublicThemes") || "Browse Community Themes"}
-              </Button>
-            </div>
-          </div>
-
-          <AlertDialogFooter className="shrink-0 flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:justify-between">
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleImportTheme}
-                className="gap-1 text-primary"
-              >
-                <DownloadIcon className="h-4 w-4" />
-                {t("settings.importTheme") || "Import"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportTheme}
-                className="gap-1 text-primary"
-              >
-                <UploadIcon className="h-4 w-4" />
-                {t("settings.exportTheme") || "Export"}
-              </Button>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="text-primary"
-                onClick={() => {
-                  if (originalColorsOnOpen) {
-                    setCustomColors(originalColorsOnOpen);
-                  }
-                  setShowCustomColorsDialog(false);
-                }}
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button className="text-secondary" onClick={handleSaveCustomColors}>
-                {t("settings.applyCustomColors") || "Apply Colors"}
-              </Button>
-            </div>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Public Themes Dialog */}
-      <AlertDialog open={showPublicThemesDialog} onOpenChange={setShowPublicThemesDialog}>
-        <AlertDialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-              {t("settings.communityThemes") || "Community Themes"}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground">
-              {t("settings.communityThemesDescription")}&nbsp;
-              <a
-                className="cursor-pointer text-primary hover:underline"
-                onClick={() => window.electron.openURL("https://ascendara.app/discord")}
-              >
-                {t("settings.joinDiscord")}
-                <ExternalLink className="mb-1 ml-1 inline-block h-3 w-3" />
-              </a>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <div className="py-4">
-            {loadingPublicThemes ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : publicThemes.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground">
-                {t("settings.noPublicThemes") || "No community themes available yet."}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {publicThemes.map((theme, index) => (
-                  <div
-                    key={index}
-                    className="cursor-pointer rounded-lg border border-border p-3 transition-all hover:border-primary hover:shadow-md"
-                    onClick={() =>
-                      handleApplyPublicTheme(theme.colors || theme, theme.version)
-                    }
-                  >
-                    {/* Theme Preview */}
-                    <div
-                      className="mb-2 rounded-md p-3"
-                      style={{
-                        backgroundColor: `rgb(${theme.colors?.background || theme.background})`,
-                      }}
-                    >
-                      <div
-                        className="rounded p-2"
-                        style={{
-                          backgroundColor: `rgb(${theme.colors?.card || theme.card})`,
-                        }}
-                      >
-                        <div
-                          className="mb-1 h-2 w-16 rounded"
-                          style={{
-                            backgroundColor: `rgb(${theme.colors?.primary || theme.primary})`,
-                          }}
-                        />
-                        <div
-                          className="h-1.5 w-10 rounded opacity-50"
-                          style={{
-                            backgroundColor: `rgb(${theme.colors?.foreground || theme.foreground})`,
-                          }}
-                        />
-                      </div>
-                      <div className="mt-2 flex gap-1">
-                        <div
-                          className="h-4 w-4 rounded"
-                          style={{
-                            backgroundColor: `rgb(${theme.colors?.primary || theme.primary})`,
-                          }}
-                        />
-                        <div
-                          className="h-4 w-4 rounded"
-                          style={{
-                            backgroundColor: `rgb(${theme.colors?.accent || theme.accent})`,
-                          }}
-                        />
-                        <div
-                          className="h-4 w-4 rounded"
-                          style={{
-                            backgroundColor: `rgb(${theme.colors?.secondary || theme.secondary})`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-foreground">
-                        {theme.name || `Theme ${index + 1}`}
-                      </p>
-                      {(theme.version === 1 || theme.version === "1") && (
-                        <span className="flex items-center gap-1 rounded bg-yellow-500/20 px-1.5 py-0.5 text-xs text-yellow-500">
-                          <AlertTriangle className="h-3 w-3" />
-                          OUTDATED
-                        </span>
-                      )}
-                    </div>
-                    {theme.author && (
-                      <p className="text-xs text-muted-foreground">
-                        {t("settings.themeBy") || "by"} {theme.author}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <AlertDialogFooter>
-            <Button
-              variant="outline"
-              className="text-primary"
-              onClick={() => {
-                setShowPublicThemesDialog(false);
-                setShowCustomColorsDialog(true);
-              }}
-            >
-              {t("common.back") || "Back"}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Support Code Dialog */}
       <AlertDialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
         <AlertDialogContent className="max-w-md">
@@ -6093,40 +4878,40 @@ function SettingsSection({ id, title, description, action, className = "", child
   );
 }
 
-function ThemeButton({ theme, currentTheme, onSelect }) {
+function ThemeButton({ theme, currentTheme, onSelect, t }) {
   const colors = getThemeColors(theme.id);
+  const isActive = currentTheme === theme.id;
 
   return (
     <button
+      type="button"
       onClick={() => onSelect(theme.id)}
-      className={`group relative overflow-hidden rounded-xl transition-all ${
-        currentTheme === theme.id
-          ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-          : "hover:ring-1 hover:ring-primary/50"
-      }`}
+      className="group text-left outline-none"
     >
-      <div className={`aspect-[4/3] ${colors.bg} border border-border`}>
-        <div className="h-full p-4">
-          <div className={`h-full rounded-lg ${colors.secondary} p-3 shadow-sm`}>
-            <div className="space-y-2">
-              <div className={`h-3 w-24 rounded-full ${colors.primary} opacity-80`} />
-              <div className={`h-2 w-16 rounded-full ${colors.primary} opacity-40`} />
-            </div>
-            <div className="mt-4 space-y-2">
-              <div className={`h-8 rounded-md ${colors.bg} bg-opacity-50`} />
-              <div className={`h-8 rounded-md ${colors.bg} bg-opacity-30`} />
-            </div>
-          </div>
+      <div
+        className={`aspect-[16/10] rounded-xl p-2.5 transition-all ${colors.bg} ${
+          isActive
+            ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+            : "ring-1 ring-border group-hover:ring-primary/50 group-focus-visible:ring-primary"
+        }`}
+      >
+        <div className={`h-full rounded-lg p-2 shadow-sm ${colors.secondary}`}>
+          <div className={`h-2 w-3/5 rounded-full opacity-80 ${colors.primary}`} />
+          <div
+            className={`mt-1.5 h-1.5 w-2/5 rounded-full opacity-40 ${colors.primary}`}
+          />
+          <div className={`mt-3 h-4 rounded-md opacity-60 ${colors.bg}`} />
         </div>
       </div>
-
-      <div
-        className={`absolute bottom-0 left-0 right-0 p-3 ${colors.bg} bg-opacity-80 backdrop-blur-sm`}
-      >
-        <div className="flex items-center justify-between">
-          <span className={`font-medium ${colors.text}`}>{theme.name}</span>
-          <div className={`h-3 w-3 rounded-full ${colors.primary}`} />
-        </div>
+      <div className="mt-2 flex items-center gap-1.5">
+        <span className={`h-2 w-2 shrink-0 rounded-full ${colors.primary}`} />
+        <span className="truncate text-sm font-medium text-foreground">{theme.name}</span>
+        {theme.isNew && !isActive && (
+          <span className="ml-auto shrink-0 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-primary">
+            {t("settings.newTheme")}
+          </span>
+        )}
+        {isActive && <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />}
       </div>
     </button>
   );

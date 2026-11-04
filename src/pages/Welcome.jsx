@@ -181,20 +181,22 @@ function getLanguageFlag(langId) {
 
 const themes = [
   // Light themes
-  { id: "light", name: "Arctic Sky", group: "light" },
+  { id: "coral", name: "Coral", group: "light", isNew: true },
   { id: "blue", name: "Ocean Blue", group: "light" },
   { id: "purple", name: "Ascendara Purple", group: "light" },
   { id: "emerald", name: "Emerald", group: "light" },
   { id: "rose", name: "Rose", group: "light" },
-  { id: "amber", name: "Amber Sand", group: "light" },
+  { id: "lagoon", name: "Lagoon", group: "light", isNew: true },
+  { id: "royal-pearl", name: "Royal Pearl", group: "light", isNew: true },
 
   // Dark themes
-  { id: "dark", name: "Dark Blue", group: "dark" },
+  { id: "aurora", name: "Aurora", group: "dark", isNew: true },
   { id: "midnight", name: "Midnight", group: "dark" },
   { id: "cyberpunk", name: "Cyberpunk", group: "dark" },
   { id: "sunset", name: "Sunset", group: "dark" },
   { id: "forest", name: "Forest", group: "dark" },
-  { id: "ocean", name: "Deep Ocean", group: "dark" },
+  { id: "crimson", name: "Crimson", group: "dark", isNew: true },
+  { id: "royal-night", name: "Royal Night", group: "dark", isNew: true },
 ];
 
 const getThemeColors = themeId => {
@@ -253,17 +255,47 @@ const getThemeColors = themeId => {
       secondary: "bg-[#1C2623]",
       text: "text-green-300",
     },
-    ocean: {
-      bg: "bg-slate-900",
-      primary: "bg-blue-400",
-      secondary: "bg-slate-800",
-      text: "text-blue-300",
+    aurora: {
+      bg: "bg-[#081218]",
+      primary: "bg-[#2DD4BF]",
+      secondary: "bg-[#0E1C24]",
+      text: "text-[#DCFCF6]",
+    },
+    crimson: {
+      bg: "bg-[#160A0E]",
+      primary: "bg-[#F85252]",
+      secondary: "bg-[#241016]",
+      text: "text-[#FEE2E2]",
     },
     midnight: {
       bg: "bg-[#0F172A]",
       primary: "bg-indigo-500",
       secondary: "bg-[#1E293B]",
       text: "text-indigo-300",
+    },
+    lagoon: {
+      bg: "bg-[#ECFAFA]",
+      primary: "bg-[#0D7480]",
+      secondary: "bg-[#CFF2F3]",
+      text: "text-[#0E3E46]",
+    },
+    coral: {
+      bg: "bg-[#FFF1EC]",
+      primary: "bg-[#CC402C]",
+      secondary: "bg-[#FDE2D8]",
+      text: "text-[#5C1C14]",
+    },
+    "royal-pearl": {
+      bg: "bg-[#F7F6FB]",
+      primary: "bg-[#37228C]",
+      secondary: "bg-[#ECE9F6]",
+      text: "text-[#1E1646]",
+    },
+    "royal-night": {
+      bg: "bg-[#120E26]",
+      primary: "bg-[#E8BA52]",
+      secondary: "bg-[#1C1638]",
+      text: "text-[#F5ECD4]",
     },
     amber: {
       bg: "bg-amber-50",
@@ -2074,7 +2106,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3 md:grid-cols-6">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
                     {themes
                       .filter(
                         theme => theme.group === (showingLightThemes ? "light" : "dark")

@@ -82,12 +82,18 @@ THEMES = {
     "emerald":   {"bg": "255 255 255", "fg": "6 78 59",     "muted": "4 120 87",    "accent": "16 185 129",  "border": "167 243 208"},
     "rose":      {"bg": "255 255 255", "fg": "136 19 55",   "muted": "190 18 60",   "accent": "225 29 72",   "border": "254 205 211"},
     "amber":     {"bg": "255 251 235", "fg": "120 53 15",   "muted": "146 64 14",   "accent": "217 119 6",   "border": "253 230 138"},
+    "lagoon":    {"bg": "255 255 255", "fg": "14 62 70",    "muted": "21 94 103",   "accent": "13 116 128",  "border": "125 211 219"},
+    "coral":     {"bg": "255 255 255", "fg": "92 28 20",    "muted": "154 52 34",   "accent": "204 64 44",   "border": "249 168 140"},
+    "royal-pearl": {"bg": "255 255 255", "fg": "30 22 70",  "muted": "88 72 140",   "accent": "55 34 140",   "border": "228 214 170"},
     "dark":      {"bg": "30 41 59",    "fg": "241 245 249", "muted": "148 163 184", "accent": "59 130 246",  "border": "51 65 85"},
     "midnight":  {"bg": "15 23 42",    "fg": "199 210 254", "muted": "165 180 252", "accent": "129 140 248", "border": "51 65 85"},
     "cyberpunk": {"bg": "31 41 55",    "fg": "251 207 232", "muted": "249 168 212", "accent": "236 72 153",  "border": "55 65 81"},
     "sunset":    {"bg": "51 65 85",    "fg": "254 215 170", "muted": "253 186 116", "accent": "249 115 22",  "border": "71 85 105"},
     "forest":    {"bg": "30 41 35",    "fg": "187 247 208", "muted": "74 222 128",  "accent": "34 197 94",   "border": "40 51 45"},
     "ocean":     {"bg": "30 41 59",    "fg": "207 250 254", "muted": "103 232 249", "accent": "34 211 238",  "border": "51 65 85"},
+    "aurora":    {"bg": "14 28 36",    "fg": "220 252 246", "muted": "153 230 216", "accent": "45 212 191",  "border": "30 54 64"},
+    "crimson":   {"bg": "36 16 22",    "fg": "254 226 226", "muted": "252 165 165", "accent": "248 82 82",   "border": "70 30 40"},
+    "royal-night": {"bg": "28 22 56",  "fg": "245 236 212", "muted": "190 178 230", "accent": "232 186 82",  "border": "56 46 96"},
 }
 
 # Custom theme keys the theme maker writes, with the general theme keys each one

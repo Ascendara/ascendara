@@ -18,7 +18,13 @@ const DARK_THEMES = new Set([
   "sunset",
   "forest",
   "ocean",
+  "aurora",
+  "crimson",
+  "royal-night",
 ]);
+
+/** Whether a built-in theme is dark; custom themes count as dark. */
+export const isDarkTheme = theme => theme === "custom" || DARK_THEMES.has(theme);
 
 // Custom themes store colors as "r g b"; treat a dark background as a dark theme.
 const isDarkBackground = rgb => {
@@ -176,6 +182,12 @@ export function ThemeProvider({ children }) {
         "rose",
         "amber",
         "ocean",
+        "aurora",
+        "crimson",
+        "coral",
+        "lagoon",
+        "royal-pearl",
+        "royal-night",
         "custom",
       ]}
     >

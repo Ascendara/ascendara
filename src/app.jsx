@@ -23,7 +23,7 @@ import ChangelogDialog from "@/components/ChangelogDialog";
 import DllSharingConsentDialog from "@/components/DllSharingConsentDialog";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { TourProvider } from "@/context/TourContext";
-import { ThemeProvider, useTheme } from "@/context/ThemeContext";
+import { ThemeProvider, useTheme, isDarkTheme } from "@/context/ThemeContext";
 import { SettingsProvider, useSettings } from "@/context/SettingsContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { SearchProvider } from "@/context/SearchContext";
@@ -2146,11 +2146,9 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const LIGHT_THEMES = ["light", "blue", "purple", "emerald", "rose", "amber"];
-
 function ToasterWithTheme() {
   const { theme } = useTheme();
-  const sonnerTheme = LIGHT_THEMES.includes(theme) ? "light" : "dark";
+  const sonnerTheme = isDarkTheme(theme) ? "dark" : "light";
 
   return (
     <Toaster
