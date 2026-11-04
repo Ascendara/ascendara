@@ -34,6 +34,7 @@ import { useSettingsSearch } from "@/hooks/useSettingsSearch";
 import { onDownloadStallChange } from "@/hooks/useDownloadStall";
 import { markBootComplete, useAppIcon } from "@/hooks/useAppIcon";
 import StartupSplash from "@/components/StartupSplash";
+import { syncIndexDuringBoot, takeBootIndexSync, whenBootReady } from "@/lib/bootGate";
 import { useLibrarySearch } from "@/hooks/useLibrarySearch";
 import {
   initializeStatusService,
@@ -370,9 +371,9 @@ const AutomaticIndexRefresher = () => {
     let retries = 0;
     let retryTimeout = null;
 
-    const sync = async () => {
+    const sync = async (pending = null) => {
       try {
-        const result = await window.electron.syncCommunityIndex();
+        const result = await (pending || window.electron.syncCommunityIndex());
         if (result?.skipped) return;
         if (!result?.success) throw new Error(result?.error || "Sync failed");
         retries = 0;
@@ -394,8 +395,10 @@ const AutomaticIndexRefresher = () => {
       }
     };
 
-    // Shortly after launch, so an out-of-date index is replaced before it's browsed
-    const timeout = setTimeout(sync, 3000);
+    // The launch sync already started during boot (see syncIndexDuringBoot);
+    // finish its bookkeeping instead of syncing a second time.
+    const bootSync = takeBootIndexSync();
+    const timeout = setTimeout(() => sync(bootSync), bootSync ? 0 : 3000);
     const interval = setInterval(sync, 6 * 60 * 60 * 1000);
     return () => {
       clearTimeout(timeout);
@@ -1235,6 +1238,9 @@ const AppRoutes = () => {
   const [isInstalling, setIsInstalling] = useState(false);
   const iconData = useAppIcon();
   const [splashDone, setSplashDone] = useState(false);
+  // The app renders under the splash once initialized; the splash only leaves
+  // after the first page has finished loading its data and images.
+  const [firstPageReady, setFirstPageReady] = useState(false);
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [showPlatformWarning, setShowPlatformWarning] = useState(false);
   const [isBrokenVersion, setIsBrokenVersion] = useState(false);
@@ -1547,6 +1553,12 @@ const AppRoutes = () => {
 
         const hasLaunched = await checkAndSetWelcomeStatus();
         await promptDllSharingIfNeeded(hasLaunched);
+        if (hasLaunched) {
+          // Pick up a newer game index while the splash is still up, so Home
+          // doesn't load the old one and then refresh in front of the user.
+          const bootSync = await syncIndexDuringBoot(await window.electron.getSettings());
+          if (bootSync?.updated) gameService.clearMemoryCache();
+        }
         const isWindows = await window.electron.isOnWindows();
         if (hasLaunched && isWindows) {
           const isWatchdogActive = await window.electron.isWatchdogRunning();
@@ -1586,6 +1598,17 @@ const AppRoutes = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (isLoading || isUpdating || isInstalling) return;
+    let cancelled = false;
+    whenBootReady().then(() => {
+      if (!cancelled) setFirstPageReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, isUpdating, isInstalling]);
 
   useEffect(() => {
     // Remove the initial loader once React is ready
@@ -1888,7 +1911,7 @@ const AppRoutes = () => {
     <StartupSplash
       key="startup-splash"
       iconData={iconData}
-      exiting={!isLoading && !isUpdating}
+      exiting={!isLoading && !isUpdating && firstPageReady}
       onDone={() => {
         setSplashDone(true);
         markBootComplete();

@@ -46,6 +46,7 @@ import {
 import { useImageLoader } from "@/hooks/useImageLoader";
 import gameService from "@/services/games/gameService";
 import imageCacheService from "@/services/images/imageCacheService";
+import { holdBoot, releaseWhenDecoded } from "@/lib/bootGate";
 import steamGridImageService from "@/services/images/steamGridImageService";
 import recentGamesService from "@/services/library/recentGamesService";
 import { pullCloudGameDataBeforeLaunch } from "@/services/cloud/gameLaunchCloudSync";
@@ -304,6 +305,7 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
     const gameId = game.game || game.name;
 
     const loadImage = async () => {
+      const releaseBoot = holdBoot();
       // No localStorage caching - data URLs blow out the per-origin localStorage
       // quota; IPC reads from disk are fast and React state holds the result.
       try {
@@ -313,8 +315,11 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
           recentCardImageCache.set(gameId, dataUrl);
           imageLoadedRef.current = true;
           setImageData(dataUrl);
+          releaseWhenDecoded(releaseBoot, dataUrl);
+          return;
         }
       } catch (error) {}
+      releaseBoot();
     };
 
     if (!imageLoadedRef.current) {
@@ -688,6 +693,8 @@ const Home = memo(() => {
 
   useEffect(() => {
     const loadGames = async (forceRefresh = false) => {
+      // Hold the startup splash until the games are in (no-op after boot)
+      const releaseBoot = holdBoot();
       try {
         // With a warm cache the page is already painted; only show the
         // skeleton when there's genuinely nothing to show yet.
@@ -786,6 +793,7 @@ const Home = memo(() => {
         console.error("Error loading games:", error);
       } finally {
         setLoading(false);
+        releaseBoot();
       }
     };
 
@@ -822,6 +830,8 @@ const Home = memo(() => {
     if (!carouselGames.length) return;
 
     let active = true;
+    // The hero image is the first thing on screen, so boot waits for it
+    const releaseBoot = holdBoot();
     const loadCarouselImages = async () => {
       const totalSlides = carouselGames.length;
       // Load current slide + next 3 slides (for the "Up Next" sidebar and preloading)
@@ -836,7 +846,11 @@ const Home = memo(() => {
         if (!active) return;
         const game = carouselGames[slideIndex];
         const key = carouselCoverKey(game);
-        if (!key || carouselImages[key]) continue;
+        const isCurrent = slideIndex === currentSlide;
+        if (!key || carouselImages[key]) {
+          if (isCurrent) releaseBoot();
+          continue;
+        }
 
         try {
           let imageUrl = null;
@@ -849,8 +863,10 @@ const Home = memo(() => {
           if (active && imageUrl) {
             setCarouselImages(prev => ({ ...prev, [key]: imageUrl }));
           }
+          if (isCurrent) releaseWhenDecoded(releaseBoot, imageUrl);
         } catch (error) {
           console.error(`Error loading carousel image for ${game.game}:`, error);
+          if (isCurrent) releaseBoot();
         }
       }
     };
@@ -858,6 +874,7 @@ const Home = memo(() => {
     loadCarouselImages();
     return () => {
       active = false;
+      releaseBoot();
     };
   }, [carouselGames, currentSlide, imageRefreshKey]);
 
@@ -899,9 +916,14 @@ const Home = memo(() => {
 
   useEffect(() => {
     const updateRecentGames = async () => {
-      const recent = await getRecentGames([...installedGames, ...apiGames]);
-      recentGamesCache = recent;
-      setRecentGames(recent);
+      const releaseBoot = holdBoot();
+      try {
+        const recent = await getRecentGames([...installedGames, ...apiGames]);
+        recentGamesCache = recent;
+        setRecentGames(recent);
+      } finally {
+        releaseBoot();
+      }
     };
     // Only update when games actually change, not on every render
     if (installedGames.length > 0 || apiGames.length > 0) {

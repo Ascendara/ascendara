@@ -1,6 +1,7 @@
 import { useState, useEffect, useSyncExternalStore } from "react";
 import imageCacheService from "@/services/images/imageCacheService";
 import steamGridImageService from "@/services/images/steamGridImageService";
+import { holdBoot, releaseWhenDecoded } from "@/lib/bootGate";
 
 // Track which images are currently being loaded to prevent duplicate requests
 const loadingImages = new Map();
@@ -68,6 +69,10 @@ export function useImageLoader(
     // Each effect owns its cancellation flag so an old request cannot update
     // a card after it has switched to a different game.
     let active = true;
+    // Keeps the startup splash up until this image is ready to paint (no-op
+    // after boot), so the first page is never revealed with empty cards.
+    const releaseBoot = holdBoot();
+    const settle = url => releaseWhenDecoded(releaseBoot, url);
 
     // SteamGrid fallback: when there's no imgID but a game name is supplied
     // (typically for custom Hydra sources), resolve a cover URL by name.
@@ -79,6 +84,7 @@ export function useImageLoader(
       const peeked = steamGridImageService.peek(name);
       if (peeked) {
         setState(resolvedState(steamGridImageService.pickUrl(peeked, slot)));
+        releaseBoot();
         return;
       }
 
@@ -93,6 +99,7 @@ export function useImageLoader(
             loading: false,
             error: url ? null : "No SteamGrid match",
           });
+          settle(url);
         })
         .catch(err => {
           if (!active) return;
@@ -101,9 +108,11 @@ export function useImageLoader(
             loading: false,
             error: err?.message || "SteamGrid lookup failed",
           });
+          releaseBoot();
         });
       return () => {
         active = false;
+        releaseBoot();
       };
     }
 
@@ -113,6 +122,7 @@ export function useImageLoader(
         loading: false,
         error: null,
       });
+      releaseBoot();
       return;
     }
 
@@ -120,6 +130,7 @@ export function useImageLoader(
     const cachedUrl = imageCacheService.memoryCache?.get(imgID)?.url;
     if (cachedUrl) {
       setState(resolvedState(cachedUrl));
+      settle(cachedUrl);
       return;
     }
 
@@ -137,6 +148,7 @@ export function useImageLoader(
               error: cached ? null : "Failed to load image",
             });
           }
+          settle(cached);
         })
         .catch(error => {
           if (active) {
@@ -146,9 +158,11 @@ export function useImageLoader(
               error: error.message || "Failed to load image",
             });
           }
+          releaseBoot();
         });
       return () => {
         active = false;
+        releaseBoot();
       };
     }
 
@@ -175,6 +189,7 @@ export function useImageLoader(
               error: null,
             });
           }
+          settle(cached);
           return cached;
         } catch (error) {
           if (active) {
@@ -184,6 +199,7 @@ export function useImageLoader(
               error: error.message || "Failed to load image",
             });
           }
+          releaseBoot();
           throw error;
         } finally {
           loadingImages.delete(loadingKey);
@@ -204,6 +220,7 @@ export function useImageLoader(
     return () => {
       active = false;
       loadTask.mounted = false;
+      releaseBoot();
     };
   }, [
     revision,
