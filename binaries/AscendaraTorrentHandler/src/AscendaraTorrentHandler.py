@@ -317,6 +317,25 @@ class TorrentManager:
         except Exception as e:
             logging.warning(f"[TorrentHandler] Could not remove finished torrent from qBittorrent: {e}")
 
+    @staticmethod
+    def _torrent_add_succeeded(result) -> bool:
+        """qBittorrent < 5.1 answers torrents/add with "Ok."/"Fails."; 5.1+ returns
+        JSON metadata (success_count, pending_count, failure_count, added_torrent_ids)."""
+        if isinstance(result, str):
+            return result.strip() == "Ok."
+        try:
+            get = result.get if hasattr(result, "get") else lambda k, d=None: getattr(result, k, d)
+            success = int(get("success_count", 0) or 0)
+            pending = int(get("pending_count", 0) or 0)
+            added = get("added_torrent_ids", None) or []
+            if success or pending or added:
+                return True
+            if get("failure_count", None) is not None:
+                return False
+        except Exception:
+            pass
+        return str(result).strip() == "Ok."
+
     def download_torrent(self, magnet_link, game, online, dlc, isVr, updateFlow, version, size, download_dir, theme=None):
         self.notification_theme = theme
         # Match the folder and JSON names Electron looks up (AscendaraDownloader does the same)
@@ -418,7 +437,7 @@ class TorrentManager:
                     use_auto_torrent_management=False,
                     sequential_download=True
                 )
-                if str(result).strip() != "Ok.":
+                if not self._torrent_add_succeeded(result):
                     raise Exception(f"qBittorrent rejected the torrent ({result})")
                 logging.info(f"Added torrent to qBittorrent for game: {game}")
             self.current_torrent_hash = torrent_hash
