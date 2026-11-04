@@ -1255,6 +1255,9 @@ const AppRoutes = () => {
   // The app renders under the splash once initialized; the splash only leaves
   // after the first page has finished loading its data and images.
   const [firstPageReady, setFirstPageReady] = useState(false);
+  // Startup dialogs wait for the splash to leave and the first page's entrance
+  // animations to play, so they never pop in over a half-loaded app.
+  const [startupSettled, setStartupSettled] = useState(false);
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [showPlatformWarning, setShowPlatformWarning] = useState(false);
   const [isBrokenVersion, setIsBrokenVersion] = useState(false);
@@ -1634,6 +1637,12 @@ const AppRoutes = () => {
 
   // Signed in: load Ascend's overview in the background once the app is up,
   // so opening Ascend shows it straight away
+  useEffect(() => {
+    if (!splashDone) return;
+    const timer = setTimeout(() => setStartupSettled(true), 600);
+    return () => clearTimeout(timer);
+  }, [splashDone]);
+
   useEffect(() => {
     if (!firstPageReady || !user?.uid) return;
     if (!user.emailVerified && user.providerData?.[0]?.providerId === "password") return;
@@ -2061,24 +2070,29 @@ const AppRoutes = () => {
           </Route>
         </Routes>
       )}
-      {showSupportDialog && <SupportDialog onClose={() => setShowSupportDialog(false)} />}
-      {showPlatformWarning && (
+      {startupSettled && showSupportDialog && (
+        <SupportDialog onClose={() => setShowSupportDialog(false)} />
+      )}
+      {startupSettled && showPlatformWarning && (
         <PlatformWarningDialog onClose={() => setShowPlatformWarning(false)} />
       )}
-      {isBrokenVersion && (
+      {startupSettled && isBrokenVersion && (
         <BrokenVersionDialog onClose={() => setIsBrokenVersion(false)} />
       )}
-      {showFirstIndexDialog && (
+      {startupSettled && showFirstIndexDialog && (
         <FirstIndexDialog onClose={() => setShowFirstIndexDialog(false)} />
       )}
       <BranchWelcomeDialog
         branch={appBranch}
-        open={showBranchWelcome}
+        open={startupSettled && showBranchWelcome}
         onOpenChange={setShowBranchWelcome}
       />
-      <WatcherWarnDialog open={showWatcherWarn} onOpenChange={setShowWatcherWarn} />
+      <WatcherWarnDialog
+        open={startupSettled && showWatcherWarn}
+        onOpenChange={setShowWatcherWarn}
+      />
       <ChangelogDialog
-        open={showChangelog}
+        open={startupSettled && showChangelog}
         onOpenChange={setShowChangelog}
         currentVersion={changelogPreviewVersion || __APP_VERSION__}
         includeDrafts={!!changelogPreviewVersion}
@@ -2086,6 +2100,7 @@ const AppRoutes = () => {
       {/* Waits until the changelog and any other startup dialog is dismissed */}
       <DllSharingConsentDialog
         open={
+          startupSettled &&
           showDllSharingConsent &&
           !effectiveShowWelcome &&
           !showChangelog &&
