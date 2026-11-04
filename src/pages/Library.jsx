@@ -141,6 +141,8 @@ import EditCoverDialog from "@/components/EditCoverDialog";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { useGameRunning } from "@/hooks/useGameRunning";
+import { useLoadHold } from "@/hooks/useLoadHold";
+import { holdLoad, releaseWhenDecoded } from "@/lib/loadGate";
 import {
   gameImageCache,
   heroImageCache,
@@ -271,6 +273,7 @@ const Library = () => {
     setFolders(currentFolders);
   }, [library.games, libraryRecords]);
   const [loading, setLoading] = useState(() => libraryGamesCache === null);
+  useLoadHold(loading);
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
   const [isImportGamesOpen, setIsImportGamesOpen] = useState(false);
   const [isStoreAccountsOpen, setIsStoreAccountsOpen] = useState(false);
@@ -4667,14 +4670,18 @@ const InstalledGameCard = memo(
 
       const loadLogo = async (force = false) => {
         if (!force && logoImageCache.has(gameId)) return;
+        const releaseLoad = holdLoad();
+        let dataUrl = null;
         try {
           const logoBase64 = await window.electron.getGameImage(gameId, "logo");
           if (!isMounted) return;
-          const dataUrl = logoBase64 ? `data:image/png;base64,${logoBase64}` : null;
+          dataUrl = logoBase64 ? `data:image/png;base64,${logoBase64}` : null;
           logoImageCache.set(gameId, dataUrl);
           setLogoData(dataUrl);
         } catch (e) {
           if (isMounted) setLogoData(null);
+        } finally {
+          releaseWhenDecoded(releaseLoad, dataUrl);
         }
       };
 
@@ -4697,14 +4704,18 @@ const InstalledGameCard = memo(
 
       const loadHero = async (force = false) => {
         if (!force && heroImageCache.has(gameId)) return;
+        const releaseLoad = holdLoad();
+        let dataUrl = null;
         try {
           const heroBase64 = await window.electron.getGameImage(gameId, "hero");
           if (!isMounted) return;
-          const dataUrl = heroBase64 ? `data:image/jpeg;base64,${heroBase64}` : null;
+          dataUrl = heroBase64 ? `data:image/jpeg;base64,${heroBase64}` : null;
           heroImageCache.set(gameId, dataUrl);
           setHeroData(dataUrl);
         } catch {
           /* falls back to the blurred cover */
+        } finally {
+          releaseWhenDecoded(releaseLoad, dataUrl);
         }
       };
 

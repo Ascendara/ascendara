@@ -34,7 +34,13 @@ import { useSettingsSearch } from "@/hooks/useSettingsSearch";
 import { onDownloadStallChange } from "@/hooks/useDownloadStall";
 import { markBootComplete, useAppIcon } from "@/hooks/useAppIcon";
 import StartupSplash from "@/components/StartupSplash";
-import { syncIndexDuringBoot, takeBootIndexSync, whenBootReady } from "@/lib/bootGate";
+import {
+  afterBoot,
+  isPageLoading,
+  syncIndexDuringBoot,
+  takeBootIndexSync,
+  whenBootReady,
+} from "@/lib/loadGate";
 import { useLibrarySearch } from "@/hooks/useLibrarySearch";
 import {
   initializeStatusService,
@@ -395,12 +401,19 @@ const AutomaticIndexRefresher = () => {
       }
     };
 
-    // The launch sync already started during boot (see syncIndexDuringBoot);
-    // finish its bookkeeping instead of syncing a second time.
-    const bootSync = takeBootIndexSync();
-    const timeout = setTimeout(() => sync(bootSync), bootSync ? 0 : 3000);
+    // This mounts before boot starts the launch sync (see syncIndexDuringBoot),
+    // so wait for boot and finish that sync's bookkeeping instead of syncing a
+    // second time. Without one, sync shortly after launch as before.
+    let cancelled = false;
+    let timeout = null;
+    afterBoot().then(() => {
+      if (cancelled) return;
+      const bootSync = takeBootIndexSync();
+      timeout = setTimeout(() => sync(bootSync), bootSync ? 0 : 3000);
+    });
     const interval = setInterval(sync, 6 * 60 * 60 * 1000);
     return () => {
+      cancelled = true;
       clearTimeout(timeout);
       clearTimeout(retryTimeout);
       clearInterval(interval);
@@ -622,6 +635,9 @@ const ScrollToTop = () => {
   const { pathname } = useLocation();
 
   useEffect(() => {
+    // Layout scrolls up itself once a page that loads behind the current one
+    // is revealed; scrolling now would jerk the page still on screen
+    if (isPageLoading()) return;
     window.scrollTo(0, 0);
   }, [pathname]);
 

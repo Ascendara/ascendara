@@ -46,7 +46,7 @@ import {
 import { useImageLoader } from "@/hooks/useImageLoader";
 import gameService from "@/services/games/gameService";
 import imageCacheService from "@/services/images/imageCacheService";
-import { holdBoot, releaseWhenDecoded } from "@/lib/bootGate";
+import { holdLoad, releaseWhenDecoded } from "@/lib/loadGate";
 import steamGridImageService from "@/services/images/steamGridImageService";
 import recentGamesService from "@/services/library/recentGamesService";
 import { pullCloudGameDataBeforeLaunch } from "@/services/cloud/gameLaunchCloudSync";
@@ -305,7 +305,7 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
     const gameId = game.game || game.name;
 
     const loadImage = async () => {
-      const releaseBoot = holdBoot();
+      const releaseLoad = holdLoad();
       // No localStorage caching - data URLs blow out the per-origin localStorage
       // quota; IPC reads from disk are fast and React state holds the result.
       try {
@@ -315,11 +315,11 @@ const MiniRecentCard = memo(({ game, onPlay }) => {
           recentCardImageCache.set(gameId, dataUrl);
           imageLoadedRef.current = true;
           setImageData(dataUrl);
-          releaseWhenDecoded(releaseBoot, dataUrl);
+          releaseWhenDecoded(releaseLoad, dataUrl);
           return;
         }
       } catch (error) {}
-      releaseBoot();
+      releaseLoad();
     };
 
     if (!imageLoadedRef.current) {
@@ -693,8 +693,8 @@ const Home = memo(() => {
 
   useEffect(() => {
     const loadGames = async (forceRefresh = false) => {
-      // Hold the startup splash until the games are in (no-op after boot)
-      const releaseBoot = holdBoot();
+      // Hold the splash / page transition until the games are in
+      const releaseLoad = holdLoad();
       try {
         // With a warm cache the page is already painted; only show the
         // skeleton when there's genuinely nothing to show yet.
@@ -793,7 +793,7 @@ const Home = memo(() => {
         console.error("Error loading games:", error);
       } finally {
         setLoading(false);
-        releaseBoot();
+        releaseLoad();
       }
     };
 
@@ -830,8 +830,8 @@ const Home = memo(() => {
     if (!carouselGames.length) return;
 
     let active = true;
-    // The hero image is the first thing on screen, so boot waits for it
-    const releaseBoot = holdBoot();
+    // The hero image is the first thing on screen, so loading waits for it
+    const releaseLoad = holdLoad();
     const loadCarouselImages = async () => {
       const totalSlides = carouselGames.length;
       // Load current slide + next 3 slides (for the "Up Next" sidebar and preloading)
@@ -848,7 +848,7 @@ const Home = memo(() => {
         const key = carouselCoverKey(game);
         const isCurrent = slideIndex === currentSlide;
         if (!key || carouselImages[key]) {
-          if (isCurrent) releaseBoot();
+          if (isCurrent) releaseLoad();
           continue;
         }
 
@@ -863,10 +863,10 @@ const Home = memo(() => {
           if (active && imageUrl) {
             setCarouselImages(prev => ({ ...prev, [key]: imageUrl }));
           }
-          if (isCurrent) releaseWhenDecoded(releaseBoot, imageUrl);
+          if (isCurrent) releaseWhenDecoded(releaseLoad, imageUrl);
         } catch (error) {
           console.error(`Error loading carousel image for ${game.game}:`, error);
-          if (isCurrent) releaseBoot();
+          if (isCurrent) releaseLoad();
         }
       }
     };
@@ -874,7 +874,7 @@ const Home = memo(() => {
     loadCarouselImages();
     return () => {
       active = false;
-      releaseBoot();
+      releaseLoad();
     };
   }, [carouselGames, currentSlide, imageRefreshKey]);
 
@@ -916,13 +916,13 @@ const Home = memo(() => {
 
   useEffect(() => {
     const updateRecentGames = async () => {
-      const releaseBoot = holdBoot();
+      const releaseLoad = holdLoad();
       try {
         const recent = await getRecentGames([...installedGames, ...apiGames]);
         recentGamesCache = recent;
         setRecentGames(recent);
       } finally {
-        releaseBoot();
+        releaseLoad();
       }
     };
     // Only update when games actually change, not on every render

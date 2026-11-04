@@ -1,3 +1,5 @@
+import { holdLoad, releaseWhenDecoded } from "@/lib/loadGate";
+
 // Module-level caches so game artwork survives page switches (Library <-> GameScreen)
 // without re-fetching via IPC. Keyed by game name; values are data URLs (or null
 // when we've confirmed the asset doesn't exist).
@@ -67,6 +69,8 @@ export const loadGameCover = game => {
   const gameId = game?.game || game?.name;
   if (!gameId) return Promise.resolve(null);
   if (gameImageCache.get(gameId)) return Promise.resolve(gameImageCache.get(gameId));
+  // A page waiting to be revealed waits for its covers too
+  const releaseLoad = holdLoad();
   if (!pendingCovers.has(gameId)) {
     pendingCovers.set(
       gameId,
@@ -78,5 +82,10 @@ export const loadGameCover = game => {
         .finally(() => pendingCovers.delete(gameId))
     );
   }
-  return pendingCovers.get(gameId);
+  const cover = pendingCovers.get(gameId);
+  cover.then(
+    image => releaseWhenDecoded(releaseLoad, image),
+    () => releaseLoad()
+  );
+  return cover;
 };
