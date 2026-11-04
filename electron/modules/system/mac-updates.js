@@ -52,8 +52,8 @@ async function fetchBuffer(url) {
 
 /**
  * Describe the macOS zip to install for branch: its build id, download URL,
- * sha256 digest and blockmap. For live, version is the release tag; for
- * public-testing, minVersion refuses a testing build older than announced.
+ * sha256 digest and blockmap. For live, version is the release tag; for the
+ * testing branches, minVersion refuses a testing build older than announced.
  */
 async function resolveMacUpdate(branch, version) {
   let build;
@@ -71,7 +71,7 @@ async function resolveMacUpdate(branch, version) {
       // The download URL is fixed, so a failed lookup only costs the delta
       console.warn("Could not read the macOS release:", error.message);
     }
-  } else if (branch === "public-testing") {
+  } else if (branch === "public-testing" || branch === "experimental") {
     ({ data: release } = await axios.get(`${RELEASE_API}/testing`, {
       headers: githubHeaders,
       timeout: 15000,

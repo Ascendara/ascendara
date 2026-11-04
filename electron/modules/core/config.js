@@ -203,15 +203,37 @@ const appBranch = "live";
 const appVersion = "11.9.1";
 const testingVersion = "";
 
+// Experimental and public-testing install the same "testing" build, so that
+// build runs as whichever of the two the user last switched to
+const TESTING_BRANCH_FILE = path.join(
+  path.dirname(TIMESTAMP_FILE),
+  "branch.ascendara.json"
+);
+
+function readTestingBranch() {
+  try {
+    const { branch } = JSON.parse(fs.readFileSync(TESTING_BRANCH_FILE, "utf8"));
+    return branch === "experimental" ? branch : "public-testing";
+  } catch {
+    return "public-testing";
+  }
+}
+
+const runningBranch = appBranch === "public-testing" ? readTestingBranch() : appBranch;
+
 // The Ascendara API every main-process request goes to. VITE_API_URL points
 // both this and the renderer (src/config/api.js) at another server.
-const API_URL = (process.env.VITE_API_URL || "https://api.ascendara.app").replace(/\/+$/, "");
+const API_URL = (process.env.VITE_API_URL || "https://api.ascendara.app").replace(
+  /\/+$/,
+  ""
+);
 
 module.exports = {
   API_URL,
   appVersion,
-  appBranch,
+  appBranch: runningBranch,
   testingVersion,
+  TESTING_BRANCH_FILE,
   isDev,
   isWindows,
   isPortable,

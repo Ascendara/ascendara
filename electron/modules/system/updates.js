@@ -28,6 +28,7 @@ const {
   isPortable,
   isLinux,
   TIMESTAMP_FILE,
+  TESTING_BRANCH_FILE,
   LANG_DIR,
 } = require("../core/config");
 const { updateTimestampFile } = require("../core/utils");
@@ -46,7 +47,8 @@ let availableVersion = null;
 // Portable copies update by downloading the new portable build from the release.
 const PORTABLE_RELEASES_URL = "https://github.com/Ascendara/ascendara/releases/latest";
 
-// Public-testing builds are published by CI as the rolling "testing" prerelease
+// Public-testing and experimental both install the rolling "testing" prerelease
+// that CI publishes; the API only announces their versions on different schedules
 const TESTING_RELEASE_URL =
   "https://api.github.com/repos/Ascendara/ascendara/releases/tags/testing";
 
@@ -56,9 +58,6 @@ const UPDATE_STALL_TIMEOUT = 30000;
 const UPDATE_DOWNLOAD_ATTEMPTS = 5;
 
 const isMac = process.platform === "darwin";
-
-// macOS builds are published for live and public-testing only
-const branchHasMacBuilds = branch => branch === "live" || branch === "public-testing";
 
 /**
  * Wrap a progress callback so it only fires when the percentage changes,
@@ -97,6 +96,14 @@ async function testingInstallerUrl(minVersion) {
   const asset = (release.assets || []).find(item => pattern.test(item.name));
   if (!asset) throw new Error("The testing build has no installer for this platform.");
   return asset.browser_download_url;
+}
+
+/**
+ * Record which branch the installed "testing" build should run as. Live builds
+ * ignore the file.
+ */
+async function rememberTestingBranch(branch) {
+  await fs.outputJson(TESTING_BRANCH_FILE, { branch });
 }
 
 /**
@@ -208,7 +215,7 @@ async function checkVersionAndUpdate() {
       `Version check [${currentBranch}]: Current=${currentVersion}, Latest=${latestVersion}, Is Latest=${isLatest}`
     );
     if (!isLatest) {
-      const canAutoUpdate = !isPortable && (!isMac || branchHasMacBuilds(currentBranch));
+      const canAutoUpdate = !isPortable;
       if (
         settings.autoUpdate &&
         canAutoUpdate &&
@@ -439,16 +446,13 @@ async function downloadUpdateInBackground() {
     };
 
     // Determine update URL based on branch
+    // macOS zips are resolved by downloadMacBuild below
     let updateUrl;
-    if (isMac) {
-      if (!branchHasMacBuilds(currentBranch))
-        throw new Error("Automatic updates for this branch are unavailable on macOS.");
-    } else if (currentBranch === "live") {
-      updateUrl = `https://lfs.ascendara.app/download?update`;
-    } else if (currentBranch === "public-testing") {
-      updateUrl = await testingInstallerUrl(availableVersion);
-    } else {
-      updateUrl = `https://lfs.ascendara.app/download?branch=${currentBranch}`;
+    if (!isMac) {
+      updateUrl =
+        currentBranch === "live"
+          ? `https://lfs.ascendara.app/download?update`
+          : await testingInstallerUrl(availableVersion);
     }
     const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
     const installerFileName =
@@ -637,20 +641,9 @@ function registerUpdateHandlers() {
         success: false,
         error: "Branch switching needs the installed version of Ascendara.",
       };
-    const branchUrls = {
-      live: "https://lfs.ascendara.app/download?update",
-      "public-testing": null,
-      experimental: "https://lfs.ascendara.app/download?branch=experimental",
-    };
-
-    if (!(branch in branchUrls)) return { success: false, error: "Unknown branch" };
+    if (!["live", "public-testing", "experimental"].includes(branch))
+      return { success: false, error: "Unknown branch" };
     const platform = isWindows ? "Windows" : isMac ? "macOS" : "Linux";
-    if (isMac && !branchHasMacBuilds(branch))
-      return {
-        success: false,
-        errorType: "notAvailable",
-        errorData: { branch, platform },
-      };
 
     try {
       const mainWindow = BrowserWindow.getAllWindows()[0];
@@ -680,11 +673,15 @@ function registerUpdateHandlers() {
         } finally {
           powerSaveBlocker.stop(blockerId);
         }
+        await rememberTestingBranch(branch);
         await installUpdate(zipPath, false);
         return { success: true };
       }
 
-      const url = branchUrls[branch] || (await testingInstallerUrl());
+      const url =
+        branch === "live"
+          ? "https://lfs.ascendara.app/download?update"
+          : await testingInstallerUrl();
       // Use testingVersion for testing branches, appVersion for live
       const versionToSend =
         branch === "public-testing" || branch === "experimental"
@@ -726,6 +723,7 @@ function registerUpdateHandlers() {
 
       await pipeline(response.data, fs.createWriteStream(installerPath));
 
+      await rememberTestingBranch(branch);
       await installUpdate(installerPath, isLinux);
 
       return { success: true };
