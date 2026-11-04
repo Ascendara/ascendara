@@ -11,7 +11,12 @@ const { encrypt, decrypt } = require("./encryption");
 class SettingsManager {
   constructor() {
     this.filePath = path.join(app.getPath("userData"), "ascendarasettings.json");
-    this.sensitiveKeys = ["twitchSecret", "twitchClientId", "torboxApiKey", "realDebridApiKey"];
+    this.sensitiveKeys = [
+      "twitchSecret",
+      "twitchClientId",
+      "torboxApiKey",
+      "realDebridApiKey",
+    ];
     this.defaultSettings = {
       downloadDirectory: "",
       additionalDirectories: [],
@@ -57,9 +62,9 @@ class SettingsManager {
       torboxApiKey: "",
       realDebridApiKey: "",
       debridEnabled: false,
-    debridProvider: "torbox",
-    debridProviderOrder: [],
-    debridProviderEnabled: {},
+      debridProvider: "torbox",
+      debridProviderOrder: [],
+      debridProviderEnabled: {},
       prioritizeRealDebridOverSeamless: false,
       useRealDebridForTorrents: true,
       localIndex: "",
@@ -170,6 +175,10 @@ class SettingsManager {
             mergedSettings[key] = value;
           }
         }
+      }
+      // Keep TorBox working for users who configured it before the debrid toggle existed
+      if (!("debridEnabled" in settings) && settings.torboxApiKey) {
+        mergedSettings.debridEnabled = true;
       }
       // Only return the merged settings without writing to disk
       return mergedSettings;
