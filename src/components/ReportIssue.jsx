@@ -20,10 +20,12 @@ import {
   Loader,
   OctagonX,
   PanelsTopLeft,
+  TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { API_URL } from "@/config/api";
 import { getReporterHeaders } from "@/services/firebase/firebaseService";
+import { isReportDetailsTooVague } from "@/lib/reportDetails";
 
 // The value is what shows up as the report's category on the Discord side
 const ISSUE_CATEGORIES = [
@@ -47,7 +49,9 @@ const ReportIssue = ({ isOpen, onClose }) => {
   const [details, setDetails] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { t } = useLanguage();
-  const canSubmit = !!category && !!details.trim();
+  const detailsTooVague = isReportDetailsTooVague(details);
+  const showVagueWarning = !!details.trim() && detailsTooVague;
+  const canSubmit = !!category && !detailsTooVague;
 
   useEffect(() => {
     if (!isOpen) {
@@ -58,6 +62,10 @@ const ReportIssue = ({ isOpen, onClose }) => {
 
   const handleSubmit = async () => {
     if (isLoading) return;
+    if (category && showVagueWarning) {
+      toast.error(t("common.reportDialog.tooVague"));
+      return;
+    }
     if (!canSubmit) {
       toast.error(t("common.reportDialog.missingInfo"), {
         description: t("common.reportDialog.missingInfoDesc"),
@@ -178,6 +186,16 @@ const ReportIssue = ({ isOpen, onClose }) => {
               placeholder={t("common.reportDialog.detailsPlaceholder")}
             />
           </div>
+
+          {showVagueWarning && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground"
+            >
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <span>{t("common.reportDialog.tooVague")}</span>
+            </div>
+          )}
 
           <DialogFooter>
             <Button

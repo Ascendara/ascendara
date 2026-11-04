@@ -26,6 +26,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { API_URL } from "@/config/api";
 import { getReporterHeaders } from "@/services/firebase/firebaseService";
+import { isReportDetailsTooVague } from "@/lib/reportDetails";
 
 const FILE_ISSUE_REPORT_PATTERN =
   /\b(?:missing|corrupt(?:ed|ion)?|incomplete|damaged)\b.{0,30}\b(?:files?|downloads?|archives?|installations?)\b|\b(?:files?|downloads?|archives?|installations?)\b.{0,30}\b(?:missing|corrupt(?:ed|ion)?|incomplete|damaged)\b/i;
@@ -98,7 +99,9 @@ export default function ReportGameDialog({
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
   const showIndexRefreshWarning = FILE_ISSUE_REPORT_PATTERN.test(reportDetails);
-  const canSubmit = !!reportReason && !!reportDetails.trim();
+  const detailsTooVague = isReportDetailsTooVague(reportDetails);
+  const showVagueWarning = !!reportDetails.trim() && detailsTooVague;
+  const canSubmit = !!reportReason && !detailsTooVague;
 
   useEffect(() => {
     if (!open) {
@@ -109,6 +112,10 @@ export default function ReportGameDialog({
 
   const handleSubmitReport = async () => {
     if (isReporting) return;
+    if (reportReason && reportDetails.trim() && detailsTooVague) {
+      toast.error(t("common.reportDialog.tooVague"));
+      return;
+    }
     if (!canSubmit) {
       toast.error(t("download.reportError"));
       return;
@@ -266,6 +273,16 @@ export default function ReportGameDialog({
               className="min-h-[110px] text-foreground"
             />
           </div>
+
+          {showVagueWarning && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground"
+            >
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <span>{t("common.reportDialog.tooVague")}</span>
+            </div>
+          )}
 
           {showIndexRefreshWarning && (
             <div

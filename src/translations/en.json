@@ -1750,7 +1750,8 @@
       "submit": "Submit Report",
       "submitting": "Submitting report...",
       "success": "Report submitted successfully!",
-      "title": "Report Issue"
+      "title": "Report Issue",
+      "tooVague": "That's not really explaining anything. The developer can't see what happened before or after the issue, so please be a little more descriptive: what were you doing, and what went wrong?"
     },
     "reportIssue": "Report Issue",
     "reportToAscendara": "Report to Ascendara",
