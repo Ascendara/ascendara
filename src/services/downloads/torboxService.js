@@ -1,3 +1,8 @@
+import {
+  createSupportedHostCache,
+  isSupportedUrl as matchesSupportedUrl,
+} from "./supportedHostCache";
+
 /**
  * Torbox API Service
  * Handles authentication and debrid operations with the Torbox API
@@ -6,13 +11,36 @@
 // Always use proxy to avoid CORS issues (works in both dev and production)
 const API_BASE_URL = "/api/torbox";
 
+export const { getCachedSupportedHosts, getSupportedHosts } = createSupportedHostCache({
+  cacheKey: "torboxSupportedHosts",
+  loadDomains: async () => {
+    const response = await fetch(`${API_BASE_URL}/webdl/hosters`, {
+      signal: AbortSignal.timeout(10000),
+    });
+    const result = await response.json();
+    if (
+      !response.ok ||
+      result?.success !== true ||
+      !Array.isArray(result.data) ||
+      result.data.some(host => !Array.isArray(host?.domains))
+    ) {
+      throw new Error("Invalid TorBox host list.");
+    }
+    // Status describes temporary availability, not whether the host is supported.
+    return result.data.flatMap(host => host.domains);
+  },
+});
+
+export const isSupportedUrl = (link, domains = getCachedSupportedHosts()) =>
+  matchesSupportedUrl(link, domains);
+
 /**
  * Check if the Torbox service is enabled by verifying if an API key exists
  * @param {Object} settings - The application settings object
  * @returns {boolean} - True if the service is enabled (API key exists)
  */
 export const isEnabled = settings => {
-  return Boolean(settings?.torboxApiKey);
+  return Boolean(settings?.torboxApiKey?.trim());
 };
 
 /**
@@ -177,6 +205,12 @@ export const createPremiumDownloadLink = async (link, apiKey) => {
 
   if (!apiKey) {
     throw new Error("API key is required");
+  }
+
+  if (!isSupportedUrl(link, await getSupportedHosts())) {
+    const error = new Error("This URL is not in TorBox’s supported host list.");
+    error.code = "UNSUPPORTED_SITE";
+    throw error;
   }
 
   try {
@@ -519,6 +553,9 @@ export const getUserInfo = async apiKey => {
 
 export default {
   isEnabled,
+  getCachedSupportedHosts,
+  getSupportedHosts,
+  isSupportedUrl,
   getApiKey,
   createTorrentFromMagnet,
   getDirectDownloadLinkFromUrl,

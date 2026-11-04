@@ -1,14 +1,4 @@
 import * as api from "../torboxService";
-import { PROVIDER_DOMAINS } from "../../../config/providers";
-const domains = ["1fichier", "datanodes", "qiwi", "megadb", "gofile", "pixeldrain", "buzzheavier"]
-  .flatMap(host => PROVIDER_DOMAINS[host] || []);
-const isSupportedUrl = (link, hosts = domains) => {
-  try {
-    const url = new URL(link);
-    return ["http:", "https:"].includes(url.protocol) && hosts.some(host =>
-      url.hostname === host || url.hostname.endsWith(`.${host}`));
-  } catch { return false; }
-};
 
 export default {
   id: "torbox",
@@ -23,9 +13,9 @@ export default {
   downloadsPath: "/torboxdownloads",
   hostDownloadMode: "cloud",
   metadataStorageKey: "torboxGameNames",
-  getCachedSupportedHosts: () => domains,
-  getSupportedHosts: async () => domains,
-  isSupportedUrl,
+  getCachedSupportedHosts: api.getCachedSupportedHosts,
+  getSupportedHosts: api.getSupportedHosts,
+  isSupportedUrl: api.isSupportedUrl,
   async submitMagnet(link, apiKey, game) {
     const result = await api.createTorrentFromMagnet(link, apiKey, game.game);
     if (result.torrentId == null) throw new Error("TorBox did not return a torrent ID.");
