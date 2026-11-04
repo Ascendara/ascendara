@@ -45,6 +45,8 @@ import {
   Gamepad2,
   Users,
   RefreshCw,
+  Sun,
+  Moon,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -199,143 +201,94 @@ const themes = [
   { id: "royal-night", name: "Royal Night", group: "dark", isNew: true },
 ];
 
-const getThemeColors = themeId => {
-  const themeMap = {
-    light: {
-      bg: "bg-white",
-      primary: "bg-blue-500",
-      secondary: "bg-slate-100",
-      text: "text-slate-900",
-    },
-    dark: {
-      bg: "bg-slate-900",
-      primary: "bg-blue-500",
-      secondary: "bg-slate-800",
-      text: "text-slate-100",
-    },
-    blue: {
-      bg: "bg-blue-50",
-      primary: "bg-blue-600",
-      secondary: "bg-blue-100",
-      text: "text-blue-900",
-    },
-    purple: {
-      bg: "bg-purple-50",
-      primary: "bg-purple-500",
-      secondary: "bg-purple-100",
-      text: "text-purple-900",
-    },
-    emerald: {
-      bg: "bg-emerald-50",
-      primary: "bg-emerald-500",
-      secondary: "bg-emerald-100",
-      text: "text-emerald-900",
-    },
-    rose: {
-      bg: "bg-rose-50",
-      primary: "bg-rose-500",
-      secondary: "bg-rose-100",
-      text: "text-rose-900",
-    },
-    cyberpunk: {
-      bg: "bg-gray-900",
-      primary: "bg-pink-500",
-      secondary: "bg-gray-800",
-      text: "text-pink-500",
-    },
-    sunset: {
-      bg: "bg-slate-800",
-      primary: "bg-orange-500",
-      secondary: "bg-slate-700",
-      text: "text-orange-400",
-    },
-    forest: {
-      bg: "bg-[#141E1B]",
-      primary: "bg-green-500",
-      secondary: "bg-[#1C2623]",
-      text: "text-green-300",
-    },
-    aurora: {
-      bg: "bg-[#081218]",
-      primary: "bg-[#2DD4BF]",
-      secondary: "bg-[#0E1C24]",
-      text: "text-[#DCFCF6]",
-    },
-    crimson: {
-      bg: "bg-[#160A0E]",
-      primary: "bg-[#F85252]",
-      secondary: "bg-[#241016]",
-      text: "text-[#FEE2E2]",
-    },
-    midnight: {
-      bg: "bg-[#0F172A]",
-      primary: "bg-indigo-500",
-      secondary: "bg-[#1E293B]",
-      text: "text-indigo-300",
-    },
-    lagoon: {
-      bg: "bg-[#ECFAFA]",
-      primary: "bg-[#0D7480]",
-      secondary: "bg-[#CFF2F3]",
-      text: "text-[#0E3E46]",
-    },
-    coral: {
-      bg: "bg-[#FFF1EC]",
-      primary: "bg-[#CC402C]",
-      secondary: "bg-[#FDE2D8]",
-      text: "text-[#5C1C14]",
-    },
-    "royal-pearl": {
-      bg: "bg-[#F7F6FB]",
-      primary: "bg-[#37228C]",
-      secondary: "bg-[#ECE9F6]",
-      text: "text-[#1E1646]",
-    },
-    "royal-night": {
-      bg: "bg-[#120E26]",
-      primary: "bg-[#E8BA52]",
-      secondary: "bg-[#1C1638]",
-      text: "text-[#F5ECD4]",
-    },
-    amber: {
-      bg: "bg-amber-50",
-      primary: "bg-amber-500",
-      secondary: "bg-amber-100",
-      text: "text-amber-900",
-    },
-  };
-  return themeMap[themeId] || themeMap.light;
-};
+const PREVIEW_CARD_TINTS = [0.55, 0.3, 0.45, 0.2];
 
-function ThemeButton({ theme, currentTheme, onSelect }) {
-  const colors = getThemeColors(theme.id);
-  const selected = currentTheme === theme.id;
+// A miniature Ascendara window. data-theme scopes the theme's color tokens to
+// this element, so it shows the real palette rather than an approximation.
+function ThemePreview({ themeId, className = "" }) {
+  return (
+    <div
+      data-theme={themeId}
+      aria-hidden
+      className={`relative flex w-full flex-col overflow-hidden rounded-2xl border border-border bg-background text-left text-foreground shadow-2xl shadow-black/20 transition-colors duration-300 [&_*]:transition-colors [&_*]:duration-300 ${className}`}
+    >
+      <div className="flex h-7 shrink-0 items-center gap-2 px-3">
+        <div className="h-3 w-3 rounded-[4px] bg-primary" />
+        <div className="h-1.5 w-14 rounded-full bg-foreground/70" />
+        <div className="ml-auto flex gap-1.5">
+          {[0, 1, 2].map(i => (
+            <div key={i} className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+          ))}
+        </div>
+      </div>
 
+      <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-14 pt-1">
+        <div className="relative flex h-[38%] shrink-0 flex-col justify-end overflow-hidden rounded-xl border border-border bg-card p-3">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/45 via-primary/10 to-transparent" />
+          <div className="relative space-y-1.5">
+            <div className="h-2 w-1/3 rounded-full bg-foreground/80" />
+            <div className="h-1.5 w-1/2 rounded-full bg-muted-foreground/60" />
+            <div className="mt-2 h-4 w-14 rounded-md bg-primary" />
+          </div>
+        </div>
+
+        <div className="h-1.5 w-20 shrink-0 rounded-full bg-foreground/60" />
+        <div className="grid min-h-0 flex-1 grid-cols-4 gap-2.5">
+          {PREVIEW_CARD_TINTS.map((tint, i) => (
+            <div
+              key={i}
+              className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card"
+            >
+              <div
+                className="min-h-0 flex-1"
+                style={{ backgroundColor: `rgb(var(--color-primary) / ${tint})` }}
+              />
+              <div className="space-y-1 p-1.5">
+                <div className="h-1 w-3/4 rounded-full bg-card-foreground/70" />
+                <div className="h-1 w-1/2 rounded-full bg-muted-foreground/50" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-xl border border-border bg-card/80 p-1.5 shadow-lg backdrop-blur">
+        {[0, 1, 2, 3, 4].map(i => (
+          <div
+            key={i}
+            className={`h-5 w-5 rounded-md ${i === 0 ? "bg-primary" : "bg-muted"}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ThemeTile({ theme, selected, onSelect, onPreview }) {
   return (
     <button
       type="button"
       onClick={() => onSelect(theme.id)}
-      className={`group overflow-hidden rounded-xl border text-left transition-all ${
+      onMouseEnter={() => onPreview(theme.id)}
+      onMouseLeave={() => onPreview(null)}
+      onFocus={() => onPreview(theme.id)}
+      onBlur={() => onPreview(null)}
+      aria-pressed={selected}
+      className={`flex w-[calc(50%-0.25rem)] items-center gap-3 rounded-xl border p-1.5 text-left outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/60 sm:w-[calc((100%-1rem)/3)] lg:w-full lg:flex-1 ${
         selected
-          ? "border-primary ring-2 ring-primary/40"
-          : "border-border/60 hover:border-primary/50"
+          ? "border-primary bg-primary/10"
+          : "border-border/60 bg-card/40 hover:border-primary/40 hover:bg-card/70"
       }`}
     >
-      <div className={`${colors.bg} p-2.5`}>
-        <div className={`rounded-md ${colors.secondary} space-y-1.5 p-2 shadow-sm`}>
-          <div className={`h-2 w-3/4 rounded-full ${colors.primary} opacity-80`} />
-          <div className={`h-1.5 w-1/2 rounded-full ${colors.primary} opacity-40`} />
-          <div className={`h-4 rounded ${colors.bg} bg-opacity-50`} />
-        </div>
-      </div>
-      <div className="flex items-center justify-between gap-2 bg-card/60 px-2.5 py-1.5">
-        <span className="truncate text-xs font-medium">{theme.name}</span>
-        {selected ? (
-          <CircleCheck className="h-3.5 w-3.5 shrink-0 text-primary" />
-        ) : (
-          <div className={`h-2.5 w-2.5 shrink-0 rounded-full ${colors.primary}`} />
-        )}
-      </div>
+      <span
+        data-theme={theme.id}
+        className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background"
+      >
+        <span className="absolute inset-y-0 right-0 w-1/2 bg-card" />
+        <span className="relative h-3 w-3 rounded-full bg-primary shadow-sm" />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">{theme.name}</span>
+      {selected && <CircleCheck className="h-4 w-4 shrink-0 text-primary" />}
     </button>
   );
 }
@@ -485,6 +438,8 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [stepDirection, setStepDirection] = useState(1);
   const [selectedTheme, setSelectedTheme] = useState("purple");
   const [showingLightThemes, setShowingLightThemes] = useState(true);
+  // Theme shown in the preview while hovering a tile
+  const [previewTheme, setPreviewTheme] = useState(null);
   const [privacyChecked, setPrivacyChecked] = useState(false);
   const [isOnWindows, setIsOnWindows] = useState(false);
   const [termsChecked, setTermsChecked] = useState(false);
@@ -2087,38 +2042,72 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     </Button>
                   }
                 >
-                  <div className="mb-4 flex justify-center">
-                    <div className="inline-flex rounded-lg bg-card/40 p-1">
-                      {[true, false].map(light => (
-                        <button
-                          key={String(light)}
-                          type="button"
-                          onClick={() => setShowingLightThemes(light)}
-                          className={`rounded-md px-4 py-1.5 text-sm transition-all ${
-                            showingLightThemes === light
-                              ? "bg-primary text-secondary"
-                              : "hover:bg-primary/10"
-                          }`}
-                        >
-                          {light ? t("welcome.lightThemes") : t("welcome.darkThemes")}
-                        </button>
-                      ))}
+                  {/* The list sets the row height and the preview stretches to
+                      match, so seven themes fill one even column */}
+                  <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+                    <div className="hidden lg:block">
+                      <ThemePreview
+                        themeId={previewTheme || selectedTheme}
+                        className="h-full"
+                      />
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-                    {themes
-                      .filter(
-                        theme => theme.group === (showingLightThemes ? "light" : "dark")
-                      )
-                      .map(theme => (
-                        <ThemeButton
-                          key={theme.id}
-                          theme={theme}
-                          currentTheme={selectedTheme}
-                          onSelect={handleThemeSelect}
-                        />
-                      ))}
+                    <div className="flex flex-col gap-3">
+                      <div className="relative grid grid-cols-2 rounded-xl border border-border/60 bg-card/40 p-1">
+                        {[true, false].map(light => {
+                          const ModeIcon = light ? Sun : Moon;
+                          const active = showingLightThemes === light;
+                          return (
+                            <button
+                              key={String(light)}
+                              type="button"
+                              onClick={() => setShowingLightThemes(light)}
+                              aria-pressed={active}
+                              className={`relative flex items-center justify-center gap-2 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+                                active
+                                  ? "text-foreground"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              {active && (
+                                <motion.span
+                                  layoutId="welcome-theme-mode"
+                                  className="absolute inset-0 rounded-lg bg-primary/15 ring-1 ring-primary/40"
+                                  transition={{
+                                    type: "spring",
+                                    bounce: 0.2,
+                                    duration: 0.4,
+                                  }}
+                                />
+                              )}
+                              <ModeIcon className="relative h-4 w-4" />
+                              <span className="relative">
+                                {light
+                                  ? t("welcome.lightThemes")
+                                  : t("welcome.darkThemes")}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex flex-1 flex-wrap justify-center gap-2 lg:flex-col lg:flex-nowrap lg:gap-1.5">
+                        {themes
+                          .filter(
+                            theme =>
+                              theme.group === (showingLightThemes ? "light" : "dark")
+                          )
+                          .map(theme => (
+                            <ThemeTile
+                              key={theme.id}
+                              theme={theme}
+                              selected={selectedTheme === theme.id}
+                              onSelect={handleThemeSelect}
+                              onPreview={setPreviewTheme}
+                            />
+                          ))}
+                      </div>
+                    </div>
                   </div>
 
                   <div
