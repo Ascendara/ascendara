@@ -35,6 +35,12 @@ const Navigation = memo(({ items }) => {
   const downloadCountRef = useRef(0);
   const pointerYRef = useRef(Number.NEGATIVE_INFINITY);
   const isDownloadPage = location.pathname === "/download";
+  // The router renders the next page in a transition, so location only
+  // changes once that page is ready. Track the clicked path separately so the
+  // dock highlights it on the very next frame instead of after the render.
+  const [pendingPath, setPendingPath] = useState(null);
+  useEffect(() => setPendingPath(null), [location.pathname]);
+  const activePath = pendingPath ?? location.pathname;
 
   const handleMouseDown = useCallback(
     (e, isLeft) => {
@@ -73,7 +79,7 @@ const Navigation = memo(({ items }) => {
 
   const isActive = useCallback(
     path => {
-      if (path === "/search" && location.pathname === "/download") {
+      if (path === "/search" && activePath === "/download") {
         return true;
       }
       if (
@@ -84,21 +90,21 @@ const Navigation = memo(({ items }) => {
           "/extralanguages",
           "/sidecaranddependencies",
           "/sources",
-        ].includes(location.pathname)
+        ].includes(activePath)
       ) {
         return true;
       }
       if (
         path === "/library" &&
-        (location.pathname === "/gamescreen" ||
-          location.pathname === "/retro" ||
-          location.pathname.startsWith("/folderview"))
+        (activePath === "/gamescreen" ||
+          activePath === "/retro" ||
+          activePath.startsWith("/folderview"))
       ) {
         return true;
       }
-      return location.pathname === path;
+      return activePath === path;
     },
-    [location.pathname]
+    [activePath]
   );
 
   const navItems = useMemo(() => {
@@ -380,6 +386,9 @@ const Navigation = memo(({ items }) => {
               <React.Fragment key={item.path}>
                 <Link
                   to={item.path}
+                  onClick={() => {
+                    if (item.path !== location.pathname) setPendingPath(item.path);
+                  }}
                   // Fetch Ascend's data on the way to the click
                   onPointerEnter={
                     item.path === "/ascend" ? prefetchAscendData : undefined

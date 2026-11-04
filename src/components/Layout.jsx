@@ -9,7 +9,9 @@ import { useNaturalDownloadScroll } from "@/hooks/useNaturalDownloadScroll";
 import Search from "@/pages/Search";
 
 const EASE_OUT = [0.22, 1, 0.36, 1];
-const EASE_EXIT = [0.4, 0, 1, 1];
+// The leaving page is pinned on top of the new one, so it has to drop off
+// right away (ease-out) or the click reads as lagging.
+const EASE_EXIT = [0, 0, 0.2, 1];
 
 // Pages that show a single game (opened from a card on Library, Search, Home...)
 const isDetailPath = path => path === "/gamescreen" || path === "/download";
@@ -60,15 +62,15 @@ const routeVariants = {
       kind === "none"
         ? { duration: 0 }
         : {
-            duration: kind === "page" ? 0.36 : 0.4,
+            duration: kind === "page" ? 0.26 : 0.3,
             ease: EASE_OUT,
-            opacity: { duration: kind === "page" ? 0.28 : 0.3, ease: "easeOut" },
+            opacity: { duration: kind === "page" ? 0.18 : 0.22, ease: "easeOut" },
           },
   }),
   // Exits start from an explicit keyframe: the settled page sits at
   // transform: none, which framer would otherwise resolve to scale(0).
   leave: kind => {
-    const transition = { duration: 0.2, ease: EASE_EXIT };
+    const transition = { duration: 0.14, ease: EASE_EXIT };
     switch (kind) {
       case "folder-in":
         return { opacity: 0, transform: [REST, tf(-24, 0)], transition };
@@ -84,7 +86,7 @@ const routeVariants = {
         return {
           opacity: 0,
           transform: [REST, tf(0, -6)],
-          transition: { duration: 0.16, ease: EASE_EXIT },
+          transition: { duration: 0.1, ease: EASE_EXIT },
         };
     }
   },
