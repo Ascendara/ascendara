@@ -161,8 +161,7 @@ const pageLoaders = {
   extraLanguages: () => import("./pages/ExtraLanguages"),
   workshopDownloader: () => import("./pages/WorkshopDownloader"),
   sidecarAndDependencies: () => import("./pages/SidecarAndDependencies"),
-  realDebridDownloads: () => import("./pages/RealDebridDownloads"),
-  torboxDownloads: () => import("./pages/TorboxDownloads"),
+  debridDownloads: () => import("./pages/DebridDownloads"),
   gameScreen: () => import("./pages/GameScreen"),
   profile: () => import("./pages/Profile"),
   ascend: () => import("./pages/Ascend"),
@@ -180,8 +179,7 @@ const Downloads = lazyPage(pageLoaders.downloads);
 const ExtraLanguages = lazyPage(pageLoaders.extraLanguages);
 const WorkshopDownloader = lazyPage(pageLoaders.workshopDownloader);
 const SidecarAndDependencies = lazyPage(pageLoaders.sidecarAndDependencies);
-const RealDebridDownloads = lazyPage(pageLoaders.realDebridDownloads);
-const TorboxDownloads = lazyPage(pageLoaders.torboxDownloads);
+const DebridDownloads = lazyPage(pageLoaders.debridDownloads);
 const GameScreen = lazyPage(pageLoaders.gameScreen);
 const Profile = lazyPage(pageLoaders.profile);
 const Ascend = lazyPage(pageLoaders.ascend);
@@ -654,7 +652,13 @@ const DiscordRPCTracker = () => {
   const isGamePlayingRef = useRef(false);
 
   const isDownloadPath = path =>
-    path === "/download" || path === "/downloads" || path === "/torboxdownloads" || path === "/realdebriddownloads";
+    [
+      "/download",
+      "/downloads",
+      "/debriddownloads",
+      "/torboxdownloads",
+      "/realdebriddownloads",
+    ].includes(path);
 
   const clearIdleTimer = () => {
     if (idleTimerRef.current) {
@@ -762,6 +766,7 @@ const UserActivityTracker = React.memo(() => {
           await setActivity(ActivityType.BROWSING_LIBRARY);
           break;
         case "/downloads":
+        case "/debriddownloads":
         case "/torboxdownloads":
         case "/realdebriddownloads":
           await setActivity(ActivityType.BROWSING_DOWNLOADS);
@@ -2039,8 +2044,15 @@ const AppRoutes = () => {
             <Route path="folderview/:folderName" element={<FolderView />} />
             <Route path="gamescreen" element={<GameScreen />} />
             <Route path="downloads" element={<Downloads />} />
-            <Route path="realdebriddownloads" element={<RealDebridDownloads />} />
-            <Route path="torboxdownloads" element={<TorboxDownloads />} />
+            <Route path="debriddownloads" element={<DebridDownloads />} />
+            <Route
+              path="realdebriddownloads"
+              element={<Navigate to="/debriddownloads?service=realdebrid" replace />}
+            />
+            <Route
+              path="torboxdownloads"
+              element={<Navigate to="/debriddownloads?service=torbox" replace />}
+            />
             <Route path="settings" element={<Settings />} />
             <Route path="themes" element={<ThemeStudio />} />
             <Route path="sidecaranddependencies" element={<SidecarAndDependencies />} />

@@ -1,6 +1,8 @@
 const featureCenterResources = {
   en: {
     debrid: {
+      downloadsTitle: "Debrid Downloads",
+      chooseService: "Choose debrid service",
       settingsTitle: "Debrid services",
       settingsDescription: "Manage your accounts and choose the order used for downloads.",
       priorityOrder: "Service priority",
