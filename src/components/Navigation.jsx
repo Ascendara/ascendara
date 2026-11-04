@@ -2,6 +2,7 @@ import React, { useState, useEffect, memo, useCallback, useMemo, useRef } from "
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
+import RealDebridIcon from "./RealDebridIcon";
 import {
   Home,
   Search,
@@ -134,6 +135,13 @@ const Navigation = memo(({ items }) => {
         color: "from-orange-500 to-amber-400",
       },
       {
+        path: "/realdebriddownloads",
+        label: t("realDebrid.title"),
+        icon: RealDebridIcon,
+        hidden: !settings.realDebridApiKey,
+        color: "from-orange-500 to-amber-400",
+      },
+      {
         path: "/torboxdownloads",
         label: t("common.torboxDownloads"),
         icon: ServerIcon,
@@ -173,7 +181,7 @@ const Navigation = memo(({ items }) => {
     });
 
     return items;
-  }, [t, settings.viewWorkshopPage, settings.torboxApiKey]);
+  }, [t, settings.viewWorkshopPage, settings.torboxApiKey, settings.realDebridApiKey]);
 
   useEffect(() => {
     const checkDownloaderStatus = async () => {

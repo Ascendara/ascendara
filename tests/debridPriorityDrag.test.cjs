@@ -27,10 +27,9 @@ traverse(parse(source, { sourceType: "module", plugins: ["jsx"] }), {
 });
 
 test("dragging a priority row saves its new order only when dropped", async () => {
-  const { createDebridService } = await loadModule(
+  const { getOrderedProviders } = await loadModule(
     "src/services/downloads/debridService.js"
   );
-  const { getOrderedProviders } = createDebridService([{ id: "torbox" }, { id: "realdebrid" }]);
   let settings = { debridEnabled: true, debridProviderOrder: ["torbox", "realdebrid"] };
   let writes = 0;
   const context = vm.createContext({

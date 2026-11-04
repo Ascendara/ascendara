@@ -25,6 +25,7 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { TourProvider } from "@/context/TourContext";
 import { ThemeProvider, useTheme, isDarkTheme } from "@/context/ThemeContext";
 import { SettingsProvider, useSettings } from "@/context/SettingsContext";
+import DebridBackgroundTasks from "@/components/DebridBackgroundTasks";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { SearchProvider } from "@/context/SearchContext";
 import GlobalSearch from "@/components/GlobalSearch";
@@ -160,6 +161,7 @@ const pageLoaders = {
   extraLanguages: () => import("./pages/ExtraLanguages"),
   workshopDownloader: () => import("./pages/WorkshopDownloader"),
   sidecarAndDependencies: () => import("./pages/SidecarAndDependencies"),
+  realDebridDownloads: () => import("./pages/RealDebridDownloads"),
   torboxDownloads: () => import("./pages/TorboxDownloads"),
   gameScreen: () => import("./pages/GameScreen"),
   profile: () => import("./pages/Profile"),
@@ -178,6 +180,7 @@ const Downloads = lazyPage(pageLoaders.downloads);
 const ExtraLanguages = lazyPage(pageLoaders.extraLanguages);
 const WorkshopDownloader = lazyPage(pageLoaders.workshopDownloader);
 const SidecarAndDependencies = lazyPage(pageLoaders.sidecarAndDependencies);
+const RealDebridDownloads = lazyPage(pageLoaders.realDebridDownloads);
 const TorboxDownloads = lazyPage(pageLoaders.torboxDownloads);
 const GameScreen = lazyPage(pageLoaders.gameScreen);
 const Profile = lazyPage(pageLoaders.profile);
@@ -651,7 +654,7 @@ const DiscordRPCTracker = () => {
   const isGamePlayingRef = useRef(false);
 
   const isDownloadPath = path =>
-    path === "/download" || path === "/downloads" || path === "/torboxdownloads";
+    path === "/download" || path === "/downloads" || path === "/torboxdownloads" || path === "/realdebriddownloads";
 
   const clearIdleTimer = () => {
     if (idleTimerRef.current) {
@@ -760,6 +763,7 @@ const UserActivityTracker = React.memo(() => {
           break;
         case "/downloads":
         case "/torboxdownloads":
+        case "/realdebriddownloads":
           await setActivity(ActivityType.BROWSING_DOWNLOADS);
           break;
         case "/settings":
@@ -2035,6 +2039,7 @@ const AppRoutes = () => {
             <Route path="folderview/:folderName" element={<FolderView />} />
             <Route path="gamescreen" element={<GameScreen />} />
             <Route path="downloads" element={<Downloads />} />
+            <Route path="realdebriddownloads" element={<RealDebridDownloads />} />
             <Route path="torboxdownloads" element={<TorboxDownloads />} />
             <Route path="settings" element={<Settings />} />
             <Route path="themes" element={<ThemeStudio />} />
@@ -2318,6 +2323,7 @@ function App() {
       <ThemeProvider>
         <LanguageProvider>
           <SettingsProvider>
+            <DebridBackgroundTasks />
             <AuthProvider>
               <TourProvider>
                 <SearchProvider>
