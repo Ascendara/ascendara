@@ -12,7 +12,9 @@ export default function DebridBackgroundTasks() {
       if (running) return;
       running = true;
       try {
-        await resumePendingTorrents(settings);
+        const transfers = await resumePendingTorrents(settings);
+        for (const transfer of transfers.filter(Boolean))
+          toast.success(`Downloading ${transfer.game} to your PC`);
         lastError = null;
       } catch (error) {
         console.warn("[Debrid] Could not start pending torrents:", error.message);

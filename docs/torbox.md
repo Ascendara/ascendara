@@ -11,3 +11,5 @@ The host list is cached in memory and local storage for 24 hours, using a separa
 TorBox submissions check the cached list again before creating a web download. Supported hosts can still be temporarily unavailable; the download API reports those failures. Temporary status is not treated as a permanent lack of support or cached as an offline block for 24 hours.
 
 TorBox processes hosted links in its cloud first, even when a local download is already active. The TorBox Downloads page handles the subsequent download to your PC.
+
+Torrents submitted through Ascendara now continue automatically to your PC after cloud completion. The shared debrid handoff requests a fresh ZIP link, waits for other local transfers, and passes it to the normal downloader for extraction and any required installer prompt. Hosted web downloads retain their existing manual Download to PC control.

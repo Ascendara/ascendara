@@ -378,14 +378,15 @@ export const checkDownloadState = async (apiKey, webdlId) => {
  * @returns {Promise<Array>} - Array of download objects
  * @throws {Error} - If the API request fails
  */
-const getDownloadList = async (apiKey, type) => {
+const getDownloadList = async (apiKey, type, params) => {
   if (!apiKey) throw new Error("API key is required");
 
   let base = API_BASE_URL;
   if (base.startsWith("/")) {
     base = window.location.origin + base;
   }
-  const url = `${base}/${type === "torrent" ? "torrents" : "webdl"}/mylist`;
+  const query = params ? `?${new URLSearchParams(params)}` : "";
+  const url = `${base}/${type === "torrent" ? "torrents" : "webdl"}/mylist${query}`;
 
   const response = await fetch(url, {
     method: "GET",
@@ -405,6 +406,11 @@ const getDownloadList = async (apiKey, type) => {
     _torboxType: type,
     _storageKey: `${type}:${item.id}`,
   }));
+};
+
+export const getTorrentInfo = async (apiKey, id) => {
+  const items = await getDownloadList(apiKey, "torrent", { id, bypass_cache: "true" });
+  return items.find(item => String(item.id) === String(id)) || null;
 };
 
 export const getAllDownloads = async apiKey => {

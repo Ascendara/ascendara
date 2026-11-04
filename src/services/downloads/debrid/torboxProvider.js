@@ -16,6 +16,22 @@ export default {
   getCachedSupportedHosts: api.getCachedSupportedHosts,
   getSupportedHosts: api.getSupportedHosts,
   isSupportedUrl: api.isSupportedUrl,
+  getTorrentGame: entry => entry.gameData,
+  async getTorrentDownload(apiKey, id) {
+    const item = await api.getTorrentInfo(apiKey, id);
+    if (!item?.download_finished || !item.download_present) return null;
+    const result = await api.getDirectDownloadLink(apiKey, id, "torrent");
+    const url =
+      typeof result === "string"
+        ? result
+        : result.download_url ||
+          result.url ||
+          (typeof result.data === "string"
+            ? result.data
+            : result.data?.download_url || result.data?.url);
+    if (!url) throw new Error("TorBox did not return a torrent download URL.");
+    return [{ url, filename: "torrent.zip", size: null }];
+  },
   async submitMagnet(link, apiKey, game) {
     const result = await api.createTorrentFromMagnet(link, apiKey, game.game);
     if (result.torrentId == null) throw new Error("TorBox did not return a torrent ID.");

@@ -1,5 +1,6 @@
 import torbox from "./debrid/torboxProvider";
 import realDebrid from "./debrid/realDebridProvider";
+import { handoffTorrents } from "./debridTorrentHandoff";
 
 // TorBox is first by default; only an explicitly saved order overrides this.
 export const debridProviders = [torbox, realDebrid];
@@ -98,9 +99,19 @@ export function createDebridService(providers) {
     return { ...result, providerId: provider.id, downloadsPath: provider.downloadsPath };
   };
   const resumePendingTorrents = settings =>
-    Promise.all(getConfiguredProviders(settings)
-      .filter(provider => provider.resumePendingTorrents && settings[provider.torrentSetting] !== false)
-      .map(provider => provider.resumePendingTorrents(getApiKey(settings, provider))));
+    Promise.all(
+      getConfiguredProviders(settings)
+        .filter(
+          provider =>
+            (provider.resumePendingTorrents || provider.getTorrentDownload) &&
+            settings[provider.torrentSetting] !== false
+        )
+        .map(async provider => {
+          const apiKey = getApiKey(settings, provider);
+          await provider.resumePendingTorrents?.(apiKey);
+          return handoffTorrents(provider, apiKey);
+        })
+    );
   const resolveHost = async (settings, link, host, game, directory = 0, providerId) => {
     if (settings?.debridEnabled !== true)
       throw new Error("Debrid services are disabled.");

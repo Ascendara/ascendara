@@ -21,6 +21,7 @@ export default function RealDebridDownloads() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [files, setFiles] = useState({});
+  const [metadata, setMetadata] = useState({});
   const fetching = useRef(false);
   const apiKey = settings.realDebridApiKey;
   const activeKey = useRef(apiKey);
@@ -33,6 +34,7 @@ export default function RealDebridDownloads() {
       if (activeKey.current !== apiKey) return;
       if (activeKey.current === apiKey) {
         setItems(downloads);
+        setMetadata(JSON.parse(localStorage.getItem("realDebridGameData") || "{}"));
         setError("");
       }
     } catch (err) {
@@ -186,8 +188,16 @@ export default function RealDebridDownloads() {
                   {t("realDebrid.download")}
                 </Button>
               )}
-              {item.type === "torrent" && item.status === "downloaded" && (
-                <>
+              {item.type === "torrent" &&
+                metadata[itemKey(item)]?.localDownloadStarted && (
+                  <Button onClick={() => navigate("/downloads")}>
+                    {t("realDebrid.viewLocalDownload")}
+                  </Button>
+                )}
+              {item.type === "torrent" &&
+                item.status === "downloaded" &&
+                !metadata[itemKey(item)]?.localDownloadStarted && (
+                  <>
                     <Button
                       variant="outline"
                       disabled={busy}
