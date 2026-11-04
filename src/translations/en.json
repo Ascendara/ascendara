@@ -4793,6 +4793,8 @@
     "additionalLocations": "Additional Locations",
     "apiKeySaved": "API Key Saved",
     "appBranch": {
+      "changelog": "Changelog",
+      "current": "Current",
       "description": "Choose your release channel. Switching will download and run the appropriate installer.",
       "experimental": {
         "description": "Cutting-edge builds with the latest changes. May be unstable.",
@@ -4804,10 +4806,15 @@
         "label": "Live"
       },
       "macExperimentalUnsupported": "The experimental branch is not available on macOS.",
+      "newer": "Newer features",
+      "onBranch": "You're on",
       "publicTesting": {
         "description": "Get early access to upcoming features before they ship to Live.",
         "label": "Public Testing"
       },
+      "sameAsLive": "No separate build right now. This channel is on the same version as Live.",
+      "steadier": "More stable",
+      "switch": "Switch",
       "switchDialog": {
         "cancel": "Cancel",
         "confirm": "Switch Branch",
@@ -4820,11 +4827,14 @@
           "timeout": "Download timed out. Please check your internet connection and try again."
         },
         "experimentalWarning": "Experimental builds may be unstable and contain bugs. Use at your own risk.",
+        "from": "From",
         "installer": "installer and launch it. The app will close automatically to complete the switch.",
         "switchAndReinstall": "Switch & Reinstall",
-        "title": "Switch to {{branch}}?"
+        "title": "Switch to {{branch}}?",
+        "to": "To"
       },
-      "title": "App Branch"
+      "title": "App Branch",
+      "unlock": "Unlock"
     },
     "appearance": "Appearance",
     "application": "Application",
@@ -5330,7 +5340,7 @@
     "themeImported": "Theme imported successfully!",
     "themes": "App Themes",
     "threads": "Threads",
-    "title": "Ascendara Preferences",
+    "title": "Your Preferences",
     "torboxApiKey": "Torbox API Key",
     "torboxApiKeyDescription": "Debrid services allow you to convert file host links into premium direct download links, bypassing speed limits and wait times. Enter your Torbox API key here to enable this feature.",
     "torboxApiKeyLearnHowtoGet": "Learn how to get your API key",

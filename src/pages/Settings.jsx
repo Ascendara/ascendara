@@ -115,6 +115,7 @@ import {
 } from "@/components/DownloadFolderCheck";
 import GameIndexManager from "@/components/GameIndexManager";
 import AchievementFolderSearch from "@/components/AchievementFolderSearch";
+import AppBranchPicker, { getAppBranch } from "@/components/AppBranchPicker";
 import { API_URL } from "@/config/api";
 
 const themes = [
@@ -284,8 +285,6 @@ function Settings() {
   const [showBranchDialog, setShowBranchDialog] = useState(false);
   const [pendingBranch, setPendingBranch] = useState("");
   const [branchVersions, setBranchVersions] = useState(null);
-  const [showNoBranchDialog, setShowNoBranchDialog] = useState(false);
-  const [noBranchMessage, setNoBranchMessage] = useState("");
   const [showAscendPromoDialog, setShowAscendPromoDialog] = useState(false);
   const { theme, setTheme } = useTheme();
   const { language, changeLanguage, t } = useLanguage();
@@ -4270,141 +4269,22 @@ function Settings() {
                 title={t("settings.appBranch.title")}
                 description={t("settings.appBranch.description")}
               >
-                <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/60">
-                  {[
-                    {
-                      id: "live",
-                      label: t("settings.appBranch.live.label"),
-                      description: t("settings.appBranch.live.description"),
-                      color: "text-emerald-500",
-                      dotColor: "bg-emerald-500",
-                      ringColor: "ring-emerald-500/30",
-                      activeBg: "bg-emerald-500/8",
-                      activeBorder: "border-l-emerald-500",
-                    },
-                    {
-                      id: "public-testing",
-                      label: t("settings.appBranch.publicTesting.label"),
-                      description: t("settings.appBranch.publicTesting.description"),
-                      color: "text-yellow-500",
-                      dotColor: "bg-yellow-500",
-                      ringColor: "ring-yellow-500/30",
-                      activeBg: "bg-yellow-500/8",
-                      activeBorder: "border-l-yellow-500",
-                    },
-                    {
-                      id: "experimental",
-                      label: t("settings.appBranch.experimental.label"),
-                      description: t("settings.appBranch.experimental.description"),
-                      color: "text-red-400",
-                      dotColor: "bg-red-400",
-                      ringColor: "ring-red-400/30",
-                      activeBg: "bg-red-400/8",
-                      activeBorder: "border-l-red-400",
-                      requiresSubscription: true,
-                    },
-                  ].map(branch => {
-                    const isActive = currentBranch === branch.id;
-                    const isLocked =
-                      branch.requiresSubscription && !hasAscendSubscription;
-                    return (
-                      <button
-                        key={branch.id}
-                        disabled={isActive}
-                        onClick={() => {
-                          if (isActive) return;
-                          // Show Ascend promo dialog if locked
-                          if (isLocked) {
-                            setShowAscendPromoDialog(true);
-                            return;
-                          }
-
-                          // Check if branch versions are available
-                          if (branchVersions) {
-                            const liveVersion = branchVersions.live;
-                            const targetVersion = branchVersions[branch.id];
-
-                            // If switching to public-testing or experimental, check if version differs from live
-                            if (branch.id !== "live" && liveVersion === targetVersion) {
-                              setNoBranchMessage(
-                                `There is no ${branch.label} version available at the moment. The ${branch.label} branch is currently on the same version as Live (v${liveVersion}).`
-                              );
-                              setShowNoBranchDialog(true);
-                              return;
-                            }
-                          }
-
-                          setPendingBranch(branch);
-                          setShowBranchDialog(true);
-                        }}
-                        className={[
-                          "group flex w-full items-center gap-4 border-l-4 px-4 py-3.5 text-left transition-all duration-150",
-                          isActive
-                            ? `${branch.activeBorder} ${branch.activeBg} cursor-default`
-                            : "cursor-pointer border-l-transparent hover:bg-muted/40",
-                        ].join(" ")}
-                      >
-                        <div className="relative flex-shrink-0">
-                          <span
-                            className={[
-                              "flex h-9 w-9 items-center justify-center rounded-full ring-2",
-                              isActive
-                                ? `${branch.dotColor} bg-opacity-20 ${branch.ringColor}`
-                                : "bg-muted ring-border",
-                            ].join(" ")}
-                          >
-                            <span
-                              className={[
-                                "h-3 w-3 rounded-full",
-                                isActive ? "bg-white" : branch.dotColor,
-                              ].join(" ")}
-                            />
-                          </span>
-                          {isActive && (
-                            <span
-                              className={`absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-background ${branch.dotColor} animate-pulse`}
-                            />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={[
-                                "text-sm font-semibold",
-                                isActive ? branch.color : "text-foreground",
-                              ].join(" ")}
-                            >
-                              {branch.label}
-                            </span>
-                            {isActive && (
-                              <Badge
-                                variant="secondary"
-                                className={`text-xs ${branch.color} border-current/20 bg-current/10`}
-                              >
-                                Active
-                              </Badge>
-                            )}
-                            {isLocked && (
-                              <Badge
-                                variant="outline"
-                                className="gap-1 border-yellow-500/30 text-xs text-yellow-500"
-                              >
-                                <Star className="h-3 w-3" />
-                                Ascend
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {branch.description}
-                          </p>
-                        </div>
-                        {!isActive && !isLocked && (
-                          <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                <AppBranchPicker
+                  t={t}
+                  currentBranch={currentBranch}
+                  currentVersion={
+                    currentBranch === "live"
+                      ? __APP_VERSION__
+                      : testingVersion || branchVersions?.[currentBranch]
+                  }
+                  branchVersions={branchVersions}
+                  hasAscendSubscription={hasAscendSubscription}
+                  onLocked={() => setShowAscendPromoDialog(true)}
+                  onSwitch={branch => {
+                    setPendingBranch({ ...branch, label: t(branch.labelKey) });
+                    setShowBranchDialog(true);
+                  }}
+                />
               </SettingsSection>
 
               {/* Developer Settings - Only shown in development mode */}
@@ -4550,40 +4430,50 @@ function Settings() {
                 branch: pendingBranch?.label,
               })}
             </AlertDialogTitle>
-            <div className="space-y-3 text-muted-foreground">
+            <div className="space-y-4 text-muted-foreground">
               <p>
                 {t("settings.appBranch.switchDialog.description")}{" "}
                 <strong>{pendingBranch?.label}</strong>{" "}
                 {t("settings.appBranch.switchDialog.installer")}
               </p>
-              {branchVersions && pendingBranch?.id && (
-                <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">
-                      Current Version (
-                      {currentBranch === "live"
-                        ? "Live"
-                        : currentBranch === "public-testing"
-                          ? "Public Testing"
-                          : "Experimental"}
-                      ):
-                    </span>
-                    <span className="font-semibold text-foreground">
-                      v{branchVersions[currentBranch] || branchVersions.live}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-muted-foreground">
-                      {pendingBranch.label} Version:
-                    </span>
-                    <span className="font-semibold text-primary">
-                      v{branchVersions[pendingBranch.id]}
-                    </span>
-                  </div>
+              {pendingBranch?.id && (
+                <div className="flex items-center gap-3 border-y border-border/60 py-4">
+                  {[
+                    {
+                      branch: getAppBranch(currentBranch),
+                      version: branchVersions?.[currentBranch] || testingVersion,
+                      caption: t("settings.appBranch.switchDialog.from"),
+                    },
+                    {
+                      branch: getAppBranch(pendingBranch.id),
+                      version: branchVersions?.[pendingBranch.id],
+                      caption: t("settings.appBranch.switchDialog.to"),
+                    },
+                  ].map(({ branch, version, caption }, index) => (
+                    <div key={caption} className="contents">
+                      {index === 1 && (
+                        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-medium uppercase tracking-wider">
+                          {caption}
+                        </p>
+                        <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-foreground">
+                          <span
+                            className={`h-2 w-2 shrink-0 rounded-full ${branch.dot}`}
+                          />
+                          {t(branch.labelKey)}
+                        </p>
+                        {version && (
+                          <p className="mt-0.5 font-mono text-xs">v{version}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
               {pendingBranch?.id === "experimental" && (
-                <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                <div className="flex items-start gap-2 border-l-2 border-red-400 pl-3 text-sm text-red-400">
                   <FlaskConical className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <span>{t("settings.appBranch.switchDialog.experimentalWarning")}</span>
                 </div>
@@ -4660,25 +4550,6 @@ function Settings() {
                 t("settings.appBranch.switchDialog.switchAndReinstall")
               )}
             </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* No Branch Available Dialog */}
-      <AlertDialog open={showNoBranchDialog} onOpenChange={setShowNoBranchDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("settings.noBranchDialog.title")}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3 text-muted-foreground">
-              {noBranchMessage}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="text-primary">
-              {t("settings.noBranchDialog.close")}
-            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
