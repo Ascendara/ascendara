@@ -43,6 +43,23 @@ from AscendaraExtraction import (
 _caffeinate_proc = None
 
 
+NON_GAME_EXE_DIRS = {
+    '__installer', '_installer', 'installer', 'installers', '_commonredist', 'commonredist',
+    'redist', 'redistributables', '_redist', 'support', 'directx', 'dotnet', 'vcredist',
+    'prerequisites', '__support', 'easyanticheat', 'battleye',
+}
+
+
+def _is_non_game_exe_dir(name):
+    """Folders that ship installers and runtimes rather than the game itself."""
+    return name.lower() in NON_GAME_EXE_DIRS
+
+
+def _compact_name(name):
+    """Lowercase letters and digits only, so "It Takes Two" matches "ItTakesTwo"."""
+    return re.sub(r'[^a-z0-9]', '', name.lower())
+
+
 def replace_file(source, target, check_cancelled=lambda: None):
     """Atomic same-volume move with bounded retries for Windows file contention."""
     source, target = _extended_path(source), _extended_path(target)
@@ -1081,8 +1098,10 @@ class AscendaraDownloader:
             # Collect all .exe files in the download directory
             exe_files = []
             for root, dirs, files in os.walk(self.download_dir):
-                # Stages and retained in-place output are not part of the game.
-                dirs[:] = [d for d in dirs if not d.startswith('.ascendara-')]
+                # Stages and retained in-place output are not part of the game,
+                # and installer/redist folders only hold helper executables.
+                dirs[:] = [d for d in dirs
+                           if not d.startswith('.ascendara-') and not _is_non_game_exe_dir(d)]
                 for file in files:
                     if file.lower().endswith('.exe'):
                         full_path = os.path.join(root, file)
@@ -1106,7 +1125,8 @@ class AscendaraDownloader:
             # Score each executable based on various criteria
             best_exe = None
             best_score = -1
-            
+            compact_game = _compact_name(self.game)
+
             for exe in exe_files:
                 score = 0
                 exe_name_lower = exe['name'].lower()
@@ -1116,7 +1136,7 @@ class AscendaraDownloader:
                 skip_keywords = ['unins', 'uninstall', 'setup', 'installer', 'redist', 'vcredist', 
                                 'directx', 'dotnet', 'prerequisite', 'launcher', 'updater', 
                                 'crash', 'report', 'config', 'settings', 'easyanticheat', 
-                                'battleye', 'steam_api']
+                                'battleye', 'steam_api', 'cleanup', 'touchup']
                 if any(keyword in exe_name_lower for keyword in skip_keywords):
                     logging.debug(f"[AscendaraDownloader] Skipping {exe['name']} (installer/utility)")
                     continue
@@ -1134,7 +1154,10 @@ class AscendaraDownloader:
                 sanitized_game = sanitize_folder_name(self.game).lower()
                 if sanitized_game in exe_name_lower or exe_name_lower.replace('.exe', '') == sanitized_game:
                     score += 300
-                
+                # "It Takes Two" -> ItTakesTwo.exe
+                elif compact_game and compact_game in _compact_name(exe_name_lower[:-4]):
+                    score += 300
+
                 # Partial game name match
                 game_words = set(re.findall(r'\w+', game_name_lower))
                 exe_words = set(re.findall(r'\w+', exe_name_lower.replace('.exe', '')))

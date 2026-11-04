@@ -61,6 +61,23 @@ def sanitize_folder_name(name: str) -> str:
     valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
     return ''.join(c for c in name if c in valid_chars)
 
+NON_GAME_EXE_DIRS = {
+    '__installer', '_installer', 'installer', 'installers', '_commonredist', 'commonredist',
+    'redist', 'redistributables', '_redist', 'support', 'directx', 'dotnet', 'vcredist',
+    'prerequisites', '__support', 'easyanticheat', 'battleye',
+}
+
+
+def _is_non_game_exe_dir(name: str) -> bool:
+    """Folders that ship installers and runtimes rather than the game itself."""
+    return name.lower() in NON_GAME_EXE_DIRS
+
+
+def _compact_name(name: str) -> str:
+    """Lowercase letters and digits only, so "It Takes Two" matches "ItTakesTwo"."""
+    return re.sub(r'[^a-z0-9]', '', name.lower())
+
+
 def magnet_info_hash(magnet_link: str) -> Optional[str]:
     """qBittorrent reports v1 hashes as lowercase hex; magnets may carry base32."""
     match = re.search(r'xt=urn:btih:([a-zA-Z0-9]+)', magnet_link, re.IGNORECASE)
@@ -994,7 +1011,10 @@ class TorrentManager:
         """Find the best game executable in install_dir, similar to AscendaraDownloader."""
         try:
             exe_files = []
-            for root, _, files in os.walk(install_dir):
+            for root, dirs, files in os.walk(install_dir):
+                # Installer/redist folders only hold helper executables.
+                dirs[:] = [d for d in dirs
+                           if not d.startswith('.ascendara') and not _is_non_game_exe_dir(d)]
                 for file in files:
                     if file.lower().endswith('.exe'):
                         full_path = os.path.join(root, file)
@@ -1017,7 +1037,8 @@ class TorrentManager:
             skip_keywords = ['unins', 'uninstall', 'setup', 'installer', 'redist', 'vcredist',
                             'directx', 'dotnet', 'prerequisite', 'launcher', 'updater',
                             'crash', 'report', 'config', 'settings', 'easyanticheat',
-                            'battleye', 'steam_api']
+                            'battleye', 'steam_api', 'cleanup', 'touchup']
+            compact_game = _compact_name(game)
 
             for exe in exe_files:
                 score = 0
@@ -1027,6 +1048,9 @@ class TorrentManager:
                     continue
 
                 if sanitized_game in exe_name_lower or exe_name_lower.replace('.exe', '') == sanitized_game:
+                    score += 300
+                # "It Takes Two" -> ItTakesTwo.exe
+                elif compact_game and compact_game in _compact_name(exe_name_lower[:-4]):
                     score += 300
 
                 game_words = set(re.findall(r'\w+', game_name_lower))
