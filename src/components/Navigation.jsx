@@ -2,6 +2,7 @@ import React, { useState, useEffect, memo, useCallback, useMemo, useRef } from "
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
+import { debridProviders } from "@/services/downloads/debridService";
 import {
   Home,
   Search,
@@ -134,10 +135,12 @@ const Navigation = memo(({ items }) => {
         color: "from-orange-500 to-amber-400",
       },
       {
-        path: "/torboxdownloads",
-        label: t("common.torboxDownloads"),
+        path: "/debriddownloads",
+        label: t("debrid.downloadsTitle"),
         icon: ServerIcon,
-        hidden: settings.torboxApiKey === "",
+        hidden: !debridProviders.some(provider =>
+          settings[provider.apiKeySetting]?.trim()
+        ),
         color: "from-orange-500 to-amber-400",
       },
     ];
@@ -173,7 +176,7 @@ const Navigation = memo(({ items }) => {
     });
 
     return items;
-  }, [t, settings.viewWorkshopPage, settings.torboxApiKey]);
+  }, [t, settings]);
 
   useEffect(() => {
     const checkDownloaderStatus = async () => {
@@ -426,7 +429,10 @@ const Navigation = memo(({ items }) => {
                     <ChevronRight className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-90 transform text-border" />
                   </div>
                 </Link>
-                {index === (settings.torboxApiKey === "" ? 3 : 4) && (
+                {index ===
+                  3 +
+                    (settings.torboxApiKey ? 1 : 0) +
+                    (settings.realDebridApiKey ? 1 : 0) && (
                   <div className="h-8 w-px bg-border/50" />
                 )}
               </React.Fragment>

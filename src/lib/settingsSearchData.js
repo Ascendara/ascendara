@@ -484,6 +484,22 @@ export const settingsSearchData = [
     },
   },
   {
+    id: "debrid-services",
+    title: "Debrid Services and Priority",
+    description: "Manage accounts, API keys, download options and service order",
+    keywords: ["debrid", "torbox", "realdebrid", "real-debrid", "priority", "order", "account", "api key", "magnet"],
+    section: "Downloads",
+    scrollTo: "debrid-services",
+  },
+  {
+    id: "realdebrid-api-key",
+    title: "Real-Debrid",
+    description: "Configure Real-Debrid API key, preferred debrid provider and cloud torrents",
+    keywords: ["realdebrid", "real-debrid", "debrid", "api", "token", "torrent", "premium"],
+    section: "Downloads",
+    scrollTo: "debrid-services",
+  },
+  {
     id: "torbox-api-key",
     title: "TorBox API Key",
     description: "Configure TorBox debrid integration",
@@ -498,7 +514,7 @@ export const settingsSearchData = [
       "token",
     ],
     section: "Downloads",
-    scrollTo: "torbox-api-key",
+    scrollTo: "debrid-services",
   },
   {
     id: "prioritize-torbox",
@@ -514,7 +530,7 @@ export const settingsSearchData = [
       "torbox first",
     ],
     section: "Downloads",
-    scrollTo: "prioritize-torbox",
+    scrollTo: "debrid-services",
   },
   {
     id: "single-stream",

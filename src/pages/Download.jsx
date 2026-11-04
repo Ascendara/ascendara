@@ -70,7 +70,8 @@ import { formatBytes } from "@/services/app/systemHealthService";
 import TimemachineDialog from "@/components/TimemachineDialog";
 import steamService from "@/services/games/gameInfoService";
 import hltbService from "@/services/integrations/hltbService";
-import torboxService from "@/services/downloads/torboxService";
+import useDebridHosts from "@/hooks/useDebridHosts";
+import * as debrid from "@/services/downloads/debridService";
 import {
   fetchProviderPatterns,
   getProviderPattern,
@@ -83,7 +84,6 @@ import installedGamesService from "@/services/library/installedGamesService";
 import {
   SEAMLESS_PROVIDERS,
   VERIFIED_PROVIDERS as CENTRAL_VERIFIED_PROVIDERS,
-  TORBOX_PROVIDER_DISPLAY_NAMES,
 } from "@/config/providers";
 import { API_URL } from "@/config/api";
 
@@ -110,39 +110,6 @@ const isValidURL = async (url, provider, patterns) => {
 
 const sanitizeGameName = name => {
   return sanitizeText(name);
-};
-
-// Helper function to check Torbox service status for a specific provider
-const checkTorboxStatus = async provider => {
-  try {
-    const response = await fetch("/api/torbox/webdl/hosters");
-    if (!response.ok) {
-      throw new Error("Failed to fetch Torbox status");
-    }
-    const data = await response.json();
-
-    const torboxName = TORBOX_PROVIDER_DISPLAY_NAMES[provider.toLowerCase()];
-    if (!torboxName) {
-      console.log(`No TorBox mapping for provider: ${provider}`);
-      return null;
-    }
-
-    // Find the hoster in the response array
-    const hoster = data.data?.find(h => h.name === torboxName);
-    if (hoster) {
-      return {
-        provider: provider,
-        status: hoster.status ? "online" : "offline",
-        isOnline: hoster.status === true,
-      };
-    }
-
-    console.log(`Hoster ${torboxName} not found in TorBox API response`);
-    return null;
-  } catch (error) {
-    console.error("Error checking Torbox status:", error);
-    return null;
-  }
 };
 
 // Helper function to check if there are active downloads
@@ -207,6 +174,7 @@ function PublicDownloadPage() {
   const [isUpdating, setIsUpdating] = useState(state?.gameData?.isUpdating || false);
   const { t } = useLanguage();
   const { settings, setSettings } = useSettings();
+  const debridHosts = useDebridHosts(settings);
   const { isAuthenticated, userData } = useAuth();
 
   const handleBack = () => {
@@ -431,7 +399,7 @@ function PublicDownloadPage() {
   // Read-only: the ref is never attached, so opening this page does not count a view
   const [, viewCount] = useGameViews(gameData?.gameID, !gameData?.privateSource);
   const [showVerifiedDialog, setShowVerifiedDialog] = useState(false);
-  const [torboxDisabledForSession, setTorboxDisabledForSession] = useState(false);
+  const [debridDisabledForSession, setDebridDisabledForSession] = useState(false);
   const [isExternalSourcesMode, setIsExternalSourcesMode] = useState(false);
   const [antivirusWarningDismissed, setAntivirusWarningDismissed] = useState(false);
   const [isGameInstalled, setIsGameInstalled] = useState(false);
@@ -835,7 +803,9 @@ function PublicDownloadPage() {
 
   // Stops a download that can't fit and warns when the install may not
   async function confirmInstallSpace(dir) {
-    const directory = dir ? settings.additionalDirectories?.[dir - 1] : settings.downloadDirectory;
+    const directory = dir
+      ? settings.additionalDirectories?.[dir - 1]
+      : settings.downloadDirectory;
     let freeSpace;
     try {
       const space = await window.electron.getDriveSpace(directory);
@@ -855,10 +825,15 @@ function PublicDownloadPage() {
     }
     if (status === "low") {
       toast.warning(
-        t(measured ? "download.toast.lowSpaceMeasured" : "download.toast.lowSpaceEstimated", {
-          needed: formatBytes(needed),
-          free: formatBytes(freeSpace),
-        })
+        t(
+          measured
+            ? "download.toast.lowSpaceMeasured"
+            : "download.toast.lowSpaceEstimated",
+          {
+            needed: formatBytes(needed),
+            free: formatBytes(freeSpace),
+          }
+        )
       );
     }
     return true;
@@ -872,6 +847,7 @@ function PublicDownloadPage() {
   ) {
     const downloadProvider =
       browserDirectUrl.current === directUrl && directUrl ? "direct" : selectedProvider;
+    let resolvedByDebrid = false;
     const sanitizedGameName = sanitizeText(gameData.game);
     console.log("[DL] handleDownload called", {
       directUrl,
@@ -931,11 +907,40 @@ function PublicDownloadPage() {
 
     if (!gameData.isUpdating && !(await confirmInstallSpace(dir))) return;
 
+    const sourceLinks = gameData.download_links?.[downloadProvider];
+    const hostSourceLink =
+      directUrl ||
+      (Array.isArray(sourceLinks)
+        ? sourceLinks.find(link => typeof link === "string" && link.trim())
+        : sourceLinks) ||
+      inputLink;
+    const supportedHosts = !["torrent", "direct"].includes(downloadProvider)
+      ? await debrid.getSupportedHosts(settings)
+      : {};
+    const downloadDebridProvider = debrid.getHostProvider(
+      settings,
+      downloadProvider,
+      hostSourceLink,
+      supportedHosts
+    );
+    const debridEligible = Boolean(downloadDebridProvider);
+    const routeThroughDebrid = !debridDisabledForSession && debridEligible;
+
     // Check if there's an active download
     const hasActive = await hasActiveDownloads();
     console.log("[DL] hasActive:", hasActive, "isAuthenticated:", isAuthenticated);
 
-    if (hasActive && !forceStart) {
+    const cloudTorrentRequest =
+      debrid.canUseCloudTorrents(settings) &&
+      !debridDisabledForSession &&
+      (downloadProvider === "torrent" ||
+        directUrl?.startsWith("magnet:") ||
+        (settings.gameSource === "fitgirl" &&
+          downloadProvider !== "direct" &&
+          gameData.torrentLink?.startsWith("magnet:")));
+    const cloudHostRequest =
+      routeThroughDebrid && downloadDebridProvider.hostDownloadMode === "cloud";
+    if (hasActive && !forceStart && !cloudTorrentRequest && !cloudHostRequest) {
       const isVrGame = gameData.category?.includes("Virtual Reality");
       const downloadData = {
         url: directUrl || inputLink || "",
@@ -951,6 +956,8 @@ function PublicDownloadPage() {
         gameID: gameData.gameID || "",
         directUrl: directUrl,
         browserDirect: downloadProvider === "direct",
+        debridProviderId: routeThroughDebrid ? downloadDebridProvider.id : null,
+        debridLink: routeThroughDebrid ? hostSourceLink : null,
         browserAssetGameId: gameData.browserAssetGameId,
         dir: dir,
       };
@@ -987,64 +994,27 @@ function PublicDownloadPage() {
       downloadProvider === "torrent" ||
       isMagnet(directUrl) ||
       (!downloadProvider && torrentLinksFromGame.some(isMagnet));
-    const shouldUseTorboxForTorrent =
-      settings.useTorboxForTorrents !== false &&
-      torboxService.isEnabled(settings) &&
-      !torboxDisabledForSession;
-
-    const queueTorrentInTorbox = async magnetLink => {
-      if (isStartingDownload) {
-        console.log("Download already in progress, skipping");
-        return { success: true };
-      }
-
+    const shouldUseCloudTorrent =
+      debrid.canUseCloudTorrents(settings) && !debridDisabledForSession;
+    const queueTorrentInDebrid = async magnet => {
+      if (isStartingDownload) return true;
       setIsStartingDownload(true);
       toast.info(t("download.toast.processingLink"));
-
       try {
-        const apiKey = torboxService.getApiKey(settings);
-        const result = await torboxService.createTorrentFromMagnet(
-          magnetLink,
-          apiKey,
-          gameData.game
-        );
-        const storageKey = result.torrentId ? `torrent:${result.torrentId}` : magnetLink;
-        const torboxData = JSON.parse(localStorage.getItem("torboxGameNames") || "{}");
-        const downloadData = {
-          name: gameData.game,
-          timestamp: Date.now(),
-          imgUrl: gameData.imgID || null,
-          provider: "torrent",
-          torboxType: "torrent",
-          originalUrl: magnetLink,
-          downloadId: result.torrentId,
-          gameData: {
-            game: gameData.game,
-            version: gameData.version || "",
-            size: gameData.size || "",
-            imgID: gameData.imgID || null,
-            gameID: gameData.gameID || "",
-            online: gameData.online || false,
-            dlc: gameData.dlc || false,
-            vr: gameData.category?.includes("Virtual Reality") || false,
-            download_links: gameData.download_links || {},
-          },
-        };
-
-        torboxData[magnetLink] = downloadData;
-        torboxData[storageKey] = downloadData;
-        localStorage.setItem("torboxGameNames", JSON.stringify(torboxData));
-
-        toast.dismiss();
+        const result = await debrid.submitMagnet(settings, magnet, gameData, dir ?? 0);
         toast.success(t("download.toast.downloadQueued"));
-        navigate("/torboxdownloads");
-        return { success: true };
+        navigate(result.downloadsPath);
+        return true;
       } catch (error) {
-        console.error("Error processing torrent with TorBox:", error);
-        toast.dismiss();
-        return { success: false, error };
+        if (debrid.allowsTorrentFallback(settings)) {
+          toast.info(t("debrid.torrentFallback"));
+          return false;
+        }
+        toast.error(error.message);
+        return true;
       } finally {
         setIsStartingDownload(false);
+        clearDownloadLock();
       }
     };
 
@@ -1060,17 +1030,12 @@ function PublicDownloadPage() {
         return;
       }
 
-      if (shouldUseTorboxForTorrent) {
-        const torboxResult = await queueTorrentInTorbox(magnetLink);
-        if (torboxResult.success) return;
-        if (!settings.fallbackToQbittorrentOnTorboxFailure) {
-          toast.error(
-            torboxResult.error?.message || t("download.toast.torboxProcessingError")
-          );
-          return;
-        }
-        toast.info(t("download.toast.torboxTorrentFallback"));
-      }
+      if (
+        shouldUseCloudTorrent &&
+        isMagnet(magnetLink) &&
+        (await queueTorrentInDebrid(magnetLink))
+      )
+        return;
 
       if (!settings.torrentEnabled) {
         toast.error(
@@ -1148,20 +1113,15 @@ function PublicDownloadPage() {
     }
 
     // Handle torrent links if Fitgirl is the source
-    if (settings.gameSource === "fitgirl") {
+    if (settings.gameSource === "fitgirl" && downloadProvider !== "direct") {
       const torrentLink = gameData.torrentLink;
       if (torrentLink) {
-        if (shouldUseTorboxForTorrent && isMagnet(torrentLink)) {
-          const torboxResult = await queueTorrentInTorbox(torrentLink);
-          if (torboxResult.success) return;
-          if (!settings.fallbackToQbittorrentOnTorboxFailure) {
-            toast.error(
-              torboxResult.error?.message || t("download.toast.torboxProcessingError")
-            );
-            return;
-          }
-          toast.info(t("download.toast.torboxTorrentFallback"));
-        }
+        if (
+          shouldUseCloudTorrent &&
+          isMagnet(torrentLink) &&
+          (await queueTorrentInDebrid(torrentLink))
+        )
+          return;
 
         if (!settings.torrentEnabled) {
           toast.error(
@@ -1246,15 +1206,11 @@ function PublicDownloadPage() {
         return;
       }
     }
-    // Determine if this provider should use Torbox (only if API key is configured and not disabled for session)
-    const shouldUseTorbox = () =>
-      torboxProviders.includes(downloadProvider) &&
-      torboxService.isEnabled(settings) &&
-      !torboxDisabledForSession;
+    const shouldUseDebrid = () => routeThroughDebrid;
 
-    // Handle providers when TorBox is disabled for session
-    // This includes both seamless providers and TorBox providers that have been disabled
-    if (torboxProviders.includes(downloadProvider) && torboxDisabledForSession) {
+    // Handle providers when debrid is disabled for session
+    // This includes both seamless providers and debrid providers that have been disabled
+    if (debridEligible && debridDisabledForSession) {
       // If directUrl is not provided, get it from gameData
       if (!directUrl) {
         let providerLinks = gameData.download_links?.[downloadProvider] || [];
@@ -1265,13 +1221,13 @@ function PublicDownloadPage() {
             : null;
 
         console.log(
-          "[DL] TorBox disabled - using direct link:",
+          "[DL] debrid disabled - using direct link:",
           validProviderLink,
           "providerLinks:",
           providerLinks
         );
         if (!validProviderLink) {
-          console.log("[DL] EARLY RETURN: no valid provider link with TorBox disabled");
+          console.log("[DL] EARLY RETURN: no valid provider link with debrid disabled");
           toast.error(t("download.toast.invalidLink"));
           return;
         }
@@ -1280,14 +1236,14 @@ function PublicDownloadPage() {
         directUrl = validProviderLink.replace(/^(?:https?:)?\/\//, "https://");
       } else {
         // directUrl provided (e.g., from extension), ensure it has proper protocol
-        console.log("[DL] Using provided directUrl with TorBox disabled:", directUrl);
+        console.log("[DL] Using provided directUrl with debrid disabled:", directUrl);
         directUrl = directUrl.replace(/^(?:https?:)?\/\//, "https://");
       }
     }
-    // Handle seamless providers (gofile, pixeldrain) when not using Torbox
+    // Handle seamless providers (gofile, pixeldrain) when not using debrid
     else if (
       (downloadProvider === "gofile" || downloadProvider === "pixeldrain") &&
-      !shouldUseTorbox()
+      !shouldUseDebrid()
     ) {
       // If directUrl is not provided, get it from gameData
       if (!directUrl) {
@@ -1319,176 +1275,37 @@ function PublicDownloadPage() {
       }
     }
 
-    // Handle providers using Torbox service
-    if (shouldUseTorbox()) {
-      // Use directUrl if provided (e.g., from extension), otherwise get from gameData
-      let providerLink = directUrl;
-
-      if (!providerLink) {
-        // Get the link array and find a valid one
-        const links = gameData.download_links?.[downloadProvider] || [];
-        providerLink = Array.isArray(links)
-          ? links.find(link => link && typeof link === "string")
-          : links;
-      }
-
-      // Ensure the link has proper protocol
-      if (providerLink && !providerLink.startsWith("http")) {
-        providerLink = "https:" + providerLink;
-      }
-
-      if (!providerLink || !isValidLink) {
-        console.log("Invalid link:", providerLink, isValidLink);
-        toast.error(t("download.toast.invalidLink"));
-        return;
-      }
-
-      // Check TorBox hoster status for the selected provider
-      const torboxStatus = await checkTorboxStatus(downloadProvider);
-      if (!torboxStatus || !torboxStatus.isOnline) {
-        toast.error(t("download.toast.torboxOffline"));
-        setIsStartingDownload(false);
-        clearDownloadLock();
-        return;
-      }
-
-      if (isStartingDownload) {
-        console.log("Download already in progress, skipping");
-        return;
-      }
-
+    if (routeThroughDebrid) {
+      if (isStartingDownload) return;
       setIsStartingDownload(true);
-      toast.info(t("download.toast.processingLink"));
-
       try {
-        console.log(`Processing ${downloadProvider} link with Torbox:`, providerLink);
-        const apiKey = torboxService.getApiKey(settings);
-
-        // Save comprehensive download data to local storage for TorboxDownloads
-        try {
-          // Get existing torbox data or initialize empty object
-          const torboxData = JSON.parse(localStorage.getItem("torboxGameNames") || "{}");
-
-          // Create a complete download data object with all necessary info
-          const downloadData = {
-            name: gameData.game,
-            timestamp: Date.now(),
-            imgUrl: gameData.imgID || null,
-            provider: downloadProvider,
-            originalUrl: providerLink,
-            // Save all the necessary game data for download processing
-            gameData: {
-              game: gameData.game,
-              version: gameData.version || "",
-              size: gameData.size || "",
-              imgID: gameData.imgID || null,
-              online: gameData.online || false,
-              dlc: gameData.dlc || false,
-              download_links: gameData.download_links || {},
-            },
-          };
-
-          // Store with the URL as key (will be used to match with download ID)
-          torboxData[providerLink] = downloadData;
-
-          // Save back to local storage
-          localStorage.setItem("torboxGameNames", JSON.stringify(torboxData));
-          console.log(
-            "Saved comprehensive download data to local storage:",
-            gameData.game
-          );
-        } catch (err) {
-          console.error("Error saving download data to local storage:", err);
-        }
-
-        const result = await torboxService.getDirectDownloadLinkFromUrl(
-          providerLink,
-          apiKey
+        const result = await debrid.resolveHost(
+          settings,
+          hostSourceLink,
+          downloadProvider,
+          gameData,
+          dir ?? 0
         );
-
-        if (!result) {
-          throw new Error("Failed to process download");
-        }
-
-        console.log("Got Torbox result:", result);
-
-        // If we have a download ID, update the stored data with the ID for better matching
-        if (result.item && result.item.id) {
-          try {
-            const torboxData = JSON.parse(
-              localStorage.getItem("torboxGameNames") || "{}"
-            );
-
-            // Get the existing data for this URL if available
-            const existingData = torboxData[providerLink] || {
-              name: gameData.game,
-              timestamp: Date.now(),
-              imgUrl: gameData.imgID || null,
-              provider: downloadProvider,
-              originalUrl: providerLink,
-              gameData: {
-                game: gameData.game,
-                version: gameData.version || "",
-                size: gameData.size || "",
-                imgID: gameData.imgID || null,
-                online: gameData.online || false,
-                dlc: gameData.dlc || false,
-                download_links: gameData.download_links || {},
-              },
-            };
-
-            // Create a new entry with the download ID as key
-            torboxData[result.item.id] = {
-              ...existingData,
-              downloadId: result.item.id,
-              // Add any additional data from the result
-              files: result.item.files || [],
-              status: result.item.status || result.status || "unknown",
-              size: result.item.size || existingData.gameData.size || "",
-            };
-
-            localStorage.setItem("torboxGameNames", JSON.stringify(torboxData));
-            console.log("Updated download data with ID:", result.item.id);
-          } catch (err) {
-            console.error("Error updating download data with ID:", err);
-          }
-        }
-
-        // Check if the download is cached and ready
-        if (result.status === "ready" && result.item) {
-          toast.dismiss();
-          toast.success(t("download.toast.linkProcessed"));
-
-          // If we have a direct URL, use it
-          if (result.url) {
-            directUrl = result.url;
-          } else {
-            // Otherwise redirect to TorboxDownloads page
-            toast.info(t("download.toast.downloadReady"));
-            navigate("/torboxdownloads");
-            setIsStartingDownload(false);
-            return;
-          }
+        if (result.url) {
+          directUrl = result.url;
+          resolvedByDebrid = true;
         } else {
-          // Download is not cached yet, redirect to TorboxDownloads page
-          toast.dismiss();
-          toast.info(t("download.toast.downloadQueued"));
-          navigate("/torboxdownloads");
-          setIsStartingDownload(false);
+          toast.info(
+            t(
+              result.status === "ready"
+                ? "download.toast.downloadReady"
+                : "download.toast.downloadQueued"
+            )
+          );
+          navigate(result.downloadsPath);
           return;
         }
       } catch (error) {
-        console.error(`Error processing ${downloadProvider} link with Torbox:`, error);
-        toast.dismiss();
-        toast.error(
-          error?.code === "UNSUPPORTED_SITE"
-            ? t("download.toast.torboxUnsupportedSite", {
-                provider: downloadProvider,
-              })
-            : t("download.toast.torboxProcessingError")
-        );
-        setIsStartingDownload(false);
+        toast.error(error.message);
+        clearDownloadLock();
         return;
+      } finally {
+        setIsStartingDownload(false);
       }
     }
 
@@ -1538,7 +1355,7 @@ function PublicDownloadPage() {
         gameData.size || "",
         dir,
         gameData.gameID || "",
-        downloadProvider === "direct",
+        downloadProvider === "direct" || resolvedByDebrid,
         gameData.browserAssetGameId
       );
       if (result?.success === false) {
@@ -1999,18 +1816,13 @@ function PublicDownloadPage() {
             );
             return (
               hasMagnet &&
-              (!!settings.torrentEnabled ||
-                (settings.useTorboxForTorrents !== false &&
-                  torboxService.isEnabled(settings)))
+              (!!settings.torrentEnabled || debrid.canUseCloudTorrents(settings))
             );
           }
           return true;
         })
         .map(([provider]) => provider)
     : [];
-
-  const prioritizeTorbox = settings.prioritizeTorboxOverSeamless;
-  const torboxProviders = prioritizeTorbox ? providers : ["1fichier", "megadb"];
 
   console.log("Final Available Providers:", providers);
 
@@ -2020,19 +1832,25 @@ function PublicDownloadPage() {
         provider => gameData.download_links[provider]?.length > 0
       );
       const ddlProviders = availableProviders.filter(p => p !== "torrent");
+      const supportedDebridProvider = ddlProviders.find(provider => {
+        const links = gameData.download_links[provider];
+        const link = Array.isArray(links)
+          ? links.find(value => typeof value === "string" && value.trim())
+          : links;
+        return debrid.canUseForHost(settings, provider, link, debridHosts);
+      });
 
       if (ddlProviders.includes("gofile")) {
         setSelectedProvider("gofile");
       } else if (ddlProviders.includes("buzzheavier")) {
         setSelectedProvider("buzzheavier");
-      } else if (torboxService.isEnabled(settings) && ddlProviders.includes("1fichier")) {
-        setSelectedProvider("1fichier");
+      } else if (supportedDebridProvider) {
+        setSelectedProvider(supportedDebridProvider);
       } else if (ddlProviders.length > 0) {
         setSelectedProvider(ddlProviders[0]);
       } else if (
         availableProviders.includes("torrent") &&
-        (settings.torrentEnabled ||
-          (settings.useTorboxForTorrents !== false && torboxService.isEnabled(settings)))
+        (settings.torrentEnabled || debrid.canUseCloudTorrents(settings))
       ) {
         setSelectedProvider("torrent");
       } else {
@@ -2041,12 +1859,7 @@ function PublicDownloadPage() {
     } else {
       setSelectedProvider("");
     }
-  }, [
-    gameData,
-    settings.prioritizeTorboxOverSeamless,
-    settings.torboxApiKey,
-    settings.torrentEnabled,
-  ]);
+  }, [gameData, settings, debridHosts]);
 
   if (gameData && gameData.game) {
     gameData.game = sanitizeGameName(gameData.game);
@@ -2065,17 +1878,23 @@ function PublicDownloadPage() {
   }
 
   // Which download flow the panel shows for the selected provider
-  const torboxEnabled = torboxService.isEnabled(settings);
-  const torboxAvailable =
-    torboxProviders.includes(selectedProvider) &&
-    torboxEnabled &&
-    !!torboxService.getApiKey(settings);
+  const selectedLinks = downloadLinks[selectedProvider];
+  const selectedHostUrl = Array.isArray(selectedLinks)
+    ? selectedLinks.find(link => typeof link === "string" && link.trim())
+    : selectedLinks;
+  const selectedDebridProvider = debrid.getHostProvider(
+    settings,
+    selectedProvider,
+    selectedHostUrl,
+    debridHosts
+  );
+  const debridAvailable = Boolean(selectedDebridProvider);
   const downloadMode =
     settings.gameSource === "fitgirl" && gameData.torrentLink
       ? "fitgirl"
       : selectedProvider === "torrent"
         ? "torrent"
-        : torboxAvailable ||
+        : debridAvailable ||
             seamlessProviders.includes(selectedProvider) ||
             selectedProvider === "buzzheavier" ||
             selectedProvider === "megadb"
@@ -2223,10 +2042,12 @@ function PublicDownloadPage() {
               filesUnavailable={filesUnavailable}
               selectedProvider={selectedProvider}
               onProviderChange={setSelectedProvider}
-              torboxEnabled={torboxEnabled}
-              torboxAvailable={torboxAvailable}
-              torboxDisabledForSession={torboxDisabledForSession}
-              onTorboxDisabledChange={setTorboxDisabledForSession}
+              debridProvider={
+                selectedDebridProvider || debrid.getTorrentProvider(settings)
+              }
+              debridAvailable={debridAvailable}
+              debridDisabledForSession={debridDisabledForSession}
+              onDebridDisabledChange={setDebridDisabledForSession}
               torrentRunning={torrentRunning}
               isStartingDownload={isStartingDownload}
               linkStage={linkStage}

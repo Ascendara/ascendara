@@ -1,3 +1,5 @@
+import { canUseCloudTorrents } from "@/services/downloads/debridService";
+import DebridSettings from "@/components/DebridSettings";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useTheme, clearCustomTheme } from "@/context/ThemeContext";
 import {
@@ -262,7 +264,6 @@ function Settings() {
   const [currentScreen, setCurrentScreen] = useState("none");
   const [isTriggering, setIsTriggering] = useState(false);
   const [apiMetadata, setApiMetadata] = useState(null);
-  const [torboxApiKey, setTorboxApiKey] = useState(null);
   const [qbitConfigDraft, setQbitConfigDraft] = useState(null);
   const [qbitStatusRefreshKey, setQbitStatusRefreshKey] = useState(0);
   const [hideQbitInstallNote, setHideQbitInstallNote] = useState(false);
@@ -1437,6 +1438,7 @@ function Settings() {
             </SettingsCategory>
 
             <SettingsCategory {...categoryProps("downloads")}>
+              <DebridSettings />
               <SettingsSection
                 id="download-manager"
                 title={t("settings.downloaderSettings")}
@@ -1881,143 +1883,6 @@ function Settings() {
                 </div>
               </SettingsSection>
 
-              <SettingsSection
-                id="torbox-settings"
-                title={t("settings.torboxTitle")}
-                className="space-y-5"
-              >
-                {/* Torbox API Key Config */}
-                <div id="torbox-api-key" className="space-y-2">
-                  <Label>{t("settings.torboxApiKey")}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings.torboxApiKeyDescription")}&nbsp;
-                    <a
-                      onClick={() =>
-                        window.electron.openURL(
-                          "https://ascendara.app/docs/features/torbox-integration"
-                        )
-                      }
-                      className="cursor inline-flex cursor-pointer items-center text-primary hover:underline"
-                    >
-                      {t("settings.torboxApiKeyLearnHowtoGet")}
-                      <ExternalLink className="ml-1 inline-block h-3 w-3" />
-                    </a>
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Input
-                    id="torboxApiKey"
-                    type="password"
-                    placeholder={t("settings.torboxApiKeyPlaceholder")}
-                    value={
-                      torboxApiKey !== null ? torboxApiKey : settings.torboxApiKey || ""
-                    }
-                    onChange={e => setTorboxApiKey(e.target.value)}
-                    autoComplete="off"
-                  />
-                  <Button
-                    onClick={() => {
-                      setSettings(s => ({ ...s, torboxApiKey: torboxApiKey }));
-                      toast.success(t("settings.apiKeySaved"));
-                      setTorboxApiKey(null);
-                    }}
-                    disabled={torboxApiKey === null}
-                    variant="none"
-                    className="text-primary"
-                  >
-                    {t("settings.setKey")}
-                  </Button>
-                </div>
-
-                <div id="prioritize-torbox" className="flex items-center justify-between">
-                  <div
-                    className={`space-y-2${
-                      !(
-                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
-                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
-                      )
-                        ? "pointer-events-none select-none opacity-50"
-                        : ""
-                    }`}
-                  >
-                    <Label>{t("settings.prioritizeTorboxOverSeamless")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.prioritizeTorboxOverSeamlessDesc")}&nbsp;
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.prioritizeTorboxOverSeamless}
-                    onCheckedChange={value => {
-                      setSettings(prev => ({
-                        ...prev,
-                        prioritizeTorboxOverSeamless: value,
-                      }));
-                    }}
-                    disabled={
-                      !(
-                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
-                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
-                      )
-                    }
-                  />
-                </div>
-
-                <div id="torbox-torrents" className="flex items-center justify-between">
-                  <div
-                    className={`space-y-2${
-                      !(
-                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
-                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
-                      )
-                        ? "pointer-events-none select-none opacity-50"
-                        : ""
-                    }`}
-                  >
-                    <Label>{t("settings.useTorboxForTorrents")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.useTorboxForTorrentsDesc")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.useTorboxForTorrents ?? true}
-                    onCheckedChange={value =>
-                      handleSettingChange("useTorboxForTorrents", value)
-                    }
-                    disabled={
-                      !(
-                        (torboxApiKey !== null && torboxApiKey.trim() !== "") ||
-                        (settings.torboxApiKey && settings.torboxApiKey.trim() !== "")
-                      )
-                    }
-                  />
-                </div>
-
-                <div
-                  id="torbox-torrent-fallback"
-                  className="flex items-center justify-between"
-                >
-                  <div
-                    className={`space-y-2${
-                      !settings.useTorboxForTorrents || !settings.torrentEnabled
-                        ? "pointer-events-none select-none opacity-50"
-                        : ""
-                    }`}
-                  >
-                    <Label>{t("settings.fallbackToQbittorrentOnTorboxFailure")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.fallbackToQbittorrentOnTorboxFailureDesc")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.fallbackToQbittorrentOnTorboxFailure ?? false}
-                    onCheckedChange={value =>
-                      handleSettingChange("fallbackToQbittorrentOnTorboxFailure", value)
-                    }
-                    disabled={!settings.useTorboxForTorrents || !settings.torrentEnabled}
-                  />
-                </div>
-              </SettingsSection>
-
               <SettingsSection id="torrent-downloads">
                 <div className="mb-6 flex items-start justify-between gap-4">
                   <div>
@@ -2039,7 +1904,7 @@ function Settings() {
                               !isOnWindows ||
                               (settings.customSourcesMode &&
                                 settings.customSource?.torrentOnly &&
-                                settings.torrentEnabled)
+                                settings.torrentEnabled && !canUseCloudTorrents(settings))
                             }
                           />
                         </div>
@@ -2052,7 +1917,7 @@ function Settings() {
                         </TooltipContent>
                       ) : settings.customSourcesMode &&
                         settings.customSource?.torrentOnly &&
-                        settings.torrentEnabled ? (
+                        settings.torrentEnabled && !canUseCloudTorrents(settings) ? (
                         <TooltipContent>
                           <p className="text-secondary">
                             {t("settings.torrentRequiredBySource") ||
@@ -2065,7 +1930,7 @@ function Settings() {
                 </div>
                 {settings.customSourcesMode &&
                   settings.customSource?.torrentOnly &&
-                  settings.torrentEnabled && (
+                  settings.torrentEnabled && !canUseCloudTorrents(settings) && (
                     <div className="mb-4 rounded-md border border-orange-500/30 bg-orange-500/5 p-3 text-xs text-orange-700 dark:text-orange-300">
                       {(
                         t("settings.torrentLockedBySourceNote") ||

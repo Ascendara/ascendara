@@ -11,7 +11,7 @@ const { encrypt, decrypt } = require("./encryption");
 class SettingsManager {
   constructor() {
     this.filePath = path.join(app.getPath("userData"), "ascendarasettings.json");
-    this.sensitiveKeys = ["twitchSecret", "twitchClientId", "torboxApiKey"];
+    this.sensitiveKeys = ["twitchSecret", "twitchClientId", "torboxApiKey", "realDebridApiKey"];
     this.defaultSettings = {
       downloadDirectory: "",
       additionalDirectories: [],
@@ -55,6 +55,13 @@ class SettingsManager {
       twitchSecret: "",
       twitchClientId: "",
       torboxApiKey: "",
+      realDebridApiKey: "",
+      debridEnabled: false,
+    debridProvider: "torbox",
+    debridProviderOrder: [],
+    debridProviderEnabled: {},
+      prioritizeRealDebridOverSeamless: false,
+      useRealDebridForTorrents: true,
       localIndex: "",
       blacklistIDs: ["ABSXUc", "AWBgqf", "ATaHuq"],
       usingLocalIndex: false,

@@ -9,13 +9,6 @@
 // Providers that support seamless (in-app) downloads.
 export const SEAMLESS_PROVIDERS = ["gofile", "pixeldrain"];
 
-// Providers that route through the TorBox debrid service.
-export const TORBOX_PROVIDERS = ["1fichier", "datanodes", "qiwi", "megadb"];
-
-// Providers that are TorBox-eligible in addition to seamless hosts
-// (used when prioritizeTorboxOverSeamless is toggled).
-export const TORBOX_ELIGIBLE_SEAMLESS = ["gofile", "datanodes", "pixeldrain"];
-
 // Providers whose downloads are considered "verified" / trusted.
 export const VERIFIED_PROVIDERS = ["megadb", "gofile", "buzzheavier", "pixeldrain"];
 
@@ -32,14 +25,6 @@ export const PROVIDER_DISPLAY_NAMES = {
   torrent: "Torrent",
   fileditch: "FileDitch",
   fileditchfiles: "FileDitch",
-};
-
-// TorBox display-name mapping (TorBox API uses slightly different casing).
-export const TORBOX_PROVIDER_DISPLAY_NAMES = {
-  "1fichier": "1Fichier",
-  megadb: "MegaDB",
-  gofile: "GoFile",
-  buzzheavier: "Buzzheavier",
 };
 
 // Known domains for each provider. Used for URL classification

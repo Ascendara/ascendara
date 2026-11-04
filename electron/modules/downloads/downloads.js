@@ -44,6 +44,7 @@ const withDownloadOperation = createOperationLock();
 const downloadProcesses = new Map();
 const retryDownloadProcesses = new Map();
 const dllRepair = require("./dllRepair");
+const { validateFileList } = require("./downloadManifest");
 
 /**
  * Log into qBittorrent's WebUI and remove any torrent(s) whose save path
@@ -434,6 +435,8 @@ function registerDownloadHandlers() {
       const backgroundStart = new Promise(resolve => (startedInBackground = resolve));
       const lockKey = sanitizeGameName(sanitizeText(game));
       const operation = withDownloadOperation(lockKey, async () => {
+        const fileList =
+          typeof link === "object" && link !== null ? validateFileList(link) : null;
         if (typeof link === "string" && link.startsWith("private:")) {
           const [, sourceId, entryId] = link.split(":");
           return require("./privateSources").start(
@@ -462,7 +465,7 @@ function registerDownloadHandlers() {
         ) {
           throw new Error("Invalid artwork logo selection");
         }
-        if (browserDirect === true) {
+        if (browserDirect === true && !fileList) {
           const parsed = new URL(link);
           if (
             !["http:", "https:"].includes(parsed.protocol) ||
@@ -539,6 +542,26 @@ function registerDownloadHandlers() {
           }
           gameDirectory = path.join(targetDirectory, sanitizedGame);
 
+          if (fileList && fs.existsSync(gameDirectory)) {
+            const cachePath = path.join(
+              app.getPath("userData"),
+              "downloadCache",
+              `${sanitizedGame}.json`
+            );
+            const cached = await fs.readJson(cachePath).catch(() => null);
+            const tracked = fs.existsSync(
+              path.join(gameDirectory, `${sanitizedGame}.ascendara.json`)
+            );
+            if (
+              cached?.transferId === fileList.transferId &&
+              (tracked || downloadProcesses.has(sanitizedGame))
+            )
+              return { success: true, alreadyStarted: true };
+            throw new Error(
+              "The game folder already exists. Resolve the existing download before starting this torrent."
+            );
+          }
+
           // If the destination folder already exists and wasn't created by a
           // previous Ascendara download (no tracking JSON present), it likely
           // contains files unrelated to this download (e.g. a manual install
@@ -591,6 +614,16 @@ function registerDownloadHandlers() {
                 `Security software ${{ locked: "locked", blocked: "blocked" }[folderCheck.reason] || "removed"} an online-fix test file in ${targetDirectory}, so it would also delete this game's online-fix files. ${action}, then download again.`
               );
             }
+          }
+          if (fileList) {
+            const cacheDir = path.join(app.getPath("userData"), "downloadCache");
+            await fs.ensureDir(cacheDir);
+            link = path.join(cacheDir, `${sanitizedGame}.files.json`);
+            await fs.writeJson(link, fileList);
+            const total = fileList.files.reduce((sum, file) => sum + (file.size || 0), 0);
+            const disk = await fs.promises.statfs(targetDirectory);
+            if (total > disk.bavail * disk.bsize)
+              throw new Error("Not enough disk space for the torrent files.");
           }
           if (updateFlow && isTorrentLink) {
             // Torrents write straight into the game folder, so copy it first.
@@ -781,6 +814,14 @@ function registerDownloadHandlers() {
 
           if (browserDirect === true && !isTorrentLink)
             spawnCommand.push("--provider", "direct");
+          if (fileList) spawnCommand.push("--file-list");
+          // Development must run the edited helper source on Windows too.
+          if (isWindows && isDev && fileList) {
+            executablePath = getPythonPath();
+            spawnCommand.unshift(
+              path.resolve("binaries/AscendaraDownloader/src/AscendaraDownloader.py")
+            );
+          }
 
           // Add notification flags if enabled
           if (settings.notifications) {
@@ -811,6 +852,8 @@ function registerDownloadHandlers() {
           const cachedDataPath = path.join(cacheDir, `${sanitizedGame}.json`);
           const cacheData = {
             link: link,
+            fileList: Boolean(fileList),
+            transferId: fileList?.transferId,
             browserDirect: browserDirect === true,
             browserAssetGameId,
             game: game,
@@ -864,7 +907,7 @@ function registerDownloadHandlers() {
           const downloadProcess = spawn(executablePath, spawnCommand, {
             detached: true,
             stdio: "ignore",
-            windowsHide: false,
+            windowsHide: Boolean(fileList),
           });
 
           downloadProcess.on("error", err => {
@@ -1791,6 +1834,7 @@ function registerDownloadHandlers() {
 
           let downloadLink = null;
           let browserDirect = false;
+          let fileList = false;
           let online = gameInfo.online || "false";
           let dlc = gameInfo.dlc || "false";
           let isVr = gameInfo.isVr || "false";
@@ -1803,6 +1847,7 @@ function registerDownloadHandlers() {
               const cachedData = JSON.parse(fs.readFileSync(cachedDataPath, "utf8"));
               downloadLink = cachedData.link;
               browserDirect = cachedData.browserDirect === true;
+              fileList = cachedData.fileList === true;
               console.log(`Found cached download link: ${downloadLink}`);
             } catch (cacheError) {
               console.error(`Error reading cached download data: ${cacheError}`);
@@ -1835,7 +1880,7 @@ function registerDownloadHandlers() {
             targetDirectory,
           ];
           if (!torrentDownload) spawnCommand.push(gameID || "");
-          if (!isWindows && isDev) {
+          if (isDev && (!isWindows || fileList)) {
             executablePath = getPythonPath();
             spawnCommand.unshift(
               path.join(`./binaries/${helperName}/src/${helperName}.py`)
@@ -1855,6 +1900,7 @@ function registerDownloadHandlers() {
 
           if (browserDirect && !torrentDownload)
             spawnCommand.push("--provider", "direct");
+          if (fileList) spawnCommand.push("--file-list");
 
           // Add notification flags if enabled
           if (settings.notifications) {

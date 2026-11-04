@@ -1307,10 +1307,13 @@ class AscendaraDownloader:
         os.makedirs(folder, exist_ok=True)
         return _member_path(folder, filename)
 
-    def download(self, url, withNotification=None, provider='auto', password=None):
+    def download(self, url, withNotification=None, provider='auto', password=None, file_list=False):
         self.withNotification = withNotification
         prevent_sleep()
         try:
+            if file_list:
+                self._download_file_list(url)
+                return
             if not isinstance(url, str) or not url.strip():
                 validate_download_url(url)
             if provider not in ('auto', 'direct', 'gofile'):
@@ -1360,6 +1363,99 @@ class AscendaraDownloader:
                     _launch_notification(withNotification, 'Download Error', f'Error downloading {self.game}: {exc}')
         finally:
             allow_sleep()
+
+    def _download_file_list(self, manifest_path):
+        """Transfer a cloud torrent as one resumable game, then use normal extraction."""
+        with open(manifest_path, encoding='utf-8') as stream:
+            plan = json.load(stream)
+        items = plan['files']
+        if not items or len(items) > 10000:
+            raise ValueError('Invalid torrent file list')
+        folder = self._download_path('torrent')
+        os.makedirs(folder, exist_ok=True)
+        receipts = os.path.join(folder, '.ascendara-receipts')
+        os.makedirs(receipts, exist_ok=True)
+        names = set()
+        for item in items:
+            name = item['filename'].replace('\\', '/')
+            if name.lower() in names or any(p.lower().startswith('.ascendara') or
+                    p.lower().endswith('.ascendara.json') for p in name.split('/')):
+                raise ValueError('Torrent filename conflicts with download metadata')
+            names.add(name.lower())
+            validate_download_url(item['url'])
+            item['source'] = _member_path(folder, name)
+            if item['size'] is not None and (type(item['size']) is not int or item['size'] < 0):
+                raise ValueError('Invalid torrent file size')
+        self.game_info['debridTransferId'] = plan['transferId']
+        self.game_info['downloadingData'].update(downloading=True, extracting=False,
+                                               verifying=False, timeUntilComplete='Getting torrent files...')
+        self._archive_sources = {item['source']: item['url'] for item in items}
+        safe_write_json(self.game_info_path, self.game_info)
+        reporter = ChunkedDownloader('', '', self.game_info, self.game_info_path)
+        settings = load_settings()
+        limit = max(0, int(settings.get('downloadLimit', 0))) * 1024
+        completed = 0
+        sizes = [item['size'] for item in items]
+        with create_robust_session() as session:
+            for index, item in enumerate(items):
+                self._check_cancelled()
+                os.makedirs(os.path.dirname(item['source']), exist_ok=True)
+                receipt = os.path.join(receipts, hashlib.sha256(item['filename'].encode()).hexdigest() + '.json')
+                identity = {'filename': item['filename'], 'size': item['size']}
+                cached = False
+                try:
+                    with open(receipt, encoding='utf-8') as stream:
+                        cached = (json.load(stream) == identity and item['size'] is not None
+                                  and os.path.getsize(item['source']) == item['size'])
+                except (OSError, ValueError):
+                    pass
+                def progress(done, total, speed):
+                    if total is not None:
+                        sizes[index] = total
+                    batch_total = sum(sizes) if all(n is not None for n in sizes) else None
+                    reporter._progress(completed + done, batch_total, speed)
+                if not cached:
+                    Transfer(item['url'], item['source'], session, progress, self._check_for_stop,
+                             limit, expected_size=item['size'], connections=connection_count(settings)).run()
+                    item['size'] = os.path.getsize(item['source'])
+                    safe_write_json(receipt, dict(identity, size=item['size']))
+                completed += item['size']
+                sizes[index] = item['size']
+        reporter._progress(completed, completed, 0)
+        archives, loose = [], []
+        for item in items:
+            if item['filename'].lower().endswith(('.zip', '.rar', '.7z')):
+                archives.append(item['source'])
+            elif re.search(r'\.[r-z]\d{2}$', item['filename'], re.I):
+                from AscendaraDownloadRecovery import archive_sources
+                if not archive_sources(item['source'], {i['source']: None for i in items
+                                                       if i['filename'].lower().endswith('.rar')}):
+                    raise RuntimeError(f'Missing first RAR volume for {item["filename"]}')
+            else:
+                loose.append(item)
+        self._extract_files(archives, loose, cleanup_folder=folder)
+
+    def _pending_debrid_installer(self):
+        """Expose the same manual-install state used by local torrent downloads."""
+        if sys.platform != 'win32' or not self.game_info.get('debridTransferId'):
+            return False
+        candidates = []
+        for root, dirs, files in os.walk(self.download_dir):
+            dirs[:] = [d for d in dirs if not d.startswith('.ascendara') and
+                       d.lower() not in ('redist', '_redist', '_commonredist', 'directx')]
+            for name in files:
+                if re.fullmatch(r'(setup|install)(?:[._ -].*)?\.exe', name, re.I):
+                    candidates.append(os.path.join(root, name))
+        if not candidates:
+            return False
+        installer = min(candidates, key=lambda p: (len(os.path.relpath(p, self.download_dir).split(os.sep)), p.lower()))
+        self.game_info['executable'] = ''
+        self.game_info['downloadingData'] = dict(
+            downloading=False, extracting=False, verifying=False, pendingManualInstall=True,
+            manualInstallerPath=installer, manualInstallDir=self.download_dir,
+            progressCompleted='100.00', progressDownloadSpeeds='0.00 KB/s', timeUntilComplete='0s')
+        safe_write_json(self.game_info_path, self.game_info)
+        return True
 
     def _extract_files(self, archive_path=None, loose_files=None, cleanup_folder=None):
         if archive_path is not None:
@@ -1698,6 +1794,10 @@ class AscendaraDownloader:
         except OSError as exc:
             logging.warning(f"[AscendaraDownloader] Could not measure installed size: {exc}")
         # Publish completion only after cleanup, before sleep/shutdown actions.
+        if self._pending_debrid_installer():
+            self.game_info.pop('extractionSources', None)
+            safe_write_json(self.game_info_path, self.game_info)
+            return
         del self.game_info['downloadingData']
         self.game_info.pop('extractionSources', None)
         safe_write_json(self.game_info_path, self.game_info)
@@ -2064,6 +2164,7 @@ def create_argument_parser():
     parser.add_argument('--provider', choices=('auto', 'direct', 'gofile'), default='auto',
                         help='Download provider; auto detects GOFile sharing URLs')
     parser.add_argument('--password', default=None, help='Password for a protected GOFile folder')
+    parser.add_argument('--file-list', action='store_true', help='Read a local cloud-torrent transfer manifest')
     return parser
 
 
@@ -2081,7 +2182,7 @@ def main():
         downloader = AscendaraDownloader(args.game, args.online, args.dlc, args.isVr,
                                          args.updateFlow, args.version, args.size,
                                          args.download_dir, args.gameID)
-        downloader.download(args.url, args.withNotification, args.provider, args.password)
+        downloader.download(args.url, args.withNotification, args.provider, args.password, args.file_list)
     except InterruptedError:
         logging.info('Download paused during startup; retaining partial files')
     except Exception as exc:

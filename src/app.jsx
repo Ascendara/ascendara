@@ -25,6 +25,7 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { TourProvider } from "@/context/TourContext";
 import { ThemeProvider, useTheme, isDarkTheme } from "@/context/ThemeContext";
 import { SettingsProvider, useSettings } from "@/context/SettingsContext";
+import DebridBackgroundTasks from "@/components/DebridBackgroundTasks";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { SearchProvider } from "@/context/SearchContext";
 import GlobalSearch from "@/components/GlobalSearch";
@@ -160,7 +161,7 @@ const pageLoaders = {
   extraLanguages: () => import("./pages/ExtraLanguages"),
   workshopDownloader: () => import("./pages/WorkshopDownloader"),
   sidecarAndDependencies: () => import("./pages/SidecarAndDependencies"),
-  torboxDownloads: () => import("./pages/TorboxDownloads"),
+  debridDownloads: () => import("./pages/DebridDownloads"),
   gameScreen: () => import("./pages/GameScreen"),
   profile: () => import("./pages/Profile"),
   ascend: () => import("./pages/Ascend"),
@@ -178,7 +179,7 @@ const Downloads = lazyPage(pageLoaders.downloads);
 const ExtraLanguages = lazyPage(pageLoaders.extraLanguages);
 const WorkshopDownloader = lazyPage(pageLoaders.workshopDownloader);
 const SidecarAndDependencies = lazyPage(pageLoaders.sidecarAndDependencies);
-const TorboxDownloads = lazyPage(pageLoaders.torboxDownloads);
+const DebridDownloads = lazyPage(pageLoaders.debridDownloads);
 const GameScreen = lazyPage(pageLoaders.gameScreen);
 const Profile = lazyPage(pageLoaders.profile);
 const Ascend = lazyPage(pageLoaders.ascend);
@@ -651,7 +652,13 @@ const DiscordRPCTracker = () => {
   const isGamePlayingRef = useRef(false);
 
   const isDownloadPath = path =>
-    path === "/download" || path === "/downloads" || path === "/torboxdownloads";
+    [
+      "/download",
+      "/downloads",
+      "/debriddownloads",
+      "/torboxdownloads",
+      "/realdebriddownloads",
+    ].includes(path);
 
   const clearIdleTimer = () => {
     if (idleTimerRef.current) {
@@ -759,7 +766,9 @@ const UserActivityTracker = React.memo(() => {
           await setActivity(ActivityType.BROWSING_LIBRARY);
           break;
         case "/downloads":
+        case "/debriddownloads":
         case "/torboxdownloads":
+        case "/realdebriddownloads":
           await setActivity(ActivityType.BROWSING_DOWNLOADS);
           break;
         case "/settings":
@@ -2044,7 +2053,15 @@ const AppRoutes = () => {
             <Route path="folderview/:folderName" element={<FolderView />} />
             <Route path="gamescreen" element={<GameScreen />} />
             <Route path="downloads" element={<Downloads />} />
-            <Route path="torboxdownloads" element={<TorboxDownloads />} />
+            <Route path="debriddownloads" element={<DebridDownloads />} />
+            <Route
+              path="realdebriddownloads"
+              element={<Navigate to="/debriddownloads?service=realdebrid" replace />}
+            />
+            <Route
+              path="torboxdownloads"
+              element={<Navigate to="/debriddownloads?service=torbox" replace />}
+            />
             <Route path="settings" element={<Settings />} />
             <Route path="themes" element={<ThemeStudio />} />
             <Route path="sidecaranddependencies" element={<SidecarAndDependencies />} />
@@ -2333,6 +2350,7 @@ function App() {
       <ThemeProvider>
         <LanguageProvider>
           <SettingsProvider>
+            <DebridBackgroundTasks />
             <AuthProvider>
               <TourProvider>
                 <SearchProvider>

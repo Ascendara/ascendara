@@ -2,6 +2,7 @@ const https = require("node:https");
 
 const ROUTES = {
   khinsider: "https://downloads.khinsider.com",
+  realdebrid: "https://api.real-debrid.com/rest/1.0",
   torbox: "https://api.torbox.app/v1/api",
   flingtrainer: "https://flingtrainer.com",
   analytics: "https://analytics.ascendara.app",
@@ -9,7 +10,7 @@ const ROUTES = {
 const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 
 function getProxyTarget(rawUrl) {
-  const match = /^\/api\/(khinsider|torbox|flingtrainer|analytics)(?=\/|\?|$)/.exec(rawUrl);
+  const match = /^\/api\/(khinsider|torbox|realdebrid|flingtrainer|analytics)(?=\/|\?|$)/.exec(rawUrl);
   if (!match) return null;
   return new URL(ROUTES[match[1]] + rawUrl.slice(match[0].length));
 }

@@ -40,6 +40,11 @@ export default defineConfig({
           });
         },
       },
+      "/api/realdebrid": {
+        target: "https://api.real-debrid.com/rest/1.0",
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api\/realdebrid/, ""),
+      },
       "/api/torbox": {
         target: "https://api.torbox.app/v1/api",
         changeOrigin: true,
