@@ -32,6 +32,8 @@ export function SettingsProvider({ children }) {
     autoCreateShortcuts: true,
     smoothTransitions: true,
     bigPictureHomeStyle: "ascendara",
+    windowControlsStyle: "icons",
+    menuBarSide: "left",
     autoUpdate: true,
     endOnClose: false,
     language: "en",

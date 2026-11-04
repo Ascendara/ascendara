@@ -19,12 +19,9 @@ import {
   WifiOff,
   Hammer,
   X,
-  Minus,
   Download,
   Flag,
   FlaskConical,
-  Maximize,
-  Minimize,
   ExternalLink,
   Gamepad2,
   TestTube2,
@@ -36,9 +33,15 @@ import { useSearch } from "@/context/SearchContext";
 import { checkForUpdates } from "@/services/app/updateCheckingService";
 import { exportToSvg } from "@/lib/exportToSvg";
 import { useAppIcon } from "@/hooks/useAppIcon";
+import { useSettings } from "@/context/SettingsContext";
+import { WindowControls } from "@/components/WindowControls";
 
 const MenuBar = () => {
   const { t } = useLanguage();
+  const { settings } = useSettings();
+  const controlsStyle = settings.windowControlsStyle;
+  // Mirrors the bar: logo at the right edge, window controls on the left
+  const mirrored = settings.menuBarSide === "right";
   const navigate = useNavigate();
   const location = useLocation();
   const { openSearch } = useSearch();
@@ -270,16 +273,18 @@ const MenuBar = () => {
       style={{ WebkitAppRegion: "drag" }}
     >
       {/* data-boot-row / data-boot-pop: staggered pop-in as the boot logo lands (app.css) */}
-      <div className="mt-2 flex h-full flex-1 items-center px-3" data-boot-row>
+      <div
+        className={`mt-2 flex h-full flex-1 items-center gap-2 px-3 ${
+          mirrored ? "flex-row-reverse" : ""
+        }`}
+        data-boot-row
+      >
         <div className="flex items-center">
-          <div className="flex items-center">
+          <div
+            className={`flex items-center gap-2 ${mirrored ? "flex-row-reverse" : ""}`}
+          >
             {iconData && (
-              <img
-                src={iconData}
-                alt="Ascendara"
-                data-app-logo
-                className="mr-2 h-6 w-6"
-              />
+              <img src={iconData} alt="Ascendara" data-app-logo className="h-6 w-6" />
             )}
             <span className="text-sm font-medium text-foreground" data-boot-pop>
               Ascendara
@@ -288,7 +293,7 @@ const MenuBar = () => {
         </div>
 
         <div
-          className="ml-1.5 flex cursor-pointer items-center gap-1"
+          className="flex cursor-pointer items-center gap-1"
           onClick={handleStatusClick}
           title={t("server-status.title")}
           data-tour="server-status"
@@ -313,27 +318,27 @@ const MenuBar = () => {
 
         {/* Branch badges */}
         {appBranch === "public-testing" && (
-          <span className="ml-2 flex items-center gap-1 rounded border border-yellow-500/20 bg-yellow-500/10 px-1 py-0.5 text-[14px] text-yellow-500">
+          <span className="flex items-center gap-1 rounded border border-yellow-500/20 bg-yellow-500/10 px-1 py-0.5 text-[14px] text-yellow-500">
             <TestTube2 className="h-4 w-4" />
             <span className="font-semibold">{t("app.publicTesting")}</span>
           </span>
         )}
         {appBranch === "experimental" && (
-          <span className="ml-2 flex items-center gap-1 rounded border border-red-400/20 bg-red-400/10 px-1 py-0.5 text-[14px] text-red-400">
+          <span className="flex items-center gap-1 rounded border border-red-400/20 bg-red-400/10 px-1 py-0.5 text-[14px] text-red-400">
             <FlaskConical className="h-4 w-4" />
             <span className="font-semibold">{t("app.experiment")}</span>
           </span>
         )}
 
         {showTorrentWarning && (
-          <span className="ml-2 flex items-center gap-1 rounded border border-red-500/20 bg-red-500/10 px-1 py-0.5 text-[14px] text-red-500">
+          <span className="flex items-center gap-1 rounded border border-red-500/20 bg-red-500/10 px-1 py-0.5 text-[14px] text-red-500">
             <Flag className="h-3 w-3" />
             {t("app.torrentWarning")}
           </span>
         )}
 
         {isDev && (
-          <span className="ml-2 flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1 py-0.5 text-[14px] text-blue-500">
+          <span className="flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1 py-0.5 text-[14px] text-blue-500">
             <Hammer className="h-3 w-3" />
             {t("app.runningInDev")}
           </span>
@@ -342,7 +347,7 @@ const MenuBar = () => {
         {hasController && location.pathname !== "/bigpicture" && (
           <button
             onClick={() => navigate("/bigpicture")}
-            className="ml-2 flex cursor-pointer items-center gap-1 rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[14px] text-primary transition-colors hover:bg-primary/20"
+            className="flex cursor-pointer items-center gap-1 rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[14px] text-primary transition-colors hover:bg-primary/20"
             style={{ WebkitAppRegion: "no-drag" }}
             title={t("bigPicture.enterBigPicture")}
           >
@@ -358,7 +363,7 @@ const MenuBar = () => {
               openLibraryBackups(true);
               navigate("/library");
             }}
-            className="ml-2 flex shrink-0 items-center gap-1.5 rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[14px] text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex shrink-0 items-center gap-1.5 rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[14px] text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ WebkitAppRegion: "no-drag" }}
             title={t("library.libraryBackups.backgroundDetails", {
               game: libraryBackupProgress?.game || "",
@@ -376,7 +381,7 @@ const MenuBar = () => {
 
         {/* Show downloading update badge when downloading */}
         {isDownloadingUpdate && (
-          <div className="ml-2 flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <span className="flex items-center gap-1 rounded border border-green-500/20 bg-green-500/10 px-1 py-0.5 text-[14px] text-green-500">
               <div className="relative h-5 w-5 flex-shrink-0">
                 {/* Track circle */}
@@ -413,7 +418,7 @@ const MenuBar = () => {
 
         {/* Show audio downloading badge when downloading audio files */}
         {audioDownloadCount > 0 && (
-          <span className="ml-2 flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[14px] text-blue-500">
+          <span className="flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[14px] text-blue-500">
             <div className="relative h-4 w-4 flex-shrink-0">
               {/* Spinning loader circle */}
               <svg
@@ -447,7 +452,7 @@ const MenuBar = () => {
 
         {/* Show outdated badge only when not downloading */}
         {!isLatest && !isDownloadingUpdate && (
-          <div className="ml-2 flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <span className="flex items-center gap-1 rounded border border-yellow-500/20 bg-yellow-500/10 px-1 py-0.5 text-[14px] text-yellow-500">
               <AlertTriangle className="h-3 w-3" />
               {t("app.outdated")}
@@ -466,7 +471,7 @@ const MenuBar = () => {
         )}
         <div className="flex-1" />
         {isDev && (
-          <div className="ml-2 flex items-center">
+          <div className="flex items-center">
             <button
               onClick={handleExportSvg}
               className="flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[14px] text-blue-500 transition-colors hover:bg-blue-500/20"
@@ -481,7 +486,7 @@ const MenuBar = () => {
           <button
             type="button"
             onClick={() => openSearch("global")}
-            className="ml-2 flex h-7 items-center gap-2 rounded-full border border-border bg-muted/50 pl-2.5 pr-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-7 items-center gap-2 rounded-full border border-border bg-muted/50 pl-2.5 pr-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ WebkitAppRegion: "no-drag" }}
             aria-label={t("globalSearch.placeholder.global")}
           >
@@ -495,38 +500,14 @@ const MenuBar = () => {
           </button>
         )}
       </div>
-      <div className="window-controls mr-2 mt-2 flex items-center">
-        <div className="flex items-center space-x-2">
-          <button
-            className="text-muted-foreground transition-colors hover:text-foreground"
-            onClick={() => window.electron.minimizeWindow()}
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-          <button
-            className="relative text-muted-foreground transition-colors hover:text-foreground"
-            onClick={handleFullscreenToggle}
-            title={isFullscreen ? t("exitFullscreen") : t("enterFullscreen")}
-          >
-            <Minimize
-              className={`absolute inset-0 h-4 w-4 transition-opacity ${
-                isFullscreen ? "opacity-100" : "opacity-0"
-              }`}
-            />
-            <Maximize
-              className={`h-4 w-4 transition-opacity ${
-                isFullscreen ? "opacity-0" : "opacity-100"
-              }`}
-            />
-          </button>
-          <button
-            className="text-muted-foreground transition-colors hover:text-foreground"
-            onClick={() => window.electron.closeWindow()}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+      <WindowControls
+        variant={controlsStyle === "traffic" ? "traffic" : "icons"}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={handleFullscreenToggle}
+        mirrored={mirrored}
+        t={t}
+        className={`mt-2 ${mirrored ? "order-first ml-2" : "mr-2"}`}
+      />
       <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <AlertDialogContent className="max-w-2xl bg-background">
           <AlertDialogHeader>

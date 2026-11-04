@@ -5211,6 +5211,10 @@
     "manageIndex2": "Manage Index",
     "matureContent": "Mature Content",
     "matureContentDescription": "Allow games with mature themes to appear in search results.",
+    "menuBarSide": "Menu Bar Layout",
+    "menuBarSideDescription": "Show the logo and menu bar items on the left or the right side.",
+    "menuBarSideLeft": "Logo left",
+    "menuBarSideRight": "Logo right",
     "newTheme": "New",
     "noAdditionalLocations": "No additional locations yet...",
     "noBranchDialog": {
@@ -5467,6 +5471,10 @@
     "warningSupportDevelopers": "Game developers invest significant time, resources, and creativity into creating the experiences we all enjoy. Your purchase directly supports their ability to continue making great games and sustains the gaming industry.",
     "warningSupportDevelopersCallToAction": "Please support the developers by purchasing games you enjoy.",
     "warningTitle": "Hey there, please read this!",
+    "windowControls": "Window Controls",
+    "windowControlsDescription": "Choose how the minimize, fullscreen and close buttons look in the menu bar.",
+    "windowControlsIcons": "Icons",
+    "windowControlsTraffic": "Traffic lights",
     "wineProton": {
       "browse": "Browse",
       "description": "Configure how Windows games are run on Linux",

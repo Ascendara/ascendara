@@ -47,6 +47,8 @@ import {
   RefreshCw,
   Sun,
   Moon,
+  AppWindow,
+  ArrowLeftRight,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -62,6 +64,11 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useLanguage } from "@/context/LanguageContext";
 import { languages } from "@/i18n";
 import { useTheme } from "@/context/ThemeContext";
+import { useSettings } from "@/context/SettingsContext";
+import {
+  MenuBarSidePicker,
+  WindowControlsStylePicker,
+} from "@/components/WindowControls";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { validateInput } from "@/services/ascend/profanityFilterService";
@@ -432,6 +439,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { setTheme } = useTheme();
+  const { settings: appSettings, updateSetting } = useSettings();
   const [isV7Welcome, setIsV7Welcome] = useState(welcomeData?.isV7Welcome);
   // Restore step from navigation state if coming back from another page
   const [step, setStep] = useState(location.state?.welcomeStep || "language");
@@ -2110,27 +2118,57 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     </div>
                   </div>
 
-                  <div
-                    className={`${cardClass} mt-4 flex cursor-pointer items-center gap-4 text-left`}
-                    onClick={() => handleAutoUpdateToggle(!autoUpdate)}
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <RefreshCw className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold">
-                        {t("welcome.setup.personalize.autoUpdateTitle")}
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    <div className={`${cardClass} flex items-center gap-4 text-left`}>
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <AppWindow className="h-5 w-5" />
+                      </div>
+                      <p className="min-w-0 flex-1 font-semibold">
+                        {t("settings.windowControls")}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        {t("welcome.setup.personalize.autoUpdateDesc")}
-                      </p>
+                      <WindowControlsStylePicker
+                        value={appSettings.windowControlsStyle}
+                        onChange={style => updateSetting("windowControlsStyle", style)}
+                        t={t}
+                      />
                     </div>
-                    <Switch
-                      checked={autoUpdate}
-                      aria-label={t("welcome.setup.personalize.autoUpdateTitle")}
-                      onClick={event => event.stopPropagation()}
-                      onCheckedChange={handleAutoUpdateToggle}
-                    />
+
+                    <div className={`${cardClass} flex items-center gap-4 text-left`}>
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <ArrowLeftRight className="h-5 w-5" />
+                      </div>
+                      <p className="min-w-0 flex-1 font-semibold">
+                        {t("settings.menuBarSide")}
+                      </p>
+                      <MenuBarSidePicker
+                        value={appSettings.menuBarSide}
+                        onChange={side => updateSetting("menuBarSide", side)}
+                        t={t}
+                      />
+                    </div>
+
+                    <div
+                      className={`${cardClass} flex cursor-pointer items-center gap-4 text-left lg:col-span-2`}
+                      onClick={() => handleAutoUpdateToggle(!autoUpdate)}
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <RefreshCw className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold">
+                          {t("welcome.setup.personalize.autoUpdateTitle")}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {t("welcome.setup.personalize.autoUpdateDesc")}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={autoUpdate}
+                        aria-label={t("welcome.setup.personalize.autoUpdateTitle")}
+                        onClick={event => event.stopPropagation()}
+                        onCheckedChange={handleAutoUpdateToggle}
+                      />
+                    </div>
                   </div>
                 </SetupStep>
               )}

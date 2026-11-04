@@ -1,5 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useTheme, clearCustomTheme } from "@/context/ThemeContext";
+import {
+  MenuBarSidePicker,
+  WindowControlsStylePicker,
+} from "@/components/WindowControls";
 import { useLanguage } from "@/context/LanguageContext";
 import { useLocation } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
@@ -1312,6 +1316,42 @@ function Settings() {
                       onCheckedChange={() =>
                         handleSettingChange("sideScrollBar", !settings.sideScrollBar)
                       }
+                    />
+                  </div>
+
+                  <div
+                    id="window-controls"
+                    className="flex items-center justify-between gap-4"
+                  >
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.windowControls")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.windowControlsDescription")}
+                      </p>
+                    </div>
+                    <WindowControlsStylePicker
+                      value={settings.windowControlsStyle}
+                      onChange={style =>
+                        handleSettingChange("windowControlsStyle", style)
+                      }
+                      t={t}
+                    />
+                  </div>
+
+                  <div
+                    id="menu-bar-side"
+                    className="flex items-center justify-between gap-4"
+                  >
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.menuBarSide")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.menuBarSideDescription")}
+                      </p>
+                    </div>
+                    <MenuBarSidePicker
+                      value={settings.menuBarSide}
+                      onChange={side => handleSettingChange("menuBarSide", side)}
+                      t={t}
                     />
                   </div>
 
