@@ -5338,6 +5338,85 @@
     "themeExported": "Theme exported successfully!",
     "themeImportFailed": "Failed to import theme",
     "themeImported": "Theme imported successfully!",
+    "themeStudio": {
+      "communityLoaded": "Theme loaded into the editor. Save to use it.",
+      "contrast": {
+        "buttonText": "Button text",
+        "cardText": "Card text",
+        "mutedText": "Muted text",
+        "text": "Text"
+      },
+      "contrastDescription": "How well text stands out from what's behind it. 4.5 or higher (AA) reads comfortably.",
+      "contrastLarge": "Large text",
+      "contrastLow": "Hard to read",
+      "contrastTitle": "Readability",
+      "description": "Build your own theme color by color, or start from one the community made. The preview shows every change as you make it.",
+      "discard": "Discard",
+      "discardLeave": "Discard & leave",
+      "fields": {
+        "accent": "Accent",
+        "accentText": "Accent text",
+        "achievement": "Achievement",
+        "background": "Background",
+        "border": "Border",
+        "card": "Card",
+        "cardText": "Card text",
+        "error": "Error",
+        "focusRing": "Focus ring",
+        "info": "Info",
+        "input": "Input",
+        "message": "Message",
+        "muted": "Muted",
+        "mutedText": "Muted text",
+        "popover": "Popover",
+        "popoverText": "Popover text",
+        "primary": "Primary",
+        "secondary": "Secondary",
+        "starEmpty": "Star empty",
+        "starFilled": "Star filled",
+        "success": "Success",
+        "text": "Text",
+        "title": "Title",
+        "warning": "Warning"
+      },
+      "groups": {
+        "core": {
+          "description": "The page background, text and the main accent colors.",
+          "title": "Core"
+        },
+        "navigation": {
+          "description": "The dock at the bottom of the app.",
+          "title": "Navigation"
+        },
+        "notifications": {
+          "description": "Download and achievement pop-ups outside the app.",
+          "title": "Desktop notifications"
+        },
+        "startup": {
+          "description": "The screen shown while Ascendara opens.",
+          "title": "Startup"
+        },
+        "status": {
+          "description": "Messages, alerts and star ratings.",
+          "title": "Status"
+        },
+        "surfaces": {
+          "description": "Cards, menus, borders and form fields.",
+          "title": "Surfaces"
+        }
+      },
+      "keepEditing": "Keep editing",
+      "leaveDescription": "Your theme edits haven't been saved and will be lost.",
+      "leaveTitle": "Discard your changes?",
+      "open": "Open Theme Studio",
+      "outdated": "Outdated",
+      "saveApply": "Save & apply",
+      "saveFailed": "Failed to save custom theme",
+      "tabColors": "Colors",
+      "tabCommunity": "Community",
+      "title": "Theme Studio",
+      "unsaved": "Unsaved changes"
+    },
     "themes": "App Themes",
     "threads": "Threads",
     "title": "Your Preferences",

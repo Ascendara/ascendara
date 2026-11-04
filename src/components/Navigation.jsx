@@ -78,9 +78,13 @@ const Navigation = memo(({ items }) => {
       }
       if (
         path === "/settings" &&
-        ["/settings", "/extralanguages", "/sidecaranddependencies", "/sources"].includes(
-          location.pathname
-        )
+        [
+          "/settings",
+          "/themes",
+          "/extralanguages",
+          "/sidecaranddependencies",
+          "/sources",
+        ].includes(location.pathname)
       ) {
         return true;
       }

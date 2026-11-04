@@ -168,6 +168,7 @@ const pageLoaders = {
   folderView: () => import("./pages/FolderView"),
   externalSources: () => import("./pages/ExternalSources"),
   settings: () => import("./pages/Settings"),
+  themeStudio: () => import("./pages/ThemeStudio"),
   welcome: () => import("./pages/Welcome"),
   bigPicture: () => import("./pages/BigPicture"),
 };
@@ -185,6 +186,7 @@ const Library = lazyPage(pageLoaders.library);
 const FolderView = lazyPage(pageLoaders.folderView);
 const ExternalSources = lazyPage(pageLoaders.externalSources);
 const Settings = lazyPage(pageLoaders.settings);
+const ThemeStudio = lazyPage(pageLoaders.themeStudio);
 const Welcome = lazyPage(pageLoaders.welcome);
 const BigPicture = lazyPage(pageLoaders.bigPicture);
 
@@ -2016,6 +2018,7 @@ const AppRoutes = () => {
             <Route path="downloads" element={<Downloads />} />
             <Route path="torboxdownloads" element={<TorboxDownloads />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="themes" element={<ThemeStudio />} />
             <Route path="sidecaranddependencies" element={<SidecarAndDependencies />} />
             <Route path="sources" element={<ExternalSources />} />
             {/* The local index moved into Settings; keep old links working */}

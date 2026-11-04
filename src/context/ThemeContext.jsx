@@ -41,45 +41,53 @@ const applyColorScheme = (theme, customColors) => {
   root.style.colorScheme = isDark ? "dark" : "light";
 };
 
-// Helper to apply custom theme CSS variables
-const applyCustomTheme = customColors => {
+// Every CSS variable a custom theme sets: [variable, color key, fallback]. A
+// fallback is another color key, or a fixed "r g b" for themes saved before
+// that color existed.
+const CUSTOM_THEME_VARS = [
+  ["--color-background", "background"],
+  ["--color-foreground", "foreground"],
+  ["--color-primary", "primary"],
+  ["--color-secondary", "secondary"],
+  ["--color-muted", "muted"],
+  ["--color-muted-foreground", "mutedForeground"],
+  ["--color-accent", "accent"],
+  ["--color-accent-foreground", "accentForeground"],
+  ["--color-border", "border"],
+  ["--color-input", "input"],
+  ["--color-ring", "ring"],
+  ["--color-card", "card"],
+  ["--color-card-foreground", "cardForeground"],
+  ["--color-popover", "popover"],
+  ["--color-popover-foreground", "popoverForeground"],
+  ["--color-nav-background", "navBackground", "background"],
+  ["--color-nav-active", "navActive", "primary"],
+  ["--color-nav-active-text", "navActiveText", "secondary"],
+  ["--color-nav-hover", "navHover", "secondary"],
+  ["--color-success", "success", "34 197 94"],
+  ["--color-warning", "warning", "234 179 8"],
+  ["--color-error", "error", "239 68 68"],
+  ["--color-info", "info", "59 130 246"],
+  ["--color-star-filled", "starFilled", "250 204 21"],
+  ["--color-star-empty", "starEmpty", "148 163 184"],
+  ["--color-startup-background", "startupBackground", "background"],
+  ["--color-startup-accent", "startupAccent", "primary"],
+];
+
+/** Apply a custom theme's colors to the whole app. */
+export const applyCustomTheme = customColors => {
   if (!customColors) return;
   const root = document.documentElement;
-  root.style.setProperty("--color-background", customColors.background);
-  root.style.setProperty("--color-foreground", customColors.foreground);
-  root.style.setProperty("--color-primary", customColors.primary);
-  root.style.setProperty("--color-secondary", customColors.secondary);
-  root.style.setProperty("--color-muted", customColors.muted);
-  root.style.setProperty("--color-muted-foreground", customColors.mutedForeground);
-  root.style.setProperty("--color-accent", customColors.accent);
-  root.style.setProperty("--color-accent-foreground", customColors.accentForeground);
-  root.style.setProperty("--color-border", customColors.border);
-  root.style.setProperty("--color-input", customColors.input);
-  root.style.setProperty("--color-ring", customColors.ring);
-  root.style.setProperty("--color-card", customColors.card);
-  root.style.setProperty("--color-card-foreground", customColors.cardForeground);
-  root.style.setProperty("--color-popover", customColors.popover);
-  root.style.setProperty("--color-popover-foreground", customColors.popoverForeground);
+  CUSTOM_THEME_VARS.forEach(([variable, key, fallback]) => {
+    const value = customColors[key] || (fallback && (customColors[fallback] || fallback));
+    if (value) root.style.setProperty(variable, value);
+  });
 };
 
-// Helper to clear custom theme CSS variables (let the theme CSS take over)
-const clearCustomTheme = () => {
+/** Clear custom theme colors so the selected built-in theme's CSS takes over. */
+export const clearCustomTheme = () => {
   const root = document.documentElement;
-  root.style.removeProperty("--color-background");
-  root.style.removeProperty("--color-foreground");
-  root.style.removeProperty("--color-primary");
-  root.style.removeProperty("--color-secondary");
-  root.style.removeProperty("--color-muted");
-  root.style.removeProperty("--color-muted-foreground");
-  root.style.removeProperty("--color-accent");
-  root.style.removeProperty("--color-accent-foreground");
-  root.style.removeProperty("--color-border");
-  root.style.removeProperty("--color-input");
-  root.style.removeProperty("--color-ring");
-  root.style.removeProperty("--color-card");
-  root.style.removeProperty("--color-card-foreground");
-  root.style.removeProperty("--color-popover");
-  root.style.removeProperty("--color-popover-foreground");
+  CUSTOM_THEME_VARS.forEach(([variable]) => root.style.removeProperty(variable));
 };
 
 export function ThemeProvider({ children }) {
