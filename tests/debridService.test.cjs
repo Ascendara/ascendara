@@ -314,10 +314,12 @@ test("real adapters retain their API contracts and existing download metadata", 
   await debrid.resumePendingTorrents({ debridEnabled: true, realDebridApiKey: "rd" });
   const rd = JSON.parse(storage.get("realDebridGameData"));
   assert.equal(rd["torrent:rd-torrent"].additionalDirIndex, 2);
+  assert.equal(rd["torrent:rd-torrent"].autoHandoff, true);
   assert.equal(rd["download:rd-web"].isUpdating, true);
   const tb = JSON.parse(storage.get("torboxGameNames"));
   assert.equal(tb["torrent:42"].gameData.gameID, "game1");
   assert.equal(tb["torrent:42"].gameData.vr, true);
+  assert.equal(tb["torrent:42"].autoHandoff, true);
   assert.equal(tb[10].gameData.isUpdating, true);
   assert.equal(tb[10].originalUrl, "https://files.test/file");
 });

@@ -19,7 +19,8 @@ export default {
   getTorrentGame: entry => entry.gameData,
   async getTorrentDownload(apiKey, id) {
     const item = await api.getTorrentInfo(apiKey, id);
-    if (!item?.download_finished || !item.download_present) return null;
+    if (!item) return "missing";
+    if (!item.download_finished || !item.download_present) return null;
     const result = await api.getDirectDownloadLink(apiKey, id, "torrent");
     const url =
       typeof result === "string"
@@ -54,7 +55,7 @@ export default {
       provider: host,
       originalUrl: link,
       downloadId: result.id,
-      ...(kind === "torrent" ? { torboxType: "torrent" } : {}),
+      ...(kind === "torrent" ? { torboxType: "torrent", autoHandoff: true } : {}),
       gameData: {
         ...game,
         vr: game.category?.includes("Virtual Reality") || false,

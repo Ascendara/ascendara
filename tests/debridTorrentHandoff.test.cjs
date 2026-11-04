@@ -66,7 +66,7 @@ test("TorBox completed torrents provide a ZIP to the shared handoff", async t =>
   assert.deepEqual(await provider.getTorrentDownload("key", "5"), [
     { url: "https://cdn.example/torrent.zip", filename: "torrent.zip", size: null },
   ]);
-  assert.equal(await provider.getTorrentDownload("key", "unknown"), null);
+  assert.equal(await provider.getTorrentDownload("key", "unknown"), "missing");
   finished = false;
   state = "completed";
   assert.equal(
@@ -90,6 +90,7 @@ test("completed Ascendara torrents hand all files to one local download, once", 
           game: "Example",
           additionalDirIndex: 2,
           autoStartPending: false,
+          autoHandoff: true,
         },
       }),
     ],
@@ -152,7 +153,9 @@ test("handoff waits for readiness and active local jobs, respects disabling, and
   const saved = { window: global.window, localStorage: global.localStorage };
   t.after(() => Object.assign(global, saved));
   for (const scenario of ["processing", "busy", "disabled", "failed"]) {
-    let stored = JSON.stringify({ "torrent:ready": { game: "Example" } });
+    let stored = JSON.stringify({
+      "torrent:ready": { game: "Example", autoHandoff: true },
+    });
     global.localStorage = {
       getItem: () => stored,
       setItem: (_k, value) => {
@@ -197,4 +200,48 @@ test("handoff waits for readiness and active local jobs, respects disabling, and
       assert.equal(calls.length, 0, scenario);
     }
   }
+});
+
+test("handoff skips legacy records and stops polling torrents removed from the cloud", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => Object.assign(global, saved));
+  let stored = JSON.stringify({
+    "torrent:legacy": { game: "Old" },
+    "torrent:gone": { game: "Gone", autoHandoff: true },
+  });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_k, value) => {
+      stored = value;
+    },
+  };
+  const calls = [];
+  global.window = {
+    electron: {
+      getGames: async () => [],
+      downloadFile: async (...args) => {
+        calls.push(args);
+        return { success: true };
+      },
+    },
+  };
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  const lookups = [];
+  const provider = {
+    id: "test",
+    apiKeySetting: "key",
+    metadataStorageKey: "metadata",
+    getTorrentGame: entry => entry,
+    getTorrentDownload: async (_key, id) => {
+      lookups.push(id);
+      return "missing";
+    },
+  };
+  await worker.handoffTorrents(provider, "token");
+  await worker.handoffTorrents(provider, "token");
+  assert.deepEqual(lookups, ["gone"], "legacy skipped, missing torrent checked once");
+  assert.equal(calls.length, 0);
+  assert.equal(JSON.parse(stored)["torrent:gone"].cloudTorrentMissing, true);
 });

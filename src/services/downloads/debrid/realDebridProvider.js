@@ -23,7 +23,7 @@ export default {
     try {
       info = await api.getTorrentInfo(apiKey, id);
     } catch (error) {
-      if (error.status === 404) return null;
+      if (error.status === 404) return "missing";
       throw error;
     }
     if (info.status !== "downloaded") return null;
@@ -59,7 +59,7 @@ export default {
       [`${kind}:${result.id}`]: {
         ...game,
         additionalDirIndex: directory,
-        ...(kind === "torrent" ? { autoStartPending: true } : {}),
+        ...(kind === "torrent" ? { autoStartPending: true, autoHandoff: true } : {}),
       },
     };
   },

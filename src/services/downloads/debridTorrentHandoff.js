@@ -15,8 +15,19 @@ export function handoffTorrents(provider, apiKey) {
       if (Date.now() < startingUntil) return;
       const read = () =>
         JSON.parse(localStorage.getItem(provider.metadataStorageKey) || "{}");
+      const mark = (id, flag) => {
+        const latest = read();
+        if (!latest[id]) return;
+        latest[id] = { ...latest[id], [flag]: true };
+        localStorage.setItem(provider.metadataStorageKey, JSON.stringify(latest));
+      };
+      // Only torrents added since auto-handoff existed; older records were handled manually.
       const entries = Object.entries(read()).filter(
-        ([id, entry]) => id.startsWith("torrent:") && entry && !entry.localDownloadStarted
+        ([id, entry]) =>
+          id.startsWith("torrent:") &&
+          entry?.autoHandoff === true &&
+          !entry.localDownloadStarted &&
+          !entry.cloudTorrentMissing
       );
       for (const [id, entry] of entries) {
         const game = provider.getTorrentGame(entry);
@@ -36,6 +47,11 @@ export function handoffTorrents(provider, apiKey) {
         )
           return;
         const files = await provider.getTorrentDownload(apiKey, id.slice(8));
+        // Removed from the cloud: stop polling it.
+        if (files === "missing") {
+          mark(id, "cloudTorrentMissing");
+          continue;
+        }
         if (!files) continue;
         if (window.electron.getSettings) {
           const current = await window.electron.getSettings();
@@ -64,11 +80,7 @@ export function handoffTorrents(provider, apiKey) {
         if (!result?.success)
           throw new Error(result?.error || "Could not start the local debrid download.");
         startingUntil = Date.now() + 15000;
-        const latest = read();
-        if (latest[id]) {
-          latest[id] = { ...latest[id], localDownloadStarted: true };
-          localStorage.setItem(provider.metadataStorageKey, JSON.stringify(latest));
-        }
+        mark(id, "localDownloadStarted");
         return { game: game.game, providerId: provider.id };
       }
     })
