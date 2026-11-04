@@ -1495,33 +1495,38 @@ const AppRoutes = () => {
         setIsUpdating(isUpdatingValue);
 
         if (isUpdatingValue) {
-          // Clear the updating flag after a delay
+          // Clear the update screen even if a post-update check is unavailable.
           setTimeout(async () => {
-            await window.electron.setTimestampValue("isUpdating", false);
-            const hasLaunched = await checkAndSetWelcomeStatus();
-            // Only show changelog on live branch
-            const branch = await window.electron.getBranch();
-            if (branch === "live") {
-              setShowChangelog(true);
-            }
-            await promptDllSharingIfNeeded(hasLaunched);
-            setIsUpdating(false);
-            setIsLoading(false);
-
-            // Use testing version for non-live branches
-            let versionToShow = __APP_VERSION__;
-            if (branch !== "live") {
-              const testingVer = await window.electron.getTestingVersion();
-              if (testingVer) {
-                versionToShow = testingVer;
+            try {
+              await window.electron.setTimestampValue("isUpdating", false);
+              const hasLaunched = await checkAndSetWelcomeStatus();
+              // Only show changelog on live branch
+              const branch = await window.electron.getBranch();
+              if (branch === "live") {
+                setShowChangelog(true);
               }
-            }
+              await promptDllSharingIfNeeded(hasLaunched);
 
-            toast(t("app.toasts.justUpdated"), {
-              description: t("app.toasts.justUpdatedDesc", { version: versionToShow }),
-              duration: 10000,
-              id: "update-completed",
-            });
+              // Use testing version for non-live branches
+              let versionToShow = __APP_VERSION__;
+              if (branch !== "live") {
+                const testingVer = await window.electron.getTestingVersion();
+                if (testingVer) {
+                  versionToShow = testingVer;
+                }
+              }
+
+              toast(t("app.toasts.justUpdated"), {
+                description: t("app.toasts.justUpdatedDesc", { version: versionToShow }),
+                duration: 10000,
+                id: "update-completed",
+              });
+            } catch (error) {
+              console.error("Error finishing update startup:", error);
+            } finally {
+              setIsUpdating(false);
+              setIsLoading(false);
+            }
           }, 2000);
           return;
         }
