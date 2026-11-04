@@ -53,7 +53,7 @@ export default function DebridDownloads() {
   };
 
   return (
-    <div className="container mx-auto max-w-5xl px-4 pb-8 pt-10">
+    <div className="container mx-auto max-w-5xl px-4 pb-8 pt-20">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div className="min-w-0 space-y-1.5">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
