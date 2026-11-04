@@ -79,7 +79,7 @@
       "emulatorPresets": "Expanded Emulator Presets",
       "emulatorPresetsDesc": "Unlock an expanded library of emulator presets covering dozens of additional systems beyond the 12 that ship with Ascendara, complete with download links and ready-to-use configurations.",
       "experimentalBranch": "Experimental Branch",
-      "experimentalBranchDesc": "Switch and test very early features on Ascendara's experimental branch within the app.",
+      "experimentalBranchDesc": "Switch to the experimental branch in one click from inside the app. It's built from Ascendara's latest development commit, so you're always on the newest changes.",
       "friends": "Friends & Social",
       "friendsDesc": "Send and accept friend requests, build your gaming network, and see when your friends are online. Connect with other Ascendara users and grow your community.",
       "highlightedReviews": "Highlighted Reviews",
@@ -901,7 +901,7 @@
         "title": "Expanded Emulator Presets"
       },
       "experimentalBranch": {
-        "description": "Easily switch to the experimental branch in Preferences to test brand new features before they're released. Be the first to try new functionality and help shape Ascendara's future.",
+        "description": "The experimental branch is available to everyone and is always up to date with Ascendara's latest development commit. Ascend lets you switch to it in one click from Preferences, so you can try new features the moment they land and help shape Ascendara's future.",
         "title": "Experimental Branch"
       },
       "flingTrainer": {
@@ -1299,7 +1299,7 @@
             "title": "Expanded Emulator Presets"
           },
           "experimentalBranch": {
-            "description": "Switch and test very early features on Ascendara's experimental branch within the app.",
+            "description": "Switch to the experimental branch in one click from inside the app. It's built from Ascendara's latest development commit, so you're always on the newest changes.",
             "title": "Experimental Branch"
           },
           "flingTrainers": {
@@ -1617,12 +1617,12 @@
   },
   "branchWelcome": {
     "experimental": {
-      "autoUpdate": "This branch will automatically update when new experimental builds are available, just like the stable version.",
+      "autoUpdate": "This branch is built from Ascendara's latest development commit and updates automatically whenever a new one lands.",
       "feature1": "Features may be incomplete or unstable",
       "feature2": "Bugs and crashes are more likely to occur",
       "feature3": "Some features may change or be removed without notice",
       "title": "Welcome to Experimental",
-      "welcome": "You're now running the experimental branch of Ascendara. This is where you can test features that aren't fully ready yet.",
+      "welcome": "You're now running the experimental branch of Ascendara, built from the latest development commit. This is where new features show up first, before they're fully ready.",
       "whatToExpect": "What to expect:"
     },
     "okayUnderstand": "Okay, I Understand",
@@ -4801,9 +4801,9 @@
       "current": "Current",
       "description": "Choose your release channel. Switching will download and run the appropriate installer.",
       "experimental": {
-        "description": "Cutting-edge builds with the latest changes. May be unstable.",
+        "description": "Always built from the latest development commit. May be unstable.",
         "label": "Experimental",
-        "requiresSubscription": "Requires Ascend subscription"
+        "requiresSubscription": "Switching in-app requires Ascend"
       },
       "live": {
         "description": "The stable release. Recommended for all users.",
@@ -4844,12 +4844,12 @@
     "application": "Application",
     "applyCustomColors": "Apply Colors",
     "ascendPromoDialog": {
-      "benefit1": "Get early access to experimental features and updates",
+      "benefit1": "Switch to the experimental branch in one click, right inside the app",
       "benefit2": "Support the development of Ascendara",
       "benefit3": "Unlock exclusive features and perks",
       "experimentalBranch": "Experimental Branch",
-      "experimentalBranchExclusivePrefix": "The",
-      "experimentalBranchExclusiveSuffix": "is an exclusive feature for Ascend subscribers.",
+      "experimentalBranchExclusivePrefix": "Switching to the",
+      "experimentalBranchExclusiveSuffix": "from inside the app is an Ascend perk. The branch itself is available to everyone and always tracks the latest development commit.",
       "learnMore": "Learn More About Ascend",
       "maybeLater": "Maybe Later",
       "title": "Ascend Required",
