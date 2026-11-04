@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import LevelingCard from "@/components/LevelingCard";
 import { useLibraryBackupStore } from "@/services/library/libraryBackupStore";
 import { StatStrip } from "./primitives";
@@ -96,7 +97,16 @@ function useSecureAccountPrompt(uid, isPaid) {
   return [show, snooze];
 }
 
-function ToolCard({ icon: Icon, title, description, meta, onClick, delay, large }) {
+function ToolCard({
+  icon: Icon,
+  title,
+  description,
+  meta,
+  metaLoading,
+  onClick,
+  delay,
+  large,
+}) {
   return (
     <motion.button
       initial={{ opacity: 0, y: 12 }}
@@ -119,8 +129,14 @@ function ToolCard({ icon: Icon, title, description, meta, onClick, delay, large 
       </div>
       <h3 className={`mt-3 font-semibold ${large ? "text-base" : "text-sm"}`}>{title}</h3>
       <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
-      {meta && (
-        <div className="mt-auto pt-3 text-xs font-medium text-primary">{meta}</div>
+      {metaLoading ? (
+        <div className="mt-auto pt-3">
+          <Skeleton className="h-3.5 w-28" />
+        </div>
+      ) : (
+        meta && (
+          <div className="mt-auto pt-3 text-xs font-medium text-primary">{meta}</div>
+        )
       )}
     </motion.button>
   );
@@ -136,6 +152,8 @@ export default function HomeSection({
   conversations,
   localStats,
   loadingLocalStats,
+  loadingFriends,
+  loadingConversations,
   formatPlaytimeDetailed,
   cloudLibrary,
   loadingCloudLibrary,
@@ -152,6 +170,8 @@ export default function HomeSection({
   const hasCloudAccess = ascendAccess?.isSubscribed || ascendAccess?.isVerified;
   const lastSynced = cloudLibrary?.lastSynced;
   const busy = isSyncingLibrary || isRestoringFromCloud;
+  // Everything is laid out from the start; values show placeholders until in
+  const loadingSaves = hasCloudAccess && loadingBackups;
   // Paid plans only: trials and verified/contributor accounts don't get the nudge
   const [showSecurePrompt, snoozeSecurePrompt] = useSecureAccountPrompt(
     user?.uid,
@@ -188,11 +208,13 @@ export default function HomeSection({
       icon: Gamepad2,
       value: cloudLibrary?.totalGames ?? 0,
       label: t("ascend.overview.stats.games"),
+      loading: loadingCloudLibrary,
     },
     {
       icon: Clock,
       value: formatPlaytimeDetailed(cloudLibrary?.totalPlaytime || 0),
       label: t("ascend.overview.stats.playtime"),
+      loading: loadingCloudLibrary,
     },
     {
       icon: Trophy,
@@ -201,11 +223,13 @@ export default function HomeSection({
         ? `/ ${cloudLibrary.totalAchievements}`
         : null,
       label: t("ascend.overview.stats.achievements"),
+      loading: loadingCloudLibrary,
     },
     {
       icon: HardDrive,
-      value: hasCloudAccess && loadingBackups ? "—" : backups.length,
+      value: backups.length,
       label: t("ascend.overview.stats.saves"),
+      loading: loadingSaves,
     },
   ];
 
@@ -225,7 +249,7 @@ export default function HomeSection({
         <div className="relative">
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             {loadingCloudLibrary ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Skeleton className="h-3.5 w-36" />
             ) : lastSynced ? (
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
@@ -242,18 +266,26 @@ export default function HomeSection({
           </div>
 
           <div className="mt-3 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-xl">
-              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                {lastSynced
-                  ? t("ascend.overview.headlineSynced")
-                  : t("ascend.overview.headlineNever")}
-              </h1>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
-                {lastSynced
-                  ? t("ascend.overview.descSynced")
-                  : t("ascend.overview.descNever")}
-              </p>
-            </div>
+            {loadingCloudLibrary ? (
+              <div className="w-full max-w-xl space-y-3" aria-hidden="true">
+                <Skeleton className="h-8 w-3/4 sm:h-9" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+            ) : (
+              <div className="max-w-xl">
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                  {lastSynced
+                    ? t("ascend.overview.headlineSynced")
+                    : t("ascend.overview.headlineNever")}
+                </h1>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
+                  {lastSynced
+                    ? t("ascend.overview.descSynced")
+                    : t("ascend.overview.descNever")}
+                </p>
+              </div>
+            )}
             <div className="flex shrink-0 flex-wrap gap-2">
               <Button
                 onClick={handleSyncLibrary}
@@ -341,6 +373,7 @@ export default function HomeSection({
             meta={t("ascend.overview.library.count", {
               count: cloudLibrary?.totalGames ?? 0,
             })}
+            metaLoading={loadingCloudLibrary}
             onClick={() => setActiveSection("cloudlibrary")}
           />
           <ToolCard
@@ -361,6 +394,7 @@ export default function HomeSection({
                     .join(" · ")
                 : t("ascend.overview.saves.empty")
             }
+            metaLoading={loadingSaves}
             onClick={() => setActiveSection("cloudbackups")}
           />
         </div>
@@ -393,53 +427,83 @@ export default function HomeSection({
       </section>
 
       {/* Recently played from the cloud library */}
-      {recentGames.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              {t("ascend.overview.recentTitle")}
-            </h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 text-xs"
-              onClick={() => setActiveSection("cloudlibrary")}
-            >
-              {t("ascend.overview.viewAll")}
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+      {loadingCloudLibrary ? (
+        <section className="space-y-3" aria-hidden="true">
+          <Skeleton className="h-4 w-32" />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {recentGames.map((game, index) => (
-              <motion.div
-                key={game.name}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 + index * 0.04 }}
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
                 className="flex items-center gap-3 rounded-xl bg-card/60 p-2.5 shadow"
               >
-                <div className="h-12 w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
-                  <AscendGameImage name={game.name || game.game} />
+                <Skeleton className="h-12 w-24 shrink-0 rounded-lg" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-3.5 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{game.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatPlaytimeDetailed(game.playTime || 0)} ·{" "}
-                    {formatRelativeTime(game.lastPlayed, i18n.language)}
-                  </p>
-                </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </section>
+      ) : (
+        recentGames.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                {t("ascend.overview.recentTitle")}
+              </h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 text-xs"
+                onClick={() => setActiveSection("cloudlibrary")}
+              >
+                {t("ascend.overview.viewAll")}
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {recentGames.map((game, index) => (
+                <motion.div
+                  key={game.name}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 + index * 0.04 }}
+                  className="flex items-center gap-3 rounded-xl bg-card/60 p-2.5 shadow"
+                >
+                  <div className="h-12 w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
+                    <AscendGameImage name={game.name || game.game} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{game.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatPlaytimeDetailed(game.playTime || 0)} ·{" "}
+                      {formatRelativeTime(game.lastPlayed, i18n.language)}
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+        )
       )}
 
       {/* Secondary: progress and community */}
       <section className="grid gap-3 lg:grid-cols-5">
         <div className="lg:col-span-3">
           {loadingLocalStats ? (
-            <div className="flex h-full min-h-32 items-center justify-center rounded-xl bg-card/60 shadow">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <div
+              className="flex h-full min-h-32 flex-col justify-between gap-4 rounded-xl bg-card/60 p-5 shadow"
+              aria-hidden="true"
+            >
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-14 w-14 shrink-0 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+              </div>
+              <Skeleton className="h-2.5 w-full rounded-full" />
             </div>
           ) : (
             <LevelingCard
@@ -464,6 +528,7 @@ export default function HomeSection({
                 icon: Users,
                 label: t("ascend.nav.friends"),
                 value: t("ascend.overview.friendsOnline", { count: friendsOnline }),
+                loading: loadingFriends,
               },
               {
                 id: "friendRequests",
@@ -472,6 +537,7 @@ export default function HomeSection({
                 label: t("ascend.nav.requests"),
                 value: incomingRequests.length,
                 highlight: incomingRequests.length > 0,
+                loading: loadingFriends,
               },
               {
                 id: "messages",
@@ -479,6 +545,7 @@ export default function HomeSection({
                 label: t("ascend.overview.unread"),
                 value: unreadMessages,
                 highlight: unreadMessages > 0,
+                loading: loadingConversations,
               },
             ].map(row => (
               <button
@@ -488,13 +555,17 @@ export default function HomeSection({
               >
                 <row.icon className="h-4 w-4 text-muted-foreground" />
                 <span className="flex-1">{row.label}</span>
-                <span
-                  className={`text-xs font-medium tabular-nums ${
-                    row.highlight ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  {row.value}
-                </span>
+                {row.loading ? (
+                  <Skeleton className="h-3 w-10" />
+                ) : (
+                  <span
+                    className={`text-xs font-medium tabular-nums ${
+                      row.highlight ? "text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    {row.value}
+                  </span>
+                )}
               </button>
             ))}
           </div>

@@ -1,3 +1,5 @@
+import { Skeleton } from "@/components/ui/skeleton";
+
 // Shared building blocks for Ascend pages. They use the same surface as the
 // Ascend nav bar so every page reads as one system.
 
@@ -9,7 +11,7 @@ export function Panel({ as: Component = "div", className = "", children, ...prop
   );
 }
 
-// stats: [{ icon, label, value, suffix?, footer? }]
+// stats: [{ icon, label, value, suffix?, footer?, loading? }]
 export function StatStrip({ stats, className = "" }) {
   return (
     <dl
@@ -22,8 +24,8 @@ export function StatStrip({ stats, className = "" }) {
             {stat.label}
           </dt>
           <dd className="mt-1 flex items-baseline gap-1 text-xl font-semibold tabular-nums">
-            {stat.value}
-            {stat.suffix && (
+            {stat.loading ? <Skeleton className="my-1 h-5 w-14" /> : stat.value}
+            {!stat.loading && stat.suffix && (
               <span className="text-sm font-normal text-muted-foreground">
                 {stat.suffix}
               </span>
