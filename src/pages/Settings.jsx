@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import DownloadLimitSelector from "@/components/DownloadLimitSelector";
 import { motion, AnimatePresence } from "framer-motion";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import SafeHtml from "@/components/SafeHtml";
 import "@/components/ui/tabs";
@@ -40,7 +39,6 @@ import {
   FolderOpen,
   X,
   ExternalLink,
-  History,
   ArrowRight,
   Download,
   Scale,
@@ -53,17 +51,14 @@ import {
   BatteryLow,
   BatteryFull,
   SquareTerminal,
-  Package,
   AlertTriangle,
   FolderSync,
   FileCheck2,
-  CpuIcon,
   Database,
   Palette,
   Download as DownloadIcon,
   UploadIcon,
   Globe,
-  MessageCircleQuestion,
   Star,
   Home,
   CheckCircle,
@@ -74,6 +69,17 @@ import {
   Gamepad2,
   Bell,
   Trophy,
+  SlidersHorizontal,
+  HardDriveDownload,
+  Joystick,
+  ArchiveRestore,
+  Layers,
+  Wrench,
+  Microscope,
+  MonitorPlay,
+  CircleHelp,
+  Heart,
+  Gift,
 } from "lucide-react";
 import gameService from "@/services/games/gameService";
 import { useNavigate } from "react-router-dom";
@@ -1264,21 +1270,22 @@ function Settings() {
     loadLanguages();
   }, []);
 
-  // Settings are grouped into categories; the side list follows the scroll
+  // Settings are grouped into categories; each category's icon is used only
+  // in the side list so it never doubles up with an icon inside the page
   const settingsCategories = [
-    { id: "general", icon: Settings2 },
+    { id: "general", icon: SlidersHorizontal },
     { id: "game-index", icon: Database },
-    { id: "downloads", icon: Download },
-    { id: "gaming", icon: Gamepad2 },
-    { id: "backups", icon: FolderSync },
+    { id: "downloads", icon: HardDriveDownload },
+    { id: "gaming", icon: Joystick },
+    { id: "backups", icon: ArchiveRestore },
     {
       id: "compatibility",
-      icon: SquareTerminal,
+      icon: Layers,
       hidden: !isOnLinux && !isOnMac,
       descriptionKey: isOnMac ? "descriptionMac" : "description",
     },
-    { id: "tools", icon: Package },
-    { id: "advanced", icon: FlaskConical },
+    { id: "tools", icon: Wrench },
+    { id: "advanced", icon: Microscope },
   ].map(category => ({
     ...category,
     title: t(`settings.categories.${category.id}.title`),
@@ -1318,7 +1325,6 @@ function Settings() {
     const category = settingsCategories.find(c => c.id === id);
     return {
       id,
-      icon: category.icon,
       title: category.title,
       description: category.description,
       active: activeCategory === id,
@@ -1490,8 +1496,8 @@ function Settings() {
           )}
         </div>
 
-        <div className="grid items-start gap-8 lg:grid-cols-[210px_minmax(0,1fr)]">
-          <aside className="space-y-4 lg:sticky lg:top-[84px]">
+        <div className="grid items-start gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-12">
+          <aside className="space-y-6 lg:sticky lg:top-[84px]">
             <SettingsNav
               categories={visibleCategories}
               activeId={activeCategory}
@@ -1501,16 +1507,9 @@ function Settings() {
           </aside>
 
           <div className="min-w-0">
-            <SettingsCategory {...categoryProps("general")} layout="grid">
-              <Card
-                id="appearance-settings"
-                className="p-6"
-              >
-                {/* Appearance Section */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                    {t("settings.appearance")}
-                  </h3>
+            <SettingsCategory {...categoryProps("general")}>
+              <SettingsSection id="appearance-settings" title={t("settings.appearance")}>
+                <div className="space-y-6">
                   <div id="theme">
                     <Label>{t("settings.themes")}</Label>
 
@@ -1552,17 +1551,17 @@ function Settings() {
                     <Accordion
                       type="single"
                       collapsible
-                      className="mt-2 w-full rounded-lg border-border bg-background text-card-foreground shadow-sm"
+                      className="mt-2 w-full border-y border-border/60"
                     >
-                      <AccordionItem value="light-themes" className="border-0 px-1">
-                        <AccordionTrigger className="px-3 py-4 hover:no-underline">
+                      <AccordionItem value="light-themes" className="border-0">
+                        <AccordionTrigger className="py-3.5 hover:no-underline">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">
                               {t("settings.lightThemes")}
                             </span>
                           </div>
                         </AccordionTrigger>
-                        <AccordionContent className="px-3 pb-4">
+                        <AccordionContent className="pb-4 pt-1">
                           <div className="grid grid-cols-2 gap-4">
                             {groupedThemes.light.map(t => (
                               <ThemeButton
@@ -1578,16 +1577,16 @@ function Settings() {
 
                       <AccordionItem
                         value="dark-themes"
-                        className="border-0 border-t border-t-border/20 px-1"
+                        className="border-0 border-t border-t-border/40"
                       >
-                        <AccordionTrigger className="px-3 py-4 hover:no-underline">
+                        <AccordionTrigger className="py-3.5 hover:no-underline">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">
                               {t("settings.darkThemes")}
                             </span>
                           </div>
                         </AccordionTrigger>
-                        <AccordionContent className="px-3 pb-4">
+                        <AccordionContent className="pb-4 pt-1">
                           <div className="grid grid-cols-2 gap-4">
                             {groupedThemes.dark.map(t => (
                               <ThemeButton
@@ -1654,18 +1653,13 @@ function Settings() {
                     />
                   </div>
                 </div>
-              </Card>
+              </SettingsSection>
 
-              <Card
+              <SettingsSection
                 id="application-settings"
-                className="p-6"
+                title={t("settings.application")}
               >
-                {/* Application Section */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                    {t("settings.application")}
-                  </h3>
-
+                <div className="space-y-6">
                   <div
                     id="default-landing-page"
                     className="flex items-center justify-between"
@@ -1782,36 +1776,25 @@ function Settings() {
                     />
                   </div>
                 </div>
-              </Card>
+              </SettingsSection>
 
-              {/* Language Settings Card */}
-              {/* Spans both columns so it sits full width under Appearance and Application */}
-              <Card
+              <SettingsSection
                 id="language"
-                className="p-6 xl:col-span-2"
+                title={t("settings.languageSettings")}
+                description={t("settings.languageSettingsDescription")}
+                action={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2 text-primary"
+                    onClick={() => navigate("/extralanguages")}
+                  >
+                    <Languages className="h-4 w-4" />
+                    {t("settings.selectMoreLanguages")}
+                  </Button>
+                }
               >
                 <div className="space-y-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                        {t("settings.languageSettings")}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.languageSettingsDescription")}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 text-primary"
-                      onClick={() => navigate("/extralanguages")}
-                    >
-                      <Languages className="h-4 w-4" />
-                      {t("settings.selectMoreLanguages")}
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
                     {availableLanguages.map(lang => (
                       <button
@@ -1841,21 +1824,19 @@ function Settings() {
                     {t("settings.languageSetNote")}
                   </p>
                 </div>
-              </Card>
+              </SettingsSection>
             </SettingsCategory>
 
             <SettingsCategory {...categoryProps("game-index")}>
               <GameIndexManager embedded view="index" />
             </SettingsCategory>
 
-            <SettingsCategory {...categoryProps("downloads")} columns>
-              <Card
+            <SettingsCategory {...categoryProps("downloads")}>
+              <SettingsSection
                 id="download-manager"
-                className="space-y-5 p-6"
+                title={t("settings.downloaderSettings")}
+                className="space-y-5"
               >
-                <h3 className="text-base font-semibold text-foreground">
-                  {t("settings.downloaderSettings")}
-                </h3>
                 {isDownloaderRunning && (
                   <div className="mb-6 flex items-center gap-2 rounded-md border border-red-400 bg-red-50 p-2 text-red-600 dark:text-red-500">
                     <CircleAlert size={14} />
@@ -1873,7 +1854,7 @@ function Settings() {
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <SquareTerminal className="mb-0.5 inline h-4 w-4 cursor-help text-muted-foreground" />
+                              <CircleHelp className="mb-0.5 inline h-4 w-4 cursor-help text-muted-foreground" />
                             </TooltipTrigger>
                             <TooltipContent className="text-secondary">
                               {t("settings.excludeFoldersTooltip")}.{" "}
@@ -2194,15 +2175,13 @@ function Settings() {
                     t={t}
                   />
                 </div>
-              </Card>
+              </SettingsSection>
 
-              <Card
+              <SettingsSection
                 id="download-locations"
-                className="space-y-5 p-6"
+                title={t("settings.downloadLocationsTitle")}
+                className="space-y-5"
               >
-                <h3 className="text-base font-semibold text-foreground">
-                  {t("settings.downloadLocationsTitle")}
-                </h3>
                 <div id="download-directory">
                   <div className="mb-4">
                     <Label
@@ -2311,15 +2290,13 @@ function Settings() {
                     </div>
                   </div>
                 </div>
-              </Card>
+              </SettingsSection>
 
-              <Card
+              <SettingsSection
                 id="torbox-settings"
-                className="space-y-5 p-6"
+                title={t("settings.torboxTitle")}
+                className="space-y-5"
               >
-                <h3 className="text-base font-semibold text-foreground">
-                  {t("settings.torboxTitle")}
-                </h3>
                 {/* Torbox API Key Config */}
                 <div id="torbox-api-key" className="space-y-2">
                   <Label>{t("settings.torboxApiKey")}</Label>
@@ -2450,19 +2427,15 @@ function Settings() {
                     disabled={!settings.useTorboxForTorrents || !settings.torrentEnabled}
                   />
                 </div>
-              </Card>
+              </SettingsSection>
 
-              {/* Torrenting Card */}
-              <Card
-                id="torrent-downloads"
-                className="p-6"
-              >
-                <div className="mb-6 flex items-center justify-between">
+              <SettingsSection id="torrent-downloads">
+                <div className="mb-6 flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-base font-semibold text-foreground">
+                    <h3 className="mb-0 text-lg font-semibold tracking-tight text-foreground">
                       {t("settings.torrenting")}
-                    </h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    </h3>
+                    <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                       {t("settings.torrentingDescription")}
                     </p>
                   </div>
@@ -2517,9 +2490,7 @@ function Settings() {
 
                 <div className="space-y-6">
                   {/* qBittorrent Status */}
-                  <div
-                    className={`rounded-lg p-4 ${settings.torrentEnabled ? "bg-muted/30" : "bg-muted/20"}`}
-                  >
+                  <div className="border-l-2 border-border py-1 pl-4">
                     <div className="flex items-center gap-2 text-sm">
                       {settings.torrentEnabled ? (
                         <QbittorrentStatus refreshKey={qbitStatusRefreshKey} />
@@ -2767,15 +2738,12 @@ function Settings() {
                     </div>
                   </div>
                 </div>
-              </Card>
+              </SettingsSection>
             </SettingsCategory>
 
-            <SettingsCategory {...categoryProps("gaming")} columns>
-              <Card
-                id="gaming-settings"
-                className="p-6"
-              >
-                <div className="space-y-4">
+            <SettingsCategory {...categoryProps("gaming")}>
+              <SettingsSection id="gaming-settings">
+                <div className="space-y-6">
                   <div id="discord-rpc" className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label>{t("settings.discordRPC")}</Label>
@@ -2895,18 +2863,15 @@ function Settings() {
                     />
                   </div>
                 </div>
-              </Card>
+              </SettingsSection>
 
-              <Card
+              <SettingsSection
                 id="big-picture-settings"
-                className="space-y-5 p-6"
+                title={t("settings.bigPictureSettings")}
+                className="space-y-5"
               >
-                <h3 className="text-base font-semibold text-foreground">
-                  {t("settings.bigPictureSettings")}
-                </h3>
-
-                <div className="space-y-3 rounded-lg border border-border/50 bg-muted/20 p-4">
-                  <div className="flex items-start gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
                     <div
                       className={`shrink-0 rounded-full p-2 ${controllerConnected ? "bg-green-500/15" : "bg-muted"}`}
                     >
@@ -2929,9 +2894,9 @@ function Settings() {
                   </div>
                   <Button
                     onClick={() => navigate("/bigpicture")}
-                    className="w-full gap-2 text-secondary"
+                    className="gap-2 text-secondary"
                   >
-                    <Gamepad2 className="h-4 w-4" />
+                    <MonitorPlay className="h-4 w-4" />
                     {t("settings.enterBigPicture")}
                   </Button>
                 </div>
@@ -2982,18 +2947,20 @@ function Settings() {
                     </SelectContent>
                   </Select>
                 </div>
-              </Card>
+              </SettingsSection>
 
-              {/* Achievement Watcher Directories Card */}
-              <Card className="p-6">
-                <h3 className="mb-2 text-base font-semibold text-foreground">
-                  {t("settings.achievementWatcher.title") ||
-                    "Achievement Watcher Directories"}
-                </h3>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  {t("settings.achievementWatcher.description") ||
-                    "Configure which directories are monitored for achievement tracking. Add folders where your games are installed to enable achievement tracking for those games."}
-                </p>
+              {/* Achievement Watcher Directories */}
+              <SettingsSection
+                id="achievement-watcher"
+                title={
+                  t("settings.achievementWatcher.title") ||
+                  "Achievement Watcher Directories"
+                }
+                description={
+                  t("settings.achievementWatcher.description") ||
+                  "Configure which directories are monitored for achievement tracking. Add folders where your games are installed to enable achievement tracking for those games."
+                }
+              >
                 {/* Default Directories Section */}
                 {isOnWindows && (
                   <div className="mb-6">
@@ -3100,18 +3067,14 @@ function Settings() {
                   </Button>
                 </div>
                 <AchievementFolderSearch />
-              </Card>
+              </SettingsSection>
             </SettingsCategory>
 
             <SettingsCategory {...categoryProps("backups")}>
-              <Card id="ludusavi" className="">
-                <div className="p-6">
+              <SettingsSection id="ludusavi" title={t("settings.gameBackup.title")}>
+                <div>
                   <div>
                     <div>
-                      <h3 className="text-base font-semibold text-foreground">
-                        {t("settings.gameBackup.title")}
-                      </h3>
-
                       {/* Backup Location */}
                       <div id="backup-directory" className="mt-2 space-y-2">
                         <Label>{t("settings.gameBackup.backupLocation")}</Label>
@@ -3307,14 +3270,14 @@ function Settings() {
                     </div>
                   </div>
                 </div>
-              </Card>
+              </SettingsSection>
             </SettingsCategory>
 
             {isOnMac && (
               <SettingsCategory {...categoryProps("compatibility")}>
-                <Card className="p-6">
+                <SettingsSection>
                   <HighballSettings />
-                </Card>
+                </SettingsSection>
               </SettingsCategory>
             )}
 
@@ -3323,15 +3286,11 @@ function Settings() {
                 {/* ── Linux Compatibility Layer ── */}
                 {isOnLinux && (
                   <>
-                    <Card className="p-6">
+                    <SettingsSection
+                      title={t("welcome.compatibilityLayer")}
+                      description={t("settings.linuxCompat.description")}
+                    >
                       <div className="space-y-6">
-                        <h3 className="mb-2 text-base font-semibold text-foreground">
-                          {t("welcome.compatibilityLayer")}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {t("settings.linuxCompat.description")}
-                        </p>
-
                         {/* Runner Selection */}
                         <div className="space-y-3">
                           <label className="text-sm font-medium">
@@ -3721,7 +3680,7 @@ function Settings() {
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           {/* UMU Launcher */}
-                          <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                          <div className="space-y-3 border-l-2 border-border pl-4">
                             <div className="flex items-center justify-between">
                               <span className="text-sm font-medium">UMU Launcher</span>
                               {umuInstalled ? (
@@ -3803,7 +3762,7 @@ function Settings() {
                           </div>
 
                           {/* UMU Proton */}
-                          <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                          <div className="space-y-3 border-l-2 border-border pl-4">
                             <div className="flex items-center justify-between">
                               <span className="text-sm font-medium">UMU-Proton</span>
                               {umuProtonInfo?.alreadyInstalled ? (
@@ -3948,7 +3907,7 @@ function Settings() {
                           </div>
                         )}
                       </div>
-                    </Card>
+                    </SettingsSection>
 
                     <ProtonOptionsDialog
                       open={protonOptionsOpen}
@@ -4211,15 +4170,9 @@ function Settings() {
               </SettingsCategory>
             )}
 
-            <SettingsCategory {...categoryProps("tools")} columns>
-              {/* Timemachine Card */}
-              <Card id="timemachine" className="p-6">
-                <div className="mb-2 flex items-center gap-2">
-                  <History className="mb-2 h-5 w-5 text-primary" />
-                  <h2 className="text-base font-semibold text-foreground">
-                    {t("settings.ascendaraTimechine")}
-                  </h2>
-                </div>
+            <SettingsCategory {...categoryProps("tools")}>
+              {/* Timemachine */}
+              <SettingsSection id="timemachine" title={t("settings.ascendaraTimechine")}>
                 <div className="space-y-6">
                   <div className="space-y-4">
                     <p className="text-sm text-muted-foreground">
@@ -4251,19 +4204,13 @@ function Settings() {
                     </div>
                   </div>
                 </div>
-              </Card>
+              </SettingsSection>
 
-              {/* Workshop Downloader Card */}
-              <Card
+              {/* Workshop Downloader */}
+              <SettingsSection
                 id="workshop-downloader"
-                className="p-6"
+                title={t("settings.ascendaraWorkshopDownloader")}
               >
-                <div className="mb-2 flex items-center gap-2">
-                  <Package className="mb-2 h-5 w-5 text-primary" />
-                  <h2 className="text-base font-semibold text-foreground">
-                    {t("settings.ascendaraWorkshopDownloader")}
-                  </h2>
-                </div>
                 <div className="space-y-6">
                   <div className="space-y-4">
                     <p className="text-sm text-muted-foreground">
@@ -4295,45 +4242,35 @@ function Settings() {
                     </div>
                   </div>
                 </div>
-              </Card>
+              </SettingsSection>
 
-              {/* Components Card */}
+              {/* Components */}
               {isOnWindows && (
-                <Card id="components" className="p-6">
-                  <div className="mb-2 flex items-center gap-2">
-                    <CpuIcon className="mb-2 h-5 w-5 text-primary" />
-                    <h2 className="text-base font-semibold text-foreground">
-                      {t("settings.components")}
-                    </h2>
-                  </div>
-                  <p className="mb-4 text-sm text-muted-foreground">
-                    {t("settings.componentsDescription")}
-                  </p>
-                  <Button
-                    onClick={() => navigate("/sidecaranddependencies")}
-                    className="flex w-full items-center gap-2 text-secondary"
-                  >
-                    {t("settings.viewComponentsPage")}
-                  </Button>
-                </Card>
+                <SettingsSection
+                  id="components"
+                  title={t("settings.components")}
+                  description={t("settings.componentsDescription")}
+                  action={
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate("/sidecaranddependencies")}
+                      className="gap-2"
+                    >
+                      {t("settings.viewComponentsPage")}
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  }
+                />
               )}
             </SettingsCategory>
 
-            <SettingsCategory {...categoryProps("advanced")} columns>
-              {/* App Branch Card */}
-              <Card className="overflow-hidden p-0">
-                <div className="border-b border-border px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <FlaskConical className="mb-2 h-5 w-5 text-primary" />
-                    <h2 className="text-base font-semibold text-foreground">
-                      {t("settings.appBranch.title")}
-                    </h2>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {t("settings.appBranch.description")}
-                  </p>
-                </div>
-                <div className="divide-y divide-border">
+            <SettingsCategory {...categoryProps("advanced")}>
+              <SettingsSection
+                id="app-branch"
+                title={t("settings.appBranch.title")}
+                description={t("settings.appBranch.description")}
+              >
+                <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/60">
                   {[
                     {
                       id: "live",
@@ -4376,16 +4313,6 @@ function Settings() {
                         disabled={isActive}
                         onClick={() => {
                           if (isActive) return;
-                          if (
-                            branch.id === "experimental" &&
-                            navigator.userAgent.toLowerCase().includes("macintosh")
-                          ) {
-                            toast.warning(
-                              t("settings.appBranch.macExperimentalUnsupported")
-                            );
-                            return;
-                          }
-
                           // Show Ascend promo dialog if locked
                           if (isLocked) {
                             setShowAscendPromoDialog(true);
@@ -4411,7 +4338,7 @@ function Settings() {
                           setShowBranchDialog(true);
                         }}
                         className={[
-                          "group flex w-full items-center gap-4 border-l-4 px-6 py-4 text-left transition-all duration-150",
+                          "group flex w-full items-center gap-4 border-l-4 px-4 py-3.5 text-left transition-all duration-150",
                           isActive
                             ? `${branch.activeBorder} ${branch.activeBg} cursor-default`
                             : "cursor-pointer border-l-transparent hover:bg-muted/40",
@@ -4478,17 +4405,13 @@ function Settings() {
                     );
                   })}
                 </div>
-              </Card>
+              </SettingsSection>
 
-              {/* Developer Settings Card - Only shown in development mode */}
+              {/* Developer Settings - Only shown in development mode */}
               {isDev && (
-                <Card className="p-6">
+                <SettingsSection title="Developer Tools">
                   <div className="space-y-6">
                     <div>
-                      <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
-                        <CircleAlert size={20} />
-                        Developer Tools
-                      </h2>
                       <div className="space-y-4">
                         <Button
                           className="w-full"
@@ -4539,7 +4462,9 @@ function Settings() {
                           onClick={() => {
                             // Welcome flow ends with the main tour and turns page tours back on
                             resetPageTours();
-                            window.dispatchEvent(new CustomEvent("ascendara:show-welcome"));
+                            window.dispatchEvent(
+                              new CustomEvent("ascendara:show-welcome")
+                            );
                           }}
                         >
                           Replay Onboarding & Tours
@@ -4585,29 +4510,27 @@ function Settings() {
                       </div>
                     </div>
                   </div>
-                </Card>
+                </SettingsSection>
               )}
 
-              <Card className="p-6">
-                <div className="mb-2 flex items-center gap-2">
-                  <MessageCircleQuestion className="mb-2 h-5 w-5 text-primary" />
-                  <h2 className="text-base font-semibold text-foreground">
-                    {t("settings.quickSupport")}
-                  </h2>
-                </div>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  {t("settings.supportDesc")}
-                </p>
-                <Button
-                  className="flex w-full items-center gap-2 text-secondary"
-                  onClick={() => {
-                    setSupportCode(["", "", "", "", "", ""]);
-                    setShowSupportDialog(true);
-                  }}
-                >
-                  {t("settings.getHelp")}
-                </Button>
-              </Card>
+              <SettingsSection
+                id="quick-support"
+                title={t("settings.quickSupport")}
+                description={t("settings.supportDesc")}
+                action={
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => {
+                      setSupportCode(["", "", "", "", "", ""]);
+                      setShowSupportDialog(true);
+                    }}
+                  >
+                    {t("settings.getHelp")}
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                }
+              />
             </SettingsCategory>
           </div>
         </div>
@@ -4785,11 +4708,11 @@ function Settings() {
                     <span>{t("settings.ascendPromoDialog.benefit1")}</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <Star className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                    <Heart className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
                     <span>{t("settings.ascendPromoDialog.benefit2")}</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <Star className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                    <Gift className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
                     <span>{t("settings.ascendPromoDialog.benefit3")}</span>
                   </li>
                 </ul>
@@ -5559,7 +5482,9 @@ function Settings() {
                         </div>
                         <X
                           className="h-3.5 w-3.5 shrink-0"
-                          style={{ color: `rgb(${notificationColor("notificationMuted")})` }}
+                          style={{
+                            color: `rgb(${notificationColor("notificationMuted")})`,
+                          }}
                         />
                         <div
                           className="absolute bottom-0 left-0 h-[3px] w-full"
@@ -6180,7 +6105,7 @@ const QbittorrentStatus = ({ refreshKey = 0 } = {}) => {
 
 function SettingsNav({ categories, activeId, onSelect }) {
   return (
-    <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0">
+    <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:border-l lg:border-border/60 lg:px-0 lg:pb-0">
       {categories.map(category => {
         const isActive = activeId === category.id;
         return (
@@ -6189,18 +6114,22 @@ function SettingsNav({ categories, activeId, onSelect }) {
             type="button"
             onClick={() => onSelect(category.id)}
             aria-current={isActive ? "true" : undefined}
-            className={`relative flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
-              isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            className={`relative flex shrink-0 items-center gap-3 rounded-md px-3 py-2 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary lg:-ml-px lg:rounded-none lg:rounded-r-md lg:pl-4 ${
+              isActive
+                ? "font-semibold text-foreground"
+                : "font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground"
             }`}
           >
             {isActive && (
               <motion.span
                 layoutId="settings-category-active"
-                className="absolute inset-0 rounded-lg bg-primary/10"
+                className="absolute inset-0 rounded-md bg-primary/10 lg:inset-y-0 lg:left-0 lg:right-auto lg:w-0.5 lg:rounded-full lg:bg-primary"
                 transition={{ type: "spring", stiffness: 400, damping: 34 }}
               />
             )}
-            <category.icon className="relative h-4 w-4 shrink-0" />
+            <category.icon
+              className={`relative h-4 w-4 shrink-0 ${isActive ? "text-primary" : ""}`}
+            />
             <span className="relative whitespace-nowrap">{category.title}</span>
           </button>
         );
@@ -6212,7 +6141,7 @@ function SettingsNav({ categories, activeId, onSelect }) {
 function SupportDevelopersNote({ t }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-3.5">
+    <div className="border-l-2 border-yellow-500/50 pl-4">
       <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
         <Hand className="h-4 w-4 shrink-0 scale-x-[-1]" />
         <h2 className="mb-0 text-sm font-semibold leading-tight">
@@ -6250,44 +6179,45 @@ function SupportDevelopersNote({ t }) {
   );
 }
 
-function SettingsCategory({
-  id,
-  icon: Icon,
-  title,
-  description,
-  active,
-  columns = false,
-  layout,
-  children,
-}) {
+function SettingsCategory({ id, title, description, active, children }) {
   return (
-    <section id={id} data-category={id} hidden={!active} className="space-y-4">
-      <header className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="min-w-0">
-          <h2 className="mb-0 text-lg font-semibold leading-tight tracking-tight">
-            {title}
-          </h2>
-          {description && (
-            <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
-          )}
-        </div>
+    <section id={id} data-category={id} hidden={!active} className="max-w-4xl">
+      <header className="border-b border-border/60 pb-5">
+        <h2 className="mb-0 text-2xl font-bold tracking-tight">{title}</h2>
+        {description && (
+          <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">{description}</p>
+        )}
       </header>
-      {/* Multi-card categories flow into two balanced columns on wide windows;
-          the grid layout instead keeps cards in the same row at equal height */}
-      <div
-        className={
-          layout === "grid"
-            ? "grid gap-4 xl:grid-cols-2"
-            : columns
-              ? "gap-4 xl:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid"
-              : "space-y-4"
-        }
-      >
-        {children}
-      </div>
+      {/* Sections sit straight on the page, split by hairlines instead of cards */}
+      <div className="divide-y divide-border/60">{children}</div>
+    </section>
+  );
+}
+
+// A flat group of settings within a category: a heading, an optional
+// description and action, then the controls
+function SettingsSection({ id, title, description, action, className = "", children }) {
+  const hasHeader = title || description || action;
+  return (
+    <section id={id} className="py-8">
+      {hasHeader && (
+        <div
+          className={`flex flex-wrap items-start justify-between gap-x-6 gap-y-3 ${children ? "mb-6" : ""}`}
+        >
+          <div className="min-w-0 flex-1 space-y-1">
+            {title && (
+              <h3 className="mb-0 text-lg font-semibold tracking-tight text-foreground">
+                {title}
+              </h3>
+            )}
+            {description && (
+              <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>
+            )}
+          </div>
+          {action && <div className="shrink-0">{action}</div>}
+        </div>
+      )}
+      {children && <div className={className}>{children}</div>}
     </section>
   );
 }

@@ -285,14 +285,16 @@ export default function HighballSettings() {
 
   return (
     <div className="space-y-6">
-      <h3 className="mb-2 text-base font-semibold text-foreground">
-        {t("welcome.compatibilityLayer")}
-      </h3>
-      <p className="text-sm text-muted-foreground">
-        {status.supported
-          ? t("settings.macCompat.description")
-          : t("settings.macCompat.intelDescription")}
-      </p>
+      <div className="space-y-1">
+        <h3 className="mb-0 text-lg font-semibold tracking-tight text-foreground">
+          {t("welcome.compatibilityLayer")}
+        </h3>
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          {status.supported
+            ? t("settings.macCompat.description")
+            : t("settings.macCompat.intelDescription")}
+        </p>
+      </div>
 
       {status.supported && (
         <div className="space-y-3">

@@ -2080,10 +2080,10 @@ const GameIndexManager = ({
               </div>
             )}
 
-            {/* Overview and its settings sit side by side on wide windows */}
-            <div className="grid gap-4 xl:grid-cols-2">
-              <div className="flex flex-col gap-4">
-                <Card className="relative flex flex-1 flex-col overflow-hidden p-6">
+            {/* Overview, external sources and settings sit flat on the page */}
+            <div className="divide-y divide-border/60">
+              <div className="divide-y divide-border/60">
+                <section className="relative overflow-hidden py-8">
                   <AnimatePresence>
                     {justRefreshed && (
                       <motion.div
@@ -2098,7 +2098,7 @@ const GameIndexManager = ({
                   </AnimatePresence>
                   <div className="relative space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="mb-0 whitespace-nowrap text-base font-semibold text-foreground">
+                      <h3 className="mb-0 whitespace-nowrap text-lg font-semibold tracking-tight text-foreground">
                         {t("localRefresh.ascendaraIndex") || "Ascendara Index"}
                       </h3>
                       {customSourcesMode ? (
@@ -2124,8 +2124,8 @@ const GameIndexManager = ({
                     </p>
                   </div>
 
-                  <dl className="relative mt-5 grid grid-cols-3 gap-3">
-                    <div className="min-w-0 rounded-lg bg-muted/40 p-3">
+                  <dl className="relative mt-6 grid grid-cols-3 divide-x divide-border/60">
+                    <div className="min-w-0 px-5 first:pl-0">
                       <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                         {t("localRefresh.games") || "Games"}
                       </dt>
@@ -2133,7 +2133,7 @@ const GameIndexManager = ({
                         <AnimatedNumber value={indexInfo?.gameCount} />
                       </dd>
                     </div>
-                    <div className="min-w-0 rounded-lg bg-muted/40 p-3">
+                    <div className="min-w-0 px-5 first:pl-0">
                       <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                         {t("localRefresh.lastRefresh") || "Last refresh"}
                       </dt>
@@ -2143,7 +2143,7 @@ const GameIndexManager = ({
                           : t("localRefresh.never") || "Never"}
                       </dd>
                     </div>
-                    <div className="min-w-0 rounded-lg bg-muted/40 p-3">
+                    <div className="min-w-0 px-5 first:pl-0">
                       <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                         {t("localRefresh.indexUpdated") || "Index age"}
                       </dt>
@@ -2158,10 +2158,8 @@ const GameIndexManager = ({
                     </div>
                   </dl>
 
-                  {/* Keeps the refresh button at the bottom when the column stretches */}
-                  <div className="min-h-4 flex-1" />
                   <Button
-                    className="relative w-full gap-2 overflow-hidden text-secondary"
+                    className="relative mt-6 gap-2 overflow-hidden text-secondary"
                     onClick={async () => {
                       if (downloadingIndex) return;
                       try {
@@ -2206,32 +2204,22 @@ const GameIndexManager = ({
                       </motion.span>
                     </AnimatePresence>
                   </Button>
-                </Card>
+                </section>
 
                 {/* Everything that isn't the Ascendara index lives on its own page */}
-                <Card className="flex items-start gap-4 px-6 py-4">
-                  <div
-                    className={cn(
-                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-                      customSourcesMode
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted text-muted-foreground"
-                    )}
-                  >
-                    <Globe className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
+                <section className="py-8">
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="mb-0 text-base font-semibold text-foreground">
+                      <h3 className="mb-0 text-lg font-semibold tracking-tight text-foreground">
                         {t("externalSources.title")}
                       </h3>
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {customSourcesMode
                         ? t("externalSources.activeDesc", { name: activeName })
                         : t("externalSources.linkDesc")}
                     </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
                       <Button
                         size="sm"
                         variant="outline"
@@ -2254,15 +2242,15 @@ const GameIndexManager = ({
                       )}
                     </div>
                   </div>
-                </Card>
+                </section>
               </div>
 
-              <Card className="divide-y divide-border/60">
-                <h3 className="mb-0 px-6 py-4 text-base font-semibold text-foreground">
+              <section className="divide-y divide-border/40 pt-8">
+                <h3 className="mb-0 pb-2 text-lg font-semibold tracking-tight text-foreground">
                   {t("localRefresh.settings") || "Settings"}
                 </h3>
 
-                <div className="flex items-center justify-between gap-4 px-6 py-4">
+                <div className="flex items-center justify-between gap-4 py-4">
                   <div className="space-y-0.5">
                     <Label htmlFor="index-background-sync">
                       {t("localRefresh.backgroundSync")}
@@ -2280,7 +2268,7 @@ const GameIndexManager = ({
                   />
                 </div>
 
-                <div className="space-y-2 px-6 py-4">
+                <div className="space-y-2 py-4">
                   <div className="space-y-0.5">
                     <Label>{t("localRefresh.storageLocation")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -2305,7 +2293,7 @@ const GameIndexManager = ({
                   </div>
                 </div>
 
-                <div className="space-y-2 px-6 py-4">
+                <div className="space-y-2 pb-8 pt-4">
                   <div className="space-y-0.5">
                     <Label htmlFor="index-blacklist">{t("localRefresh.blacklist")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -2360,7 +2348,7 @@ const GameIndexManager = ({
                     </div>
                   )}
                 </div>
-              </Card>
+              </section>
             </div>
           </div>
         )}
