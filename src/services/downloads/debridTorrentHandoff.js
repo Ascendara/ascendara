@@ -2,6 +2,17 @@
 const inFlight = new Map();
 let localStart = Promise.resolve();
 let startingUntil = 0;
+// A torrent that could not start waits before its links are requested again.
+const HANDOFF_RETRY_MS = 5 * 60 * 1000;
+const handoffFailures = new Map();
+
+const startLocalDownload = async (...args) => {
+  try {
+    return await window.electron.downloadFile(...args);
+  } catch (error) {
+    return { error: error.message };
+  }
+};
 
 export function handoffTorrents(provider, apiKey) {
   if (!globalThis.window?.electron?.downloadFile || !provider.getTorrentDownload)
@@ -29,9 +40,20 @@ export function handoffTorrents(provider, apiKey) {
           !entry.localDownloadStarted &&
           !entry.cloudTorrentMissing
       );
+      let failure;
+      const fail = (retryKey, error) => {
+        handoffFailures.set(retryKey, { error, retryAt: Date.now() + HANDOFF_RETRY_MS });
+        failure ??= error;
+      };
       for (const [id, entry] of entries) {
         const game = provider.getTorrentGame(entry);
         if (!game?.game) continue;
+        const retryKey = `${provider.id}:${id}`;
+        const previous = handoffFailures.get(retryKey);
+        if (previous && Date.now() < previous.retryAt) {
+          failure ??= previous.error;
+          continue;
+        }
         // Wait for the current local transfer; cloud preparation can continue meanwhile.
         const games = await window.electron.getGames();
         if (
@@ -46,7 +68,13 @@ export function handoffTorrents(provider, apiKey) {
           })
         )
           return;
-        const files = await provider.getTorrentDownload(apiKey, id.slice(8));
+        let files;
+        try {
+          files = await provider.getTorrentDownload(apiKey, id.slice(8));
+        } catch (error) {
+          fail(retryKey, error);
+          continue;
+        }
         // Removed from the cloud: stop polling it.
         if (files === "missing") {
           mark(id, "cloudTorrentMissing");
@@ -63,7 +91,7 @@ export function handoffTorrents(provider, apiKey) {
           )
             return;
         }
-        const result = await window.electron.downloadFile(
+        const result = await startLocalDownload(
           { transferId: `${provider.id}:${id}`, files },
           game.game,
           game.online || false,
@@ -77,12 +105,19 @@ export function handoffTorrents(provider, apiKey) {
           game.gameID || "",
           true
         );
-        if (!result?.success)
-          throw new Error(result?.error || "Could not start the local debrid download.");
+        if (!result?.success) {
+          fail(
+            retryKey,
+            new Error(result?.error || "Could not start the local debrid download.")
+          );
+          continue;
+        }
+        handoffFailures.delete(retryKey);
         startingUntil = Date.now() + 15000;
         mark(id, "localDownloadStarted");
         return { game: game.game, providerId: provider.id };
       }
+      if (failure) throw failure;
     })
     .finally(() => inFlight.delete(key));
   localStart = task;

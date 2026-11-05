@@ -2,6 +2,8 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { loadModule } = require("./helpers/loadModule.cjs");
 
+const realNow = Date.now;
+
 test("Real-Debrid may package several selected torrent files into one archive link", async t => {
   const originalFetch = global.fetch;
   t.after(() => {
@@ -193,8 +195,12 @@ test("handoff waits for readiness and active local jobs, respects disabling, and
     if (scenario === "failed") {
       await assert.rejects(worker.handoffTorrents(provider, "token"), /start failed/);
       assert.equal(JSON.parse(stored)["torrent:ready"].localDownloadStarted, undefined);
+      await assert.rejects(worker.handoffTorrents(provider, "token"), /start failed/);
+      assert.equal(calls.length, 1, "the next poll waits");
+      t.mock.method(Date, "now", () => realNow() + 5 * 60 * 1000);
       await worker.handoffTorrents(provider, "token");
       assert.equal(JSON.parse(stored)["torrent:ready"].localDownloadStarted, true);
+      t.mock.restoreAll();
     } else {
       await worker.handoffTorrents(provider, "token");
       assert.equal(calls.length, 0, scenario);
@@ -244,4 +250,105 @@ test("handoff skips legacy records and stops polling torrents removed from the c
   assert.deepEqual(lookups, ["gone"], "legacy skipped, missing torrent checked once");
   assert.equal(calls.length, 0);
   assert.equal(JSON.parse(stored)["torrent:gone"].cloudTorrentMissing, true);
+});
+
+test("a refused torrent asks Real-Debrid for its links once per retry, not on every poll", async t => {
+  const saved = {
+    fetch: global.fetch,
+    window: global.window,
+    localStorage: global.localStorage,
+  };
+  t.after(() => Object.assign(global, saved));
+  let stored = JSON.stringify({ "torrent:big": { game: "Big", autoHandoff: true } });
+  global.localStorage = { getItem: () => stored, setItem: () => {} };
+  const links = Array.from({ length: 30 }, (_, i) => `https://real-debrid.com/d/${i}`);
+  let requests = 0;
+  global.fetch = async url => {
+    requests += 1;
+    return url.includes("/torrents/info/")
+      ? Response.json({
+          status: "downloaded",
+          files: links.map((_, i) => ({ selected: 1, path: `/${i}.bin`, bytes: 1 })),
+          links,
+        })
+      : Response.json({ download: "https://cdn.example/f", filesize: 1 });
+  };
+  global.window = {
+    electron: {
+      getGames: async () => [],
+      downloadFile: async () => ({ success: false, error: "Folder already exists" }),
+    },
+  };
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  const { default: provider } = await loadModule(
+    "src/services/downloads/debrid/realDebridProvider.js"
+  );
+
+  let now = realNow();
+  t.mock.method(Date, "now", () => now);
+  // One minute of the 5 second background poll.
+  for (let poll = 0; poll < 12; poll++) {
+    await assert.rejects(
+      worker.handoffTorrents(provider, "key"),
+      /Folder already exists/
+    );
+    now += 5000;
+  }
+  assert.equal(requests, 31);
+
+  now += 5 * 60 * 1000;
+  await assert.rejects(worker.handoffTorrents(provider, "key"), /Folder already exists/);
+  assert.equal(requests, 62);
+});
+
+test("a torrent that can not start does not hold back the ones behind it", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => Object.assign(global, saved));
+  for (const failure of ["refused", "cloud error"]) {
+    let stored = JSON.stringify({
+      "torrent:first": { game: "First", autoHandoff: true },
+      "torrent:second": { game: "Second", autoHandoff: true },
+    });
+    global.localStorage = {
+      getItem: () => stored,
+      setItem: (_k, value) => {
+        stored = value;
+      },
+    };
+    const started = [];
+    global.window = {
+      electron: {
+        getGames: async () => [],
+        downloadFile: async (_data, game) => {
+          if (game === "First") return { success: false, error: "refused" };
+          started.push(game);
+          return { success: true };
+        },
+      },
+    };
+    const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+      fresh: true,
+    });
+    const provider = {
+      id: "test",
+      metadataStorageKey: "metadata",
+      getTorrentGame: entry => entry,
+      getTorrentDownload: async (_key, id) => {
+        if (failure === "cloud error" && id === "first") throw new Error("cloud error");
+        return [{ url: "https://example.com/file", filename: "data.bin", size: 10 }];
+      },
+    };
+    assert.deepEqual(await worker.handoffTorrents(provider, "key"), {
+      game: "Second",
+      providerId: "test",
+    });
+    assert.deepEqual(started, ["Second"]);
+    assert.equal(JSON.parse(stored)["torrent:first"].localDownloadStarted, undefined);
+    // The one that failed still reaches the user once the new download has had its start.
+    t.mock.method(Date, "now", () => realNow() + 20000);
+    await assert.rejects(worker.handoffTorrents(provider, "key"), new RegExp(failure));
+    t.mock.restoreAll();
+  }
 });
