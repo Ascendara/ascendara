@@ -415,6 +415,8 @@
         "reviewProgress": "{{count}} reviewed",
         "reviews": "Review milestones",
         "reviewsDescription": "Review different games to climb the ranks",
+        "special": "Special badges",
+        "specialDescription": "Given for supporting and helping build Ascendara",
         "title": "Badges"
       },
       "contributor": "Contributor",
@@ -435,6 +437,8 @@
         "ocean": "Ocean",
         "solar": "Solar"
       },
+      "lifetimeMember": "Lifetime Member",
+      "lifetimeMemberDescription": "Owns Ascend for life",
       "owner": "Owner",
       "ownerDescription": "Created and runs Ascendara",
       "reviewMilestone": "{{count}} Reviews",

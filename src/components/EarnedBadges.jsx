@@ -1,7 +1,16 @@
 import { useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { BadgeCheck, Bug, Crown, Hammer, Lock, Sparkles } from "lucide-react";
+import {
+  Award,
+  BadgeCheck,
+  Bug,
+  Crown,
+  Hammer,
+  Infinity as InfinityIcon,
+  Lock,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -482,19 +491,94 @@ const VERIFIED_BADGE = {
   colors: ["#60a5fa", "#2563eb"],
 };
 
-const DISCORD_BADGE = { field: "discord", emblem: DiscordEmblem };
+// Bought Ascend once, for good
+const LIFETIME_BADGE = {
+  field: "lifetimeMember",
+  icon: InfinityIcon,
+  colors: ["#5eead4", "#7c3aed"],
+};
+
+const DISCORD_BADGE = {
+  field: "discord",
+  emblem: DiscordEmblem,
+  colors: ["#a5b4fc", "#5865f2"],
+};
 
 // Lists hand over a discordLinked flag; full user docs keep the linked name
 const hasDiscordLinked = user =>
   Boolean(user?.discordLinked || user?.socials?.linkedDiscord);
 
+// Lists hand over a lifetimeMember flag; full user docs keep the subscription
+const hasLifetime = user =>
+  Boolean(user?.lifetimeMember || user?.ascendSubscription?.lifetime === true);
+
 // The special badges the catalog lists. Owner stays out since nobody can earn it.
 const CATALOG_BADGES = [
   VERIFIED_BADGE,
   CONTRIBUTOR_BADGE,
+  LIFETIME_BADGE,
   DISCORD_BADGE,
   ...EARNED_BADGES,
 ];
+
+// One special badge as a wide card: the emblem on a tinted tile, its name and
+// what earns it, washed in the badge's own colors
+function CatalogBadgeCard({ badge, highlighted }) {
+  const { t } = useLanguage();
+  const [from, to] = badge.colors;
+  return (
+    <motion.div
+      variants={listItem}
+      className={`relative flex min-w-0 items-center gap-3 overflow-hidden rounded-xl border p-3 transition-colors ${highlighted ? "border-primary/60 ring-1 ring-primary/40" : "border-border/60"}`}
+      style={{
+        background: `linear-gradient(120deg, ${from}26, ${to}0d 55%, transparent)`,
+      }}
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-20 blur-2xl"
+        style={{ background: to }}
+      />
+      <span
+        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border"
+        style={{ background: `${from}1f`, borderColor: `${to}33` }}
+      >
+        {badge.emblem ? (
+          <badge.emblem className="h-7 w-7" />
+        ) : (
+          <BadgeEmblem icon={badge.icon} colors={badge.colors} className="h-7 w-7" />
+        )}
+      </span>
+      <div className="relative min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold">
+          {t(`ascend.badges.${badge.field}`)}
+        </p>
+        <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
+          {t(`ascend.badges.${badge.field}Description`)}
+        </p>
+      </div>
+    </motion.div>
+  );
+}
+
+// A titled panel the catalog's columns are built from
+function CatalogPanel({ title, description, aside, highlighted, children }) {
+  return (
+    <motion.section
+      variants={listItem}
+      className={`rounded-2xl border p-4 transition-colors ${highlighted ? "border-primary/50 bg-primary/5" : "border-border/60 bg-muted/30"}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+        {aside}
+      </div>
+      {children}
+    </motion.section>
+  );
+}
 
 // Which catalog entry a clicked badge points at
 const CATALOG_SECTIONS = {
@@ -548,22 +632,18 @@ function MilestoneLadder({
     : 1;
 
   return (
-    <motion.section
-      variants={listItem}
-      className={`rounded-xl border p-4 transition-colors ${highlighted ? "border-primary/50 bg-primary/5" : "border-border/60 bg-muted/30"}`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold">{title}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-        {known && (
+    <CatalogPanel
+      title={title}
+      description={description}
+      highlighted={highlighted}
+      aside={
+        known && (
           <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
             {progressLabel}
           </span>
-        )}
-      </div>
-
+        )
+      }
+    >
       {known && (
         <div className="mt-3">
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -625,7 +705,7 @@ function MilestoneLadder({
           );
         })}
       </div>
-    </motion.section>
+    </CatalogPanel>
   );
 }
 
@@ -659,70 +739,67 @@ function BadgeCatalogDialog({ open, onOpenChange, highlight, user }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] max-w-xl flex-col gap-0 overflow-hidden p-0">
-        <div className="border-b border-border/60 px-6 pb-4 pt-6">
-          <DialogTitle className="text-xl">
-            {t("ascend.badges.catalog.title")}
-          </DialogTitle>
-          <DialogDescription className="mt-1">
-            {t("ascend.badges.catalog.description")}
-          </DialogDescription>
+      <DialogContent className="flex max-h-[85vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
+        <div className="flex items-center gap-3 border-b border-border/60 bg-gradient-to-r from-primary/10 via-transparent to-transparent px-6 pb-4 pt-6">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+            <Award className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <DialogTitle className="mb-0 text-xl">
+              {t("ascend.badges.catalog.title")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("ascend.badges.catalog.description")}
+            </DialogDescription>
+          </div>
         </div>
 
+        {/* Special badges on the left, the milestone ladders on the right */}
         <motion.div
-          className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5"
+          className="grid min-h-0 flex-1 items-start gap-4 overflow-y-auto px-6 py-5 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
           variants={listContainer}
           initial={reduceMotion ? false : "hidden"}
           animate="show"
         >
-          <div className="grid gap-3 sm:grid-cols-2">
-            {CATALOG_BADGES.map(badge => (
-              <motion.div
-                key={badge.field}
-                variants={listItem}
-                className={`flex flex-col items-center rounded-xl border p-4 text-center transition-colors ${section === badge.field ? "border-primary/50 bg-primary/5" : "border-border/60 bg-muted/30"}`}
-              >
-                {badge.emblem ? (
-                  <badge.emblem className="h-11 w-11" />
-                ) : (
-                  <BadgeEmblem
-                    icon={badge.icon}
-                    colors={badge.colors}
-                    className="h-11 w-11"
-                  />
-                )}
-                <p className="mt-2 text-sm font-semibold">
-                  {t(`ascend.badges.${badge.field}`)}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {t(`ascend.badges.${badge.field}Description`)}
-                </p>
-              </motion.div>
-            ))}
-          </div>
+          <CatalogPanel
+            title={t("ascend.badges.catalog.special")}
+            description={t("ascend.badges.catalog.specialDescription")}
+          >
+            <motion.div className="mt-3 space-y-2" variants={listContainer}>
+              {CATALOG_BADGES.map(badge => (
+                <CatalogBadgeCard
+                  key={badge.field}
+                  badge={badge}
+                  highlighted={section === badge.field}
+                />
+              ))}
+            </motion.div>
+          </CatalogPanel>
 
-          <MilestoneLadder
-            steps={levelSteps}
-            shape="hexagon"
-            progress={level}
-            progressLabel={t("ascend.badges.catalog.levelProgress", { level })}
-            columns="grid-cols-5"
-            highlighted={section === "levels"}
-            title={t("ascend.badges.catalog.levels")}
-            description={t("ascend.badges.catalog.levelsDescription")}
-          />
-          <MilestoneLadder
-            steps={reviewSteps}
-            shape="bubble"
-            progress={reviewProgress}
-            progressLabel={t("ascend.badges.catalog.reviewProgress", {
-              count: reviewProgress,
-            })}
-            columns="grid-cols-3 sm:grid-cols-6"
-            highlighted={section === "reviews"}
-            title={t("ascend.badges.catalog.reviews")}
-            description={t("ascend.badges.catalog.reviewsDescription")}
-          />
+          <motion.div className="space-y-4" variants={listContainer}>
+            <MilestoneLadder
+              steps={levelSteps}
+              shape="hexagon"
+              progress={level}
+              progressLabel={t("ascend.badges.catalog.levelProgress", { level })}
+              columns="grid-cols-5"
+              highlighted={section === "levels"}
+              title={t("ascend.badges.catalog.levels")}
+              description={t("ascend.badges.catalog.levelsDescription")}
+            />
+            <MilestoneLadder
+              steps={reviewSteps}
+              shape="bubble"
+              progress={reviewProgress}
+              progressLabel={t("ascend.badges.catalog.reviewProgress", {
+                count: reviewProgress,
+              })}
+              columns="grid-cols-3 sm:grid-cols-6"
+              highlighted={section === "reviews"}
+              title={t("ascend.badges.catalog.reviews")}
+              description={t("ascend.badges.catalog.reviewsDescription")}
+            />
+          </motion.div>
         </motion.div>
 
         {!viewerHasAscend(userData) && (
@@ -903,7 +980,7 @@ function ReviewMilestoneBadge({ user, tier, className, style }) {
 }
 
 // Every badge a user has, in one fixed order: owner and verified first, then
-// their level, then contributor, Discord, and the earned ones. A private
+// their level, then contributor, lifetime, Discord, and the earned ones. A private
 // account's badges, a linked Discord included, show only to the account
 // itself and its friends.
 export default function EarnedBadges({ user, className = "h-4 w-4", style }) {
@@ -915,6 +992,7 @@ export default function EarnedBadges({ user, className = "h-4 w-4", style }) {
     Number.isFinite(reviewCount) && REVIEW_TIERS.find(tier => reviewCount >= tier.count);
   const leading = [OWNER_BADGE, VERIFIED_BADGE].filter(badge => user?.[badge.field]);
   const handGiven = [CONTRIBUTOR_BADGE].filter(badge => user?.[badge.field]);
+  const lifetime = hasLifetime(user) ? [LIFETIME_BADGE] : [];
   const linked = hasDiscordLinked(user) ? [DISCORD_BADGE] : [];
   const earned = EARNED_BADGES.filter(badge => user?.[badge.field] === true);
   const hasLevelMilestone = !user?.private && getLevel(user) >= 10;
@@ -922,6 +1000,7 @@ export default function EarnedBadges({ user, className = "h-4 w-4", style }) {
     !leading.length &&
     !hasLevelMilestone &&
     !handGiven.length &&
+    !lifetime.length &&
     !linked.length &&
     !reviewTier &&
     !earned.length
@@ -938,7 +1017,7 @@ export default function EarnedBadges({ user, className = "h-4 w-4", style }) {
           <BadgeWithTooltip key={badge.field} {...badge} {...badgeProps} />
         ))}
         <LevelMilestoneBadge {...badgeProps} />
-        {[...handGiven, ...linked].map(badge => (
+        {[...handGiven, ...lifetime, ...linked].map(badge => (
           <BadgeWithTooltip key={badge.field} {...badge} {...badgeProps} />
         ))}
         {reviewTier && <ReviewMilestoneBadge tier={reviewTier} {...badgeProps} />}
