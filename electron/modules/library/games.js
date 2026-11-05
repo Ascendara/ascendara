@@ -34,6 +34,7 @@ const { hideWindow, showWindow } = require("../app/window");
 
 const { createGameExitMonitor } = require("./gameExitMonitor");
 const { ensureInstallSize } = require("./installSize");
+const dllGuard = require("./dllGuard");
 
 const steamgrid = require("./steamgrid");
 const { resetOnboarding } = require("../core/onboarding");
@@ -1042,6 +1043,33 @@ function registerGameHandlers() {
           console.log(
             `[Games] Linux launch mode: ${launchConfig.mode} via ${launchConfig.runner?.name || "UMU-Proton auto"}`
           );
+        }
+
+        // Online-fix / crack DLLs are frequently quarantined by antivirus
+        // after install, which stops the game starting with a confusing crash.
+        // Detect that specific case up front and tell the user what happened
+        // instead of launching into a failure. Non-custom Windows installs
+        // only; any check error leaves the launch untouched.
+        if (isWindows && !isCustom && gameDirectory) {
+          try {
+            const missingDlls = await dllGuard.findMissingCompatDlls(
+              gameDirectory,
+              sanitizeGameName(game)
+            );
+            if (missingDlls.length) {
+              console.warn(
+                `[Games] Blocking launch of ${game}: missing compat DLL(s): ${missingDlls
+                  .map(entry => entry.file)
+                  .join(", ")}`
+              );
+              if (!event.sender.isDestroyed()) {
+                event.sender.send("game-dll-missing", { game, missing: missingDlls });
+              }
+              return false;
+            }
+          } catch (guardError) {
+            console.warn("[Games] DLL guard check failed:", guardError.message);
+          }
         }
 
         // Build final spawn arguments

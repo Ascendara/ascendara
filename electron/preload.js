@@ -471,6 +471,11 @@ contextBridge.exposeInMainWorld("electron", {
       includeEventPlaceholder: true,
       selectArgs: args => [args[0]],
     }),
+  onGameDllMissing: callback =>
+    preloadIpc.subscribe("game-dll-missing", callback, {
+      includeEventPlaceholder: true,
+      selectArgs: args => [args[0]],
+    }),
   onGameClosed: callback =>
     preloadIpc.subscribe("game-closed", callback, {
       includeEventPlaceholder: true,

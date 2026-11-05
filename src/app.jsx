@@ -21,6 +21,7 @@ import BranchWelcomeDialog from "@/components/BranchWelcomeDialog";
 import UpdateOverlay from "@/components/UpdateOverlay";
 import RepairAscendaraDialog from "@/components/RepairAscendaraDialog";
 import ChangelogDialog from "@/components/ChangelogDialog";
+import MissingDllDialog from "@/components/MissingDllDialog";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { TourProvider } from "@/context/TourContext";
 import { ThemeProvider, useTheme, isDarkTheme } from "@/context/ThemeContext";
@@ -1247,6 +1248,7 @@ const AppRoutes = () => {
   const [showFirstIndexDialog, setShowFirstIndexDialog] = useState(false);
   const [showBranchWelcome, setShowBranchWelcome] = useState(false);
   const [missingAppFiles, setMissingAppFiles] = useState([]);
+  const [missingDllInfo, setMissingDllInfo] = useState(null);
   const [appBranch, setAppBranch] = useState(null);
   const location = useLocation();
   const hasChecked = useRef(false);
@@ -1259,6 +1261,15 @@ const AppRoutes = () => {
   const lastHandledGameProtocolRef = useRef({ gameID: null, time: 0 });
 
   useEffect(() => startAnalyticsListeners(), []);
+
+  // A game was blocked from launching because an online-fix / crack DLL the
+  // install expects is gone (antivirus usually). Surface the explain-and-guide
+  // dialog globally so it works wherever the launch was triggered.
+  useEffect(() => {
+    return window.electron?.onGameDllMissing?.((_, data) => {
+      if (data?.game) setMissingDllInfo(data);
+    });
+  }, []);
 
   useEffect(() => {
     trackScreen(location.pathname);
@@ -2084,6 +2095,12 @@ const AppRoutes = () => {
         onOpenChange={setShowChangelog}
         currentVersion={changelogPreviewVersion || __APP_VERSION__}
         includeDrafts={!!changelogPreviewVersion}
+      />
+      <MissingDllDialog
+        open={!!missingDllInfo}
+        info={missingDllInfo}
+        onClose={() => setMissingDllInfo(null)}
+        t={i18n.t.bind(i18n)}
       />
     </>
   );
