@@ -106,6 +106,8 @@ export async function pollCodeSignIn(flow) {
 
 let refreshing = null;
 let refreshedFrom = null;
+// A revoked login keeps failing: its refresh token is not sent again.
+let refusedRefreshToken = null;
 
 async function refresh(rejectedToken) {
   const settings = await globalThis.window?.electron?.getSettings?.();
@@ -116,10 +118,17 @@ async function refresh(rejectedToken) {
   const clientSecret = settings?.realDebridOauthClientSecret;
   const refreshToken = settings?.realDebridOauthRefreshToken;
   // A pasted key, or a key being tested before it is saved, has nothing to renew.
-  if (current !== rejectedToken || !clientId || !clientSecret || !refreshToken)
+  if (
+    current !== rejectedToken ||
+    !clientId ||
+    !clientSecret ||
+    !refreshToken ||
+    refreshToken === refusedRefreshToken
+  )
     return null;
 
-  const { ok, body } = await postToken(clientId, clientSecret, refreshToken);
+  const { status, ok, body } = await postToken(clientId, clientSecret, refreshToken);
+  if (!ok && !canTryAgain(status)) refusedRefreshToken = refreshToken;
   if (!ok || !body?.access_token) return null;
   await window.electron.saveSettings({
     realDebridApiKey: body.access_token,

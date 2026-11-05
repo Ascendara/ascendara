@@ -185,3 +185,39 @@ test("a pasted key without a sign-in and a revoked login report the bad key", as
     assert.equal(apiCalls, 1, "no retry without a new token");
   }
 });
+
+test("a refused renewal is not tried again until the login changes", async t => {
+  withGlobals(t);
+  // Its own tokens: the sign-in module is shared by every test in this file.
+  let settings = {
+    ...signedInSettings(),
+    realDebridApiKey: "revoked-token",
+    realDebridOauthRefreshToken: "revoked",
+  };
+  global.window = { electron: { getSettings: async () => settings } };
+  let tokenAnswer = 400;
+  const tokenCalls = [];
+  global.fetch = async (url, options) => {
+    if (url === "/api/rdoauth/token") {
+      tokenCalls.push(new URLSearchParams(options.body).get("code"));
+      return Response.json({ error: "invalid_grant" }, { status: tokenAnswer });
+    }
+    return Response.json({ error: "bad_token", error_code: 8 }, { status: 401 });
+  };
+  const rd = await loadModule("src/services/downloads/realDebridService.js", {
+    fresh: true,
+  });
+
+  // A busy API is not a refusal.
+  tokenAnswer = 503;
+  await assert.rejects(rd.getUserInfo("revoked-token"), /invalid or expired/);
+  tokenAnswer = 400;
+  for (let i = 0; i < 3; i++)
+    await assert.rejects(rd.getUserInfo("revoked-token"), /invalid or expired/);
+  assert.deepEqual(tokenCalls, ["revoked", "revoked"]);
+
+  // A new sign-in brings a new refresh token, which is tried.
+  settings = { ...settings, realDebridOauthRefreshToken: "renewed" };
+  await assert.rejects(rd.getUserInfo("revoked-token"), /invalid or expired/);
+  assert.deepEqual(tokenCalls, ["revoked", "revoked", "renewed"]);
+});
