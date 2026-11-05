@@ -142,6 +142,20 @@ test("every sensitive setting gets the stored format", async () => {
   );
 });
 
+test("a key with a non-ASCII character saves and reads back as it was", async () => {
+  const pasted = "key with-é";
+  for (const safeStorage of [fakeSafeStorage(), undefined]) {
+    await withSettings(
+      async ({ boot }) => {
+        const manager = boot();
+        assert.equal(manager.updateSetting("torboxApiKey", pasted), true);
+        assert.equal(manager.getSetting("torboxApiKey"), pasted);
+      },
+      { safeStorage }
+    );
+  }
+});
+
 test("without safeStorage plain values get the machine-key format", async () => {
   for (const safeStorage of [
     undefined,

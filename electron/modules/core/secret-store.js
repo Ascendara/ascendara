@@ -18,9 +18,10 @@ const fs = require("fs");
 
 const SAFE_PREFIX = "ascsafe:v1:";
 const LEGACY_SHAPE = /^[0-9a-f]{32}:[0-9a-f]*$/i;
-// Keys, tokens and client ids are text. A wrong AES key gives bytes outside this
-// range, even on the rare occasion the padding happens to check out.
-const PLAUSIBLE_TEXT = /^[\t\r\n\x20-\x7e]+$/;
+// Keys, tokens and client ids are text. A wrong AES key gives control characters or
+// invalid UTF-8, even on the rare occasion the padding happens to check out. A pasted
+// key may still carry a stray non-breaking space or accent, and must save as it is.
+const PLAUSIBLE_TEXT = /^[^\x00-\x08\x0b\x0c\x0e-\x1f\x7f�]+$/;
 
 const OWNER_ONLY = 0o600;
 
