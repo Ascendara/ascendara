@@ -22,6 +22,7 @@ const {
   updateTimestampFile,
 } = require("../core/utils");
 const { getSettingsManager } = require("../core/settings");
+const { linkForLog } = require("../core/log-safe");
 const { prepareDownloaderRuntime } = require("./downloaderRuntime");
 const { startDownloadWatchdog, getDownloadStalls } = require("./downloadLiveness");
 
@@ -457,7 +458,7 @@ function registerDownloadHandlers() {
           );
         }
         console.log(
-          `Downloading file: ${link}, game: ${game}, online: ${online}, dlc: ${dlc}, isVr: ${isVr}, updateFlow: ${updateFlow}, version: ${version}, size: ${size}, additionalDirIndex: ${additionalDirIndex}, gameID: ${gameID}`
+          `Downloading file: ${linkForLog(link)}, game: ${game}, online: ${online}, dlc: ${dlc}, isVr: ${isVr}, updateFlow: ${updateFlow}, version: ${version}, size: ${size}, additionalDirIndex: ${additionalDirIndex}, gameID: ${gameID}`
         );
 
         if (
@@ -1863,7 +1864,7 @@ function registerDownloadHandlers() {
               downloadLink = cachedData.link;
               browserDirect = cachedData.browserDirect === true;
               fileList = cachedData.fileList === true;
-              console.log(`Found cached download link: ${downloadLink}`);
+              console.log(`Found cached download link: ${linkForLog(downloadLink)}`);
             } catch (cacheError) {
               console.error(`Error reading cached download data: ${cacheError}`);
             }

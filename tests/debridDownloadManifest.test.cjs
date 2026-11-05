@@ -61,6 +61,7 @@ test("download IPC launches a grouped torrent using edited helper source and pre
       getPythonPath: () => "python",
     },
     "../core/settings": { getSettingsManager: () => ({ getSettings: () => settings }) },
+    "../core/log-safe": { linkForLog: link => link },
     "../core/utils": {
       sanitizeText: x => x,
       sanitizeGameName: x => x,
