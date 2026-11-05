@@ -175,17 +175,26 @@ function registerLocalRefreshHandlers() {
 
   // Inspect the file itself: a saved path or previous successful download is
   // not proof that the catalog still exists and can be read.
+  // Parsing the multi-MB catalog stalls the main thread, so reuse the last
+  // result until the file changes
+  let healthCache = null;
   const inspectLocalIndex = async () => {
     const settings = settingsManager.getSettings();
     if (settings.customSourcesMode) return { status: "custom" };
     const indexPath = settings.localIndex;
     if (!indexPath) return { status: "missing-path" };
     try {
-      const data = await fs.readJson(path.join(indexPath, "ascendara_games.json"));
-      if (!Array.isArray(data?.games) || data.games.length === 0) {
-        return { status: "empty", path: indexPath };
-      }
-      return { status: "ready", path: indexPath, games: data.games.length };
+      const filePath = path.join(indexPath, "ascendara_games.json");
+      const stat = await fs.promises.stat(filePath);
+      const key = `${filePath}|${stat.size}|${stat.mtimeMs}`;
+      if (healthCache?.key === key) return healthCache.result;
+      const data = await fs.readJson(filePath);
+      const result =
+        !Array.isArray(data?.games) || data.games.length === 0
+          ? { status: "empty", path: indexPath }
+          : { status: "ready", path: indexPath, games: data.games.length };
+      healthCache = { key, result };
+      return result;
     } catch (error) {
       return {
         status: error.code === "ENOENT" ? "missing" : "unreadable",
