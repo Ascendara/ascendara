@@ -12,6 +12,7 @@ const COVERS_URL = "https://r2.ascendara.app/covers";
 const GAMES_FILE = "ascendara_games.json";
 const SYNC_STATE_FILE = "sync.json";
 const IMG_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const COVER_SCHEME = "ascendara-cover";
 const MAX_COVER_DOWNLOADS = 12;
 // Covers fetched ahead of time after a sync, so the pages people open first
 // aren't blank: the most popular games plus the most recently updated ones.
@@ -253,12 +254,12 @@ function prefetchCovers(indexPath) {
 }
 
 /**
- * Get a cover as a data URL, downloading and caching it on first use
+ * Make sure a cover is on disk, downloading and caching it on first use
  * @param {string} indexPath - Path to the local index directory
  * @param {string} imgID - Cover ID from the game list
- * @returns {Promise<string|null>}
+ * @returns {Promise<string|null>} The cover's file path, or null if it has none
  */
-async function getIndexCover(indexPath, imgID) {
+async function ensureIndexCover(indexPath, imgID) {
   if (typeof imgID !== "string" || !IMG_ID_PATTERN.test(imgID)) return null;
 
   const coverPath = path.join(indexPath, "imgs", `${imgID}.jpg`);
@@ -272,13 +273,26 @@ async function getIndexCover(indexPath, imgID) {
     }
     if (!(await pendingCovers.get(imgID))) return null;
   }
+  return coverPath;
+}
 
-  const buffer = await fs.readFile(coverPath);
-  return `data:image/jpeg;base64,${buffer.toString("base64")}`;
+/**
+ * Get a cover as a URL the renderer loads itself, so the image bytes never
+ * cross IPC or get base64-encoded on the main thread
+ * @param {string} indexPath - Path to the local index directory
+ * @param {string} imgID - Cover ID from the game list
+ * @returns {Promise<string|null>}
+ */
+async function getIndexCover(indexPath, imgID) {
+  if (!(await ensureIndexCover(indexPath, imgID))) return null;
+  return `${COVER_SCHEME}://cover/${imgID}`;
 }
 
 module.exports = {
+  COVER_SCHEME,
+  IMG_ID_PATTERN,
   syncCommunityIndex,
+  ensureIndexCover,
   getIndexCover,
   prefetchCovers,
 };

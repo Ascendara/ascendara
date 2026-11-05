@@ -5,10 +5,14 @@
 
 const fs = require("fs-extra");
 const path = require("path");
-const { ipcMain, BrowserWindow, app } = require("electron");
+const { pathToFileURL } = require("url");
+const { ipcMain, BrowserWindow, app, protocol, net } = require("electron");
 const { getSettingsManager } = require("../core/settings");
 const {
+  COVER_SCHEME,
+  IMG_ID_PATTERN,
   syncCommunityIndex,
+  ensureIndexCover,
   getIndexCover,
   prefetchCovers,
 } = require("./community-index");
@@ -18,6 +22,28 @@ let publicIndexDownloading = false;
 
 function registerLocalRefreshHandlers() {
   const settingsManager = getSettingsManager();
+
+  // Serves ascendara-cover://cover/<imgID> straight from the index folder.
+  // Chromium reads and decodes the file, so the main thread never touches the bytes.
+  protocol.handle(COVER_SCHEME, async request => {
+    const imgID = decodeURIComponent(new URL(request.url).pathname.slice(1));
+    const indexPath = settingsManager.getSettings().localIndex;
+    if (!indexPath || !IMG_ID_PATTERN.test(imgID)) {
+      return new Response(null, { status: 404 });
+    }
+    try {
+      const coverPath = await ensureIndexCover(indexPath, imgID);
+      if (!coverPath) return new Response(null, { status: 404 });
+      const response = await net.fetch(pathToFileURL(coverPath).toString());
+      const headers = new Headers(response.headers);
+      headers.set("Content-Type", "image/jpeg");
+      headers.set("Access-Control-Allow-Origin", "*");
+      return new Response(response.body, { status: response.status, headers });
+    } catch (error) {
+      console.error("Error serving index cover:", error);
+      return new Response(null, { status: 500 });
+    }
+  });
 
   ipcMain.handle("get-default-local-index-path", () => {
     return path.join(app.getPath("appData"), "ascendara", "localindex");

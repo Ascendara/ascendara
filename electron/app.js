@@ -686,5 +686,18 @@ process.on("SIGTERM", () => {
   app.quit();
 });
 
+// Index covers load through their own scheme; it must be declared before ready
+require("electron").protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "ascendara-cover",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+]);
+
 // Start the application
 initializeApp();
