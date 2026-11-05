@@ -139,7 +139,8 @@ async function tick() {
     }
     const sessions = await window.electron.getRunningGameSessions();
     if (currentUser !== user) return;
-    if (!games) games = await localGames();
+    // Sessions are matched to library games; with none running, skip reading the library
+    if (!games && sessions.length) games = await localGames();
     if (currentUser !== user) return;
     const activityBody = JSON.stringify({
       sessions: sessions.flatMap(session => {
