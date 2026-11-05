@@ -8,7 +8,7 @@ const nativeFs = require("fs");
 const path = require("path");
 const os = require("os");
 const crypto = require("crypto");
-const { machineIdSync } = require("node-machine-id");
+const { getMachineId } = require("../core/machine-id");
 const { exec, execFile, spawn } = require("child_process");
 const { ipcMain, app, BrowserWindow } = require("electron");
 const unzipper = require("unzipper");
@@ -327,7 +327,7 @@ async function checkGameDependencies() {
  */
 function getHardwareId() {
   try {
-    const machineId = machineIdSync(true);
+    const machineId = getMachineId();
     // Hash it for privacy - same hardware always produces same hash
     return crypto.createHash("sha256").update(machineId).digest("hex");
   } catch (error) {

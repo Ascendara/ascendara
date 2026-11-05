@@ -4,14 +4,20 @@
  */
 
 const crypto = require("crypto");
-const { machineIdSync } = require("node-machine-id");
+const { getMachineId } = require("./machine-id");
+
+let encryptionKey = null;
 
 /**
  * Generate encryption key based on machine ID
  */
 function generateEncryptionKey() {
-  const machineId = machineIdSync(true);
-  return crypto.createHash("sha256").update(machineId).digest("hex").substring(0, 32);
+  encryptionKey ??= crypto
+    .createHash("sha256")
+    .update(getMachineId())
+    .digest("hex")
+    .substring(0, 32);
+  return encryptionKey;
 }
 
 /**
