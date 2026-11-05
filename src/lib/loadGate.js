@@ -11,8 +11,11 @@
 const SETTLE_MS = 120;
 // Never keep the splash up longer than this, however slow the network is.
 const MAX_WAIT_MS = 10000;
-// How long boot waits for the background index sync before giving up on it.
-const INDEX_SYNC_WAIT_MS = 6000;
+// How long boot waits for the launch index sync before giving up on it. A sync
+// that outlasts this lands after the app is showing and reloads every cover in
+// front of the user, so wait for it to finish; this only bounds a stalled
+// network (the request itself times out after 60s).
+const INDEX_SYNC_WAIT_MS = 30000;
 
 let pending = 0;
 let armed = false;
