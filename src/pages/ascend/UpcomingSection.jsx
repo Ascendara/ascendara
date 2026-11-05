@@ -67,7 +67,7 @@ export default function UpcomingSection({
                       </span>
                       <span className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="h-4 w-4" />
-                        {new Date(upcomingEntry.date).toLocaleDateString(undefined, {
+                        {new Date(`${upcomingEntry.date}T00:00:00`).toLocaleDateString(undefined, {
                           year: "numeric",
                           month: "long",
                           day: "numeric",
