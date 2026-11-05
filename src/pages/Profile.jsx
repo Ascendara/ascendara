@@ -1431,7 +1431,7 @@ const Profile = () => {
             label: T("profile.level"),
             value: Stats.level,
             footer: (
-              <div className="mt-2 space-y-1">
+              <div className="mt-3 space-y-1">
                 <Progress value={LevelProgressPercent} className="h-1.5 bg-muted/60" />
                 <p className="text-[11px] tabular-nums text-muted-foreground">
                   {Math.round(

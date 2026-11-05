@@ -45,9 +45,12 @@ export function StatStripSkeleton() {
   return (
     <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-border/50 shadow sm:grid-cols-4">
       {range(4).map(i => (
-        <div key={i} className="bg-card/80 px-4 py-3">
-          <Skeleton className="h-3.5 w-20" />
-          <Skeleton className="mb-1 mt-2.5 h-5 w-14" />
+        <div key={i} className="flex items-center gap-3 bg-card/80 px-5 py-4">
+          <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-6 w-16" />
+          </div>
         </div>
       ))}
     </div>

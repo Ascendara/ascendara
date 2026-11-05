@@ -18,19 +18,32 @@ export function StatStrip({ stats, className = "" }) {
       className={`grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-border/50 shadow sm:grid-cols-4 ${className}`}
     >
       {stats.map(stat => (
-        <div key={stat.label} className="bg-card/80 px-4 py-3">
-          <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {stat.icon && <stat.icon className="h-3.5 w-3.5" />}
-            {stat.label}
-          </dt>
-          <dd className="mt-1 flex items-baseline gap-1 text-xl font-semibold tabular-nums">
-            {stat.loading ? <Skeleton className="my-1 h-5 w-14" /> : stat.value}
-            {!stat.loading && stat.suffix && (
-              <span className="text-sm font-normal text-muted-foreground">
-                {stat.suffix}
+        <div key={stat.label} className="flex min-w-0 flex-col bg-card/80 px-5 py-4">
+          {/* Icon tile beside the label and figure; a footer spans the cell below */}
+          <div className="flex min-w-0 items-center gap-3">
+            {stat.icon && (
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <stat.icon className="h-5 w-5" />
               </span>
             )}
-          </dd>
+            <div className="min-w-0">
+              <dt className="truncate text-xs font-medium text-muted-foreground">
+                {stat.label}
+              </dt>
+              <dd className="mt-0.5 flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-tight">
+                {stat.loading ? (
+                  <Skeleton className="my-1 h-6 w-16" />
+                ) : (
+                  <span className="truncate">{stat.value}</span>
+                )}
+                {!stat.loading && stat.suffix && (
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {stat.suffix}
+                  </span>
+                )}
+              </dd>
+            </div>
+          </div>
           {stat.footer}
         </div>
       ))}
