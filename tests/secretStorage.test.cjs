@@ -202,13 +202,16 @@ test("a sealed value reads as empty when the keychain refuses it or the app is n
         file,
         JSON.stringify({ realDebridApiKey: stored, torboxApiKey: sealedForm("tb-key") })
       );
+      env.ready = false;
+      const early = boot();
+      assert.equal(early.getSetting("torboxApiKey"), "");
+      assert.equal(early.migrateSecretStorage(), false);
+      assert.equal(readDisk(file).torboxApiKey, sealedForm("tb-key"));
+
+      env.ready = true;
       const manager = boot();
       assert.equal(manager.getSetting("realDebridApiKey"), "");
       assert.equal(manager.getSetting("torboxApiKey"), "tb-key");
-      env.ready = false;
-      assert.equal(manager.getSetting("torboxApiKey"), "");
-      assert.equal(manager.migrateSecretStorage(), false);
-      assert.equal(readDisk(file).torboxApiKey, sealedForm("tb-key"));
     },
     { safeStorage: fakeSafeStorage() }
   );
@@ -307,7 +310,7 @@ test(
   }
 );
 
-test("a removed key is gone from the backup, the recovery points and memory", async () => {
+test("a removed key is gone from the backup and memory, and no recovery point holds one", async () => {
   const safeStorage = fakeSafeStorage();
   await withSettings(
     async ({ boot, encryptWith, file, invoke, userData }) => {
@@ -322,10 +325,19 @@ test("a removed key is gone from the backup, the recovery points and memory", as
       manager.migrateSecretStorage();
       await invoke("get-settings");
 
+      manager.updateSetting("theme", "blue");
       const { createRecoveryPoint, restoreRecoveryPoint } = require(RECOVERY);
       const { id } = await createRecoveryPoint("test", "0.0.0");
       const pointFile = path.join(userData, "recovery-points", `${id}.json`);
-      assert.equal(readDisk(pointFile).settings.realDebridApiKey, sealedForm("rd-key"));
+      const saved = readDisk(pointFile).settings;
+      assert.equal(saved.theme, "blue");
+      for (const key of manager.sensitiveKeys) assert.equal(key in saved, false);
+      // A point made by an older version still holds its keys.
+      const older = path.join(userData, "recovery-points", "settings-1000000000000.json");
+      fs.writeFileSync(
+        older,
+        JSON.stringify({ settings: { ...readDisk(file), theme: "red" } })
+      );
 
       const decryptsBefore = safeStorage.decrypts;
       assert.equal(manager.getSetting("torboxApiKey"), "tb-key");
@@ -338,9 +350,6 @@ test("a removed key is gone from the backup, the recovery points and memory", as
       assert.equal(manager.updateSetting("realDebridApiKey", ""), true);
 
       assert.equal(fs.existsSync(manager.preMigrationBackupPath), false);
-      const point = readDisk(pointFile);
-      assert.equal("realDebridApiKey" in point.settings, false);
-      assert.equal(point.settings.torboxApiKey, sealedForm("tb-key"), "other keys stay");
 
       assert.equal(manager.getSetting("torboxApiKey"), "tb-key");
       assert.equal(
@@ -349,13 +358,16 @@ test("a removed key is gone from the backup, the recovery points and memory", as
         "the opened copies were dropped"
       );
 
-      await restoreRecoveryPoint(id);
-      assert.equal(
-        readDisk(file).realDebridApiKey,
-        "",
-        "a restore does not bring it back"
-      );
-      assert.equal(readDisk(file).torboxApiKey, sealedForm("tb-key"));
+      for (const point of [id, "settings-1000000000000"]) {
+        await restoreRecoveryPoint(point);
+        assert.equal(
+          readDisk(file).realDebridApiKey,
+          "",
+          "a restore does not bring it back"
+        );
+        assert.equal(readDisk(file).torboxApiKey, sealedForm("tb-key"), "nor drops one");
+      }
+      assert.equal(readDisk(file).theme, "red");
     },
     { safeStorage }
   );

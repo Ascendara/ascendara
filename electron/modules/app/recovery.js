@@ -88,9 +88,8 @@ async function createRecoveryPoint(reason = "manual", version = appVersion) {
     throw new Error("Ascendara settings file does not exist yet");
   }
 
-  // Read the file directly instead of using getSettings(). Sensitive fields are already
-  // encrypted on disk, so the recovery copy never turns API keys into plaintext.
-  const settings = await fs.readJson(settingsPath);
+  // Saved logins stay out, so a restore never brings back a removed key.
+  const settings = getSettingsManager().withoutSecrets(await fs.readJson(settingsPath));
   const timestamp = Date.now();
   const id = `settings-${timestamp}`;
   const recoveryPath = getRecoveryPath(id);
@@ -106,7 +105,6 @@ async function createRecoveryPoint(reason = "manual", version = appVersion) {
       reason: String(reason || "manual").slice(0, 64),
       settings,
     },
-    // Saved logins are in here, encrypted the way the settings file has them.
     { spaces: 2, mode: 0o600 }
   );
 
@@ -131,7 +129,8 @@ async function restoreRecoveryPoint(id) {
   }
 
   const manager = getSettingsManager();
-  const restored = manager.saveSettings(payload.settings);
+  // Points made by an older version can still hold saved logins.
+  const restored = manager.saveSettings(manager.withoutSecrets(payload.settings));
   if (!restored) {
     throw new Error("Ascendara could not restore the settings recovery point");
   }

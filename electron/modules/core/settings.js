@@ -174,11 +174,8 @@ class SettingsManager {
   }
 
   /**
-   * Bring saved secrets to the best format available. Runs at app ready, once per
-   * launch. A value that can not be read stays exactly as it is and counts as no
-   * key, so the next launch tries again. The pre-migration file is kept next to
-   * the settings file until retirePreMigrationBackup removes it, and the settings
-   * file is replaced in one step.
+   * Bring saved secrets to the best format available, once per launch at app ready.
+   * A value that can not be read stays as it is, so the next launch tries again.
    * @returns {boolean} Whether the file was rewritten
    */
   migrateSecretStorage() {
@@ -233,8 +230,7 @@ class SettingsManager {
 
   /**
    * Remove the pre-migration copy once it is old enough, or right away with `force`.
-   * Never while any saved secret fails to open or the settings file can not be read:
-   * that copy may be the only way back.
+   * Never while a saved secret fails to open: it may be the only way back.
    * @returns {boolean} Whether it was removed
    */
   retirePreMigrationBackup({ force = false, now = Date.now() } = {}) {
@@ -286,31 +282,11 @@ class SettingsManager {
     }
   }
 
-  /**
-   * The same for settings recovery points. A restore merges over the current
-   * settings, so a point without a secret leaves the current one as it is, and a removed
-   * key can not come back from one.
-   */
-  dropFromRecoveryPoints(keys) {
-    for (const file of this.recoveryPointFiles()) {
-      try {
-        const point = JSON.parse(fs.readFileSync(file, "utf8"));
-        if (!keys.some(key => key in (point?.settings ?? {}))) continue;
-        for (const key of keys) delete point.settings[key];
-        writeFileAtomic(file, JSON.stringify(point, null, 2), { durable: true });
-      } catch (error) {
-        console.error("Could not clean a settings recovery point:", error?.message);
-      }
-    }
-  }
-
-  /** Whether a stored secret now says something else, or nothing. */
-  secretChanged(stored, value) {
-    if (!stored) return false;
-    const before = this.secrets.open(stored);
-    if (!before.ok) return value !== stored;
-    const after = this.secrets.open(value);
-    return !after.ok || after.value !== before.value;
+  /** A copy without saved logins, for files that outlive a removed key. */
+  withoutSecrets(settings) {
+    const copy = { ...settings };
+    for (const key of this.sensitiveKeys) delete copy[key];
+    return copy;
   }
 
   /** The secret behind a stored value, or "" when it can not be read. */
@@ -351,13 +327,12 @@ class SettingsManager {
   }
 
   /**
-   * Merge into the settings file. A failure to protect a secret keeps the old
-   * stored value, never plain text, and makes this return false.
-   * @param {Object} settings - Changes. Secrets may be plain or already in a stored form.
+   * Merge into the settings file. A secret that can not be protected keeps its old
+   * stored value, never plain text, and this returns false.
+   * @param {Object} settings - Changes. Secrets may be plain or in a stored form.
    * @param {Object} [options]
-   * @param {string[]} [options.clears] - Secrets the caller really means to empty.
-   *   Without this an empty value never erases one that could not be read: a
-   *   settings snapshot shows those as empty.
+   * @param {string[]} [options.clears] - Secrets to really empty. Otherwise an empty
+   *   value never erases one that could not be read: a snapshot shows those as empty.
    */
   saveSettings(settings, { clears = [] } = {}) {
     try {
@@ -373,20 +348,26 @@ class SettingsManager {
       };
 
       let protectedAll = true;
+      // Saved secrets that now say something else, or nothing.
+      const changedSecrets = [];
       for (const key of this.sensitiveKeysIn(mergedSettings)) {
         const stored = existingSettings[key];
         const value = mergedSettings[key];
-        const kind = classifySecret(value);
         if (value === stored) continue;
+        const kind = classifySecret(value);
+        const current = this.secrets.open(stored);
         if (kind === SECRET_KINDS.EMPTY) {
-          if (stored && !clears.includes(key) && !this.secrets.open(stored).ok) {
+          if (stored && !clears.includes(key) && !current.ok)
             mergedSettings[key] = stored;
-          }
+          else if (stored) changedSecrets.push(key);
           continue;
         }
-        if (kind !== SECRET_KINDS.PLAIN) continue;
-
-        const current = this.secrets.open(stored);
+        if (kind !== SECRET_KINDS.PLAIN) {
+          const next = this.secrets.open(value);
+          if (stored && (!current.ok || !next.ok || next.value !== current.value))
+            changedSecrets.push(key);
+          continue;
+        }
         if (stored && current.ok && current.value === value) {
           mergedSettings[key] = stored;
           continue;
@@ -394,16 +375,13 @@ class SettingsManager {
         const sealed = this.secrets.seal(value);
         if (sealed.ok) {
           mergedSettings[key] = sealed.value;
+          if (stored) changedSecrets.push(key);
         } else {
           if (stored === undefined) delete mergedSettings[key];
           else mergedSettings[key] = stored;
           protectedAll = false;
         }
       }
-
-      const changedSecrets = this.sensitiveKeysIn(existingSettings).filter(key =>
-        this.secretChanged(existingSettings[key], mergedSettings[key])
-      );
 
       // Other settings can be written again. A lost key may mean finding it again.
       this.writeSettingsFile(mergedSettings, {
@@ -415,7 +393,6 @@ class SettingsManager {
       if (changedSecrets.length > 0) {
         this.secrets.forget();
         this.dropFromPreMigrationBackup(changedSecrets);
-        this.dropFromRecoveryPoints(changedSecrets);
       }
       return protectedAll;
     } catch (error) {
