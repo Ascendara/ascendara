@@ -19,6 +19,7 @@ import IndexRecoveryNotice from "@/components/IndexRecoveryNotice";
 import FirstIndexDialog from "@/components/FirstIndexDialog";
 import BranchWelcomeDialog from "@/components/BranchWelcomeDialog";
 import UpdateOverlay from "@/components/UpdateOverlay";
+import RepairAscendaraDialog from "@/components/RepairAscendaraDialog";
 import ChangelogDialog from "@/components/ChangelogDialog";
 import DllSharingConsentDialog from "@/components/DllSharingConsentDialog";
 import { LanguageProvider } from "@/context/LanguageContext";
@@ -1272,6 +1273,7 @@ const AppRoutes = () => {
   const [isBrokenVersion, setIsBrokenVersion] = useState(false);
   const [showFirstIndexDialog, setShowFirstIndexDialog] = useState(false);
   const [showBranchWelcome, setShowBranchWelcome] = useState(false);
+  const [missingAppFiles, setMissingAppFiles] = useState([]);
   const [appBranch, setAppBranch] = useState(null);
   const location = useLocation();
   const hasChecked = useRef(false);
@@ -1564,10 +1566,13 @@ const AppRoutes = () => {
             // A failed check here must never leave the app on the updating screen
             try {
               await window.electron.setTimestampValue("isUpdating", false);
+              const wasRepair = await window.electron.getTimestampValue("isRepairing");
+              if (wasRepair)
+                await window.electron.setTimestampValue("isRepairing", false);
               const hasLaunched = await checkAndSetWelcomeStatus();
               // Only show changelog on live branch
               const branch = await window.electron.getBranch();
-              if (branch === "live") {
+              if (branch === "live" && !wasRepair) {
                 setShowChangelog(true);
               }
               await promptDllSharingIfNeeded(hasLaunched);
@@ -1581,11 +1586,21 @@ const AppRoutes = () => {
                 }
               }
 
-              toast(t("app.toasts.justUpdated"), {
-                description: t("app.toasts.justUpdatedDesc", { version: versionToShow }),
-                duration: 10000,
-                id: "update-completed",
-              });
+              if (wasRepair) {
+                toast(t("app.repair.complete"), {
+                  description: t("app.repair.completeDesc"),
+                  duration: 10000,
+                  id: "update-completed",
+                });
+              } else {
+                toast(t("app.toasts.justUpdated"), {
+                  description: t("app.toasts.justUpdatedDesc", {
+                    version: versionToShow,
+                  }),
+                  duration: 10000,
+                  id: "update-completed",
+                });
+              }
             } catch (error) {
               console.error("Error finishing update startup:", error);
             } finally {
@@ -1755,6 +1770,15 @@ const AppRoutes = () => {
   }, [isLoading, showWelcome]);
 
   // Check for branch welcome dialog (public-testing or experimental)
+  // Antivirus can quarantine a helper program after install; offer a repair
+  useEffect(() => {
+    if (isLoading) return;
+    window.electron
+      .getMissingAppFiles?.()
+      .then(files => files?.length && setMissingAppFiles(files))
+      .catch(error => console.error("Error checking app files:", error));
+  }, [isLoading]);
+
   useEffect(() => {
     const checkBranchWelcome = async () => {
       // Only check after loading is done and welcome is not showing
@@ -2099,6 +2123,11 @@ const AppRoutes = () => {
       {startupSettled && showFirstIndexDialog && (
         <FirstIndexDialog onClose={() => setShowFirstIndexDialog(false)} />
       )}
+      <RepairAscendaraDialog
+        open={startupSettled && missingAppFiles.length > 0}
+        onOpenChange={open => !open && setMissingAppFiles([])}
+        missingFiles={missingAppFiles}
+      />
       <BranchWelcomeDialog
         branch={appBranch}
         open={startupSettled && showBranchWelcome}

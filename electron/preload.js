@@ -665,6 +665,14 @@ contextBridge.exposeInMainWorld("electron", {
   deleteInstaller: () => ipcRenderer.invoke("delete-installer"),
   uninstallAscendara: () => ipcRenderer.invoke("uninstall-ascendara"),
   switchBranch: branch => ipcRenderer.invoke("switch-branch", branch),
+  repairAscendara: () => ipcRenderer.invoke("repair-ascendara"),
+  getMissingAppFiles: () => ipcRenderer.invoke("get-missing-app-files"),
+  onRepairProgress: callback =>
+    preloadIpc.subscribe("repair-progress", callback, {
+      selectArgs: args => [args[0]],
+    }),
+  removeRepairProgressListener: callback =>
+    preloadIpc.unsubscribe("repair-progress", callback),
   onUpdateAvailable: callback =>
     preloadIpc.subscribe("update-available", callback, {
       includeEventPlaceholder: true,

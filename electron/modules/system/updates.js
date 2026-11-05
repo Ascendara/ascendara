@@ -31,6 +31,7 @@ const {
   TESTING_BRANCH_FILE,
   testingReleaseTag,
   LANG_DIR,
+  appDirectory,
 } = require("../core/config");
 const { updateTimestampFile } = require("../core/utils");
 const { runTranslation, isTranslationRunning } = require("../app/translations");
@@ -58,6 +59,16 @@ const UPDATE_STALL_TIMEOUT = 30000;
 const UPDATE_DOWNLOAD_ATTEMPTS = 5;
 
 const isMac = process.platform === "darwin";
+
+// The helper programs package.json ships in resources on Windows
+const BUNDLED_WINDOWS_BINARIES = [
+  "AscendaraDownloader.exe",
+  "AscendaraGameHandler.exe",
+  "AscendaraCrashReporter.exe",
+  "AscendaraNotificationHelper.exe",
+  "AscendaraAchievementWatcher.exe",
+  "AscendaraTorrentHandler.exe",
+];
 
 /**
  * Wrap a progress callback so it only fires when the percentage changes,
@@ -643,116 +654,142 @@ function registerUpdateHandlers() {
       };
     if (!["live", "public-testing", "experimental"].includes(branch))
       return { success: false, error: "Unknown branch" };
-    const platform = isWindows ? "Windows" : isMac ? "macOS" : "Linux";
-
-    try {
-      const mainWindow = BrowserWindow.getAllWindows()[0];
-      const onProgress = progressSender(mainWindow, "branch-switch-progress");
-      const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
-      await fs.ensureDir(tempDir);
-
-      if (isMac) {
-        const zipPath = path.join(tempDir, "AscendaraBranchInstaller.zip");
-        const version =
-          branch === "live"
-            ? (await axios.get(`${API_URL}/`, { timeout: 15000 })).data.appVer
-            : null;
-        const blockerId = powerSaveBlocker.start("prevent-app-suspension");
-        try {
-          await downloadMacBuild(
-            branch,
-            version,
-            zipPath,
-            {
-              "X-Ascendara-Client": "app",
-              "X-Ascendara-Version": testingVersion || appVersion,
-              "X-Ascendara-Platform": "macos",
-            },
-            onProgress
-          );
-        } finally {
-          powerSaveBlocker.stop(blockerId);
-        }
-        await rememberTestingBranch(branch);
-        await installUpdate(zipPath, false);
-        return { success: true };
-      }
-
-      const url =
-        branch === "live"
-          ? "https://lfs.ascendara.app/download?update"
-          : await testingInstallerUrl(branch);
-      // Use testingVersion for testing branches, appVersion for live
-      const versionToSend =
-        branch === "public-testing" || branch === "experimental"
-          ? testingVersion
-          : appVersion;
-
-      const headers = {
-        "X-Ascendara-Client": "app",
-        "X-Ascendara-Version": versionToSend,
-        "X-Ascendara-Platform": isWindows ? "windows" : "linux",
-      };
-
-      const installerFileName = isWindows
-        ? "AscendaraBranchInstaller.exe"
-        : "AscendaraBranchInstaller.AppImage";
-      const installerPath = path.join(tempDir, installerFileName);
-
-      const response = await axios({
-        url,
-        method: "GET",
-        responseType: "stream",
-        headers: {
-          ...headers,
-          "Accept-Encoding": "gzip, deflate, br",
-          Connection: "keep-alive",
-          "Cache-Control": "no-cache",
-        },
-        maxRedirects: 5,
-        timeout: 30000,
-      });
-
-      const totalSize = parseInt(response.headers["content-length"], 10) || 0;
-      let downloadedSize = 0;
-
-      response.data.on("data", chunk => {
-        downloadedSize += chunk.length;
-        if (totalSize > 0) onProgress(Math.round((downloadedSize * 100) / totalSize));
-      });
-
-      await pipeline(response.data, fs.createWriteStream(installerPath));
-
-      await rememberTestingBranch(branch);
-      await installUpdate(installerPath, isLinux);
-
-      return { success: true };
-    } catch (error) {
-      console.error("Error switching branch:", error);
-
-      // Return error type and metadata for frontend translation
-      if (error.response?.status === 404) {
-        return {
-          success: false,
-          errorType: "notAvailable",
-          errorData: { branch, platform },
-        };
-      } else if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
-        return {
-          success: false,
-          errorType: "connectionFailed",
-        };
-      } else if (error.code === "ETIMEDOUT") {
-        return {
-          success: false,
-          errorType: "timeout",
-        };
-      }
-
-      // Fallback to generic error message
-      return { success: false, error: error.message };
-    }
+    return reinstallBranch(branch, "branch-switch-progress");
   });
+
+  // Files the installer puts in resources but antivirus can quarantine later
+  ipcMain.handle("get-missing-app-files", () => {
+    if (isDev || !isWindows) return [];
+    const resources = path.join(appDirectory, "resources");
+    return BUNDLED_WINDOWS_BINARIES.filter(
+      name => !fs.existsSync(path.join(resources, name))
+    );
+  });
+
+  // Reinstall the running branch over itself to restore missing app files
+  ipcMain.handle("repair-ascendara", async () => {
+    if (isPortable)
+      return {
+        success: false,
+        error: "Repairing needs the installed version of Ascendara.",
+      };
+    return reinstallBranch(appBranch, "repair-progress");
+  });
+}
+
+/**
+ * Download and run the installer for a branch. Branch switches and repairs
+ * both reinstall the whole app this way.
+ */
+async function reinstallBranch(branch, progressChannel) {
+  const platform = isWindows ? "Windows" : isMac ? "macOS" : "Linux";
+  try {
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    const onProgress = progressSender(mainWindow, progressChannel);
+    const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
+    await fs.ensureDir(tempDir);
+
+    if (isMac) {
+      const zipPath = path.join(tempDir, "AscendaraBranchInstaller.zip");
+      const version =
+        branch === "live"
+          ? (await axios.get(`${API_URL}/`, { timeout: 15000 })).data.appVer
+          : null;
+      const blockerId = powerSaveBlocker.start("prevent-app-suspension");
+      try {
+        await downloadMacBuild(
+          branch,
+          version,
+          zipPath,
+          {
+            "X-Ascendara-Client": "app",
+            "X-Ascendara-Version": testingVersion || appVersion,
+            "X-Ascendara-Platform": "macos",
+          },
+          onProgress
+        );
+      } finally {
+        powerSaveBlocker.stop(blockerId);
+      }
+      await rememberTestingBranch(branch);
+      await installUpdate(zipPath, false);
+      return { success: true };
+    }
+
+    const url =
+      branch === "live"
+        ? "https://lfs.ascendara.app/download?update"
+        : await testingInstallerUrl(branch);
+    // Use testingVersion for testing branches, appVersion for live
+    const versionToSend =
+      branch === "public-testing" || branch === "experimental"
+        ? testingVersion
+        : appVersion;
+
+    const headers = {
+      "X-Ascendara-Client": "app",
+      "X-Ascendara-Version": versionToSend,
+      "X-Ascendara-Platform": isWindows ? "windows" : "linux",
+    };
+
+    const installerFileName = isWindows
+      ? "AscendaraBranchInstaller.exe"
+      : "AscendaraBranchInstaller.AppImage";
+    const installerPath = path.join(tempDir, installerFileName);
+
+    const response = await axios({
+      url,
+      method: "GET",
+      responseType: "stream",
+      headers: {
+        ...headers,
+        "Accept-Encoding": "gzip, deflate, br",
+        Connection: "keep-alive",
+        "Cache-Control": "no-cache",
+      },
+      maxRedirects: 5,
+      timeout: 30000,
+    });
+
+    const totalSize = parseInt(response.headers["content-length"], 10) || 0;
+    let downloadedSize = 0;
+
+    response.data.on("data", chunk => {
+      downloadedSize += chunk.length;
+      if (totalSize > 0) onProgress(Math.round((downloadedSize * 100) / totalSize));
+    });
+
+    await pipeline(response.data, fs.createWriteStream(installerPath));
+
+    await rememberTestingBranch(branch);
+    await installUpdate(installerPath, isLinux);
+
+    return { success: true };
+  } catch (error) {
+    console.error(`Error reinstalling ${branch}:`, error);
+
+    // Return error type and metadata for frontend translation
+    if (error.response?.status === 404) {
+      return {
+        success: false,
+        errorType: "notAvailable",
+        errorData: { branch, platform },
+      };
+    } else if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
+      return {
+        success: false,
+        errorType: "connectionFailed",
+      };
+    } else if (error.code === "ETIMEDOUT") {
+      return {
+        success: false,
+        errorType: "timeout",
+      };
+    }
+
+    // Fallback to generic error message
+    return { success: false, error: error.message };
+  }
 }
 
 module.exports = {

@@ -296,6 +296,19 @@
       "inactiveWithError": "qBittorrent WebUI Inactive - {{error}}",
       "notAccessible": "qBittorrent WebUI is not accessible"
     },
+    "repair": {
+      "complete": "Repair Complete",
+      "completeDesc": "Ascendara's missing files were restored",
+      "description": "Some of Ascendara's files are missing, so it can't launch games or finish some tasks. This usually happens when antivirus software removes one of them by mistake.",
+      "downloading": "Downloading Ascendara ({{progress}}%)",
+      "failed": "Ascendara could not be repaired: {{error}}",
+      "missingFiles": "Missing files:",
+      "note": "Repairing reinstalls Ascendara in place. Your games, library and settings are kept. If this keeps happening, add the Ascendara install folder to your antivirus exclusions.",
+      "overlayDescription": "Restoring missing files. Ascendara will restart automatically",
+      "overlayTitle": "Repairing Ascendara",
+      "repair": "Repair Ascendara",
+      "title": "Ascendara Needs Repair"
+    },
     "runningInDev": "DEVELOPMENT MODE",
     "supportDialog": {
       "donate": "Support Development",

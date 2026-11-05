@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import VerifyingGameDialog from "@/components/VerifyingGameDialog";
+import RepairAscendaraDialog from "@/components/RepairAscendaraDialog";
 import SteamNotRunningDialog from "@/components/SteamNotRunningDialog";
 import recentGamesService from "@/services/library/recentGamesService";
 import GamesBackupDialog from "@/components/GamesBackupDialog";
@@ -1232,7 +1233,13 @@ export default function GameScreen() {
 }
 
 function InstalledGameScreen() {
-  const showError = (game, error) => {
+  const showError = async (game, error) => {
+    // A missing helper program is not the game's fault; offer a repair instead
+    const missing = (await window.electron.getMissingAppFiles?.().catch(() => [])) || [];
+    if (missing.length > 0) {
+      setMissingAppFiles(missing);
+      return;
+    }
     setErrorGame(game);
     setErrorMessage(error);
     setShowErrorDialog(true);
@@ -1294,6 +1301,7 @@ function InstalledGameScreen() {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorGame, setErrorGame] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [missingAppFiles, setMissingAppFiles] = useState([]);
   const [showExecutableManager, setShowExecutableManager] = useState(false);
   const [showEditGameEntry, setShowEditGameEntry] = useState(false);
   const [showEditGameInfo, setShowEditGameInfo] = useState(false);
@@ -3383,6 +3391,12 @@ function InstalledGameScreen() {
         errorMessage={errorMessage}
         t={t}
         onManageExecutables={() => setShowExecutableManager(true)}
+      />
+
+      <RepairAscendaraDialog
+        open={missingAppFiles.length > 0}
+        onOpenChange={open => !open && setMissingAppFiles([])}
+        missingFiles={missingAppFiles}
       />
 
       <ExecutableManagerDialog

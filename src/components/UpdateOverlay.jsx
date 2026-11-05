@@ -1,10 +1,10 @@
-
 import { motion } from "framer-motion";
 import { useTheme } from "@/context/ThemeContext";
 import { useTranslation } from "react-i18next";
 import { Loader } from "lucide-react";
 
-const UpdateOverlay = () => {
+// Shown while Ascendara installs itself; repairs reuse it with their own text
+const UpdateOverlay = ({ title, description, detail }) => {
   const { theme } = useTheme();
   const { t } = useTranslation();
 
@@ -38,13 +38,20 @@ const UpdateOverlay = () => {
         <h2
           className={`mb-2 text-2xl font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}
         >
-          {t("app.loading.installingUpdate")}
+          {title ?? t("app.loading.installingUpdate")}
         </h2>
         <p
           className={`text-base ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
         >
-          {t("app.loading.ascendaraWillRestart")}
+          {description ?? t("app.loading.ascendaraWillRestart")}
         </p>
+        {detail && (
+          <p
+            className={`mt-2 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+          >
+            {detail}
+          </p>
+        )}
       </motion.div>
     </motion.div>
   );
