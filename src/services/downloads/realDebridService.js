@@ -19,6 +19,43 @@ export const { getCachedSupportedHosts, getSupportedHosts } = createSupportedHos
 
 export const isEnabled = settings => Boolean(settings?.realDebridApiKey?.trim());
 
+const RATE_LIMITED = "Real-Debrid is limiting requests. Try again in a minute.";
+// The codes a user can act on, from the error table in Real-Debrid's API docs.
+const ERROR_MESSAGES = {
+  5: RATE_LIMITED,
+  9: "Real-Debrid denied this request for your account.",
+  10: "Real-Debrid needs two-factor authentication for this account.",
+  11: "Real-Debrid is waiting for two-factor authentication on this account.",
+  14: "Your Real-Debrid account is locked.",
+  15: "Your Real-Debrid account is not activated.",
+  16: "Real-Debrid does not support this host.",
+  17: "This host is under maintenance on Real-Debrid.",
+  18: "You reached the limit for this host on Real-Debrid.",
+  19: "This host is temporarily unavailable on Real-Debrid.",
+  20: "This host is not available to free Real-Debrid accounts.",
+  21: "Your Real-Debrid account has too many active downloads.",
+  22: "Real-Debrid does not allow requests from this IP address.",
+  23: "Your Real-Debrid traffic is used up.",
+  24: "This file is no longer available on Real-Debrid.",
+  25: "Real-Debrid is temporarily unavailable.",
+  28: "Real-Debrid does not allow this file.",
+  29: "This torrent is too big for Real-Debrid.",
+  30: "Real-Debrid could not read this torrent.",
+  33: "This torrent is already active on Real-Debrid.",
+  34: RATE_LIMITED,
+  35: "Real-Debrid blocked this file as infringing.",
+  36: "You reached Real-Debrid's fair usage limit.",
+};
+
+const errorMessage = (status, result) => {
+  // A 403 with code 8 is also a bad token.
+  if (status === 401 || result?.error_code === 8)
+    return "Real-Debrid API key is invalid or expired. Update it in Settings.";
+  if (ERROR_MESSAGES[result?.error_code]) return ERROR_MESSAGES[result.error_code];
+  if (status === 429) return RATE_LIMITED;
+  return `Real-Debrid: ${result?.error || `request failed (${status})`}`;
+};
+
 async function request(apiKey, path, method = "GET", data) {
   if (!apiKey?.trim()) throw new Error("Real-Debrid API key is missing.");
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -33,11 +70,7 @@ async function request(apiKey, path, method = "GET", data) {
   if (response.status === 204 || response.status === 202) return null;
   const result = await response.json().catch(() => null);
   if (!response.ok || result?.error) {
-    const error = new Error(
-      response.status === 401
-        ? "Real-Debrid API key is invalid or expired. Update it in Settings."
-        : `Real-Debrid: ${result?.error || `request failed (${response.status})`}`
-    );
+    const error = new Error(errorMessage(response.status, result));
     error.code = result?.error_code;
     error.status = response.status;
     throw error;

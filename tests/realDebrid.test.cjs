@@ -277,8 +277,27 @@ test("Real-Debrid API contracts", async t => {
       Response.json({ error: "hoster_unsupported", error_code: 16 }, { status: 503 });
     await assert.rejects(
       rd.unrestrictLink("https://example.com/file", "secret"),
-      error => error.code === 16 && /hoster_unsupported/.test(error.message)
+      error => error.code === 16 && /does not support this host/.test(error.message)
     );
+    for (const [status, body, expected] of [
+      [429, { error: "too_many_requests", error_code: 34 }, /limiting requests/],
+      [429, null, /limiting requests/],
+      [403, { error: "bad_token", error_code: 8 }, /invalid or expired/],
+      [403, { error: "account_locked", error_code: 14 }, /account is locked/],
+      [503, { error: "fair_usage_limit", error_code: 36 }, /fair usage limit/],
+      [400, { error: "something_new", error_code: 99 }, /Real-Debrid: something_new/],
+      [500, null, /request failed \(500\)/],
+    ]) {
+      global.fetch = async () =>
+        body
+          ? Response.json(body, { status })
+          : new Response("Service error", { status });
+      await assert.rejects(rd.getUserInfo("secret"), error => {
+        assert.match(error.message, expected);
+        assert.equal(error.status, status);
+        return true;
+      });
+    }
     global.fetch = async () => Response.json({ download: "javascript:alert(1)" });
     await assert.rejects(
       rd.unrestrictLink("https://example.com/file", "secret"),
