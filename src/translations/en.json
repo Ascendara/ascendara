@@ -254,14 +254,6 @@
       "title": "Oh no...",
       "troubleshooting": "Try these steps to resolve the issue:"
     },
-    "dllSharingConsent": {
-      "and": "and the",
-      "decline": "Not now",
-      "enroll": "Enable DLL sharing",
-      "intro": "This update adds optional DLL sharing for Ascend members, and Ascendara's Terms of Service and Privacy Policy have been updated to cover it. Please review them and choose whether to take part. You can change this anytime in Ascend settings.",
-      "readPolicies": "I have read the updated",
-      "title": "Help repair games for everyone"
-    },
     "downloading-update": "Downloading Update...",
     "experiment": "EXPERIMENTAL",
     "firstIndexDialog": {
@@ -311,10 +303,20 @@
     },
     "runningInDev": "DEVELOPMENT MODE",
     "supportDialog": {
-      "donate": "Support Development",
+      "ascend": "Join Ascend",
+      "dismissRating": "Dismiss rating",
+      "dismissWarning": "You haven't rated Ascendara yet. Dismiss the rating and continue?",
       "feedback": "Give Feedback",
+      "goBack": "Go back",
       "message": "You're starting to use Ascendara and I would love for you to rate it or give me some feedback. You won't ever see this message again.",
       "note": "I've spent so much time creating Ascendara as a passion project. Every feature, every line of code is crafted with care. Your support means everything to me and helps me continue making Ascendara even better.",
+      "ratings": {
+        "1": "Not for me",
+        "2": "Needs work",
+        "3": "It's okay",
+        "4": "Really like it",
+        "5": "Love it!"
+      },
       "title": "Oh you liking Ascendara a bit?"
     },
     "toasts": {
@@ -1099,7 +1101,6 @@
       "discordVerification": "Discord Verification",
       "discordVerificationDescription": "Get verified on the Discord server to unlock exclusive roles and features.",
       "displayName": "Display Name",
-      "dllSharing": "DLL Sharing",
       "edit": "Edit Profile",
       "enjoyingAscend": "Enjoying all Ascend features",
       "enterThisCode": "This is your Ascend remote connection code",
@@ -1155,16 +1156,6 @@
           "nav": "Account",
           "requestDeletionButton": "Request deletion",
           "signedInAs": "Signed in as"
-        },
-        "dllSharing": {
-          "approvedText": "A file is approved once several members report the same hash for it.",
-          "approvedTitle": "Approved by the community",
-          "description": "Help other players fix games that are missing DLL files by sharing the ones from your finished installs.",
-          "onlyDllsText": "Only DLLs listed for a game are shared. Saves and personal documents are never uploaded.",
-          "onlyDllsTitle": "Only listed DLLs",
-          "publicText": "Approved files are stored with Cloudflare so anyone can use them to repair a game.",
-          "publicTitle": "Publicly downloadable",
-          "toggle": "Share repair files automatically"
         },
         "howItWorks": "How it works",
         "privacy": {
@@ -4934,11 +4925,6 @@
     "communityThemesDescription": "Browse and apply themes created by the community. Want to submit your own?",
     "components": "Application Components",
     "componentsDescription": "View all official app sidecars and check which game dependencies are installed. You can also reinstall required dependencies from this page.",
-    "contributeRepairDlls": "Contribute DLL repair files",
-    "contributeRepairDllsControl": "Off by default. You can restore missing DLLs without contributing. Turning this off stops future contributions and cancels uploads in progress where possible; files already shared are not removed.",
-    "contributeRepairDllsDescription": "Allow Ascendara to automatically share DLL files from your completed game installations so other users can repair missing files. When a game has no approved files yet, Ascendara reports the hashes of its listed DLLs with your Ascend account, and a file is approved once several members report the same hash. Approved files are stored with Cloudflare and publicly downloadable. Only listed DLLs are shared; this feature does not upload saves or personal documents.",
-    "contributeRepairDllsPrivacy": "Read the Privacy Policy",
-    "contributeRepairDllsSaveError": "Could not save your DLL contribution preference. Please try again.",
     "controllerConnected": "Controller Connected",
     "controllerConnectedDescription": "Ready to use Big Picture mode",
     "controllerType": "Controller Type",

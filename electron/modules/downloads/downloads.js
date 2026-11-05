@@ -236,11 +236,6 @@ function registerDownloadHandlers() {
                 await withDownloadOperation(dir, () =>
                   gameUpdateBackup.finish(path.join(downloadDir, dir))
                 );
-                dllRepair.scheduleContribution(
-                  gameData,
-                  path.join(downloadDir, dir),
-                  `${dir}.ascendara.json`
-                );
               }
 
               // Check if this game has active downloadingData
@@ -1403,14 +1398,6 @@ function registerDownloadHandlers() {
     }
   );
 
-  ipcMain.handle("set-ascend-repair-token", (_, token) => {
-    dllRepair.setAscendToken(token);
-  });
-
-  ipcMain.handle("set-ascend-repair-access", (_, member) => {
-    dllRepair.setAscendMember(member === true);
-  });
-
   ipcMain.handle("repair-game-dlls", async (_, game, libraryDirectory) => {
     try {
       const name = sanitizeGameName(sanitizeText(game));
@@ -1441,7 +1428,11 @@ function registerDownloadHandlers() {
     const gameInfoPath = await dllRepair.safePath(gameDirectory, target.metadataName);
     const filemapPath = await dllRepair.safePath(gameDirectory, "filemap.ascendara.json");
     const filemap = JSON.parse(
-      await dllRepair.readBounded(gameDirectory, "filemap.ascendara.json", 16 * 1024 * 1024)
+      await dllRepair.readBounded(
+        gameDirectory,
+        "filemap.ascendara.json",
+        16 * 1024 * 1024
+      )
     );
     const gameInfo = JSON.parse(
       await dllRepair.readBounded(gameDirectory, target.metadataName, 4 * 1024 * 1024)
@@ -1496,7 +1487,15 @@ function registerDownloadHandlers() {
         });
       }
     }
-    return { gameInfo, gameInfoPath, data, filemap, filemapPath, filemapStat, verifyErrors };
+    return {
+      gameInfo,
+      gameInfoPath,
+      data,
+      filemap,
+      filemapPath,
+      filemapStat,
+      verifyErrors,
+    };
   }
 
   // Verify game handler

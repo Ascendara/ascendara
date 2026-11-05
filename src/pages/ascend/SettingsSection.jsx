@@ -4,7 +4,6 @@ import PrivacySettingsCard from "./settings/PrivacySettingsCard";
 import ReviewCardSettingsCard from "./settings/ReviewCardSettingsCard";
 import SubscriptionSettingsCard from "./settings/SubscriptionSettingsCard";
 import AccountActionsCard from "./settings/AccountActionsCard";
-import DllSharingSettingsCard from "./settings/DllSharingSettingsCard";
 import TwoFactorSettingsCard from "./settings/TwoFactorSettingsCard";
 import SectionHeader from "./SectionHeader";
 import { useEffect, useState } from "react";
@@ -19,7 +18,6 @@ import {
   Image as ImageIcon,
   Lock,
   ShieldCheck,
-  Share2,
   UserCog,
 } from "lucide-react";
 
@@ -163,9 +161,6 @@ export default function SettingsSection({
         isNew: newSecurityFeature,
         newLabel: t("ascend.settings.newFeature"),
       },
-      ...(ascendAccess?.hasAccess
-        ? [{ id: "dllSharing", icon: Share2, label: t("ascend.settings.dllSharing") }]
-        : []),
     ],
     [{ id: "account", icon: UserCog, label: t("ascend.settings.pages.account.nav") }],
   ];
@@ -235,7 +230,6 @@ export default function SettingsSection({
       <PrivacySettingsCard t={t} userData={userData} updateData={updateData} />
     ),
     security: () => <TwoFactorSettingsCard t={t} />,
-    dllSharing: () => <DllSharingSettingsCard t={t} />,
     account: () => (
       <AccountActionsCard
         t={t}

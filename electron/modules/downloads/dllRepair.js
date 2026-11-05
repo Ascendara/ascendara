@@ -1,4 +1,4 @@
-/** Approved, release-specific DLL sharing. No renderer-provided paths or URLs. */
+/** Restores approved, release-specific DLLs. No renderer-provided paths or URLs. */
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
@@ -9,41 +9,6 @@ const CDN = "https://repair.ascendara.app";
 const MAX_DLL = 32 * 1024 * 1024;
 const MAX_TOTAL = 128 * 1024 * 1024;
 const sha256 = bytes => crypto.createHash("sha256").update(bytes).digest("hex");
-const contributionControllers = new Set();
-// Firebase ID token pushed by the renderer while an Ascend member is signed in. Memory only.
-let ascendToken = null;
-
-function setAscendToken(value) {
-  ascendToken =
-    typeof value === "string" && value.length <= 16384 && !/[\r\n]/.test(value)
-      ? value
-      : null;
-}
-
-// Contributing is an Ascend feature. The renderer reports whether the signed-in
-// account has Ascend access; memory only, so nothing uploads until it confirms,
-// and sign-out or an ended trial or plan stops contributions.
-let ascendMember = false;
-
-function setAscendMember(value) {
-  ascendMember = value === true;
-  if (!ascendMember) stopContributions();
-}
-
-function contributionAllowed() {
-  return (
-    ascendMember &&
-    require("../core/settings")
-      .getSettingsManager()
-      .getSetting("contributeRepairDlls") === true
-  );
-}
-
-function stopContributions() {
-  for (const controller of contributionControllers) controller.abort();
-  scheduled.clear();
-}
-
 function relativeName(value) {
   if (typeof value !== "string" || value.length > 500)
     throw new Error("Invalid repair path.");
@@ -218,20 +183,18 @@ async function context(directory, metadataName) {
   };
 }
 
-function idle(info, upload) {
+function idle(info) {
   const data = info.downloadingData;
   return (
     !info.isRunning &&
-    (upload
-      ? !data
-      : !data ||
-        (data.verifyError?.length &&
-          !data.downloading &&
-          !data.extracting &&
-          !data.verifying &&
-          !data.updating &&
-          !data.awaitingRecoveryAction &&
-          !data.pendingManualInstall))
+    (!data ||
+      (data.verifyError?.length &&
+        !data.downloading &&
+        !data.extracting &&
+        !data.verifying &&
+        !data.updating &&
+        !data.awaitingRecoveryAction &&
+        !data.pendingManualInstall))
   );
 }
 
@@ -269,149 +232,63 @@ async function approved(release, bearer, signal) {
   }
 }
 
-// Reports this install's listed DLL hashes so the server can approve the release once
-// enough Ascend members agree. Returns the manifest when this report approved it.
-async function report(directory, ctx, bearer, signal) {
-  if (!ascendToken) throw new Error("Sign in to Ascend to help approve repair files.");
-  const files = [];
-  for (const name of ctx.allowed) {
-    let bytes;
-    try {
-      bytes = await readBounded(directory, name, MAX_DLL);
-    } catch (error) {
-      if (error.code === "ENOENT") continue;
-      throw error;
-    }
-    if (bytes.length !== ctx.filemap[name]?.size) continue;
-    files.push({ path: name, size: bytes.length, sha256: sha256(bytes) });
-  }
-  if (!files.length) throw new Error("No listed DLLs are intact in this installation.");
-  const response = await axios.post(
-    `${API}/repair/v1/reports/${ctx.release}`,
-    { files },
-    {
-      headers: { Authorization: `Bearer ${bearer}`, "X-Ascend-Token": ascendToken },
-      timeout: 15000,
-      maxRedirects: 0,
-      maxContentLength: 128 * 1024,
-      signal,
-    }
-  );
-  return response.data?.manifest || null;
-}
-
-async function run(directory, metadataName, upload = false) {
-  if (!upload) return runOperation(directory, metadataName, false);
-  if (!contributionAllowed()) throw new Error("DLL contributions are turned off.");
-  const controller = new AbortController();
-  contributionControllers.add(controller);
-  try {
-    return await runOperation(directory, metadataName, true, controller.signal);
-  } finally {
-    contributionControllers.delete(controller);
-  }
-}
-
-async function runOperation(directory, metadataName, upload, signal) {
-  const checkConsent = () => {
-    signal?.throwIfAborted();
-    if (upload && !contributionAllowed())
-      throw new Error("DLL contributions are turned off.");
-  };
-  checkConsent();
+async function run(directory, metadataName) {
   const ctx = await context(directory, metadataName);
-  if (!idle(ctx.info, upload))
+  if (!idle(ctx.info))
     throw new Error("Wait for this game to finish downloading or running.");
-  checkConsent();
-  const bearer = await token(signal);
-  let manifest;
-  try {
-    manifest = await approved(ctx.release, bearer, signal);
-  } catch (error) {
-    if (!upload || error.code !== "NO_MANIFEST") throw error;
-    checkConsent();
-    manifest = await report(directory, ctx, bearer, signal);
-    if (!manifest) return { success: true, restored: 0, reported: true };
-  }
-  const covered = new Set(manifest?.files?.map(file => file.path) || []);
-  if (upload && ctx.allowed.some(name => !covered.has(name))) {
-    // Keep voting on listed DLLs that were not approved yet; uploads continue either way.
-    try {
-      checkConsent();
-      manifest = (await report(directory, ctx, bearer, signal)) || manifest;
-    } catch (error) {
-      if (signal?.aborted || !contributionAllowed()) throw error;
-    }
-  }
+  const bearer = await token();
+  const manifest = await approved(ctx.release, bearer);
   const files = validateManifest(manifest, ctx.release, ctx.allowed, ctx.filemap);
   let restored = 0;
   for (const file of files) {
-    checkConsent();
     const latest = await context(directory, metadataName);
-    if (latest.release !== ctx.release || !idle(latest.info, upload))
+    if (latest.release !== ctx.release || !idle(latest.info))
       throw new Error("Installation changed during repair.");
     const target = await safePath(directory, file.path);
-    if (upload) {
-      const bytes = await readBounded(directory, file.path, MAX_DLL);
-      if (bytes.length !== file.size || sha256(bytes) !== file.sha256) continue;
-      checkConsent();
-      await axios.put(`${API}/repair/v1/objects/${ctx.release}/${file.sha256}`, bytes, {
-        headers: {
-          Authorization: `Bearer ${bearer}`,
-          "Content-Type": "application/octet-stream",
-        },
+    try {
+      await fs.lstat(target);
+      continue;
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    let bytes;
+    try {
+      const response = await axios.get(`${CDN}/v1/${ctx.release}/${file.sha256}`, {
+        responseType: "arraybuffer",
         timeout: 60000,
         maxRedirects: 0,
-        maxBodyLength: MAX_DLL,
-        maxContentLength: 4096,
-        signal,
+        maxContentLength: file.size,
       });
-    } else {
-      try {
-        await fs.lstat(target);
-        continue;
-      } catch (error) {
-        if (error.code !== "ENOENT") throw error;
-      }
-      let bytes;
-      try {
-        const response = await axios.get(`${CDN}/v1/${ctx.release}/${file.sha256}`, {
-          responseType: "arraybuffer",
-          timeout: 60000,
-          maxRedirects: 0,
-          maxContentLength: file.size,
-        });
-        bytes = Buffer.from(response.data);
-      } catch {
-        throw new Error(
-          "An approved DLL has not been shared yet, or the repair service is unavailable."
-        );
-      }
-      if (bytes.length !== file.size || sha256(bytes) !== file.sha256)
-        throw new Error("Repair integrity check failed. No file was installed.");
-      const fresh = await context(directory, metadataName);
-      if (fresh.release !== ctx.release || !idle(fresh.info, false))
-        throw new Error("Installation changed during repair.");
-      await safePath(directory, file.path);
-      const temporary = await fs.mkdtemp(
-        path.join(path.dirname(target), ".ascendara-repair-")
+      bytes = Buffer.from(response.data);
+    } catch {
+      throw new Error(
+        "An approved DLL is not available yet, or the repair service is unavailable."
       );
-      const staged = path.join(temporary, "verified.dll");
-      try {
-        await fs.writeFile(staged, bytes, { flag: "wx" });
-        await safePath(directory, file.path);
-        // Atomic create-without-overwrite, including on Windows. Never replace an existing DLL.
-        await fs.link(staged, target);
-        await fs.unlink(staged);
-        const installed = await readBounded(directory, file.path, MAX_DLL);
-        if (installed.length !== file.size || sha256(installed) !== file.sha256) {
-          throw new Error("The restored DLL was removed or changed during installation.");
-        }
-        restored++;
-      } finally {
-        await fs.rm(staged, { force: true });
-        await fs.rmdir(temporary);
+    }
+    if (bytes.length !== file.size || sha256(bytes) !== file.sha256)
+      throw new Error("Repair integrity check failed. No file was installed.");
+    const fresh = await context(directory, metadataName);
+    if (fresh.release !== ctx.release || !idle(fresh.info))
+      throw new Error("Installation changed during repair.");
+    await safePath(directory, file.path);
+    const temporary = await fs.mkdtemp(
+      path.join(path.dirname(target), ".ascendara-repair-")
+    );
+    const staged = path.join(temporary, "verified.dll");
+    try {
+      await fs.writeFile(staged, bytes, { flag: "wx" });
+      await safePath(directory, file.path);
+      // Atomic create-without-overwrite, including on Windows. Never replace an existing DLL.
+      await fs.link(staged, target);
+      await fs.unlink(staged);
+      const installed = await readBounded(directory, file.path, MAX_DLL);
+      if (installed.length !== file.size || sha256(installed) !== file.sha256) {
+        throw new Error("The restored DLL was removed or changed during installation.");
       }
+      restored++;
+    } finally {
+      await fs.rm(staged, { force: true });
+      await fs.rmdir(temporary);
     }
   }
   return { success: true, restored };
@@ -447,32 +324,9 @@ async function resolveTarget(settings, game, libraryDirectory) {
   return matches[0];
 }
 
-const scheduled = new Map();
-let queue = Promise.resolve();
-function scheduleContribution(info, directory, metadataName) {
-  if (!contributionAllowed()) return;
-  if (!idle(info, true) || !info.gameID || info.privateSource) return;
-  const key = `${directory}:${info.version}`;
-  if ((scheduled.get(key) || 0) > Date.now()) return;
-  scheduled.set(key, Date.now() + 6 * 60 * 60 * 1000);
-  if (scheduled.size > 1000) scheduled.delete(scheduled.keys().next().value);
-  queue = queue
-    .then(() => run(directory, metadataName, true))
-    .catch(error => {
-      // Sharing is best effort and must never turn a successful install into a failure.
-      console.warn(
-        `[DLL Repair] Contribution skipped for ${directory}: ${error.message}`
-      );
-    });
-}
-
 module.exports = {
-  setAscendToken,
-  setAscendMember,
-  stopContributions,
   run,
   resolveTarget,
-  scheduleContribution,
   relativeName,
   safePath,
   readBounded,

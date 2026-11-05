@@ -248,19 +248,6 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // DLL repair reports run in the main process and are counted per Ascend member
-  useEffect(() => {
-    const unsubscribe = subscribeToIdTokenChanges(async firebaseUser => {
-      try {
-        const token = firebaseUser ? await firebaseUser.getIdToken() : null;
-        await window.electron?.setAscendRepairToken?.(token);
-      } catch (err) {
-        console.error("Failed to share Ascend token for DLL repair:", err);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
   // Register new user
   const register = async (email, password, displayName, hardwareId = null) => {
     setError(null);

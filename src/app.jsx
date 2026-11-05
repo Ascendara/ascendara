@@ -21,7 +21,6 @@ import BranchWelcomeDialog from "@/components/BranchWelcomeDialog";
 import UpdateOverlay from "@/components/UpdateOverlay";
 import RepairAscendaraDialog from "@/components/RepairAscendaraDialog";
 import ChangelogDialog from "@/components/ChangelogDialog";
-import DllSharingConsentDialog from "@/components/DllSharingConsentDialog";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { TourProvider } from "@/context/TourContext";
 import { ThemeProvider, useTheme, isDarkTheme } from "@/context/ThemeContext";
@@ -1078,33 +1077,7 @@ const DownloadStallNotifier = () => {
 
 // Initialize download sync service when user is authenticated with Ascend access
 const DownloadSyncInitializer = () => {
-  const { user, userData, isAuthenticated } = useAuth();
-  const subscriptionKey = JSON.stringify(userData?.ascendSubscription ?? null);
-
-  // DLL contributions are an Ascend feature: the main process only uploads
-  // while this reports access. Rechecked when the subscription changes and
-  // hourly, so a trial or plan that ends mid-session stops them.
-  useEffect(() => {
-    let canceled = false;
-    const shareAccess = async () => {
-      let member = false;
-      if (isAuthenticated && user) {
-        try {
-          const access = await verifyAscendAccess();
-          member = Boolean(access.hasAccess || access.isSubscribed || access.isVerified);
-        } catch (error) {
-          console.error("[App] Error checking Ascend access for DLL sharing:", error);
-        }
-      }
-      if (!canceled) await window.electron?.setAscendRepairAccess?.(member);
-    };
-    shareAccess();
-    const interval = setInterval(shareAccess, 60 * 60 * 1000);
-    return () => {
-      canceled = true;
-      clearInterval(interval);
-    };
-  }, [isAuthenticated, user, subscriptionKey]);
+  const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
     initializeDesktopLibrarySync(isAuthenticated ? user : null);
@@ -1362,34 +1335,6 @@ const AppRoutes = () => {
       delete window.showChangelog;
     };
   }, []);
-  const [showDllSharingConsent, setShowDllSharingConsent] = useState(false);
-  const [dllSharingPending, setDllSharingPending] = useState(false);
-
-  // Existing users are asked once whether to enroll in DLL sharing. New users
-  // accept the current terms during welcome and are marked as asked there.
-  const promptDllSharingIfNeeded = async hasLaunched => {
-    if (!hasLaunched || !(await window.electron.isV7())) return;
-    if (await window.electron.getTimestampValue("dllSharingPromptSeen")) return;
-    setDllSharingPending(true);
-  };
-
-  // DLL sharing is an Ascend feature, so only members are asked
-  useEffect(() => {
-    if (!dllSharingPending || !user) return;
-    let canceled = false;
-    verifyAscendAccess()
-      .then(access => {
-        if (!canceled && (access.hasAccess || access.isSubscribed || access.isVerified)) {
-          setDllSharingPending(false);
-          setShowDllSharingConsent(true);
-        }
-      })
-      .catch(error => console.error("Failed to check Ascend access:", error));
-    return () => {
-      canceled = true;
-    };
-  }, [dllSharingPending, user]);
-
   useEffect(() => {
     const initializeApp = async () => {
       if (hasChecked.current) return;
@@ -1569,13 +1514,12 @@ const AppRoutes = () => {
               const wasRepair = await window.electron.getTimestampValue("isRepairing");
               if (wasRepair)
                 await window.electron.setTimestampValue("isRepairing", false);
-              const hasLaunched = await checkAndSetWelcomeStatus();
+              await checkAndSetWelcomeStatus();
               // Only show changelog on live branch
               const branch = await window.electron.getBranch();
               if (branch === "live" && !wasRepair) {
                 setShowChangelog(true);
               }
-              await promptDllSharingIfNeeded(hasLaunched);
 
               // Use testing version for non-live branches
               let versionToShow = __APP_VERSION__;
@@ -1612,7 +1556,6 @@ const AppRoutes = () => {
         }
 
         const hasLaunched = await checkAndSetWelcomeStatus();
-        await promptDllSharingIfNeeded(hasLaunched);
         if (hasLaunched) {
           // Pick up a newer game index while the splash is still up, so Home
           // doesn't load the old one and then refresh in front of the user.
@@ -1702,7 +1645,6 @@ const AppRoutes = () => {
 
   const handleWelcomeComplete = async (withTour = false) => {
     setWelcomeData({ isNew: false, isV7: true });
-    await window.electron.setTimestampValue("dllSharingPromptSeen", true);
     enablePageTours();
 
     // Persist tour intent via sessionStorage instead of a query param.
@@ -2142,22 +2084,6 @@ const AppRoutes = () => {
         onOpenChange={setShowChangelog}
         currentVersion={changelogPreviewVersion || __APP_VERSION__}
         includeDrafts={!!changelogPreviewVersion}
-      />
-      {/* Waits until the changelog and any other startup dialog is dismissed */}
-      <DllSharingConsentDialog
-        open={
-          startupSettled &&
-          showDllSharingConsent &&
-          !effectiveShowWelcome &&
-          !showChangelog &&
-          !showWatcherWarn &&
-          !showBranchWelcome &&
-          !showFirstIndexDialog &&
-          !showSupportDialog &&
-          !showPlatformWarning &&
-          !isBrokenVersion
-        }
-        onOpenChange={setShowDllSharingConsent}
       />
     </>
   );
