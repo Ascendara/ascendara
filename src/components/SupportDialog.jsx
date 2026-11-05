@@ -1,14 +1,28 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Star, MessageCircle, DollarSign, X } from "lucide-react";
+import { Star, MessageCircle, Heart, Sparkles, AlertTriangle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { API_URL } from "@/config/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import DeveloperSignature from "@/components/DeveloperSignature";
+import { cn } from "@/lib/utils";
+
+const ratingLabelKey = value => `app.supportDialog.ratings.${value}`;
 
 const SupportDialog = ({ onClose }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [rating, setRating] = useState(0);
   const [hoveredStar, setHoveredStar] = useState(0);
+  const [pendingAction, setPendingAction] = useState(null);
   const [authToken, setAuthToken] = useState("");
 
   useEffect(() => {
@@ -32,10 +46,6 @@ const SupportDialog = ({ onClose }) => {
 
     fetchToken();
   }, []);
-
-  const handleStarClick = value => {
-    setRating(value);
-  };
 
   const handleClose = () => {
     if (rating > 0) {
@@ -69,96 +79,195 @@ const SupportDialog = ({ onClose }) => {
     onClose();
   };
 
-  const handleDonate = () => {
-    window.electron.openURL("https://ascendara.app/donate");
+  const handleAscend = () => {
+    handleClose();
+    navigate("/ascend");
   };
 
   const handleFeedback = () => {
     window.electron.openURL("https://ascendara.app/feedback");
   };
 
+  const actions = {
+    ascend: handleAscend,
+    feedback: () => {
+      handleFeedback();
+      onClose();
+    },
+  };
+
+  // Ask before leaving the rating behind; once rated, act right away.
+  const requestAction = action => {
+    if (rating > 0) {
+      action === "ascend" ? handleAscend() : handleFeedback();
+      return;
+    }
+    setPendingAction(action);
+  };
+
+  const activeRating = hoveredStar || rating;
+
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.9 }}
-          className="relative mx-4 w-full max-w-lg rounded-lg bg-card p-6 shadow-xl"
-        >
-          <button
-            onClick={handleClose}
-            className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
-          >
-            <X size={20} />
-          </button>
+    <Dialog open onOpenChange={open => !open && handleClose()}>
+      <DialogContent className="max-w-md gap-0 overflow-hidden border-border/60 bg-card p-0 sm:rounded-2xl">
+        {/* Header */}
+        <div className="relative px-6 pb-5 pt-8 text-center">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-primary/15 to-transparent"
+          />
+          <div className="relative mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/25">
+            <Heart className="h-6 w-6" aria-hidden="true" />
+          </div>
+          <DialogTitle className="relative text-xl font-bold text-foreground">
+            {t("app.supportDialog.title")}
+          </DialogTitle>
+          <DialogDescription className="relative mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+            {t("app.supportDialog.message")}
+          </DialogDescription>
+        </div>
 
-          <div className="space-y-6">
-            <div className="space-y-2 text-center">
-              <h2 className="text-2xl font-bold text-foreground">
-                {t("app.supportDialog.title")}
-              </h2>
-              <p className="text-muted-foreground">{t("app.supportDialog.message")}</p>
-            </div>
-
-            <div className="flex justify-center -space-x-1">
-              {[1, 2, 3, 4, 5].map(value => (
-                <button
-                  key={value}
-                  onMouseEnter={() => setHoveredStar(value)}
-                  onMouseLeave={() => setHoveredStar(0)}
-                  onClick={() => handleStarClick(value)}
-                  className="px-1 transition-transform hover:scale-110"
-                >
-                  <Star
-                    size={32}
-                    className="transition-colors"
-                    style={{
-                      fill:
-                        value <= (hoveredStar || rating)
-                          ? "rgb(var(--color-star-filled, 250 204 21))"
-                          : "transparent",
-                      stroke:
-                        value <= (hoveredStar || rating)
-                          ? "rgb(var(--color-star-filled, 250 204 21))"
-                          : "rgb(var(--color-star-empty, 148 163 184))",
+        {/* Rating */}
+        <div className="px-6">
+          <div className="flex flex-col items-center gap-1 rounded-xl border border-border/60 bg-muted/30 px-4 py-4">
+            <div
+              className="flex items-center"
+              role="radiogroup"
+              onMouseLeave={() => setHoveredStar(0)}
+            >
+              {[1, 2, 3, 4, 5].map(value => {
+                const filled = value <= activeRating;
+                return (
+                  <motion.button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={rating === value}
+                    aria-label={t(ratingLabelKey(value))}
+                    whileHover={{ scale: 1.12 }}
+                    whileTap={{ scale: 0.9 }}
+                    onMouseEnter={() => setHoveredStar(value)}
+                    onFocus={() => setHoveredStar(value)}
+                    onBlur={() => setHoveredStar(0)}
+                    onClick={() => {
+                      setRating(value);
+                      setPendingAction(null);
                     }}
-                  />
-                </button>
-              ))}
+                    className="rounded-md p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Star
+                      className={cn(
+                        "h-8 w-8 transition-colors",
+                        filled ? "fill-star-filled text-star-filled" : "text-star-empty"
+                      )}
+                    />
+                  </motion.button>
+                );
+              })}
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={handleDonate}
-                className="text-secondary-foreground flex items-center justify-center gap-2 rounded-lg bg-primary/80 px-4 py-3 transition-colors hover:bg-primary/90"
-              >
-                <DollarSign size={20} />
-                {t("app.supportDialog.donate")}
-              </button>
-              <button
-                onClick={handleFeedback}
-                className="flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-3 text-primary transition-colors hover:bg-secondary/90"
-              >
-                <MessageCircle size={20} />
-                {t("app.supportDialog.feedback")}
-              </button>
-            </div>
-
-            <div className="space-y-3 rounded-lg bg-primary/40 p-4 pt-2 text-center text-sm text-muted-foreground">
-              <p className="px-8 italic">{t("app.supportDialog.note")}</p>
-              <div className="flex justify-center">
-                <img
-                  src="https://cdn.ascendara.app/files/signature.svg"
-                  className="w-28"
-                  alt="Santiago Signature"
-                />
-              </div>
+            <div className="h-5">
+              <AnimatePresence mode="wait">
+                {activeRating > 0 && (
+                  <motion.p
+                    key={activeRating}
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.12 }}
+                    className="text-sm font-medium text-foreground"
+                  >
+                    {t(ratingLabelKey(activeRating))}
+                  </motion.p>
+                )}
+              </AnimatePresence>
             </div>
           </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>
+        </div>
+
+        {/* Actions */}
+        <div className="px-6 pt-4">
+          <AnimatePresence mode="wait" initial={false}>
+            {pendingAction ? (
+              <motion.div
+                key="confirm"
+                role="alertdialog"
+                aria-live="polite"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.15 }}
+                className="border-status-warning space-y-3 rounded-xl border bg-[rgb(var(--color-warning,234_179_8)/0.08)] p-3"
+              >
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle
+                    className="text-status-warning mt-0.5 h-4 w-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <p className="text-sm text-foreground">
+                    {t("app.supportDialog.dismissWarning")}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPendingAction(null)}
+                    className="flex-1 whitespace-nowrap text-primary"
+                  >
+                    {t("app.supportDialog.goBack")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => actions[pendingAction]()}
+                    className="flex-1 whitespace-nowrap text-secondary"
+                  >
+                    {t("app.supportDialog.dismissRating")}
+                  </Button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="actions"
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.15 }}
+                className="flex flex-wrap gap-3"
+              >
+                <Button
+                  onClick={() => requestAction("ascend")}
+                  className="flex-1 gap-2 whitespace-nowrap text-secondary"
+                >
+                  <Sparkles className="h-4 w-4" aria-hidden="true" />
+                  {t("app.supportDialog.ascend")}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => requestAction("feedback")}
+                  className="flex-1 gap-2 whitespace-nowrap text-primary"
+                >
+                  <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                  {t("app.supportDialog.feedback")}
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Personal note */}
+        <figure className="mx-6 mb-6 mt-5 border-t border-border/60 pt-5">
+          <blockquote className="border-l-2 border-primary/40 pl-4 text-sm italic leading-relaxed text-muted-foreground">
+            {t("app.supportDialog.note")}
+          </blockquote>
+          <figcaption className="mt-3 flex justify-end">
+            <DeveloperSignature
+              title={t("ascend.settings.pages.profile.signatureAlt")}
+              className="h-auto w-28 text-foreground/80"
+            />
+          </figcaption>
+        </figure>
+      </DialogContent>
+    </Dialog>
   );
 };
 
