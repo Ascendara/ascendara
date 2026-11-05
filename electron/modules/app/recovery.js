@@ -106,7 +106,8 @@ async function createRecoveryPoint(reason = "manual", version = appVersion) {
       reason: String(reason || "manual").slice(0, 64),
       settings,
     },
-    { spaces: 2 }
+    // Saved logins are in here, encrypted the way the settings file has them.
+    { spaces: 2, mode: 0o600 }
   );
 
   await pruneRecoveryPoints();

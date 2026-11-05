@@ -469,6 +469,10 @@ async function initializeApp() {
     // Reset quitting flag on app start
     app.isQuitting = false;
 
+    // safeStorage only works from here on
+    settings.getSettingsManager().migrateSecretStorage();
+    settings.getSettingsManager().retirePreMigrationBackup();
+
     // Start local HTTP server in production to serve app from localhost
     // This allows Firebase auth to work since 'localhost' can be added to authorized domains
     if (!isDev) {
