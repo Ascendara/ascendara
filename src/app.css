@@ -814,6 +814,15 @@ html[data-motion="reduced"] .animate-fade-in {
   opacity: 0;
 }
 
+/* Post-checkout celebration (AscendCelebration): the menu bar logo leaves its
+   slot to fly to the center, then pops back in as the dim lifts */
+.ascend-celebrate [data-app-logo] {
+  opacity: 0;
+}
+.ascend-celebrate-return [data-app-logo] {
+  animation: boot-pop-in 420ms cubic-bezier(0.34, 1.4, 0.64, 1) 180ms both;
+}
+
 /* Once the boot logo has landed, the rest of the menu bar pops in after it:
    the name first, then the items to its right, with the window controls
    alongside. They stay hidden during the flight (.splash-active);

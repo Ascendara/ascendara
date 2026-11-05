@@ -5,6 +5,12 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { userAuthenticatedFetch } from "@/utils/authHelper";
 import { API_URL } from "@/config/api";
+import AscendCelebration, { celebrationPixelSize } from "@/components/AscendCelebration";
+import {
+  beginAscendCelebration,
+  isAscendCelebrationActive,
+  preloadAscendCelebration,
+} from "@/services/ascend/ascendCelebration";
 
 // Checkout can return on any page, including while Firebase is restoring login.
 export default function CheckoutReturnHandler() {
@@ -12,7 +18,26 @@ export default function CheckoutReturnHandler() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
+  const [celebration, setCelebration] = useState(null);
   const sessionId = sessions[0];
+
+  // The celebration plays over the Ascend page and the welcome tour waits for
+  // it (useAscendPage). The success toast follows once it clears.
+  const celebrate = toastId => {
+    if (isAscendCelebrationActive()) {
+      toast.success(t("ascend.settings.subscriptionSuccessMessage"), { id: toastId });
+      return;
+    }
+    toast.dismiss(toastId);
+    const end = beginAscendCelebration();
+    setCelebration({
+      onDone: () => {
+        setCelebration(null);
+        end();
+        toast.success(t("ascend.settings.subscriptionSuccessMessage"), { id: toastId });
+      },
+    });
+  };
 
   useEffect(() => {
     let disposed = false;
@@ -46,6 +71,7 @@ export default function CheckoutReturnHandler() {
     let timer;
     const onEmulate = async () => {
       if (!(await window.electron?.isDev?.())) return;
+      preloadAscendCelebration(celebrationPixelSize());
       const toastId = "checkout-dev-emulated";
       toast.loading(
         t("ascend.settings.verifyingPayment", "Verifying your payment, please wait..."),
@@ -54,7 +80,7 @@ export default function CheckoutReturnHandler() {
       clearTimeout(timer);
       timer = setTimeout(() => {
         window.dispatchEvent(new CustomEvent("ascendara:checkout-verified"));
-        toast.success(t("ascend.settings.subscriptionSuccessMessage"), { id: toastId });
+        celebrate(toastId);
         navigate("/ascend", { state: { ascendWelcome: true } });
       }, 1500);
     };
@@ -73,6 +99,8 @@ export default function CheckoutReturnHandler() {
     let controller;
     let toastSettled = false;
     const toastId = `checkout-${sessionId}`;
+    // Fetch and decode the celebration while the payment verifies
+    preloadAscendCelebration(celebrationPixelSize());
     toast.loading(
       t("ascend.settings.verifyingPayment", "Verifying your payment, please wait..."),
       { id: toastId }
@@ -100,7 +128,7 @@ export default function CheckoutReturnHandler() {
         if (response.ok && data.success) {
           // Firestore's existing real-time listener refreshes account data globally.
           window.dispatchEvent(new CustomEvent("ascendara:checkout-verified"));
-          toast.success(t("ascend.settings.subscriptionSuccessMessage"), { id: toastId });
+          celebrate(toastId);
           toastSettled = true;
           // The welcome tour lives on the Ascend page, wherever checkout returned to
           navigate("/ascend", { state: { ascendWelcome: true } });
@@ -142,5 +170,5 @@ export default function CheckoutReturnHandler() {
     };
   }, [sessionId, user, t, navigate]);
 
-  return null;
+  return celebration ? <AscendCelebration onDone={celebration.onDone} /> : null;
 }

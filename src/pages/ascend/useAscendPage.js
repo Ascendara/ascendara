@@ -60,6 +60,7 @@ import {
 import { syncFavoritesNow } from "@/services/cloud/favoritesCloudSync";
 import { takePrefetched } from "@/services/ascend/ascendPrefetch";
 import { API_URL } from "@/config/api";
+import { whenAscendCelebrationDone } from "@/services/ascend/ascendCelebration";
 
 // Per account, so a second account on this PC still gets offered the tour.
 // Also saved to the account, so a new device or reinstall doesn't replay it.
@@ -2279,13 +2280,14 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     return () => window.removeEventListener("ascendara:checkout-verified", onVerified);
   }, [user?.uid]);
 
-  // A verified checkout routes here with this flag to start the welcome tour.
-  // Clearing it keeps a back/forward navigation from replaying the tour.
+  // A verified checkout routes here with this flag to start the welcome tour,
+  // once the checkout celebration has played. Clearing it keeps a
+  // back/forward navigation from replaying the tour.
   useEffect(() => {
     if (!location.state?.ascendWelcome) return;
     markWelcomeTourSeen(user?.uid);
     setShowWelcomeTourPrompt(false);
-    setShowWelcomeTour(true);
+    whenAscendCelebrationDone().then(() => setShowWelcomeTour(true));
     navigate(location.pathname, { replace: true, state: {} });
   }, [location.state?.ascendWelcome]);
 

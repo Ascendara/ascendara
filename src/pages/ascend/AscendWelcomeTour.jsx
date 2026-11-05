@@ -1,8 +1,6 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import {
-  BadgeCheck,
-  Crown,
   FlaskConical,
   Gamepad2,
   HardDrive,
@@ -23,6 +21,7 @@ import {
 } from "lucide-react";
 import Tour from "@/components/Tour";
 import DiscordIcon from "./DiscordIcon";
+import { ASCEND_CROWN_URL } from "@/services/ascend/ascendCelebration";
 
 const DiscordOutlineIcon = props => <DiscordIcon {...props} outline />;
 
@@ -60,16 +59,15 @@ function PerkGrid({ t }) {
   );
 }
 
-function UnlockedChip({ t }) {
-  return (
-    <div className="mt-4 flex justify-center">
-      <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-500">
-        <BadgeCheck className="h-3.5 w-3.5" />
-        {t("ascend.settings.allFeaturesUnlocked")}
-      </span>
-    </div>
-  );
-}
+// The Ascend logo the checkout celebration morphs into, filling the icon tile
+const AscendLogo = () => (
+  <img
+    src={ASCEND_CROWN_URL}
+    alt=""
+    draggable={false}
+    className="h-full w-full rounded-full object-cover shadow-lg"
+  />
+);
 
 // Walks a new Ascend member (trial or checkout) through every Ascend section
 export default function AscendWelcomeTour({ t, setActiveSection, onClose }) {
@@ -83,8 +81,8 @@ export default function AscendWelcomeTour({ t, setActiveSection, onClose }) {
       ...extra,
     });
     return [
-      step("welcome", Crown, "home", null, {
-        extra: <UnlockedChip t={t} />,
+      step("welcome", AscendLogo, "home", null, {
+        iconBare: true,
         nextLabel: t("ascendTour.start"),
       }),
       step("overview", LayoutDashboard, "home", "[data-tour='ascend-home']"),
@@ -102,7 +100,10 @@ export default function AscendWelcomeTour({ t, setActiveSection, onClose }) {
       step("upcoming", Rocket, "upcoming", "[data-tour='ascend-upcoming']"),
       step("everywhere", Sparkles, "premium", null, { extra: <PerkGrid t={t} /> }),
       step("account", UserCog, "settings", "[data-tour='ascend-account']"),
-      step("final", Crown, "home", null, { nextLabel: t("ascendTour.finish") }),
+      step("final", AscendLogo, "home", null, {
+        iconBare: true,
+        nextLabel: t("ascendTour.finish"),
+      }),
     ];
   }, [t, setActiveSection]);
 

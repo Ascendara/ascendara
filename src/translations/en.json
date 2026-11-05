@@ -782,7 +782,7 @@
       "messages": "Messages",
       "notifications": "Notifications",
       "overview": "Overview",
-      "premium": "Premium Features",
+      "premium": "Ascend Features",
       "reports": "My Reports",
       "requests": "Requests",
       "search": "Search",
@@ -975,7 +975,7 @@
         "title": "Retro Cloud Saves"
       },
       "subtitle": "These are the current available features you have access to with Ascend",
-      "title": "Premium Features",
+      "title": "Ascend Features",
       "unlimitedDownloads": {
         "description": "Download as many games as you want with no restrictions. Ascend removes all download limits so you can build your library freely.",
         "title": "Unlimited Downloads"
@@ -1075,7 +1075,7 @@
       "accountNowPublic": "Your account is now public",
       "active": "Active",
       "addProfileInfo": "Add profile info",
-      "allFeaturesUnlocked": "All premium features unlocked",
+      "allFeaturesUnlocked": "All Ascend features unlocked",
       "ascendSubscription": "Ascend",
       "billingCycle": "Billing Cycle",
       "bio": "Bio",
@@ -1134,7 +1134,7 @@
         "benefitTrial": "7-day free trial included",
         "chooseAmount": "Lifetime access starts at $39. You can choose to contribute more at checkout to support Ascendara.",
         "description": "You're currently on a recurring subscription. Upgrade to Lifetime Ascend and pay once, forever!",
-        "descriptionNoSub": "Unlock premium features with Ascend! Start with a 7-day free trial, then just $1.50/month.",
+        "descriptionNoSub": "Unlock Ascend features! Start with a 7-day free trial, then just $1.50/month.",
         "descriptionWithDiscount": "You're currently on a {{tier}} subscription. Upgrade to Lifetime Ascend and save ${{amount}}!",
         "disclaimer": "This special offer is available for a limited time only. Don't miss out!",
         "getLifetime": "Get Lifetime",
@@ -1367,7 +1367,7 @@
         "title": "Step Up. Connect. Join Ascend.",
         "unlimitedDownloads": "Unlimited game downloads"
       },
-      "subscriptionSuccessMessage": "You now have full access to all premium features. Thank you for your support!",
+      "subscriptionSuccessMessage": "You now have full access to all Ascend features. Thank you for your support!",
       "subtitle": "Manage your account and profile",
       "supportMessage": "Step Up. Connect. Join Ascend.",
       "supportMessageSub": "You are subscribed to Ascend. Thank you for your support!",
@@ -1474,7 +1474,7 @@
       "title": "Discord Perks"
     },
     "everywhere": {
-      "content": "Ascend isn't just this page. These are now switched on throughout the app, and you can find them all anytime under Premium Features.",
+      "content": "Ascend isn't just this page. These are now switched on throughout the app, and you can find them all anytime under Ascend Features.",
       "title": "Unlocked Across Ascendara"
     },
     "final": {
@@ -1502,14 +1502,14 @@
       "title": "Update Preview"
     },
     "welcome": {
-      "content": "Ascend is active on your account and every feature is unlocked. Here's a quick look at everything you can do with it.",
+      "content": "Ascend is active on your account. Here's a quick look at everything you can do with it.",
       "title": "Welcome to Ascend"
     }
   },
   "bigPicture": {
     "activeDownloads": "Active Downloads",
     "addedToPlayLater": "Added to Play Later",
-    "ascendPremiumFeatures": "Ascend Premium Features",
+    "ascendPremiumFeatures": "Ascend Features",
     "autoUpdates": "Auto Updates",
     "available": "Available",
     "bToClose": "Hold to close - short press to go back",
@@ -2900,8 +2900,8 @@
       "autoCloudBackupDesc": "Upload each backup to your cloud account when you choose Back up now",
       "autoCloudBackupLearnMore": "Learn more about Ascend →",
       "autoCloudBackupSignInDesc": "Sign in to Ascend to unlock cloud backups and keep your saves safe across devices",
-      "autoCloudBackupUpgrade": "Upgrade to Premium →",
-      "autoCloudBackupUpgradeDesc": "Upgrade to Ascend Premium to unlock cloud backups and protect your game saves",
+      "autoCloudBackupUpgrade": "Get Ascend →",
+      "autoCloudBackupUpgradeDesc": "Get Ascend to unlock cloud backups and protect your game saves",
       "backingUpDescription": "Backing up {{game}}...",
       "backupFailed": "Backup failed",
       "backupLocallyOnly": "Just back up locally",
@@ -2920,9 +2920,9 @@
       "cloudBackupsEnabledDesc": "Each backup you create with Back up now will also upload to cloud",
       "cloudBackupsEnabledToast": "Cloud backups enabled",
       "cloudBackupsRequireAccount": "Cloud backups require an Ascend account",
-      "cloudBackupsRequirePremium": "Cloud backups require Ascend Premium",
+      "cloudBackupsRequirePremium": "Cloud backups require Ascend",
       "cloudBackupsUpgradeAction": "Upgrade",
-      "cloudBackupsUpgradePrompt": "Upgrade to Premium to unlock cloud backups",
+      "cloudBackupsUpgradePrompt": "Get Ascend to unlock cloud backups",
       "cloudUploadClarification": "When enabled, Back up now saves locally and uploads that backup to your cloud account. Enable this on each PC you use.",
       "confirmRestore": "Confirm Restore",
       "confirmSpecificRestore": "Confirm Specific Backup Restore",
@@ -5798,15 +5798,15 @@
     "noWindowsDefender": "I don't have Windows Defender",
     "notEnoughSpaceWarning": "Woah! You have less than 40 GB of free space on the selected drive. Consider clearing some space or selecting a different drive.",
     "noticeAppIsFree": {
-      "ascendDescription": "Unlock cloud saves, achievements, and exclusive premium features with Ascend.",
+      "ascendDescription": "Unlock cloud saves, achievements, and exclusive Ascend features.",
       "ascendTitle": "Step Up. Connect. Join Ascend.",
       "learnMore": "Learn more about Ascend",
       "point1": "Core app features - downloading, installing, and playing games are completely free",
       "point2": "No personal details required to download or play games",
-      "point3": "Ascend is an optional premium service with extra features like cloud saves and achievements",
+      "point3": "Ascend is an optional service with extra features like cloud saves and achievements",
       "point4": "Anonymous data is only shared if you opt in, and you can change this anytime in Settings",
-      "subtitle": "Ascendara is free to use, with an optional Ascend premium service for extra features",
-      "title": "Free app with optional premium features"
+      "subtitle": "Ascendara is free to use, with an optional Ascend service for extra features",
+      "title": "Free app with optional Ascend features"
     },
     "okay": "Okay",
     "optOutOfSharing": "Opt out of sharing anonymous usage data. You can always enable this later in settings if you change your mind.",

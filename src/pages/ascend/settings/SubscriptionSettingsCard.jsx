@@ -545,7 +545,7 @@ export default function SubscriptionSettingsCard({
                 onClick={handleSubscribe}
               >
                 <Crown className="h-4 w-4" />
-                {t("ascend.settings.subscribeToPro") || "Subscribe to Ascend Pro"}
+                {t("ascend.settings.subscribeToPro") || "Subscribe to Ascend"}
               </Button>
             ) : (
               <div className="bg-destructive/10 border-destructive/30 text-destructive rounded-lg border p-4 text-center text-sm">

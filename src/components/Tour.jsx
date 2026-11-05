@@ -531,9 +531,16 @@ function Tour({ onClose, steps: customSteps, onFinish, sound = true }) {
                 <div
                   className={`mb-3 flex items-center gap-3 ${isHero ? "flex-col text-center" : ""}`}
                 >
+                  {/* iconBare: the icon is its own artwork (a logo), shown larger without the tile */}
                   <div
-                    className={`flex shrink-0 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary ${
-                      isHero ? "h-14 w-14" : "h-10 w-10"
+                    className={`flex shrink-0 items-center justify-center ${
+                      step.iconBare
+                        ? isHero
+                          ? "h-20 w-20"
+                          : "h-12 w-12"
+                        : `rounded-xl border border-primary/30 bg-primary/10 text-primary ${
+                            isHero ? "h-14 w-14" : "h-10 w-10"
+                          }`
                     }`}
                   >
                     <Icon className={isHero ? "h-7 w-7" : "h-5 w-5"} />
