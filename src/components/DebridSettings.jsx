@@ -62,7 +62,9 @@ export default function DebridSettings() {
       setSettings(current => ({
         ...current,
         [provider.apiKeySetting]: value,
-        ...provider.signIn?.clearedSettings,
+        // Only a new key ends a code sign-in: saving the same one keeps its refresh token
+        ...(value !== current[provider.apiKeySetting] &&
+          provider.signIn?.clearedSettings),
       }));
       clearDraft(provider);
       toast.success(t("settings.apiKeySaved"));
