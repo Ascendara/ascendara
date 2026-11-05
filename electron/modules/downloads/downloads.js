@@ -223,164 +223,180 @@ function registerDownloadHandlers() {
           const subdirectories = await fs.promises.readdir(downloadDir, {
             withFileTypes: true,
           });
+          // .ascendara-updates holds pre-update backups, not a game
           const gameDirectories = subdirectories
-            .filter(dirent => dirent.isDirectory())
+            .filter(
+              dirent => dirent.isDirectory() && dirent.name !== ".ascendara-updates"
+            )
             .map(dirent => dirent.name);
+          // Only games listed here can have a backup left to clean up
+          const backedUp = new Set(
+            await fs.promises
+              .readdir(path.join(downloadDir, ".ascendara-updates"))
+              .catch(() => [])
+          );
 
-          for (const dir of gameDirectories) {
-            const gameInfoPath = path.join(downloadDir, dir, `${dir}.ascendara.json`);
-            try {
-              const gameInfoData = await fs.promises.readFile(gameInfoPath, "utf8");
-              const gameData = JSON.parse(gameInfoData);
-              if (!gameData.downloadingData) {
-                await withDownloadOperation(dir, () =>
-                  gameUpdateBackup.finish(path.join(downloadDir, dir))
-                );
-              }
-
-              // Check if this game has active downloadingData
-              if (gameData.downloadingData) {
-                const { downloadingData } = gameData;
-                const isActive =
-                  downloadingData.downloading ||
-                  downloadingData.extracting ||
-                  downloadingData.updating ||
-                  downloadingData.verifying ||
-                  downloadingData.stopped ||
-                  downloadingData.pendingManualInstall ||
-                  downloadingData.awaitingRecoveryAction ||
-                  (downloadingData.verifyError &&
-                    downloadingData.verifyError.length > 0) ||
-                  downloadingData.error;
-
-                if (isActive) {
-                  // Parse progress - handle both "50.5%" string and numeric values
-                  let progress = 0;
-
-                  // Use extraction progress if extracting, otherwise use download progress
-                  if (
-                    downloadingData.extracting &&
-                    downloadingData.extractionProgress?.percentComplete != null
-                  ) {
-                    const progressStr = String(
-                      downloadingData.extractionProgress.percentComplete
-                    );
-                    progress = parseFloat(progressStr.replace("%", "")) || 0;
-                  } else if (downloadingData.progressCompleted) {
-                    const progressStr = String(downloadingData.progressCompleted);
-                    progress = parseFloat(progressStr.replace("%", "")) || 0;
-                  }
-
-                  progress = Number.isFinite(progress)
-                    ? Math.max(0, Math.min(100, progress))
-                    : 0;
-                  const rawDownloadProgress = parseFloat(
-                    downloadingData.progressCompleted
+          // Read every game at once; one at a time took seconds on big libraries
+          const dirDownloads = await Promise.all(
+            gameDirectories.map(async dir => {
+              const gameInfoPath = path.join(downloadDir, dir, `${dir}.ascendara.json`);
+              try {
+                const gameInfoData = await fs.promises.readFile(gameInfoPath, "utf8");
+                const gameData = JSON.parse(gameInfoData);
+                if (!gameData.downloadingData && backedUp.has(dir)) {
+                  await withDownloadOperation(dir, () =>
+                    gameUpdateBackup.finish(path.join(downloadDir, dir))
                   );
-                  const downloadProgress = Number.isFinite(rawDownloadProgress)
-                    ? Math.max(0, Math.min(100, rawDownloadProgress))
-                    : 0;
-                  const status =
-                    downloadingData.pendingManualInstall ||
-                    downloadingData.awaitingRecoveryAction
-                      ? "actionRequired"
-                      : downloadingData.error || downloadingData.verifyError?.length
-                        ? "error"
-                        : downloadingData.paused
-                          ? "paused"
-                          : downloadingData.stopped
-                            ? "stopped"
-                            : downloadingData.verifying
-                              ? "verifying"
-                              : downloadingData.extracting
-                                ? "extracting"
-                                : downloadingData.waiting
-                                  ? "queued"
-                                  : downloadingData.updating
-                                    ? "updating"
-                                    : "downloading";
-                  const transferring = status === "downloading" || status === "updating";
-
-                  // Downloaded size is an estimate from transfer progress, never extraction progress.
-                  let downloadedSize = "0 MB";
-                  const totalSize = String(gameData.size || "Unknown");
-
-                  // Calculate downloaded size if we have both progress and total size
-                  // Use >= 0 instead of > 0 to handle edge cases
-                  if (progress >= 0 && totalSize !== "Unknown") {
-                    // Parse size (e.g., "2.2 GB" -> calculate downloaded)
-                    const sizeMatch = totalSize.match(/(\d+\.?\d*)\s*(GB|MB|TB)/i);
-                    if (sizeMatch) {
-                      const sizeValue = parseFloat(sizeMatch[1]);
-                      const sizeUnit = sizeMatch[2].toUpperCase();
-                      const downloadedValue = (
-                        (sizeValue * downloadProgress) /
-                        100
-                      ).toFixed(2);
-                      downloadedSize = `${downloadedValue} ${sizeUnit}`;
-                    }
-                  }
-
-                  const download = {
-                    privateSource: !!gameData.privateSource,
-                    id: gameData.game || dir,
-                    name: gameData.game || dir,
-                    progress: progress,
-                    speed:
-                      status === "extracting" &&
-                      downloadingData.extractionProgress?.extractionSpeed
-                        ? downloadingData.extractionProgress.extractionSpeed
-                        : transferring
-                          ? downloadingData.progressDownloadSpeeds || "0 B/s"
-                          : "0 B/s",
-                    eta:
-                      status === "extracting" &&
-                      downloadingData.extractionProgress?.currentFile
-                        ? `Extracting: ${downloadingData.extractionProgress.filesExtracted}/${downloadingData.extractionProgress.totalFiles} files`
-                        : transferring
-                          ? downloadingData.timeUntilComplete || "Calculating..."
-                          : "-",
-                    status,
-                    size: totalSize,
-                    downloaded: downloadedSize,
-                    error:
-                      status === "error"
-                        ? downloadingData.message ||
-                          (typeof downloadingData.error === "string"
-                            ? downloadingData.error
-                            : "Download or verification failed")
-                        : null,
-                    paused: downloadingData.paused || false,
-                    stopped: downloadingData.stopped || false,
-                    // Include all downloadingData fields for frontend
-                    downloadingData: {
-                      downloading: downloadingData.downloading || false,
-                      extracting: downloadingData.extracting || false,
-                      verifying: downloadingData.verifying || false,
-                      updating: downloadingData.updating || false,
-                      stopped: downloadingData.stopped || false,
-                      paused: downloadingData.paused || false,
-                      waiting: downloadingData.waiting || false,
-                      pendingManualInstall: downloadingData.pendingManualInstall || false,
-                      awaitingRecoveryAction:
-                        downloadingData.awaitingRecoveryAction || false,
-                      recoverableError: downloadingData.recoverableError || null,
-                      manualInstallerPath: downloadingData.manualInstallerPath || null,
-                      progressCompleted: downloadingData.progressCompleted,
-                      progressDownloadSpeeds: downloadingData.progressDownloadSpeeds,
-                      timeUntilComplete: downloadingData.timeUntilComplete,
-                      extractionProgress: downloadingData.extractionProgress || null,
-                      verifyError: downloadingData.verifyError || null,
-                      error: downloadingData.error || null,
-                    },
-                  };
-                  downloads.push(download);
                 }
+
+                // Check if this game has active downloadingData
+                if (gameData.downloadingData) {
+                  const { downloadingData } = gameData;
+                  const isActive =
+                    downloadingData.downloading ||
+                    downloadingData.extracting ||
+                    downloadingData.updating ||
+                    downloadingData.verifying ||
+                    downloadingData.stopped ||
+                    downloadingData.pendingManualInstall ||
+                    downloadingData.awaitingRecoveryAction ||
+                    (downloadingData.verifyError &&
+                      downloadingData.verifyError.length > 0) ||
+                    downloadingData.error;
+
+                  if (isActive) {
+                    // Parse progress - handle both "50.5%" string and numeric values
+                    let progress = 0;
+
+                    // Use extraction progress if extracting, otherwise use download progress
+                    if (
+                      downloadingData.extracting &&
+                      downloadingData.extractionProgress?.percentComplete != null
+                    ) {
+                      const progressStr = String(
+                        downloadingData.extractionProgress.percentComplete
+                      );
+                      progress = parseFloat(progressStr.replace("%", "")) || 0;
+                    } else if (downloadingData.progressCompleted) {
+                      const progressStr = String(downloadingData.progressCompleted);
+                      progress = parseFloat(progressStr.replace("%", "")) || 0;
+                    }
+
+                    progress = Number.isFinite(progress)
+                      ? Math.max(0, Math.min(100, progress))
+                      : 0;
+                    const rawDownloadProgress = parseFloat(
+                      downloadingData.progressCompleted
+                    );
+                    const downloadProgress = Number.isFinite(rawDownloadProgress)
+                      ? Math.max(0, Math.min(100, rawDownloadProgress))
+                      : 0;
+                    const status =
+                      downloadingData.pendingManualInstall ||
+                      downloadingData.awaitingRecoveryAction
+                        ? "actionRequired"
+                        : downloadingData.error || downloadingData.verifyError?.length
+                          ? "error"
+                          : downloadingData.paused
+                            ? "paused"
+                            : downloadingData.stopped
+                              ? "stopped"
+                              : downloadingData.verifying
+                                ? "verifying"
+                                : downloadingData.extracting
+                                  ? "extracting"
+                                  : downloadingData.waiting
+                                    ? "queued"
+                                    : downloadingData.updating
+                                      ? "updating"
+                                      : "downloading";
+                    const transferring =
+                      status === "downloading" || status === "updating";
+
+                    // Downloaded size is an estimate from transfer progress, never extraction progress.
+                    let downloadedSize = "0 MB";
+                    const totalSize = String(gameData.size || "Unknown");
+
+                    // Calculate downloaded size if we have both progress and total size
+                    // Use >= 0 instead of > 0 to handle edge cases
+                    if (progress >= 0 && totalSize !== "Unknown") {
+                      // Parse size (e.g., "2.2 GB" -> calculate downloaded)
+                      const sizeMatch = totalSize.match(/(\d+\.?\d*)\s*(GB|MB|TB)/i);
+                      if (sizeMatch) {
+                        const sizeValue = parseFloat(sizeMatch[1]);
+                        const sizeUnit = sizeMatch[2].toUpperCase();
+                        const downloadedValue = (
+                          (sizeValue * downloadProgress) /
+                          100
+                        ).toFixed(2);
+                        downloadedSize = `${downloadedValue} ${sizeUnit}`;
+                      }
+                    }
+
+                    const download = {
+                      privateSource: !!gameData.privateSource,
+                      id: gameData.game || dir,
+                      name: gameData.game || dir,
+                      progress: progress,
+                      speed:
+                        status === "extracting" &&
+                        downloadingData.extractionProgress?.extractionSpeed
+                          ? downloadingData.extractionProgress.extractionSpeed
+                          : transferring
+                            ? downloadingData.progressDownloadSpeeds || "0 B/s"
+                            : "0 B/s",
+                      eta:
+                        status === "extracting" &&
+                        downloadingData.extractionProgress?.currentFile
+                          ? `Extracting: ${downloadingData.extractionProgress.filesExtracted}/${downloadingData.extractionProgress.totalFiles} files`
+                          : transferring
+                            ? downloadingData.timeUntilComplete || "Calculating..."
+                            : "-",
+                      status,
+                      size: totalSize,
+                      downloaded: downloadedSize,
+                      error:
+                        status === "error"
+                          ? downloadingData.message ||
+                            (typeof downloadingData.error === "string"
+                              ? downloadingData.error
+                              : "Download or verification failed")
+                          : null,
+                      paused: downloadingData.paused || false,
+                      stopped: downloadingData.stopped || false,
+                      // Include all downloadingData fields for frontend
+                      downloadingData: {
+                        downloading: downloadingData.downloading || false,
+                        extracting: downloadingData.extracting || false,
+                        verifying: downloadingData.verifying || false,
+                        updating: downloadingData.updating || false,
+                        stopped: downloadingData.stopped || false,
+                        paused: downloadingData.paused || false,
+                        waiting: downloadingData.waiting || false,
+                        pendingManualInstall:
+                          downloadingData.pendingManualInstall || false,
+                        awaitingRecoveryAction:
+                          downloadingData.awaitingRecoveryAction || false,
+                        recoverableError: downloadingData.recoverableError || null,
+                        manualInstallerPath: downloadingData.manualInstallerPath || null,
+                        progressCompleted: downloadingData.progressCompleted,
+                        progressDownloadSpeeds: downloadingData.progressDownloadSpeeds,
+                        timeUntilComplete: downloadingData.timeUntilComplete,
+                        extractionProgress: downloadingData.extractionProgress || null,
+                        verifyError: downloadingData.verifyError || null,
+                        error: downloadingData.error || null,
+                      },
+                    };
+                    return download;
+                  }
+                }
+              } catch (error) {
+                // Silently skip games without .ascendara.json files
               }
-            } catch (error) {
-              // Silently skip games without .ascendara.json files
-            }
-          }
+              return null;
+            })
+          );
+          downloads.push(...dirDownloads.filter(Boolean));
         } catch (error) {
           console.error(`[get-downloads] Error reading directory ${downloadDir}:`, error);
         }
