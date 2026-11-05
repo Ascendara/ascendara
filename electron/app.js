@@ -538,13 +538,18 @@ async function initializeApp() {
     // Create system tray
     createTray();
 
-    // Start achievement watcher
-    startAchievementWatcher();
+    // Migrate the legacy onboarding flag now; the watcher that can rewrite it
+    // starts after the window loads
+    require("./modules/core/onboarding").hasCompletedOnboarding();
 
     // Defer non-critical initialization until after window loads
     mainWindow.webContents.once("did-finish-load", () => {
       // Register deferred handlers (steamcmd, ludusavi, translations, themes, etc.)
       registerDeferredHandlers();
+
+      // Launching the watcher blocks the main thread for ~0.7s, so keep it off
+      // the path to the first paint
+      startAchievementWatcher();
 
       // Initialize Discord RPC after a short delay
       setTimeout(() => {
