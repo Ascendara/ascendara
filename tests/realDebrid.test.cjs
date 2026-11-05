@@ -39,6 +39,10 @@ test("Real-Debrid proxies stay on the official API", () => {
     "https://api.real-debrid.com/rest/1.0/torrents?limit=100&page=2"
   );
   assert.equal(getProxyTarget("/api/realdebrid-evil/user"), null);
+  assert.equal(
+    getProxyTarget("/api/rdoauth/device/code?client_id=X").href,
+    "https://api.real-debrid.com/oauth/v2/device/code?client_id=X"
+  );
 });
 
 test("supported hosts govern routing using the actual URL", async () => {

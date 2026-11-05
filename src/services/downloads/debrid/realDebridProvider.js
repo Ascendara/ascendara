@@ -1,10 +1,18 @@
 import * as api from "../realDebridService";
+import * as signIn from "../realDebridSignIn";
 import { resumePendingTorrents } from "../realDebridTorrentStartup";
 
 export default {
   id: "realdebrid",
   name: "Real-Debrid",
   apiKeyUrl: "https://real-debrid.com/apitoken",
+  signIn: {
+    start: signIn.startCodeSignIn,
+    poll: signIn.pollCodeSignIn,
+    verificationUrl: signIn.VERIFICATION_URL,
+    clearedSettings: signIn.CLEARED_SIGN_IN,
+    isSignedIn: settings => Boolean(settings.realDebridOauthRefreshToken),
+  },
   getUserInfo: api.getUserInfo,
   apiKeySetting: "realDebridApiKey",
   torrentSetting: "useRealDebridForTorrents",

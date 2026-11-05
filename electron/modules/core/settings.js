@@ -28,6 +28,9 @@ class SettingsManager {
       "twitchClientId",
       "torboxApiKey",
       "realDebridApiKey",
+      "realDebridOauthClientId",
+      "realDebridOauthClientSecret",
+      "realDebridOauthRefreshToken",
     ];
     this.secrets = createSecretStore({
       safeStorage,
@@ -77,6 +80,9 @@ class SettingsManager {
       twitchClientId: "",
       torboxApiKey: "",
       realDebridApiKey: "",
+      realDebridOauthClientId: "",
+      realDebridOauthClientSecret: "",
+      realDebridOauthRefreshToken: "",
       debridEnabled: false,
       debridProvider: "torbox",
       debridProviderOrder: [],

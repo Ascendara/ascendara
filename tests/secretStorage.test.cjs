@@ -128,6 +128,9 @@ test("every sensitive setting gets the stored format", async () => {
         "twitchClientId",
         "torboxApiKey",
         "realDebridApiKey",
+        "realDebridOauthClientId",
+        "realDebridOauthClientSecret",
+        "realDebridOauthRefreshToken",
       ];
       assert.deepEqual(manager.sensitiveKeys, names);
       for (const name of names)
@@ -154,6 +157,38 @@ test("a key with a non-ASCII character saves and reads back as it was", async ()
       { safeStorage }
     );
   }
+});
+
+test("a code sign-in saved in one bulk save is sealed, and clearing it leaves nothing", async () => {
+  await withSettings(
+    async ({ boot, file, invoke }) => {
+      boot();
+      const login = {
+        realDebridApiKey: "access",
+        realDebridOauthClientId: "client",
+        realDebridOauthClientSecret: "secret",
+        realDebridOauthRefreshToken: "refresh",
+      };
+      assert.equal(await invoke("save-settings", login), true);
+      const disk = readDisk(file);
+      for (const [name, value] of Object.entries(login)) {
+        assert.equal(disk[name], sealedForm(value));
+      }
+      assert.equal(boot().getSetting("realDebridOauthRefreshToken"), "refresh");
+
+      await invoke("save-settings", {
+        realDebridApiKey: "pasted",
+        realDebridOauthClientId: "",
+        realDebridOauthClientSecret: "",
+        realDebridOauthRefreshToken: "",
+      });
+      const cleared = readDisk(file);
+      assert.equal(cleared.realDebridApiKey, sealedForm("pasted"));
+      assert.equal(cleared.realDebridOauthRefreshToken, "");
+      assert.equal(cleared.realDebridOauthClientSecret, "");
+    },
+    { safeStorage: fakeSafeStorage() }
+  );
 });
 
 test("without safeStorage plain values get the machine-key format", async () => {

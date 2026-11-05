@@ -2,6 +2,7 @@ import {
   createSupportedHostCache,
   isSupportedUrl as matchesSupportedUrl,
 } from "./supportedHostCache";
+import { refreshSignIn } from "./realDebridSignIn";
 
 const API_BASE_URL = "/api/realdebrid";
 export const isSupportedUrl = (link, domains = getCachedSupportedHosts()) =>
@@ -56,7 +57,7 @@ const errorMessage = (status, result) => {
   return `Real-Debrid: ${result?.error || `request failed (${status})`}`;
 };
 
-async function request(apiKey, path, method = "GET", data) {
+async function request(apiKey, path, method = "GET", data, canRefresh = true) {
   if (!apiKey?.trim()) throw new Error("Real-Debrid API key is missing.");
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
@@ -69,6 +70,10 @@ async function request(apiKey, path, method = "GET", data) {
   });
   if (response.status === 204 || response.status === 202) return null;
   const result = await response.json().catch(() => null);
+  if (canRefresh && (response.status === 401 || result?.error_code === 8)) {
+    const refreshed = await refreshSignIn(apiKey.trim());
+    if (refreshed) return request(refreshed, path, method, data, false);
+  }
   if (!response.ok || result?.error) {
     const error = new Error(errorMessage(response.status, result));
     error.code = result?.error_code;

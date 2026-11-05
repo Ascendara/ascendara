@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDown,
@@ -43,17 +43,28 @@ export default function DebridSettings() {
       order.splice(target, 0, order.splice(index, 1)[0]);
       return { ...current, debridProviderOrder: order, debridProvider: order[0] };
     });
+  const clearDraft = provider =>
+    setDrafts(current => {
+      const next = { ...current };
+      delete next[provider.id];
+      return next;
+    });
+  const signedIn = (provider, values) => {
+    setSettings(current => ({ ...current, ...values }));
+    clearDraft(provider);
+    toast.success(t("debrid.signIn.success", { provider: provider.name }));
+  };
   const save = async provider => {
     const value = (drafts[provider.id] ?? settings[provider.apiKeySetting] ?? "").trim();
     setSaving(provider.id);
     try {
       if (value) await provider.getUserInfo(value);
-      update(provider.apiKeySetting, value);
-      setDrafts(current => {
-        const next = { ...current };
-        delete next[provider.id];
-        return next;
-      });
+      setSettings(current => ({
+        ...current,
+        [provider.apiKeySetting]: value,
+        ...provider.signIn?.clearedSettings,
+      }));
+      clearDraft(provider);
       toast.success(t("settings.apiKeySaved"));
     } catch (error) {
       toast.error(error.message);
@@ -125,6 +136,7 @@ export default function DebridSettings() {
                   }
                   saving={saving}
                   onSave={() => save(item)}
+                  onSignedIn={signedIn}
                   onMove={targetIndex => move(item.id, providers[targetIndex]?.id)}
                   isDragged={draggedId === item.id}
                   isDragTarget={dragTargetId === item.id}
@@ -180,6 +192,7 @@ function ProviderRow({
   onDraftChange,
   saving,
   onSave,
+  onSignedIn,
   onMove,
   isDragged,
   isDragTarget,
@@ -349,6 +362,13 @@ function ProviderRow({
                 <p className="text-xs text-muted-foreground">
                   {t("debrid.keyDescription")}
                 </p>
+                {provider.signIn && (
+                  <DebridCodeSignIn
+                    provider={provider}
+                    signedIn={provider.signIn.isSignedIn(settings)}
+                    onApproved={onSignedIn}
+                  />
+                )}
               </div>
 
               {options.map(([key, label, description, defaultValue]) => (
@@ -375,5 +395,90 @@ function ProviderRow({
         )}
       </AnimatePresence>
     </li>
+  );
+}
+
+// A service's code sign-in: the user approves a short code on the service's own site.
+function DebridCodeSignIn({ provider, signedIn, onApproved }) {
+  const { t } = useLanguage();
+  const [flow, setFlow] = useState(null);
+  const [starting, setStarting] = useState(false);
+
+  useEffect(() => {
+    if (!flow) return undefined;
+    let stopped = false;
+    let timer;
+    const check = async () => {
+      const result = await provider.signIn.poll(flow);
+      if (stopped) return;
+      if (result.status === "pending" && Date.now() < flow.expiresAt) {
+        timer = setTimeout(check, flow.intervalMs);
+        return;
+      }
+      setFlow(null);
+      if (result.status === "approved") onApproved(provider, result.settings);
+      else if (result.status === "pending") toast.error(t("debrid.signIn.expired"));
+      else toast.error(t("debrid.signIn.failed"));
+    };
+    timer = setTimeout(check, flow.intervalMs);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow]);
+
+  const start = async () => {
+    setStarting(true);
+    try {
+      setFlow(await provider.signIn.start());
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  if (!flow) {
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1">
+        <Button variant="outline" size="sm" onClick={start} disabled={starting}>
+          {starting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {t("debrid.signIn.button")}
+        </Button>
+        {signedIn && (
+          <span className="text-xs text-muted-foreground">
+            {t("debrid.signIn.signedIn")}
+          </span>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2 rounded-lg border border-border p-3">
+      <p className="text-xs text-muted-foreground">
+        {t("debrid.signIn.instructions", { url: provider.signIn.verificationUrl })}
+      </p>
+      <p className="select-all font-mono text-lg font-semibold tracking-widest">
+        {flow.userCode}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.electron.openURL(flow.openUrl)}
+        >
+          {t("debrid.signIn.openPage")}
+          <ExternalLink className="ml-1 h-3 w-3" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setFlow(null)}>
+          {t("debrid.signIn.cancel")}
+        </Button>
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {t("debrid.signIn.waiting")}
+        </span>
+      </div>
+    </div>
   );
 }

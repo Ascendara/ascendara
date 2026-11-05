@@ -53,6 +53,17 @@ const featureCenterResources = {
       useService: "Use service",
       apiKey: "API key",
       getApiKey: "Get an API key",
+      signIn: {
+        button: "Sign in with a code",
+        instructions: "Open {{url}} and enter this code:",
+        openPage: "Open the page",
+        cancel: "Cancel",
+        waiting: "Waiting for approval...",
+        signedIn: "Signed in with a code. The login renews by itself.",
+        success: "Signed in to {{provider}}",
+        failed: "Sign-in failed. Try again.",
+        expired: "The code expired. Try again.",
+      },
       saveKey: "Save key",
       keyDescription:
         "Keys are validated when saved. Clear and save the field to disconnect.",
