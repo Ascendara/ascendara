@@ -52,7 +52,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useNavigate, useLocation } from "react-router-dom";
+import useStableNavigate from "@/hooks/useStableNavigate";
 import imageCacheService from "@/services/images/imageCacheService";
 import { formatLatestUpdate, sanitizeText, formatCompactNumber } from "@/lib/utils";
 import verifiedGamesService from "@/services/games/verifiedGamesService";
@@ -193,7 +193,6 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
   const showStickySearchRef = useRef(false);
   const mainSearchRef = useRef(null);
   const searchSectionRef = useRef(null);
-  const location = useLocation();
 
   const [selectedCategories, setSelectedCategories] = useState(() => {
     const saved = window.sessionStorage.getItem("selectedCategories");
@@ -264,7 +263,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
   // Custom sources (Hydra Library) have no popularity/weight or categories, so
   // treat them the same as fitgirl for sort/filter UI degradation purposes.
   const isFitGirlSource = settings.gameSource === "fitgirl" || isCustomSource;
-  const navigate = useNavigate();
+  const navigate = useStableNavigate();
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [contextMenuGame, setContextMenuGame] = useState(null);
@@ -765,10 +764,15 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
     return () => observer.disconnect();
   }, [loadMore, isLoadingMore, hasMore, isVisible]);
 
+  // Read through a ref so handleDownload stays the same function; every card
+  // takes it as a prop, and a new one re-rendered the whole grid
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
+
   const handleDownload = useCallback(
     async game => {
       // Save the current search query when downloading a game
-      const currentSearch = mainSearchRef.current?.value || searchQuery;
+      const currentSearch = mainSearchRef.current?.value || searchQueryRef.current;
       if (currentSearch && currentSearch.trim()) {
         saveRecentSearch(currentSearch);
       }
@@ -796,7 +800,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
         });
       }
     },
-    [searchQuery, saveRecentSearch, navigate, mainSearchRef]
+    [saveRecentSearch, navigate, mainSearchRef]
   );
 
   // Handle clicking on a quick search result
@@ -1187,9 +1191,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                                     {game.size && (
                                       <div className="flex items-center gap-1">
                                         <Database className="h-3 w-3" />
-                                        <span>
-                                          {catalogSizeText(game, t)}
-                                        </span>
+                                        <span>{catalogSizeText(game, t)}</span>
                                       </div>
                                     )}
                                     {game.latest_update && (
@@ -1540,7 +1542,7 @@ const MemoizedGameCard = memo(
 
 // Featured game card — spans 2 columns with larger image and description
 const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) => {
-  const navigate = useNavigate();
+  const navigate = useStableNavigate();
   const [viewRef, viewCount] = useGameViews(
     game?.gameID,
     trackViews && !game?.privateSource

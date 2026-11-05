@@ -46,7 +46,7 @@ import {
 import DebridIcon from "./DebridIcon";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useNavigate, useLocation } from "react-router-dom";
+import useStableNavigate from "@/hooks/useStableNavigate";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import useDebridHosts from "@/hooks/useDebridHosts";
@@ -89,7 +89,7 @@ const GameCard = memo(function GameCard(props) {
 });
 
 function GameCardContent({ game, compact, viewCount }) {
-  const navigate = useNavigate();
+  const navigate = useStableNavigate();
   const [isVisible, setIsVisible] = useState(false);
   const [isPlayLater, setIsPlayLater] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -112,13 +112,6 @@ function GameCardContent({ game, compact, viewCount }) {
   const [isInstalled, setIsInstalled] = useState(false);
   const [needsUpdate, setNeedsUpdate] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { key: locationKey } = useLocation();
-
-  // The Search page stays mounted while hidden, so the loading state set by the
-  // details button must be cleared once navigation has completed.
-  useEffect(() => {
-    setIsLoading(false);
-  }, [locationKey]);
 
   const [gameRating, setGameRating] = useState(game?.rating || 0);
   const [isVerified, setIsVerified] = useState(false);
@@ -245,9 +238,14 @@ function GameCardContent({ game, compact, viewCount }) {
   const openDownloadPage = useCallback(async () => {
     if (isLoading) return;
     setIsLoading(true);
-    await gamePagePreparer.prepare(game);
+    // Cleared before navigating: the Search page stays mounted while hidden,
+    // so the spinner would otherwise still show when the user comes back
+    try {
+      await gamePagePreparer.prepare(game);
+    } finally {
+      if (isMounted.current) setIsLoading(false);
+    }
     if (!isMounted.current) return;
-    setIsLoading(false);
     navigate("/download", {
       state: {
         gameData: {
