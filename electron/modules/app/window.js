@@ -49,7 +49,7 @@ function showLoadFailure(
     char =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]
   );
-  mainWindow.loadURL(`data:text/html,
+  const page = `
   <html>
     <head>
       <style>
@@ -67,7 +67,9 @@ function showLoadFailure(
       <p>Try restarting Ascendara or your computer.</p>
     </body>
   </html>
-    `);
+    `;
+  // Encoded, because a raw "#" (the colours) would start a URL fragment and cut the page.
+  mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`);
 }
 
 /** Whether this process holds the local server's port. */

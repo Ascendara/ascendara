@@ -147,8 +147,21 @@ test("no window trusts the port before the answer, and only a yes grants it", as
     assert.equal(trusted.length, 0, "no trust for a port someone else holds");
     assert.equal(windows[0].urls.length, 1);
     assert.match(windows[0].urls[0], /^data:text\/html/);
-    assert.match(windows[0].urls[0], /netstat -ano/, "says how to find the holder");
-    assert.doesNotMatch(windows[0].urls[0], /Visual C\+\+|Antivirus/);
+    // The page must survive URL parsing whole: a raw "#" would end it at the first colour.
+    const errorPage = new URL(windows[0].urls[0]);
+    assert.equal(errorPage.hash, "", "no part of the page is read as a fragment");
+    const errorHtml = decodeURIComponent(
+      errorPage.pathname.slice(errorPage.pathname.indexOf(",") + 1)
+    );
+    assert.match(errorHtml, /netstat -ano/, "says how to find the holder");
+    assert.doesNotMatch(errorHtml, /Visual C\+\+|Antivirus/);
+    assert.match(errorHtml, /background: #09090b;/);
+    assert.match(errorHtml, /Another program is using port 46859 \(port in use\)/);
+    assert.match(errorHtml, /findstr :46859<\/code>/);
+    assert.match(
+      errorHtml,
+      /Try restarting Ascendara or your computer\.<\/p>\s*<\/body>\s*<\/html>/
+    );
 
     const owned = fresh();
     owned.createWindow();
