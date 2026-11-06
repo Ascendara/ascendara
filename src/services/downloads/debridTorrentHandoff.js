@@ -16,6 +16,30 @@ const missingSince = new Map();
 const STALL_MS = 72 * 60 * 60 * 1000;
 // Services that ask for gentler polling than the 5-second pass set pollIntervalMs.
 const lastPolled = new Map();
+// A started hand-off whose game is not in the game list by then is handed off again.
+const CONFIRM_MS = 2 * 60 * 1000;
+
+// Only starts made since this check existed (localDownloadSeen false) are confirmed, so a
+// game the user deleted on purpose is never downloaded again.
+async function confirmStarts(provider) {
+  const unconfirmed = Object.entries(readRecords(provider.metadataStorageKey)).filter(
+    ([id, entry]) =>
+      id.startsWith("torrent:") &&
+      entry?.localDownloadStarted &&
+      entry.localDownloadSeen === false
+  );
+  if (!unconfirmed.length) return;
+  const games = await window.electron.getGames();
+  for (const [id, entry] of unconfirmed) {
+    const name = provider.getTorrentGame(entry)?.game;
+    if (games.some(item => item.game === name))
+      updateRecord(provider, id, { localDownloadSeen: true });
+    else if (Date.now() - (entry.localDownloadStartedAt || 0) >= CONFIRM_MS) {
+      console.warn(`[debrid-handoff] ${name} did not appear on this PC, starting again`);
+      updateRecord(provider, id, { localDownloadStarted: false });
+    }
+  }
+}
 
 const startLocalDownload = async (...args) => {
   try {
@@ -76,6 +100,7 @@ export function handoffTorrents(provider, apiKey) {
     .then(async () => {
       // The child process needs a moment to publish its first game metadata.
       if (Date.now() < startingUntil) return;
+      await confirmStarts(provider);
       const update = (id, fields) => updateRecord(provider, id, fields);
       const mark = (id, flag) => update(id, { [flag]: true });
       // Stalled and failed torrents wait in the Downloads list for the user to remove.
@@ -206,7 +231,11 @@ export function handoffTorrents(provider, apiKey) {
         }
         handoffFailures.delete(retryKey);
         startingUntil = Date.now() + 15000;
-        update(id, { localDownloadStarted: true, localDownloadStartedAt: Date.now() });
+        update(id, {
+          localDownloadStarted: true,
+          localDownloadStartedAt: Date.now(),
+          localDownloadSeen: false,
+        });
         return { game: game.game, providerId: provider.id };
       }
       if (failure) throw failure;

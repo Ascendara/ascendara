@@ -208,6 +208,84 @@ test("handoff waits for readiness and active local jobs, respects disabling, and
   }
 });
 
+test("a hand-off whose game never shows up on this PC is started again, once confirmed games are left alone", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => {
+    Object.assign(global, saved);
+    t.mock.restoreAll();
+  });
+  let stored = JSON.stringify({
+    "torrent:lost": { game: "Lost", autoHandoff: true },
+    "torrent:listed": { game: "Listed", autoHandoff: true },
+    // Started before the confirm step existed, then deleted locally on purpose.
+    "torrent:deleted": {
+      game: "Deleted",
+      autoHandoff: true,
+      localDownloadStarted: true,
+      localDownloadStartedAt: 1,
+    },
+  });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_k, value) => {
+      stored = value;
+    },
+  };
+  const started = [];
+  let listed = [];
+  global.window = {
+    electron: {
+      getGames: async () => listed,
+      downloadFile: async (_data, game) => {
+        started.push(game);
+        return { success: true };
+      },
+    },
+  };
+  t.mock.method(console, "warn", () => {});
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  const provider = {
+    id: "test",
+    metadataStorageKey: "metadata",
+    getTorrentGame: entry => entry,
+    getTorrentDownload: async () => [
+      { url: "https://example.com/file", filename: "data.bin", size: 10 },
+    ],
+  };
+  let now = realNow();
+  t.mock.method(Date, "now", () => now);
+  const record = id => JSON.parse(stored)[`torrent:${id}`];
+
+  await worker.handoffTorrents(provider, "token");
+  now += 20000;
+  await worker.handoffTorrents(provider, "token");
+  assert.deepEqual(started, ["Lost", "Listed"]);
+  assert.equal(record("lost").localDownloadSeen, false);
+  // Only one of the two reaches the game list.
+  listed = [{ game: "Listed" }];
+  now += 20000;
+  await worker.handoffTorrents(provider, "token");
+  assert.equal(record("listed").localDownloadSeen, true);
+  assert.deepEqual(started, ["Lost", "Listed"], "no restart inside the confirm window");
+  now += 2 * 60 * 1000;
+  await worker.handoffTorrents(provider, "token");
+  assert.deepEqual(
+    started,
+    ["Lost", "Listed", "Lost"],
+    "the unconfirmed start is handed off again without a click"
+  );
+  // A confirmed game that later leaves the list (deleted on purpose) stays deleted.
+  listed = [];
+  now += 10 * 60 * 1000;
+  await worker.handoffTorrents(provider, "token");
+  now += 20000;
+  await worker.handoffTorrents(provider, "token");
+  assert.equal(started.filter(game => game === "Listed").length, 1);
+  assert.equal(started.includes("Deleted"), false);
+});
+
 test("handoff skips legacy records and stops polling torrents removed from the cloud", async t => {
   const saved = { window: global.window, localStorage: global.localStorage };
   t.after(() => Object.assign(global, saved));
