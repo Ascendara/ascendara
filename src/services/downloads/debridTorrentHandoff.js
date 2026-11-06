@@ -1,3 +1,4 @@
+import { isDownloadHalted } from "./downloadState";
 import { isPendingTorrent, readRecords, updateRecord } from "./debridRecords";
 
 // One local transfer per cloud torrent, independent of the currently open page.
@@ -105,8 +106,7 @@ export function handoffTorrents(provider, apiKey) {
             const data = item.downloadingData;
             return (
               data &&
-              !data.error &&
-              !data.stopped &&
+              !isDownloadHalted(data) &&
               (data.downloading || data.extracting || data.verifying || data.updating)
             );
           })
