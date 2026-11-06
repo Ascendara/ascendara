@@ -65,7 +65,7 @@ import HighballCompatibility, {
   useHighballCompat,
 } from "@/components/HighballCompatibility";
 import { toast } from "sonner";
-import { checkInstallSpace } from "@/lib/installSpace";
+import { checkInstallSpace, parseSize } from "@/lib/installSpace";
 import { formatBytes } from "@/services/app/systemHealthService";
 import TimemachineDialog from "@/components/TimemachineDialog";
 import steamService from "@/services/games/gameInfoService";
@@ -2077,7 +2077,11 @@ function PublicDownloadPage() {
                 }
               }}
             />
-            <SystemRequirements minReqs={gameData.minReqs} />
+            <SystemRequirements
+              minReqs={gameData.minReqs}
+              downloadSize={parseSize(gameData.size)}
+              downloadDirectory={settings.downloadDirectory}
+            />
             <AscendPerks
               gameName={gameData.game}
               isAuthenticated={isAuthenticated}

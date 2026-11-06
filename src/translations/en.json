@@ -1810,6 +1810,15 @@
     "autoUpdates": "Auto Updates",
     "betaFeature": "Woah... this is still in beta!",
     "by": "by",
+    "canRun": {
+      "fail": "Below it",
+      "freeSpace": "{{free}} free",
+      "needsSpace": "{{free}} free, needs {{needed}}",
+      "note": "Checked on this PC. CPU and GPU models aren't ranked, so compare those yourself.",
+      "pass": "Meets it",
+      "unknown": "Can't tell",
+      "yours": "Yours: {{value}}"
+    },
     "categories": "Categories",
     "cloudSaving": "Cloud Saves",
     "companies": "Companies",
@@ -2101,7 +2110,8 @@
       "directx": "DirectX",
       "gpu": "GPU",
       "os": "OS",
-      "ram": "RAM"
+      "ram": "RAM",
+      "storage": "Storage"
     },
     "steamLoading": "Loading game information...",
     "steamRating": "This game is rated {{rating}} apples. Apple ratings are different than Star ratings on Ascendara, and are more of a general rating of the game.",

@@ -112,24 +112,36 @@ test("OS stays undecided when the text or the PC doesn't allow a fair call", asy
   assert.equal(checkOs("macOS 12", win10).status, "unknown");
 });
 
-test("checkCanRun judges only OS, RAM and storage", async () => {
+test("checkCanRun judges OS, RAM and storage and never CPU or GPU", async () => {
   const { checkCanRun } = await load();
+  const minReqs = {
+    os: "Windows 10",
+    cpu: "Intel Core i5-760",
+    ram: "8 GB RAM",
+    gpu: "GeForce GTX 550 Ti",
+    directx: "Version 11",
+    storage: "2 GB available space",
+  };
   const verdicts = checkCanRun(
+    minReqs,
     {
-      os: "Windows 10",
-      cpu: "Intel Core i5-760",
-      ram: "8 GB RAM",
-      gpu: "GeForce GTX 550 Ti",
-      directx: "Version 11",
-      storage: "2 GB available space",
+      ...win11,
+      totalMemory: 16 * GIB,
+      cpu: "AMD Ryzen 7 9700X 8-Core Processor",
+      gpu: "NVIDIA GeForce RTX 5070",
     },
-    { ...win11, totalMemory: 16 * GIB },
     { freeSpace: 100 * GIB, downloadSize: 1 * GIB }
   );
-  assert.deepEqual(Object.keys(verdicts).sort(), ["os", "ram", "storage"]);
+  assert.deepEqual(Object.keys(verdicts).sort(), ["cpu", "gpu", "os", "ram", "storage"]);
   assert.equal(verdicts.os.status, "pass");
   assert.equal(verdicts.ram.status, "pass");
   assert.equal(verdicts.storage.status, "pass");
+  assert.deepEqual(verdicts.gpu, { status: "unknown", have: "NVIDIA GeForce RTX 5070" });
+  assert.equal(verdicts.cpu.status, "unknown");
+  // Detection that found nothing is "can't tell", never a fail
+  const undetected = checkCanRun(minReqs, { ...win11, gpu: "Unknown" });
+  assert.deepEqual(undetected.gpu, { status: "unknown" });
+  assert.deepEqual(checkCanRun(minReqs, { ...win11 }).cpu, { status: "unknown" });
   assert.deepEqual(checkCanRun({ ram: "8 GB RAM" }, null), {});
   assert.deepEqual(checkCanRun(null, win11), {});
 });

@@ -112,12 +112,25 @@ export function checkOs(requirement, { platform, osRelease, arch } = {}) {
   return { status: "pass", have };
 }
 
-/** Verdicts for the requirement lines this can judge, keyed like minReqs */
+/**
+ * CPU and GPU are always "unknown": the detected name is shown so players can
+ * compare it themselves, and a missing one ("Unknown") is never a fail.
+ */
+export function describeUnranked(name) {
+  const have = String(name || "").trim();
+  return have && have.toLowerCase() !== "unknown"
+    ? { status: "unknown", have }
+    : { status: "unknown" };
+}
+
+/** A verdict for every requirement line the card shows, keyed like minReqs */
 export function checkCanRun(minReqs, specs, { freeSpace, downloadSize } = {}) {
   if (!minReqs || !specs) return {};
   const verdicts = {};
   if (minReqs.os) verdicts.os = checkOs(minReqs.os, specs);
+  if (minReqs.cpu) verdicts.cpu = describeUnranked(specs.cpu);
   if (minReqs.ram) verdicts.ram = checkRam(minReqs.ram, specs.totalMemory);
+  if (minReqs.gpu) verdicts.gpu = describeUnranked(specs.gpu);
   if (minReqs.storage) {
     verdicts.storage = checkStorage(minReqs.storage, freeSpace, downloadSize);
   }
