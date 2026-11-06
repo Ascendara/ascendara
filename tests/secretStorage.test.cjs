@@ -124,8 +124,6 @@ test("every sensitive setting gets the stored format", async () => {
     async ({ boot, file }) => {
       const manager = boot();
       const names = [
-        "twitchSecret",
-        "twitchClientId",
         "torboxApiKey",
         "realDebridApiKey",
         "realDebridOauthClientId",

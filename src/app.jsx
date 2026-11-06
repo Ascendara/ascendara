@@ -308,14 +308,11 @@ const GiantBombMigrationWarning = () => {
     // Only check once after settings are loaded
     if (hasCheckedRef.current) return;
 
-    // Check if user has deprecated API keys set (giantBombKey or IGDB keys)
+    // Check if user has a deprecated API key set
     // Note: giantBombKey was removed from default settings, so it will only exist if user had it previously
     const hasGiantBombKey = settings.giantBombKey && settings.giantBombKey.trim() !== "";
-    const hasIgdbKeys =
-      (settings.twitchClientId && settings.twitchClientId.trim() !== "") ||
-      (settings.twitchSecret && settings.twitchSecret.trim() !== "");
 
-    if (hasGiantBombKey || hasIgdbKeys) {
+    if (hasGiantBombKey) {
       setShowWarning(true);
     }
 
@@ -328,8 +325,6 @@ const GiantBombMigrationWarning = () => {
     await setSettings({
       ...settings,
       giantBombKey: "",
-      twitchClientId: "",
-      twitchSecret: "",
     });
     setShowWarning(false);
   };

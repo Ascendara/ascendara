@@ -24,8 +24,6 @@ class SettingsManager {
     this.filePath = path.join(app.getPath("userData"), "ascendarasettings.json");
     this.preMigrationBackupPath = `${this.filePath}.pre-safestorage.bak`;
     this.sensitiveKeys = [
-      "twitchSecret",
-      "twitchClientId",
       "torboxApiKey",
       "realDebridApiKey",
       "realDebridOauthClientId",
@@ -76,8 +74,6 @@ class SettingsManager {
       excludeFolders: false,
       prioritizeTorboxOverSeamless: false,
       crackDirectory: "",
-      twitchSecret: "",
-      twitchClientId: "",
       torboxApiKey: "",
       realDebridApiKey: "",
       realDebridOauthClientId: "",
