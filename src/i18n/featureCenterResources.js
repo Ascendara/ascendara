@@ -1,5 +1,48 @@
 const featureCenterResources = {
   en: {
+    fitgirlInstall: {
+      title: "FitGirl auto-install",
+      description:
+        "What happens when a FitGirl repack finishes downloading. A download can change these in its parts dialog.",
+      afterDownload: "After this FitGirl pack downloads",
+      ask: "Ask after each download",
+      askDescription:
+        "Ask before installing. When off, a finished pack installs by itself.",
+      verify: "Check files with MD5",
+      verifyDescription: "Check every part against the pack's MD5 list first.",
+      silent: "Silent setup",
+      silentDescription: "Run setup without its wizard pages.",
+      limitRam: "Limit installer to 2 GB of RAM",
+      limitRamDescription:
+        "Setup has no switch for this, so it opens its own window and you tick the box there.",
+      verifyInstalled: "Check installed files",
+      verifyInstalledDescription:
+        "After setup, check the installed game against the pack's file list. No extra window.",
+      redists: "Install DirectX and Visual C++",
+      redistsDescription:
+        "Run the pack's DirectX and Visual C++ installers. Most PCs already have them.",
+      hostsRedirect: "Redirect fake FitGirl sites",
+      hostsRedirectDescription:
+        "Run the pack's script that points fake FitGirl sites to the real one.",
+      openSite: "Open the FitGirl site",
+      openSiteDescription: "Open fitgirl-repacks.site in your browser after install.",
+      deletePack: "Delete pack after install",
+      deletePackDescription:
+        "Removes only the pack's own files after a good install, never the game.",
+      promptTitle: "Verify and install {{game}} now?",
+      promptDescription: "Setup asks for admin rights. It runs: {{path}}",
+      install: "Install",
+      notNow: "Not now",
+      checking: "Checking the pack",
+      verifying: "Verifying {{percent}}%",
+      installing: "Installing",
+      verifyingInstall: "Checking installed files {{percent}}%",
+      cleaning: "Cleaning up",
+      done: "Done",
+      failed: "Failed: {{error}}",
+      installed: "{{game}} is installed",
+      retry: "Verify and install",
+    },
     debrid: {
       downloadsTitle: "Debrid Downloads",
       setupGuide: "Setup guide",
@@ -39,6 +82,14 @@ const featureCenterResources = {
       statusWaitingFiles: "Waiting for files",
       statusFailed: "Failed",
       statusSent: "On your PC",
+      handoff: {
+        startingIn: "Starting on your PC in {{seconds}} s",
+        startingNow: "Starting on your PC now",
+        retryingIn: "Retrying in {{seconds}} s",
+        waitingFor: "Waiting for {{game}} to finish",
+        folderHasInstall:
+          "Folder already has an install: remove it or pick another download folder",
+      },
       emptyReady: "Nothing ready yet",
       emptyReadyDesc: "Finished cloud downloads wait here until they are on your PC.",
       emptyCloud: "Nothing in the cloud",
@@ -82,6 +133,21 @@ const featureCenterResources = {
       routeLocal: "qBittorrent",
       routeNone: "Not handled",
       openDownloads: "Open debrid downloads",
+      torrentParts: {
+        label: "When a torrent has several parts",
+        description:
+          "Skipping extras keeps the game and the language packs for your system language and English, and leaves out bonus content, soundtracks, artbooks and other languages.",
+        ask: "Ask me",
+        all: "Download all parts",
+        skipExtras: "Skip extras automatically",
+        dialogTitle: "Choose the parts to download",
+        dialogDescription: "{{name}} has several parts. Untick the ones you do not want.",
+        selected: "{{count}} of {{total}} parts, {{size}}",
+        download: "Download",
+        later: "Not now",
+        waiting: "Waiting",
+        chooseParts: "Choose parts",
+      },
       viewDownloads: "Downloads",
       accountsTitle: "Accounts",
       accountsDescription:

@@ -40,9 +40,32 @@ const {
   stopHelpers,
   createOperationLock,
   waitForSpawn,
+  watchEarlyExit,
 } = require("./downloadControl");
 const withDownloadOperation = createOperationLock();
 const downloadProcesses = new Map();
+// Helpers the user stopped, so their exit is not reported as a failed start.
+const stoppedProcesses = new WeakSet();
+const earlyExitMessage = code =>
+  `The downloader quit right after starting (exit code ${code}). It may be outdated or blocked; check downloadmanager.log.`;
+
+// Records an early downloader exit in the game file, the way the downloader reports its own errors.
+async function recordEarlyExit(jsonFile, code) {
+  try {
+    if (!(await fs.pathExists(jsonFile))) return;
+    const current = await fs.readJson(jsonFile);
+    if (!current.downloadingData || current.downloadingData.stopped) return;
+    current.downloadingData = {
+      ...current.downloadingData,
+      downloading: false,
+      error: true,
+      message: earlyExitMessage(code),
+    };
+    await fs.writeJson(jsonFile, current, { spaces: 4 });
+  } catch (error) {
+    console.error("Could not record early downloader exit:", error);
+  }
+}
 const retryDownloadProcesses = new Map();
 const dllRepair = require("./dllRepair");
 const { validateFileList } = require("./downloadManifest");
@@ -201,6 +224,14 @@ function registerDownloadHandlers() {
       return false;
     }
   });
+
+  // Game folders whose downloader process is still alive. A finished process stays in
+  // the map, so its exit state is checked too.
+  ipcMain.handle("get-running-downloads", () =>
+    [...downloadProcesses]
+      .filter(([, child]) => child && child.exitCode == null && child.signalCode == null)
+      .map(([folder]) => folder)
+  );
 
   // Get current downloads
   ipcMain.handle("get-downloads", async () => {
@@ -380,6 +411,12 @@ function registerDownloadHandlers() {
                           downloadingData.awaitingRecoveryAction || false,
                         recoverableError: downloadingData.recoverableError || null,
                         manualInstallerPath: downloadingData.manualInstallerPath || null,
+                        fitgirlPack:
+                          !!downloadingData.pendingManualInstall &&
+                          !!downloadingData.manualInstallerPath &&
+                          require("./fitgirlInstall").isFitgirlPack(
+                            path.dirname(downloadingData.manualInstallerPath)
+                          ),
                         progressCompleted: downloadingData.progressCompleted,
                         progressDownloadSpeeds: downloadingData.progressDownloadSpeeds,
                         timeUntilComplete: downloadingData.timeUntilComplete,
@@ -561,17 +598,30 @@ function registerDownloadHandlers() {
               `${sanitizedGame}.json`
             );
             const cached = await fs.readJson(cachePath).catch(() => null);
-            const tracked = fs.existsSync(
-              path.join(gameDirectory, `${sanitizedGame}.ascendara.json`)
+            const trackedPath = path.join(
+              gameDirectory,
+              `${sanitizedGame}.ascendara.json`
             );
-            if (
-              cached?.transferId === fileList.transferId &&
-              (tracked || downloadProcesses.has(sanitizedGame))
-            )
+            const sameTransfer = cached?.transferId === fileList.transferId;
+            const running = downloadProcesses.has(sanitizedGame);
+            const tracked = await fs.readJson(trackedPath).catch(() => null);
+            // Running, or listed in Downloads where the user can resume it.
+            if (sameTransfer && (running || tracked?.downloadingData))
               return { success: true, alreadyStarted: true };
-            throw new Error(
-              "The game folder already exists. Resolve the existing download before starting this torrent."
-            );
+            // Leftovers start again in their folder, like Redownload: an unfinished cloud
+            // torrent download with nothing running, or files with no game record. A
+            // running download, a paused normal download or an installed game is never
+            // overwritten, even by the transfer that downloaded it: the downloader writes
+            // its game file with downloadingData, so a game file without it is a finished game.
+            // Normal downloads always leave a cache entry without fileList.
+            const unfinishedTorrent =
+              tracked?.downloadingData && (!cached || cached.fileList === true);
+            if (!running && (!fs.existsSync(trackedPath) || unfinishedTorrent))
+              console.log(`Starting over the leftover folder of ${sanitizedGame}`);
+            else
+              throw new Error(
+                "The game folder already exists. Resolve the existing download before starting this torrent."
+              );
           }
 
           // If the destination folder already exists and wasn't created by a
@@ -931,6 +981,21 @@ function registerDownloadHandlers() {
           });
 
           await waitForSpawn(downloadProcess);
+          watchEarlyExit(downloadProcess, code => {
+            if (stoppedProcesses.has(downloadProcess)) return;
+            console.error(
+              `Downloader for ${sanitizedGame} exited with code ${code} right after starting`
+            );
+            if (!event.sender.isDestroyed())
+              event.sender.send("download-error", {
+                game: sanitizedGame,
+                error: earlyExitMessage(code),
+              });
+            recordEarlyExit(
+              path.join(gameDirectory, `${sanitizedGame}.ascendara.json`),
+              code
+            );
+          });
           const analyticsParams = {
             game: sanitizedGame,
             game_id: gameID,
@@ -1035,7 +1100,7 @@ function registerDownloadHandlers() {
   // Called when the user confirms they've finished running a manual installer
   // (e.g. torrent repack setup.exe). Detects the resulting executable and
   // clears the pendingManualInstall state so the game shows as fully installed.
-  ipcMain.handle("complete-manual-install", async (_, game) => {
+  async function completeManualInstall(game) {
     try {
       const settings = settingsManager.getSettings();
       if (!settings.downloadDirectory) {
@@ -1111,6 +1176,66 @@ function registerDownloadHandlers() {
       console.error("Error completing manual install:", error);
       return { success: false, error: error.message };
     }
+  }
+  ipcMain.handle("complete-manual-install", (_, game) => completeManualInstall(game));
+
+  // FitGirl packs: verify, run setup elevated with arguments, finish, clean up.
+  const fitgirlInstalls = new Map();
+  ipcMain.handle("fitgirl-autoinstall-status", () => Object.fromEntries(fitgirlInstalls));
+  // Trigger decisions from the renderer (ask or install, and why) for the main log.
+  ipcMain.handle("fitgirl-autoinstall-log", (_, message) =>
+    console.log("[autoinstall]", sanitizeText(String(message)).slice(0, 500))
+  );
+  ipcMain.handle("fitgirl-autoinstall", async (event, game, options = {}) => {
+    const sanitizedGame = sanitizeGameName(sanitizeText(game));
+    const running = fitgirlInstalls.get(sanitizedGame);
+    if (running && !["done", "failed"].includes(running.stage)) {
+      return { success: false, error: "Already installing" };
+    }
+    const send = update => {
+      const state = { game: sanitizedGame, ...update };
+      fitgirlInstalls.set(sanitizedGame, state);
+      if (!event.sender.isDestroyed()) {
+        event.sender.send("fitgirl-autoinstall-progress", state);
+      }
+    };
+    if (process.platform !== "win32") {
+      send({ stage: "failed", error: "Auto-install runs on Windows only" });
+      return { success: false, error: "Auto-install runs on Windows only" };
+    }
+    const settings = settingsManager.getSettings();
+    const gameDirectory = path.join(settings.downloadDirectory || "", sanitizedGame);
+    const gameInfoPath = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
+    let installerPath;
+    try {
+      const info = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
+      if (!info.downloadingData?.pendingManualInstall)
+        throw new Error("Nothing to install");
+      installerPath = info.downloadingData.manualInstallerPath;
+    } catch (error) {
+      send({ stage: "failed", error: error.message });
+      return { success: false, error: error.message };
+    }
+    const pick = key => options[key] === true;
+    console.log(`[autoinstall] ${sanitizedGame}: start with ${JSON.stringify(options)}`);
+    send({ stage: "checking" });
+    return require("./fitgirlAutoInstall").runAutoInstall({
+      gameDirectory,
+      gameName: sanitizedGame,
+      installerPath,
+      options: {
+        verify: pick("verify"),
+        silent: pick("silent"),
+        limitRam: pick("limitRam"),
+        verifyInstalled: pick("verifyInstalled"),
+        redists: pick("redists"),
+        hostsRedirect: pick("hostsRedirect"),
+        openSite: pick("openSite"),
+        deletePack: pick("deletePack"),
+      },
+      completeInstall: () => completeManualInstall(sanitizedGame),
+      onStage: send,
+    });
   });
 
   // Stop download handler
@@ -1199,6 +1324,10 @@ function registerDownloadHandlers() {
                 before.downloadingData.awaitingRecoveryAction)
             ) {
               throw new Error("This download is no longer in a pausable stage.");
+            }
+            for (const map of [downloadProcesses, retryDownloadProcesses]) {
+              const child = map.get(sanitizedGame);
+              if (child) stoppedProcesses.add(child);
             }
             const knownPids = [
               before.downloadingData?.ownerPid,
@@ -1956,6 +2085,13 @@ function registerDownloadHandlers() {
             throw error;
           }
           downloadProcess.on("error", error => console.error("Downloader error:", error));
+          watchEarlyExit(downloadProcess, code => {
+            if (stoppedProcesses.has(downloadProcess)) return;
+            console.error(
+              `Downloader for ${sanitizedGame} exited with code ${code} right after resuming`
+            );
+            recordEarlyExit(jsonFile, code);
+          });
           downloadProcess.once("exit", () => {
             if (downloadProcesses.get(sanitizedGame) === downloadProcess)
               downloadProcesses.delete(sanitizedGame);

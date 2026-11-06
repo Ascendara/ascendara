@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import DebridIcon from "@/components/DebridIcon";
 import { formatBytes } from "@/components/debrid/DebridDownloadParts";
+import TorrentPartsSetting from "@/components/debrid/TorrentPartsSetting";
 import { useSettings } from "@/context/SettingsContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
@@ -336,6 +337,7 @@ function Overview({ providers, accounts }) {
               <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           )}
+          <TorrentPartsSetting />
         </>
       ) : (
         <ul className="mt-6 grid gap-3 sm:grid-cols-3">

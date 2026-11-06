@@ -559,6 +559,16 @@ contextBridge.exposeInMainWorld("electron", {
   runElevatedInstaller: installerPath =>
     ipcRenderer.invoke("run-elevated-installer", installerPath),
   completeManualInstall: game => ipcRenderer.invoke("complete-manual-install", game),
+  fitgirlAutoInstall: (game, options) =>
+    ipcRenderer.invoke("fitgirl-autoinstall", game, options),
+  fitgirlAutoInstallStatus: () => ipcRenderer.invoke("fitgirl-autoinstall-status"),
+  fitgirlAutoInstallLog: message =>
+    ipcRenderer.invoke("fitgirl-autoinstall-log", message),
+  onFitgirlAutoInstallProgress: callback => {
+    const listener = (_, state) => callback(state);
+    ipcRenderer.on("fitgirl-autoinstall-progress", listener);
+    return () => ipcRenderer.removeListener("fitgirl-autoinstall-progress", listener);
+  },
   resumeDownload: game => ipcRenderer.invoke("resume-download", game),
   retryDownload: (link, game, online, dlc, version) =>
     ipcRenderer.invoke("retry-download", link, game, online, dlc, version),
@@ -572,6 +582,7 @@ contextBridge.exposeInMainWorld("electron", {
   downloadTrainerToGame: (downloadUrl, gameName, isCustom) =>
     ipcRenderer.invoke("download-trainer-to-game", downloadUrl, gameName, isCustom),
   isDownloaderRunning: () => ipcRenderer.invoke("is-downloader-running"),
+  getRunningDownloads: () => ipcRenderer.invoke("get-running-downloads"),
   getDownloadHistory: () => ipcRenderer.invoke("get-download-history"),
   getDownloads: () => ipcRenderer.invoke("get-downloads"),
   getDownloadLog: lines => ipcRenderer.invoke("get-download-log", lines),

@@ -1,5 +1,6 @@
 import { canUseCloudTorrents } from "@/services/downloads/debridService";
 import DebridSettings from "@/components/DebridSettings";
+import FitgirlInstallSettings from "@/components/FitgirlInstallToggles";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useTheme, clearCustomTheme } from "@/context/ThemeContext";
 import {
@@ -1787,6 +1788,7 @@ function Settings() {
                     t={t}
                   />
                 </div>
+                <FitgirlInstallSettings />
               </SettingsSection>
 
               <SettingsSection

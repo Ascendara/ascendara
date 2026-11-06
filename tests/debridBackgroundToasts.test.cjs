@@ -53,6 +53,11 @@ test("one service failing does not hide the download another service started", a
   assert.match(results[0].reason.message, /Bad service is down/);
   assert.deepEqual(results[1], {
     status: "fulfilled",
-    value: { game: "Started", providerId: "good" },
+    value: {
+      game: "Started",
+      providerId: "good",
+      storageKey: "good",
+      recordKey: "torrent:1",
+    },
   });
 });

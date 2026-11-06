@@ -52,6 +52,13 @@ export const getApiKey = settings => {
   return settings?.torboxApiKey || null;
 };
 
+// TorBox expects an integer id, or all=true, never both.
+const controlTarget = (idField, options) =>
+  options.all === true ? { all: true } : { [idField]: Number(options[idField]) };
+
+const controlError = (data, fallback) =>
+  new Error([data?.error, data?.detail].filter(Boolean).join(": ") || fallback);
+
 /**
  * Control web downloads (delete, etc.)
  * @param {string} apiKey - The Torbox API key for authorization
@@ -83,16 +90,15 @@ export const controlWebDownload = async (apiKey, options) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        webdl_id: options.webdl_id,
+        ...controlTarget("webdl_id", options),
         operation: options.operation,
-        all: options.all || false,
       }),
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
 
-    if (!data.success) {
-      throw new Error(data.detail || `Failed to ${options.operation} download`);
+    if (!response.ok || !data.success) {
+      throw controlError(data, `Failed to ${options.operation} download`);
     }
 
     return data;
@@ -127,32 +133,40 @@ export const controlTorrent = async (apiKey, options) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      torrent_id: options.torrent_id,
+      ...controlTarget("torrent_id", options),
       operation: options.operation,
-      all: options.all || false,
     }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.success) {
-    throw new Error(data.detail || `Failed to ${options.operation} torrent`);
+    throw controlError(data, `Failed to ${options.operation} torrent`);
   }
   return data;
 };
 
+// TorBox's mylist can serve a cached copy that still holds a just-deleted item.
+// Hide those until a list arrives without them.
+const deletedKeys = new Set();
+
 /**
  * Control either a web download or torrent using its normalized TorBox type.
+ * TorBox has no stop operation for torrents or web downloads, so stop is a delete.
  */
 export const controlDownload = async (apiKey, download, operation) => {
-  if (download?._torboxType === "torrent") {
-    return controlTorrent(apiKey, {
-      torrent_id: download.id,
-      operation: operation === "stop" ? "delete" : operation,
-    });
-  }
-  return controlWebDownload(apiKey, {
-    webdl_id: download?.id,
-    operation,
-  });
+  const apiOperation = operation === "stop" ? "delete" : operation;
+  const type = download?._torboxType === "torrent" ? "torrent" : "webdl";
+  const data =
+    type === "torrent"
+      ? await controlTorrent(apiKey, {
+          torrent_id: download.id,
+          operation: apiOperation,
+        })
+      : await controlWebDownload(apiKey, {
+          webdl_id: download?.id,
+          operation: apiOperation,
+        });
+  if (apiOperation === "delete") deletedKeys.add(`${type}:${download.id}`);
+  return data;
 };
 
 /**
@@ -260,7 +274,12 @@ export const createPremiumDownloadLink = async (link, apiKey) => {
  * @returns {Promise<string>} - The direct download URL
  * @throws {Error} - If the API request fails
  */
-export const getDirectDownloadLink = async (apiKey, downloadId, type = "webdl") => {
+export const getDirectDownloadLink = async (
+  apiKey,
+  downloadId,
+  type = "webdl",
+  fileId = null
+) => {
   if (!apiKey) {
     throw new Error("API key is required");
   }
@@ -295,8 +314,9 @@ export const getDirectDownloadLink = async (apiKey, downloadId, type = "webdl") 
     url.searchParams.append("token", apiKey);
     url.searchParams.append(type === "torrent" ? "torrent_id" : "web_id", downloadId);
 
-    // Always set zip_link to true (as string)
-    url.searchParams.append("zip_link", "true");
+    // One file of a torrent, or the whole download as a zip.
+    if (fileId != null) url.searchParams.append("file_id", fileId);
+    else url.searchParams.append("zip_link", "true");
 
     console.log("[Torbox] Requesting direct download link:", {
       type,
@@ -305,7 +325,7 @@ export const getDirectDownloadLink = async (apiKey, downloadId, type = "webdl") 
     console.log("[Torbox] Download link params:", {
       type,
       downloadId,
-      zip_link: "true",
+      fileId,
     });
 
     const response = await fetch(url.toString(), {
@@ -408,23 +428,43 @@ const getDownloadList = async (apiKey, type, params) => {
   }));
 };
 
+// null when the torrent is not on the account (TorBox answers a deleted one with an error).
 export const getTorrentInfo = async (apiKey, id) => {
-  const items = await getDownloadList(apiKey, "torrent", { id, bypass_cache: "true" });
+  let items;
+  try {
+    items = await getDownloadList(apiKey, "torrent", { id, bypass_cache: "true" });
+  } catch (error) {
+    if (/no torrents found/i.test(error.message)) return null;
+    throw error;
+  }
   return items.find(item => String(item.id) === String(id)) || null;
 };
 
-export const getAllDownloads = async apiKey => {
+// fresh: skip TorBox's list cache (after a change or a manual refresh, not for polling).
+export const getAllDownloads = async (apiKey, { fresh = false } = {}) => {
   try {
+    const params = fresh ? { bypass_cache: "true" } : undefined;
     const results = await Promise.allSettled([
-      getDownloadList(apiKey, "webdl"),
-      getDownloadList(apiKey, "torrent"),
+      getDownloadList(apiKey, "webdl", params),
+      getDownloadList(apiKey, "torrent", params),
     ]);
-    const downloads = results.flatMap(result =>
-      result.status === "fulfilled" ? result.value : []
-    );
     if (results.every(result => result.status === "rejected")) {
       throw results[0].reason;
     }
+    const listed = new Set();
+    const downloads = results
+      .flatMap(result => (result.status === "fulfilled" ? result.value : []))
+      .filter(item => {
+        listed.add(item._storageKey);
+        return !deletedKeys.has(item._storageKey);
+      });
+    results.forEach((result, index) => {
+      if (result.status !== "fulfilled") return;
+      const prefix = index === 0 ? "webdl:" : "torrent:";
+      for (const key of deletedKeys) {
+        if (key.startsWith(prefix) && !listed.has(key)) deletedKeys.delete(key);
+      }
+    });
     results
       .filter(result => result.status === "rejected")
       .forEach(result =>

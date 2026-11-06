@@ -17,6 +17,11 @@ import { toast } from "sonner";
 import { AlertCircle, Download, StopCircle, Trash } from "lucide-react";
 import torboxProvider from "@/services/downloads/debrid/torboxProvider";
 import {
+  getDownloadKey,
+  getStoredDownloadData,
+  isSentToPc,
+} from "@/services/downloads/torboxRecords";
+import {
   DebridAccountBar,
   DebridEmpty,
   DebridItem,
@@ -25,6 +30,7 @@ import {
   DebridTabs,
   formatBytes as formatSize,
 } from "@/components/debrid/DebridDownloadParts";
+import HandoffCountdown from "@/components/debrid/HandoffCountdown";
 import "@/lib/utils";
 import {
   getUserInfo,
@@ -88,17 +94,6 @@ const manageStoredGameNames = () => {
   }
 };
 
-const getDownloadKey = download =>
-  download?._storageKey ||
-  `${download?._torboxType === "torrent" ? "torrent" : "webdl"}:${download?.id}`;
-
-const getStoredDownloadData = (storedDownloads, download) =>
-  storedDownloads[getDownloadKey(download)] ||
-  storedDownloads[download?.id] ||
-  storedDownloads[download?.url] ||
-  storedDownloads[download?.original_url] ||
-  null;
-
 const TorboxDownloads = () => {
   const { t } = useLanguage();
   const { settings } = useSettings();
@@ -146,7 +141,7 @@ const TorboxDownloads = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   // Fetch TorBox downloads
-  const fetchTorboxDownloads = async () => {
+  const fetchTorboxDownloads = async (fresh = false) => {
     if (!settings?.torboxApiKey) {
       setError("TorBox API key not found in settings");
       setIsLoading(false);
@@ -155,7 +150,7 @@ const TorboxDownloads = () => {
 
     try {
       // Use the getAllDownloads service function
-      const downloads = await getAllDownloads(settings.torboxApiKey);
+      const downloads = await getAllDownloads(settings.torboxApiKey, { fresh });
       console.log("[TorboxDownloads] Downloads fetched:", downloads);
       setTorboxDownloads(downloads || []);
       setError(null);
@@ -309,8 +304,11 @@ const TorboxDownloads = () => {
 
       await controlDownload(apiKey, download, "delete");
 
-      // Update the downloads list after successful deletion
-      fetchTorboxDownloads();
+      // Drop it now, then re-read past TorBox's list cache
+      setTorboxDownloads(prev =>
+        prev.filter(item => item._storageKey !== download._storageKey)
+      );
+      fetchTorboxDownloads(true);
 
       toast.success(
         t("torbox.download_deleted_desc", {
@@ -319,7 +317,7 @@ const TorboxDownloads = () => {
       );
     } catch (error) {
       console.error("[TorboxDownloads] Error deleting download:", error);
-      toast.error(t("torbox.error_deleting_download"));
+      toast.error(t("torbox.error_deleting_download"), { description: error?.message });
     }
   };
 
@@ -488,11 +486,7 @@ const TorboxDownloads = () => {
   };
   const describe = download => {
     const state = (download.download_state || download.status || "").toLowerCase();
-    const stored = getStoredDownloadData(storedDownloads, download);
-    const sent =
-      downloadedToPc[getDownloadKey(download)] ||
-      downloadedToPc[download.id] ||
-      stored?.localDownloadStarted;
+    const sent = isSentToPc(downloadedToPc, storedDownloads, download);
     const ready = state === "completed" || state === "cached";
     if (sent && ready)
       return { group: "sent", tone: "done", status: t("debrid.statusSent"), ready };
@@ -578,7 +572,7 @@ const TorboxDownloads = () => {
           onRefresh={async () => {
             setRefreshing(true);
             try {
-              await Promise.all([fetchTorboxDownloads(), fetchUserInfo()]);
+              await Promise.all([fetchTorboxDownloads(true), fetchUserInfo()]);
             } finally {
               setRefreshing(false);
             }
@@ -605,7 +599,7 @@ const TorboxDownloads = () => {
               variant="outline"
               size="sm"
               className="mt-4"
-              onClick={fetchTorboxDownloads}
+              onClick={() => fetchTorboxDownloads(true)}
             >
               {t("common.retry")}
             </Button>
@@ -634,6 +628,14 @@ const TorboxDownloads = () => {
                   tone={tone}
                   progress={ready ? undefined : progressOf(download)}
                   meta={meta}
+                  note={
+                    download._torboxType === "torrent" && tone !== "done" ? (
+                      <HandoffCountdown
+                        storageKey={torboxProvider.metadataStorageKey}
+                        recordKey={getDownloadKey(download)}
+                      />
+                    ) : null
+                  }
                   action={
                     tone === "ready" ? (
                       <Button size="sm" onClick={() => handleDownloadToPC(download)}>
@@ -735,11 +737,16 @@ const TorboxDownloads = () => {
                     })
                   );
 
-                  // Refresh downloads to show updated status
-                  fetchTorboxDownloads();
+                  // Stop is a delete on TorBox: drop it now, then re-read past the list cache
+                  setTorboxDownloads(prev =>
+                    prev.filter(item => item._storageKey !== confirmStop._storageKey)
+                  );
+                  fetchTorboxDownloads(true);
                 } catch (error) {
                   console.error("Error stopping download:", error);
-                  toast.error(t("torbox.error_stopping_download"));
+                  toast.error(t("torbox.error_stopping_download"), {
+                    description: error?.message,
+                  });
                 }
                 setConfirmStop(null);
               }}
