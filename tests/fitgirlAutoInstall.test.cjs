@@ -140,3 +140,25 @@ test("an installer outside the download folder never runs", async () => {
   assert.equal(result.success, false);
   assert.equal(ran, false);
 });
+
+test("setup path and arguments never enter the PowerShell script text", async () => {
+  const {
+    runElevatedSetup,
+  } = require("../electron/modules/downloads/fitgirlAutoInstall");
+  const { EventEmitter } = require("node:events");
+  const installer = "C:\\Games\\Bob\u2019s Game'; calc\\setup.exe";
+  const args = ["/SP-", '/DIR="C:\\Games\\Bob\u2019s Game"'];
+  let seen;
+  const spawnProcess = (file, argv, opts) => {
+    seen = { file, argv, opts };
+    const child = new EventEmitter();
+    setImmediate(() => child.emit("exit", 0));
+    return child;
+  };
+  assert.equal(await runElevatedSetup(installer, args, spawnProcess), 0);
+  const script = Buffer.from(seen.argv.at(-1), "base64").toString("utf16le");
+  assert.equal(script.includes("Bob"), false);
+  assert.equal(seen.opts.env.ASCENDARA_FG_SETUP, installer);
+  assert.deepEqual(seen.opts.env.ASCENDARA_FG_ARGS.split("\n"), args);
+  await assert.rejects(runElevatedSetup("C:\\a\nb\\setup.exe", [], spawnProcess));
+});

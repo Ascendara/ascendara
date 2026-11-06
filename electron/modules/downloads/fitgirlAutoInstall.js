@@ -11,14 +11,22 @@ const fitgirl = require("./fitgirlInstall");
 const UAC_DECLINED = 1223;
 const log = (...args) => console.log("[autoinstall]", ...args);
 
-/** Run setup.exe elevated with arguments and wait; resolves the exit code or null. */
+/**
+ * Run setup.exe elevated with arguments and wait; resolves the exit code or null.
+ * The path and arguments reach PowerShell through environment variables, so no
+ * game name or path is ever parsed as script text.
+ */
 function runElevatedSetup(installerPath, args, spawnProcess = spawn) {
-  const quote = value => `'${String(value).replace(/'/g, "''")}'`;
-  const list = args.map(quote).join(",");
+  for (const value of [installerPath, ...args]) {
+    if ([...String(value)].some(char => char < " " || char === "\u007f")) {
+      return Promise.reject(new Error("Installer path has control characters"));
+    }
+  }
   const script =
-    `try { $p = Start-Process -FilePath ${quote(installerPath)} -ArgumentList ${list} ` +
-    `-Verb RunAs -Wait -PassThru -ErrorAction Stop; ` +
-    `if ($null -eq $p.ExitCode) { exit 259 } else { exit $p.ExitCode } } ` +
+    "try { $p = Start-Process -FilePath $env:ASCENDARA_FG_SETUP " +
+    "-ArgumentList ($env:ASCENDARA_FG_ARGS -split [char]10) " +
+    "-Verb RunAs -Wait -PassThru -ErrorAction Stop; " +
+    "if ($null -eq $p.ExitCode) { exit 259 } else { exit $p.ExitCode } } " +
     `catch { exit ${UAC_DECLINED} }`;
   return new Promise((resolve, reject) => {
     const child = spawnProcess(
@@ -29,7 +37,15 @@ function runElevatedSetup(installerPath, args, spawnProcess = spawn) {
         "-EncodedCommand",
         Buffer.from(script, "utf16le").toString("base64"),
       ],
-      { windowsHide: true, stdio: "ignore" }
+      {
+        windowsHide: true,
+        stdio: "ignore",
+        env: {
+          ...process.env,
+          ASCENDARA_FG_SETUP: installerPath,
+          ASCENDARA_FG_ARGS: args.join("\n"),
+        },
+      }
     );
     child.once("error", reject);
     // 259 means PowerShell could not read the code through elevation.
