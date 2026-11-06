@@ -38,6 +38,33 @@ test("index names lose bundle, soundtrack, bonus, edition, version and repack ta
   assert.equal(cleanGameTitle(undefined), "");
 });
 
+test("FitGirl extras, language tags and more edition names come off too", async () => {
+  const { cleanGameTitle } = await load();
+  const cases = {
+    "ELDEN RING NIGHTREIGN Deluxe Edition,-v1.03.1 -Bonuses": "ELDEN RING NIGHTREIGN",
+    "Enshrouded Deluxe Edition – -Bonuses": "Enshrouded",
+    "Split Fiction, v1.0.2.0 + Friend's Pass": "Split Fiction",
+    "Dead Island 2: Ultimate Edition, v1.1.2 + 5 DLCs, MULTi15": "Dead Island 2",
+    "Stardew Valley MULTi12": "Stardew Valley",
+    "Persona 3 Reload: Digital Premium Edition, v1.0.0.0 + 23 DLCs": "Persona 3 Reload",
+    "Warhammer 40,000: Space Marine 2 – Ultra Edition, v4.0 + 8 DLCs":
+      "Warhammer 40,000: Space Marine 2",
+    "Sid Meier's Civilization VII: Founders Edition, v1.0.1 + 7 DLCs":
+      "Sid Meier's Civilization VII",
+    "Dredge Digital Deluxe": "Dredge",
+    "Atomfall: Deluxe Edition, Build 18031628 + 2 DLCs": "Atomfall",
+    "The Last of Us Part II Remastered, v1.0 + Bonus Content":
+      "The Last of Us Part II Remastered",
+    "Ghost of Tsushima: Director's Cut, v1053.6.0718.1532 + 2 DLCs":
+      "Ghost of Tsushima: Director's Cut",
+    "Age of Empires II: Definitive Edition, Build 125283 + 6 DLCs":
+      "Age of Empires II: Definitive Edition",
+  };
+  for (const [raw, clean] of Object.entries(cases)) {
+    assert.equal(cleanGameTitle(raw), clean, raw);
+  }
+});
+
 test("only the same name after cleaning counts as a match", async () => {
   const { isConfidentMatch } = await load();
   assert.ok(
