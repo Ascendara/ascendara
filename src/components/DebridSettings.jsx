@@ -659,7 +659,9 @@ function AccountSummary({
         </div>
       )}
       {signedInWithCode && (
-        <p className="text-xs text-muted-foreground">{t("debrid.signIn.signedIn")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t(provider.signIn.signedInText || "debrid.signIn.signedIn")}
+        </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" className="gap-1.5" onClick={onChangeKey}>

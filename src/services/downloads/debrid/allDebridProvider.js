@@ -1,9 +1,19 @@
 import * as api from "../allDebridService";
+import * as signIn from "../allDebridSignIn";
 
 export default {
   id: "alldebrid",
   name: "AllDebrid",
   apiKeyUrl: "https://alldebrid.com/apikeys/",
+  signIn: {
+    start: signIn.startCodeSignIn,
+    poll: signIn.pollCodeSignIn,
+    verificationUrl: signIn.VERIFICATION_URL,
+    clearedSettings: signIn.CLEARED_SIGN_IN,
+    isSignedIn: settings => settings.allDebridSignedIn === true,
+    // The PIN yields a plain API key: there is no login to renew.
+    signedInText: "debrid.signIn.signedInKey",
+  },
   getUserInfo: api.getUserInfo,
   describeAccount: (user, t) => ({
     name: user.username || user.email,

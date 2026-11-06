@@ -87,6 +87,7 @@ class SettingsManager {
       prioritizeRealDebridOverSeamless: false,
       useRealDebridForTorrents: true,
       allDebridApiKey: "",
+      allDebridSignedIn: false,
       prioritizeAllDebridOverSeamless: false,
       useAllDebridForTorrents: true,
       localIndex: "",

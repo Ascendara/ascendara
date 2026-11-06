@@ -99,6 +99,7 @@ const featureCenterResources = {
         cancel: "Cancel",
         waiting: "Waiting for approval…",
         signedIn: "Signed in with a code. The login renews by itself.",
+        signedInKey: "Signed in with a code.",
         success: "Signed in to {{provider}}",
         failed: "Sign-in failed. Try again.",
         expired: "The code expired. Try again.",
