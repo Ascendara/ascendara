@@ -12,8 +12,9 @@ import HandoffCountdown from "@/components/debrid/HandoffCountdown";
 // so each new state replaces the last one instead of stacking.
 const toastId = (storageKey, recordKey) => `debrid-handoff:${storageKey}:${recordKey}`;
 
-// Shows a ticking toast when a torrent's hand-off starts waiting or is rescheduled.
-// A waiting pass that only refreshes its time keeps the same state: no toast every tick.
+// Shows a ticking toast when a torrent's hand-off starts waiting or its reason changes.
+// A retry or a pass that only moves the time keeps the same state: no toast every retry,
+// the Downloads row keeps counting down.
 function announceWaits(shown) {
   for (const { metadataStorageKey: storageKey } of debridProviders) {
     for (const [recordKey, entry] of Object.entries(readRecords(storageKey))) {
@@ -21,9 +22,8 @@ function announceWaits(shown) {
       if (!recordKey.startsWith("torrent:") || !reason || entry.localDownloadStarted)
         continue;
       const id = toastId(storageKey, recordKey);
-      const state = reason === "retrying" ? `${reason}@${entry.nextHandoffAt}` : reason;
-      if (shown.get(id) === state) continue;
-      shown.set(id, state);
+      if (shown.get(id) === reason) continue;
+      shown.set(id, reason);
       toast.info(
         <HandoffCountdown storageKey={storageKey} recordKey={recordKey} className="" />,
         { id, duration: 8000 }
