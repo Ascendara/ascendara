@@ -21,6 +21,29 @@ test("a dedicated GPU wins over the integrated one", () => {
   );
 });
 
+test("a dedicated GPU wins over an APU named RX Vega or Radeon 780M", () => {
+  assert.equal(
+    pickGpuName("AMD Radeon(TM) RX Vega 11 Graphics\r\nNVIDIA GeForce GTX 1660"),
+    "NVIDIA GeForce GTX 1660"
+  );
+  assert.equal(
+    pickGpuName("AMD Radeon(TM) RX Vega 10 Graphics\nAMD Radeon RX 6600"),
+    "AMD Radeon RX 6600"
+  );
+  assert.equal(
+    pickGpuName("AMD Radeon 780M Graphics\nNVIDIA GeForce RTX 4060 Laptop GPU"),
+    "NVIDIA GeForce RTX 4060 Laptop GPU"
+  );
+  assert.equal(
+    pickGpuName("AMD Radeon(TM) Vega 8 Graphics\nIntel(R) Arc(TM) A750 Graphics"),
+    "Intel(R) Arc(TM) A750 Graphics"
+  );
+  assert.equal(
+    pickGpuName("AMD Radeon(TM) RX Vega 11 Graphics"),
+    "AMD Radeon(TM) RX Vega 11 Graphics"
+  );
+});
+
 test("an integrated GPU alone is still shown", () => {
   assert.equal(pickGpuName("AMD Radeon(TM) Graphics\r\n"), "AMD Radeon(TM) Graphics");
   assert.equal(pickGpuName("Intel(R) HD Graphics 620"), "Intel(R) HD Graphics 620");
