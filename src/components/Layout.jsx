@@ -162,7 +162,8 @@ const Layout = memo(() => {
       kind: getTransitionKind(routeTransition.path, location.pathname),
     });
   }
-  const animate = settings?.smoothTransitions !== false && !reducedMotion;
+  const animate =
+    settings?.smoothTransitions !== false && !settings?.reduceEffects && !reducedMotion;
   const transitionKind = animate ? routeTransition.kind : "none";
 
   useEffect(() => {

@@ -1193,6 +1193,21 @@ function Settings() {
                     />
                   </div>
 
+                  <div id="reduce-effects" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.reduceEffects")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.reduceEffectsDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.reduceEffects === true}
+                      onCheckedChange={() =>
+                        handleSettingChange("reduceEffects", !settings.reduceEffects)
+                      }
+                    />
+                  </div>
+
                   <div id="side-scrollbar" className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label>{t("settings.sideScrollBar")}</Label>

@@ -5343,6 +5343,8 @@
     "singleStreamDescription": "Use a single connection for downloads. More stable for large files but may be slower.",
     "smoothTransitions": "Smooth Transitions",
     "smoothTransitionsDescription": "Switching between pages in the app has a smooth animation to make it feel more natural.",
+    "reduceEffects": "Reduce Effects",
+    "reduceEffectsDescription": "Turns off blur, page transitions and looping animations so Ascendara uses less CPU and GPU. Useful on lower-end PCs or while gaming.",
     "startMinimized": "Start Minimized",
     "startMinimizedDescription": "Launch Ascendara in the background on startup instead of opening the main window.",
     "supportCodeDesc": "Enter your 6 digit support code here to upload logs automatically. Need help?",

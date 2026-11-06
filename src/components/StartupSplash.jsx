@@ -33,6 +33,7 @@ const StartupSplash = ({ iconData, exiting, onDone, fallback = null }) => {
   // and the system's reduced-motion preference
   const animate =
     settings?.smoothTransitions !== false &&
+    !settings?.reduceEffects &&
     !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const backdropRef = useRef(null);
   const flyerRef = useRef(null);

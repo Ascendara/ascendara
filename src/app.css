@@ -799,6 +799,25 @@ html[data-motion="reduced"] .animate-page-fade,
 html[data-motion="reduced"] .animate-fade-in {
   animation: none;
 }
+
+/* "Reduce effects" setting: backdrop blur makes the GPU redraw whatever sits
+   behind it, and looping animations keep the page painting while idle. Loading
+   spinners keep spinning so progress stays visible. */
+html[data-effects="reduced"] *,
+html[data-effects="reduced"] *::before,
+html[data-effects="reduced"] *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+/* Without blur the translucent dock would show page text through it */
+html[data-effects="reduced"] [data-boot-dock] {
+  background-color: rgb(var(--color-nav-background, var(--color-background)) / 0.97) !important;
+}
+html[data-effects="reduced"] *:not(.animate-spin),
+html[data-effects="reduced"] *:not(.animate-spin)::before,
+html[data-effects="reduced"] *:not(.animate-spin)::after {
+  animation-iteration-count: 1 !important;
+}
 @media (prefers-reduced-motion: reduce) {
   .press:active,
   .press-sm:active {

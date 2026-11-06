@@ -818,12 +818,12 @@ const Home = memo(() => {
   }, []);
 
   useEffect(() => {
-    if (!autoPlay || !carouselGames.length) return;
+    if (!autoPlay || settings?.reduceEffects || !carouselGames.length) return;
     const timer = setInterval(() => {
       setCurrentSlide(prev => (prev === carouselGames.length - 1 ? 0 : prev + 1));
     }, 5000);
     return () => clearInterval(timer);
-  }, [autoPlay, carouselGames.length]);
+  }, [autoPlay, settings?.reduceEffects, carouselGames.length]);
 
   // Load carousel images - current, next two (for side cards), and one ahead
   useEffect(() => {

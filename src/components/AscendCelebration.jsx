@@ -59,6 +59,7 @@ const AscendCelebration = ({ onDone }) => {
   const iconData = useAppIcon();
   const animate =
     settings?.smoothTransitions !== false &&
+    !settings?.reduceEffects &&
     !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
   const refs = {

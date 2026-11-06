@@ -27,6 +27,7 @@ import { TourProvider } from "@/context/TourContext";
 import { ThemeProvider, useTheme, isDarkTheme } from "@/context/ThemeContext";
 import { SettingsProvider, useSettings } from "@/context/SettingsContext";
 import DebridBackgroundTasks from "@/components/DebridBackgroundTasks";
+import EffectsPreference from "@/components/EffectsPreference";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { SearchProvider } from "@/context/SearchContext";
 import GlobalSearch from "@/components/GlobalSearch";
@@ -2310,36 +2311,38 @@ function App() {
         <LanguageProvider>
           <SettingsProvider>
             <DebridBackgroundTasks />
-            <AuthProvider>
-              <TourProvider>
-                <SearchProvider>
-                  <Router>
-                    <ToasterWithTheme />
-                    <ContextMenu />
-                    <ScrollToTop />
-                    <AscendStatusInitializer />
-                    <DownloadSyncInitializer />
-                    <DownloadStallNotifier />
-                    <WishlistAlertNotifier />
-                    <DiscordRPCTracker />
-                    <UserActivityTracker />
-                    <MessageNotificationChecker />
-                    <TrialWarningChecker />
-                    <GiantBombMigrationWarning />
-                    <AutomaticIndexRefresher />
-                    <ControllerDetectionPrompt />
-                    <CheckoutReturnHandler />
-                    <SearchInitializer />
-                    <GlobalSearch />
-                    <AppRoutes />
-                    <MiniPlayer
-                      expanded={playerExpanded}
-                      onToggleExpand={() => setPlayerExpanded(!playerExpanded)}
-                    />
-                  </Router>
-                </SearchProvider>
-              </TourProvider>
-            </AuthProvider>
+            <EffectsPreference>
+              <AuthProvider>
+                <TourProvider>
+                  <SearchProvider>
+                    <Router>
+                      <ToasterWithTheme />
+                      <ContextMenu />
+                      <ScrollToTop />
+                      <AscendStatusInitializer />
+                      <DownloadSyncInitializer />
+                      <DownloadStallNotifier />
+                      <WishlistAlertNotifier />
+                      <DiscordRPCTracker />
+                      <UserActivityTracker />
+                      <MessageNotificationChecker />
+                      <TrialWarningChecker />
+                      <GiantBombMigrationWarning />
+                      <AutomaticIndexRefresher />
+                      <ControllerDetectionPrompt />
+                      <CheckoutReturnHandler />
+                      <SearchInitializer />
+                      <GlobalSearch />
+                      <AppRoutes />
+                      <MiniPlayer
+                        expanded={playerExpanded}
+                        onToggleExpand={() => setPlayerExpanded(!playerExpanded)}
+                      />
+                    </Router>
+                  </SearchProvider>
+                </TourProvider>
+              </AuthProvider>
+            </EffectsPreference>
           </SettingsProvider>
         </LanguageProvider>
       </ThemeProvider>
