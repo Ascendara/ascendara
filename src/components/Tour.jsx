@@ -6,6 +6,7 @@ import {
   useCallback,
   useMemo,
 } from "react";
+import { createPortal } from "react-dom";
 import { useTour } from "@/context/TourContext";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import {
@@ -433,7 +434,10 @@ function Tour({ onClose, steps: customSteps, onFinish, sound = true }) {
   const Icon = step.icon;
   const spring = { type: "spring", stiffness: 260, damping: 30 };
 
-  return (
+  // Portaled to the body: tours mounted inside a page (like Ascend's, whose page sits
+  // in a fixed wrapper) would otherwise be trapped in that page's stacking context and
+  // leave the menu bar and dock undimmed above them
+  return createPortal(
     <MotionConfig reducedMotion="user">
       <div
         className="fixed inset-0 z-[200]"
@@ -684,7 +688,8 @@ function Tour({ onClose, steps: customSteps, onFinish, sound = true }) {
           </div>
         </motion.div>
       </div>
-    </MotionConfig>
+    </MotionConfig>,
+    document.body
   );
 }
 
