@@ -5,6 +5,17 @@ export default {
   name: "TorBox",
   apiKeyUrl: "https://ascendara.app/docs/features/torbox-integration",
   getUserInfo: api.getUserInfo,
+  describeAccount: (user, t) => ({
+    name: user.email,
+    plan:
+      [
+        t("torbox.plan_free"),
+        t("torbox.plan_essential"),
+        t("torbox.plan_pro"),
+        t("torbox.plan_standard"),
+      ][user.plan] || null,
+    expiresAt: user.plan > 0 ? user.premium_expires_at : null,
+  }),
   apiKeySetting: "torboxApiKey",
   torrentSetting: "useTorboxForTorrents",
   prioritizeSetting: "prioritizeTorboxOverSeamless",

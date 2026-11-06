@@ -14,6 +14,11 @@ export default {
     isSignedIn: settings => Boolean(settings.realDebridOauthRefreshToken),
   },
   getUserInfo: api.getUserInfo,
+  describeAccount: (user, t) => ({
+    name: user.username || user.email,
+    plan: user.type === "premium" ? t("debrid.planPremium") : t("debrid.planFree"),
+    expiresAt: user.type === "premium" ? user.expiration : null,
+  }),
   apiKeySetting: "realDebridApiKey",
   torrentSetting: "useRealDebridForTorrents",
   prioritizeSetting: "prioritizeRealDebridOverSeamless",

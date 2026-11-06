@@ -3,11 +3,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDown,
   ArrowUp,
-  Check,
-  ChevronDown,
+  ChevronRight,
   ExternalLink,
   GripVertical,
+  KeyRound,
   Loader2,
+  LogOut,
+  QrCode,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -17,23 +20,28 @@ import { Switch } from "@/components/ui/switch";
 import DebridIcon from "@/components/DebridIcon";
 import { useSettings } from "@/context/SettingsContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { cn } from "@/lib/utils";
 import { getOrderedProviders } from "@/services/downloads/debridService";
 
-// Flat section that sits on the settings page like its neighbours: a header with
-// the master toggle, then one divided row per service that expands in place.
+const STATUS_TONES = {
+  connected: "bg-green-500/10 text-green-600 dark:text-green-400",
+  checking: "bg-muted text-muted-foreground",
+  error: "bg-destructive/10 text-destructive",
+  notConnected: "bg-muted text-muted-foreground",
+  paused: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
+};
+
+// The settings page section for debrid accounts: a master toggle, the order services
+// are tried in, and one card per service with its account and download options.
 export default function DebridSettings() {
   const { settings, setSettings } = useSettings();
   const { t } = useLanguage();
   const providers = getOrderedProviders(settings);
-  const [openId, setOpenId] = useState(providers[0]?.id ?? null);
-  const [drafts, setDrafts] = useState({});
-  const [saving, setSaving] = useState(null);
   const [draggedId, setDraggedId] = useState(null);
   const [dragTargetId, setDragTargetId] = useState(null);
   const debridEnabled = settings.debridEnabled === true;
   if (!providers.length) return null;
 
-  const update = (key, value) => setSettings(current => ({ ...current, [key]: value }));
   const move = (id, targetId) =>
     setSettings(current => {
       const order = getOrderedProviders(current).map(item => item.id);
@@ -43,37 +51,6 @@ export default function DebridSettings() {
       order.splice(target, 0, order.splice(index, 1)[0]);
       return { ...current, debridProviderOrder: order, debridProvider: order[0] };
     });
-  const clearDraft = provider =>
-    setDrafts(current => {
-      const next = { ...current };
-      delete next[provider.id];
-      return next;
-    });
-  const signedIn = (provider, values) => {
-    setSettings(current => ({ ...current, ...values }));
-    clearDraft(provider);
-    toast.success(t("debrid.signIn.success", { provider: provider.name }));
-  };
-  const save = async provider => {
-    const value = (drafts[provider.id] ?? settings[provider.apiKeySetting] ?? "").trim();
-    setSaving(provider.id);
-    try {
-      if (value) await provider.getUserInfo(value);
-      setSettings(current => ({
-        ...current,
-        [provider.apiKeySetting]: value,
-        // Only a new key ends a code sign-in: saving the same one keeps its refresh token
-        ...(value !== current[provider.apiKeySetting] &&
-          provider.signIn?.clearedSettings),
-      }));
-      clearDraft(provider);
-      toast.success(t("settings.apiKeySaved"));
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setSaving(null);
-    }
-  };
 
   return (
     <section id="debrid-services" className="py-8">
@@ -97,7 +74,9 @@ export default function DebridSettings() {
           checked={debridEnabled}
           aria-controls="debrid-service-controls"
           aria-expanded={debridEnabled}
-          onCheckedChange={value => update("debridEnabled", value)}
+          onCheckedChange={value =>
+            setSettings(current => ({ ...current, debridEnabled: value }))
+          }
         />
       </div>
 
@@ -111,34 +90,14 @@ export default function DebridSettings() {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-              <Label className="text-sm font-medium">{t("debrid.priorityOrder")}</Label>
-              <span className="text-xs text-muted-foreground">
-                {t("debrid.dragHint")}
-              </span>
-            </div>
-            <ol
-              className="divide-y divide-border/60 border-y border-border/60"
-              aria-label={t("debrid.priorityOrder")}
-            >
+            <PriorityStrip providers={providers} settings={settings} t={t} />
+            <ol className="space-y-3" aria-label={t("debrid.priorityOrder")}>
               {providers.map((item, index) => (
-                <ProviderRow
+                <ProviderCard
                   key={item.id}
                   provider={item}
                   index={index}
                   count={providers.length}
-                  open={openId === item.id}
-                  onToggle={() => setOpenId(id => (id === item.id ? null : item.id))}
-                  settings={settings}
-                  setSettings={setSettings}
-                  update={update}
-                  draft={drafts[item.id]}
-                  onDraftChange={value =>
-                    setDrafts(current => ({ ...current, [item.id]: value }))
-                  }
-                  saving={saving}
-                  onSave={() => save(item)}
-                  onSignedIn={signedIn}
                   onMove={targetIndex => move(item.id, providers[targetIndex]?.id)}
                   isDragged={draggedId === item.id}
                   isDragTarget={dragTargetId === item.id}
@@ -167,13 +126,9 @@ export default function DebridSettings() {
                     setDraggedId(null);
                     setDragTargetId(null);
                   }}
-                  t={t}
                 />
               ))}
             </ol>
-            <p className="mt-3 max-w-2xl text-xs leading-relaxed text-muted-foreground">
-              {t("debrid.priorityDescription")}
-            </p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -181,20 +136,76 @@ export default function DebridSettings() {
   );
 }
 
-function ProviderRow({
+// One line that reads like the routing itself: which service gets asked first.
+function PriorityStrip({ providers, settings, t }) {
+  return (
+    <div className="mb-4 rounded-xl bg-muted/40 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {t("debrid.priorityOrder")}
+        </span>
+        <ol className="flex flex-wrap items-center gap-1.5">
+          {providers.map((provider, index) => {
+            const active =
+              Boolean(settings[provider.apiKeySetting]?.trim()) &&
+              settings.debridProviderEnabled?.[provider.id] !== false;
+            return (
+              <li key={provider.id} className="flex items-center gap-1.5">
+                {index > 0 && (
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
+                )}
+                <span
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                    active
+                      ? "border-primary/30 bg-background text-foreground"
+                      : "border-dashed border-border text-muted-foreground"
+                  )}
+                >
+                  <span className="tabular-nums text-muted-foreground">{index + 1}</span>
+                  {provider.name}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        <span className="ml-auto text-xs text-muted-foreground">
+          {t("debrid.dragHint")}
+        </span>
+      </div>
+      <p className="mt-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+        {t("debrid.priorityDescription")}
+      </p>
+    </div>
+  );
+}
+
+// Loads the account behind a saved key, so the card can say who is connected.
+function useAccount(provider, apiKey) {
+  const [state, setState] = useState({ status: "idle" });
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!apiKey) {
+      setState({ status: "idle" });
+      return undefined;
+    }
+    let stopped = false;
+    setState(current => ({ ...current, status: "loading" }));
+    provider
+      .getUserInfo(apiKey)
+      .then(user => !stopped && setState({ status: "ready", user }))
+      .catch(error => !stopped && setState({ status: "error", error: error.message }));
+    return () => {
+      stopped = true;
+    };
+  }, [provider, apiKey, attempt]);
+  return [state, () => setAttempt(value => value + 1)];
+}
+
+function ProviderCard({
   provider,
   index,
   count,
-  open,
-  onToggle,
-  settings,
-  setSettings,
-  update,
-  draft,
-  onDraftChange,
-  saving,
-  onSave,
-  onSignedIn,
   onMove,
   isDragged,
   isDragTarget,
@@ -202,17 +213,50 @@ function ProviderRow({
   onDragOver,
   onDrop,
   onDragEnd,
-  t,
 }) {
-  const hasKey = Boolean(settings[provider.apiKeySetting]?.trim());
+  const { settings, setSettings } = useSettings();
+  const { t } = useLanguage();
+  const apiKey = settings[provider.apiKeySetting]?.trim() || "";
+  const hasKey = Boolean(apiKey);
   const enabled = settings.debridProviderEnabled?.[provider.id] !== false;
-  const status = !enabled ? "disabled" : hasKey ? "configured" : "notConfigured";
-  const statusDot = {
-    configured: "bg-green-500",
-    notConfigured: "bg-muted-foreground/40",
-    disabled: "bg-yellow-500",
-  }[status];
-  const panelId = `debrid-${provider.id}-panel`;
+  const [account, retryAccount] = useAccount(provider, apiKey);
+  const [editingKey, setEditingKey] = useState(false);
+  const status = !enabled
+    ? "paused"
+    : !hasKey
+      ? "notConnected"
+      : account.status === "error"
+        ? "error"
+        : account.status === "ready"
+          ? "connected"
+          : "checking";
+  const update = (key, value) => setSettings(current => ({ ...current, [key]: value }));
+
+  const saveKey = async value => {
+    if (value) await provider.getUserInfo(value);
+    setSettings(current => ({
+      ...current,
+      [provider.apiKeySetting]: value,
+      // Only a new key ends a code sign-in: saving the same one keeps its refresh token
+      ...(value !== current[provider.apiKeySetting] && provider.signIn?.clearedSettings),
+    }));
+    setEditingKey(false);
+  };
+  const disconnect = () => {
+    setSettings(current => ({
+      ...current,
+      [provider.apiKeySetting]: "",
+      ...provider.signIn?.clearedSettings,
+    }));
+    setEditingKey(false);
+    toast.success(t("debrid.disconnected", { provider: provider.name }));
+  };
+  const signedIn = values => {
+    setSettings(current => ({ ...current, ...values }));
+    setEditingKey(false);
+    toast.success(t("debrid.signIn.success", { provider: provider.name }));
+  };
+
   const options = [
     [provider.torrentSetting, "debrid.useMagnets", "debrid.useMagnetsDescription", true],
     [
@@ -237,36 +281,42 @@ function ProviderRow({
     // Spread so the list's handlers stay the only JSX drag attributes in this file
     <li
       {...{ onDragOver, onDrop, onDragEnd }}
-      className={`relative transition-colors ${isDragTarget ? "bg-primary/5 before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-primary" : ""} ${isDragged ? "opacity-50" : ""}`}
+      className={cn(
+        "relative overflow-hidden rounded-xl border bg-card/40 transition-[opacity,border-color,box-shadow]",
+        isDragTarget ? "border-primary ring-2 ring-primary/20" : "border-border/70",
+        isDragged && "opacity-50"
+      )}
     >
-      <div draggable {...{ onDragStart }} className="flex items-center gap-3 py-3">
+      <div
+        draggable
+        {...{ onDragStart }}
+        className="flex items-center gap-3 border-b border-border/60 px-4 py-3"
+      >
         <GripVertical
           aria-hidden="true"
-          className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing"
+          className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
         />
-        <span className="w-4 text-center text-sm tabular-nums text-muted-foreground">
-          {index + 1}
-        </span>
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          aria-controls={panelId}
-          className="group flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <DebridIcon provider={provider} className="h-5 w-5 shrink-0 text-primary" />
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+          <DebridIcon provider={provider} className="h-5 w-5 text-primary" />
+          <span className="text-primary-foreground absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-background bg-primary px-1 text-[10px] font-bold tabular-nums">
+            {index + 1}
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-foreground">
             {provider.name}
+          </p>
+          <span
+            className={cn(
+              "mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-px text-[11px] font-medium",
+              STATUS_TONES[status]
+            )}
+          >
+            {status === "checking" && <Loader2 className="h-3 w-3 animate-spin" />}
+            {t(`debrid.status.${status}`)}
           </span>
-          <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-            <span className={`h-1.5 w-1.5 rounded-full ${statusDot}`} />
-            {t(`debrid.${status}`)}
-          </span>
-          <ChevronDown
-            className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:text-foreground ${open ? "rotate-180" : ""}`}
-          />
-        </button>
-        <div className="flex shrink-0 items-center">
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
           <Button
             size="icon"
             variant="ghost"
@@ -287,100 +337,70 @@ function ProviderRow({
           >
             <ArrowDown className="h-3.5 w-3.5" />
           </Button>
+          <Switch
+            className="ml-2"
+            checked={enabled}
+            aria-label={t("debrid.useService", { provider: provider.name })}
+            onCheckedChange={value =>
+              setSettings(current => ({
+                ...current,
+                debridProviderEnabled: {
+                  ...current.debridProviderEnabled,
+                  [provider.id]: value,
+                },
+              }))
+            }
+          />
         </div>
       </div>
 
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            id={panelId}
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.18 }}
-            className="overflow-hidden"
-          >
-            <div className="space-y-5 pb-5 pl-[3.25rem] pr-1">
-              <div className="flex items-center justify-between gap-4">
-                <div className="space-y-0.5">
-                  <Label htmlFor={`enable-${provider.id}`}>
-                    {t("debrid.useService")}
-                  </Label>
-                </div>
-                <Switch
-                  id={`enable-${provider.id}`}
-                  checked={enabled}
-                  onCheckedChange={value =>
-                    setSettings(current => ({
-                      ...current,
-                      debridProviderEnabled: {
-                        ...current.debridProviderEnabled,
-                        [provider.id]: value,
-                      },
-                    }))
-                  }
-                />
-              </div>
+      <div className="grid gap-x-8 gap-y-5 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="min-w-0">
+          <h4 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {t("debrid.accountTitle")}
+          </h4>
+          {hasKey && !editingKey ? (
+            <AccountSummary
+              provider={provider}
+              account={account}
+              signedInWithCode={provider.signIn?.isSignedIn(settings)}
+              onRetry={retryAccount}
+              onChangeKey={() => setEditingKey(true)}
+              onDisconnect={disconnect}
+            />
+          ) : (
+            <ConnectForm
+              provider={provider}
+              currentKey={apiKey}
+              onSave={saveKey}
+              onSignedIn={signedIn}
+              onCancel={hasKey ? () => setEditingKey(false) : null}
+            />
+          )}
+        </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor={provider.apiKeySetting}>{t("debrid.apiKey")}</Label>
-                  <Button
-                    variant="link"
-                    className="h-auto p-0 text-xs"
-                    onClick={() => window.electron.openURL(provider.apiKeyUrl)}
-                  >
-                    {t("debrid.getApiKey")}
-                    <ExternalLink className="ml-1 h-3 w-3" />
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id={provider.apiKeySetting}
-                    type="password"
-                    autoComplete="off"
-                    disabled={saving === provider.id}
-                    value={draft ?? settings[provider.apiKeySetting] ?? ""}
-                    onChange={event => onDraftChange(event.target.value)}
-                    onKeyDown={event => {
-                      if (event.key === "Enter" && draft !== undefined && !saving)
-                        onSave();
-                    }}
-                  />
-                  <Button
-                    variant="outline"
-                    className="shrink-0 whitespace-nowrap"
-                    onClick={onSave}
-                    disabled={draft === undefined || Boolean(saving)}
-                  >
-                    {saving === provider.id ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Check className="mr-2 h-4 w-4" />
-                    )}
-                    {t("debrid.saveKey")}
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {t("debrid.keyDescription")}
-                </p>
-                {provider.signIn && (
-                  <DebridCodeSignIn
-                    provider={provider}
-                    signedIn={provider.signIn.isSignedIn(settings)}
-                    onApproved={onSignedIn}
-                  />
-                )}
-              </div>
-
-              {options.map(([key, label, description, defaultValue]) => (
-                <div key={key} className="flex items-center justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor={key}>{t(label)}</Label>
-                    <p className="text-sm text-muted-foreground">{t(description)}</p>
+        <div className="min-w-0">
+          <h4 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {t("debrid.optionsTitle")}
+          </h4>
+          {(!hasKey || !enabled) && (
+            <p className="mb-1 text-xs text-muted-foreground">
+              {t(hasKey ? "debrid.optionsPaused" : "debrid.optionsNeedAccount")}
+            </p>
+          )}
+          <div className="divide-y divide-border/50">
+            {options.map(([key, label, description, defaultValue]) => {
+              const id = `${provider.id}-${key}`;
+              return (
+                <div key={key} className="flex items-center justify-between gap-4 py-2.5">
+                  <div className="min-w-0 space-y-0.5">
+                    <Label htmlFor={id} className="text-sm">
+                      {t(label)}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">{t(description)}</p>
                   </div>
                   <Switch
-                    id={key}
+                    id={id}
                     checked={settings[key] ?? defaultValue}
                     disabled={
                       !hasKey ||
@@ -391,17 +411,176 @@ function ProviderRow({
                     onCheckedChange={value => update(key, value)}
                   />
                 </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </li>
   );
 }
 
+function AccountSummary({
+  provider,
+  account,
+  signedInWithCode,
+  onRetry,
+  onChangeKey,
+  onDisconnect,
+}) {
+  const { t } = useLanguage();
+  const details =
+    account.status === "ready" ? provider.describeAccount?.(account.user, t) : null;
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+        {account.status === "error" ? (
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-destructive min-w-0 text-xs">{account.error}</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 gap-1.5 px-2 text-xs"
+              onClick={onRetry}
+            >
+              <RefreshCw className="h-3 w-3" />
+              {t("featureCenters.common.retry")}
+            </Button>
+          </div>
+        ) : !details ? (
+          <div className="space-y-1.5">
+            <div className="h-4 w-36 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-24 animate-pulse rounded bg-muted/70" />
+          </div>
+        ) : (
+          <>
+            <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <span className="truncate">{details.name || provider.name}</span>
+              {details.plan && (
+                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-px text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  {details.plan}
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {details.expiresAt
+                ? t("debrid.expires", {
+                    date: new Date(details.expiresAt).toLocaleDateString(),
+                  })
+                : t("debrid.noPremium")}
+            </p>
+          </>
+        )}
+      </div>
+      {signedInWithCode && (
+        <p className="text-xs text-muted-foreground">{t("debrid.signIn.signedIn")}</p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={onChangeKey}>
+          <KeyRound className="h-3.5 w-3.5" />
+          {t("debrid.changeKey")}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="hover:text-destructive gap-1.5 text-muted-foreground"
+          onClick={onDisconnect}
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          {t("debrid.disconnect")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ConnectForm({ provider, currentKey, onSave, onSignedIn, onCancel }) {
+  const { t } = useLanguage();
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const inputId = `${provider.id}-api-key`;
+
+  const submit = async () => {
+    const key = value.trim();
+    if (!key || saving) return;
+    setSaving(true);
+    try {
+      await onSave(key);
+      toast.success(t("settings.apiKeySaved"));
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {provider.signIn && (
+        <>
+          <DebridCodeSignIn provider={provider} onApproved={onSignedIn} />
+          <div className="flex items-center gap-3 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <span className="h-px flex-1 bg-border/70" />
+            {t("debrid.orUseKey")}
+            <span className="h-px flex-1 bg-border/70" />
+          </div>
+        </>
+      )}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor={inputId} className="text-sm">
+            {t("debrid.apiKey")}
+          </Label>
+          <Button
+            variant="link"
+            className="h-auto p-0 text-xs"
+            onClick={() => window.electron.openURL(provider.apiKeyUrl)}
+          >
+            {t("debrid.getApiKey")}
+            <ExternalLink className="ml-1 h-3 w-3" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            id={inputId}
+            type="password"
+            autoComplete="off"
+            placeholder={currentKey ? "••••••••••••" : t("debrid.keyPlaceholder")}
+            disabled={saving}
+            value={value}
+            onChange={event => setValue(event.target.value)}
+            onKeyDown={event => event.key === "Enter" && submit()}
+          />
+          <Button
+            className="shrink-0"
+            onClick={submit}
+            disabled={!value.trim() || saving}
+          >
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {t("debrid.connect")}
+          </Button>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">{t("debrid.keyDescription")}</p>
+          {onCancel && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 px-2 text-xs"
+              onClick={onCancel}
+            >
+              {t("debrid.signIn.cancel")}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // A service's code sign-in: the user approves a short code on the service's own site.
-function DebridCodeSignIn({ provider, signedIn, onApproved }) {
+function DebridCodeSignIn({ provider, onApproved }) {
   const { t } = useLanguage();
   const [flow, setFlow] = useState(null);
   const [starting, setStarting] = useState(false);
@@ -418,7 +597,7 @@ function DebridCodeSignIn({ provider, signedIn, onApproved }) {
         return;
       }
       setFlow(null);
-      if (result.status === "approved") onApproved(provider, result.settings);
+      if (result.status === "approved") onApproved(result.settings);
       else if (result.status === "pending") toast.error(t("debrid.signIn.expired"));
       else toast.error(t("debrid.signIn.failed"));
     };
@@ -443,40 +622,38 @@ function DebridCodeSignIn({ provider, signedIn, onApproved }) {
 
   if (!flow) {
     return (
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1">
-        <Button variant="outline" size="sm" onClick={start} disabled={starting}>
-          {starting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {t("debrid.signIn.button")}
-        </Button>
-        {signedIn && (
-          <span className="text-xs text-muted-foreground">
-            {t("debrid.signIn.signedIn")}
-          </span>
+      <Button
+        variant="outline"
+        className="w-full gap-2"
+        onClick={start}
+        disabled={starting}
+      >
+        {starting ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <QrCode className="h-4 w-4" />
         )}
-      </div>
+        {t("debrid.signIn.button")}
+      </Button>
     );
   }
   return (
-    <div className="space-y-2 rounded-lg border border-border p-3">
+    <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
       <p className="text-xs text-muted-foreground">
         {t("debrid.signIn.instructions", { url: provider.signIn.verificationUrl })}
       </p>
-      <p className="select-all font-mono text-lg font-semibold tracking-widest">
+      <p className="select-all text-center font-mono text-2xl font-semibold tracking-[0.3em] text-foreground">
         {flow.userCode}
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.electron.openURL(flow.openUrl)}
-        >
+        <Button size="sm" onClick={() => window.electron.openURL(flow.openUrl)}>
           {t("debrid.signIn.openPage")}
           <ExternalLink className="ml-1 h-3 w-3" />
         </Button>
         <Button variant="ghost" size="sm" onClick={() => setFlow(null)}>
           {t("debrid.signIn.cancel")}
         </Button>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
           <Loader2 className="h-3 w-3 animate-spin" />
           {t("debrid.signIn.waiting")}
         </span>
