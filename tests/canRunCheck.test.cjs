@@ -112,13 +112,91 @@ test("OS stays undecided when the text or the PC doesn't allow a fair call", asy
   assert.equal(checkOs("macOS 12", win10).status, "unknown");
 });
 
-test("checkCanRun judges OS, RAM and storage and never CPU or GPU", async () => {
+const ryzen = {
+  cpu: "AMD Ryzen 7 7800X3D 8-Core Processor",
+  cpuCores: 16,
+  cpuSpeedMhz: 4201,
+};
+
+test("real requirement texts read Meets it on a current PC", async () => {
+  const { checkCpu, checkGpu } = await load();
+  assert.equal(checkCpu("3GHz 4-Core or similar", ryzen).status, "pass");
+  assert.equal(checkCpu("INTEL CORE I5-8400 or AMD RYZEN 3 3300X", ryzen).status, "pass");
+  assert.equal(
+    checkGpu("GeForce GTX 1060 or Radeon RX 580", { gpu: "NVIDIA GeForce RTX 5070" })
+      .status,
+    "pass"
+  );
+  // The name says 8 cores even without the raw counts
+  assert.equal(checkCpu("3GHz 4-Core", { cpu: ryzen.cpu }).status, "pass");
+});
+
+test("hardware names map onto the tier table", async () => {
+  const { gpuKey, cpuScore, gpuScore } = await load();
+  assert.equal(gpuKey("NVIDIA GeForce RTX 4070 Ti SUPER"), "rtx 4070 ti super");
+  assert.equal(gpuKey("AMD Radeon RX 7900 XTX"), "rx 7900 xtx");
+  assert.equal(gpuKey("Radeon R9 290X"), "r9 290x");
+  assert.equal(gpuKey("AMD Radeon HD 7850"), "hd 7850");
+  assert.equal(gpuKey("Intel(R) HD Graphics 4000"), "intel hd 4000");
+  assert.equal(gpuKey("Intel(R) UHD Graphics 630"), "intel uhd 630");
+  assert.equal(gpuKey("Intel(R) Arc(TM) A770 Graphics"), "arc a770");
+  assert.equal(gpuKey("AMD Radeon(TM) Graphics"), null);
+  assert.ok(gpuScore("NVIDIA GeForce RTX 4060 Laptop GPU") < gpuScore("RTX 4060"));
+  assert.ok(cpuScore("Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz") > cpuScore("i5-8400"));
+  assert.ok(cpuScore("12th Gen Intel(R) Core(TM) i5-12400F") > cpuScore("i7-8700"));
+  assert.ok(cpuScore("Intel Core i7-1165G7") < cpuScore("Intel Core i7-11700"));
+  assert.ok(cpuScore("Intel(R) Core(TM) Ultra 7 265K") > cpuScore("Ryzen 5 3600"));
+  assert.ok(cpuScore("AMD FX-8350 Eight-Core Processor") < cpuScore("Ryzen 5 1600"));
+  assert.equal(cpuScore("Intel Core i7-920"), null);
+  assert.equal(cpuScore("Intel Pentium G4560"), null);
+});
+
+test("alternatives pass on the weakest one, close and below are told apart", async () => {
+  const { checkCpu, checkGpu } = await load();
+  const gtx1060 = { gpu: "NVIDIA GeForce GTX 1060 6GB" };
+  assert.equal(checkGpu("GTX 1080 / RX 470", gtx1060).status, "pass");
+  assert.equal(checkGpu("GTX 1070 or RX Vega 56", gtx1060).status, "fail");
+  assert.equal(checkGpu("GeForce GTX 1660 (or AMD equivalent)", gtx1060).status, "close");
+  assert.equal(checkGpu("RX 580 8GB or better", gtx1060).status, "pass");
+  const i5 = {
+    cpu: "Intel(R) Core(TM) i5-4460 CPU @ 3.20GHz",
+    cpuCores: 4,
+    cpuSpeedMhz: 3200,
+  };
+  assert.equal(checkCpu("Intel Core i7-4770 or AMD FX-8350", i5).status, "pass");
+  assert.equal(checkCpu("Intel Core i7-4770", i5).status, "fail");
+  assert.equal(checkCpu("Intel Core i7-8700K | AMD Ryzen 5 3600", i5).status, "fail");
+  assert.equal(checkCpu("Intel Core 2 Duo 2.4 GHz", i5).status, "pass");
+  assert.equal(checkCpu("3.4 GHz Quad-Core", { ...i5, cpuCores: 8 }).status, "close");
+  assert.equal(checkCpu("3 GHz 8-Core", i5).status, "fail");
+});
+
+test("unknown models and requirements stay Can't tell and never fail", async () => {
+  const { checkCpu, checkGpu } = await load();
+  const odd = { cpu: "Mystery Chip 9000", gpu: "Mystery Graphics", cpuCores: 8 };
+  assert.deepEqual(checkGpu("GTX 1060", odd), {
+    status: "unknown",
+    have: "Mystery Graphics",
+  });
+  assert.equal(checkCpu("Intel Core i5-8400", odd).status, "unknown");
+  // A low base clock on an unranked chip isn't proof it is slower
+  assert.equal(checkCpu("3GHz 4-Core", { ...odd, cpuSpeedMhz: 2000 }).status, "unknown");
+  assert.equal(
+    checkGpu("DirectX 11 card with 2 GB VRAM", { gpu: "RTX 5070" }).status,
+    "unknown"
+  );
+  assert.equal(checkGpu("GTX 9999 or Voodoo 5", { gpu: "RTX 5070" }).status, "unknown");
+  assert.deepEqual(checkGpu("GTX 1060", { gpu: "Unknown" }), { status: "unknown" });
+  assert.deepEqual(checkCpu("Intel Core i5-8400", {}), { status: "unknown" });
+});
+
+test("checkCanRun gives a verdict for every line it can judge", async () => {
   const { checkCanRun } = await load();
   const minReqs = {
     os: "Windows 10",
-    cpu: "Intel Core i5-760",
+    cpu: "Intel Core i5-2500K",
     ram: "8 GB RAM",
-    gpu: "GeForce GTX 550 Ti",
+    gpu: "GeForce GTX 660",
     directx: "Version 11",
     storage: "2 GB available space",
   };
@@ -128,6 +206,8 @@ test("checkCanRun judges OS, RAM and storage and never CPU or GPU", async () => 
       ...win11,
       totalMemory: 16 * GIB,
       cpu: "AMD Ryzen 7 9700X 8-Core Processor",
+      cpuCores: 16,
+      cpuSpeedMhz: 3800,
       gpu: "NVIDIA GeForce RTX 5070",
     },
     { freeSpace: 100 * GIB, downloadSize: 1 * GIB }
@@ -136,8 +216,8 @@ test("checkCanRun judges OS, RAM and storage and never CPU or GPU", async () => 
   assert.equal(verdicts.os.status, "pass");
   assert.equal(verdicts.ram.status, "pass");
   assert.equal(verdicts.storage.status, "pass");
-  assert.deepEqual(verdicts.gpu, { status: "unknown", have: "NVIDIA GeForce RTX 5070" });
-  assert.equal(verdicts.cpu.status, "unknown");
+  assert.deepEqual(verdicts.gpu, { status: "pass", have: "NVIDIA GeForce RTX 5070" });
+  assert.equal(verdicts.cpu.status, "pass");
   // Detection that found nothing is "can't tell", never a fail
   const undetected = checkCanRun(minReqs, { ...win11, gpu: "Unknown" });
   assert.deepEqual(undetected.gpu, { status: "unknown" });

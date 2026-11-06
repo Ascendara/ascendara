@@ -10,7 +10,14 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/LanguageContext";
 import { checkCanRun } from "@/lib/canRunCheck";
 import { formatBytes } from "@/services/app/systemHealthService";
-import { CheckCircle2, Cpu, HelpCircle, Loader, XCircle } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Cpu,
+  HelpCircle,
+  Loader,
+  XCircle,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 const SPEC_KEYS = ["os", "cpu", "ram", "gpu", "directx"];
@@ -18,6 +25,7 @@ const CARD_KEYS = [...SPEC_KEYS, "storage"];
 
 const VERDICT_STYLE = {
   pass: { Icon: CheckCircle2, className: "text-green-500" },
+  close: { Icon: AlertCircle, className: "text-amber-500 dark:text-amber-400" },
   fail: { Icon: XCircle, className: "text-red-500 dark:text-red-400" },
   unknown: { Icon: HelpCircle, className: "text-muted-foreground" },
 };

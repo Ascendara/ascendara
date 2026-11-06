@@ -526,6 +526,7 @@ function registerSystemHandlers() {
   });
 
   async function readSystemSpecs() {
+    const cpus = os.cpus();
     const specs = {
       os: `${os.type()} ${os.release()}`,
       // Raw values for comparing against a game's minimum requirements
@@ -533,7 +534,10 @@ function registerSystemHandlers() {
       osRelease: os.release(),
       arch: os.arch(),
       totalMemory: os.totalmem(),
-      cpu: os.cpus()[0]?.model || "Unknown",
+      cpu: cpus[0]?.model || "Unknown",
+      // Logical threads and the highest clock reported, in MHz
+      cpuCores: cpus.length,
+      cpuSpeedMhz: Math.max(0, ...cpus.map(cpu => cpu.speed || 0)),
       ram: `${Math.round(os.totalmem() / (1024 * 1024 * 1024))} GB`,
       gpu: "Unknown",
       directx: "Unknown",
