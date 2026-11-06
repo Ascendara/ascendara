@@ -566,16 +566,19 @@ function registerDownloadHandlers() {
               `${sanitizedGame}.ascendara.json`
             );
             const sameTransfer = cached?.transferId === fileList.transferId;
+            const running = downloadProcesses.has(sanitizedGame);
+            const tracked = await fs.readJson(trackedPath).catch(() => null);
             // Running, or listed in Downloads where the user can resume it.
-            if (
-              sameTransfer &&
-              (downloadProcesses.has(sanitizedGame) ||
-                (await fs.readJson(trackedPath).catch(() => null))?.downloadingData)
-            )
+            if (sameTransfer && (running || tracked?.downloadingData))
               return { success: true, alreadyStarted: true };
-            // A leftover of this transfer with nothing running starts again in its folder.
-            if (sameTransfer && fs.existsSync(trackedPath))
-              console.log(`Starting the leftover transfer for ${sanitizedGame} again`);
+            // Leftovers start again in their folder, like Redownload: this transfer's own,
+            // an unfinished download with nothing running, or files with no game record.
+            // A running download or an installed game is never overwritten.
+            if (
+              !running &&
+              (sameTransfer || !fs.existsSync(trackedPath) || tracked?.downloadingData)
+            )
+              console.log(`Starting over the leftover folder of ${sanitizedGame}`);
             else
               throw new Error(
                 "The game folder already exists. Resolve the existing download before starting this torrent."

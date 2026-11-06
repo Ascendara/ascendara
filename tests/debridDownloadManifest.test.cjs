@@ -174,12 +174,40 @@ test("a leftover of the same torrent with nothing running starts downloading aga
   );
   assert.equal((await startFresh()(...args)).alreadyStarted, true);
   assert.equal(spawns.length, 2);
-  await assert.rejects(
-    startFresh()(
+});
+
+test("a game folder left by an earlier attempt starts unless it holds an installed game", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-handoff-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const settings = { downloadDirectory: path.join(root, "games") };
+  const folder = path.join(settings.downloadDirectory, "Example");
+  const gameFile = path.join(folder, "Example.ascendara.json");
+  fs.mkdirSync(folder, { recursive: true });
+  const spawns = [];
+  // A fresh data folder: no download cache knows this transfer.
+  const startFresh = transferId => {
+    fs.rmSync(path.join(root, "downloadCache"), { recursive: true, force: true });
+    return loadDownloadHandlers(root, settings, spawns).get("download-file")(
       args[0],
-      { ...payload, transferId: "realdebrid:torrent:other" },
+      { ...payload, transferId },
       ...args.slice(2)
-    ),
-    /folder already exists/
+    );
+  };
+  // Only part files, no game record.
+  fs.writeFileSync(path.join(folder, "part.bin"), "x");
+  assert.equal((await startFresh("torbox:torrent:old")).success, true);
+  assert.equal(spawns.length, 1);
+  // An unfinished download whose downloader is gone.
+  fs.writeFileSync(
+    gameFile,
+    JSON.stringify({ game: "Example", downloadingData: { downloading: true } })
   );
+  const unfinished = await startFresh("torbox:torrent:older");
+  assert.equal(unfinished.success, true);
+  assert.equal(unfinished.alreadyStarted, undefined);
+  assert.equal(spawns.length, 2);
+  // An installed game is never overwritten.
+  fs.writeFileSync(gameFile, JSON.stringify({ game: "Example" }));
+  await assert.rejects(startFresh("torbox:torrent:new"), /folder already exists/);
+  assert.equal(spawns.length, 2);
 });
