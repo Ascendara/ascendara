@@ -287,9 +287,23 @@ export default function DownloadPanel({
           {/* Provider selection */}
           {mode !== "fitgirl" && (
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">
-                {t("download.downloadOptions.downloadSource")}
-              </Label>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <Label className="text-xs font-medium text-muted-foreground">
+                  {t("download.downloadOptions.downloadSource")}
+                </Label>
+                {/* Above the trigger, so the open source list never covers it */}
+                {mode === "seamless" && debridAvailable && (
+                  <button
+                    type="button"
+                    onClick={() => onDebridDisabledChange(!debridDisabledForSession)}
+                    className="text-xs text-muted-foreground underline transition-colors hover:text-foreground"
+                  >
+                    {t(debridDisabledForSession ? "debrid.enable" : "debrid.disable", {
+                      provider: debridProvider?.name,
+                    })}
+                  </button>
+                )}
+              </div>
               {providers.length > 0 ? (
                 <Select value={selectedProvider} onValueChange={onProviderChange}>
                   <SelectTrigger className="w-full">
@@ -353,16 +367,6 @@ export default function DownloadPanel({
                 </div>
               )}
               {downloadButton}
-              {debridAvailable && (
-                <button
-                  onClick={() => onDebridDisabledChange(!debridDisabledForSession)}
-                  className="block w-full text-center text-xs text-muted-foreground underline transition-colors hover:text-foreground"
-                >
-                  {t(debridDisabledForSession ? "debrid.enable" : "debrid.disable", {
-                    provider: debridProvider?.name,
-                  })}
-                </button>
-              )}
             </>
           )}
 
