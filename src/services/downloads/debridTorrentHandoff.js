@@ -245,13 +245,19 @@ export function handoffTorrents(provider, apiKey, settings) {
           requestPartChoice(provider.metadataStorageKey, id, files.chooseFrom);
           continue;
         }
-        // Removed from the cloud: stop polling it once the grace period is over.
+        // Removed from the cloud: stop polling it once the grace period is over, and say so once.
         if (files === "missing") {
           const since = missingSince.get(retryKey) ?? Date.now();
           missingSince.set(retryKey, since);
           if (Date.now() - since >= MISSING_GRACE_MS) {
             missingSince.delete(retryKey);
             mark(id, "cloudTorrentMissing");
+            fail(
+              retryKey,
+              new Error(
+                `${game.game}: This torrent was removed from your ${provider.name} account.`
+              )
+            );
           }
           continue;
         }

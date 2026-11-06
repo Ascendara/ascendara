@@ -393,6 +393,7 @@ test("handoff skips legacy records and stops polling torrents removed from the c
   const lookups = [];
   const provider = {
     id: "test",
+    name: "TestDebrid",
     apiKeySetting: "key",
     metadataStorageKey: "metadata",
     getTorrentGame: entry => entry,
@@ -410,7 +411,9 @@ test("handoff skips legacy records and stops polling torrents removed from the c
   );
   assert.equal(JSON.parse(stored)["torrent:gone"].cloudTorrentMissing, undefined);
   t.mock.method(Date, "now", () => realNow() + 10 * 60 * 1000);
-  await worker.handoffTorrents(provider, "token");
+  await assert.rejects(worker.handoffTorrents(provider, "token"), {
+    message: "Gone: This torrent was removed from your TestDebrid account.",
+  });
   await worker.handoffTorrents(provider, "token");
   assert.deepEqual(lookups, ["gone", "gone", "gone"], "missing torrent stops polling");
   assert.equal(calls.length, 0);
