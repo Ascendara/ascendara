@@ -103,20 +103,24 @@ export function createDebridService(providers) {
   };
   const resumePendingTorrents = settings =>
     Promise.all(
-      getConfiguredProviders(settings)
-        .filter(
-          provider =>
-            (provider.resumePendingTorrents || provider.getTorrentDownload) &&
-            settings[provider.torrentSetting] !== false
-        )
-        .map(async provider => {
-          const apiKey = getApiKey(settings, provider);
+      getConfiguredProviders(settings).map(async provider => {
+        const apiKey = getApiKey(settings, provider);
+        try {
+          if (
+            !(provider.resumePendingTorrents || provider.getTorrentDownload) ||
+            settings[provider.torrentSetting] === false
+          )
+            return undefined;
           await provider.resumePendingTorrents?.(apiKey);
-          const started = await handoffTorrents(provider, apiKey);
+          return await handoffTorrents(provider, apiKey);
+        } finally {
+          // Also when this service's handoff failed, or its torrent toggle is off.
           if (settings[provider.removeAfterDoneSetting])
-            await removeFinishedTorrents(provider, apiKey);
-          return started;
-        })
+            await removeFinishedTorrents(provider, apiKey).catch(error =>
+              console.warn(`[Debrid] ${provider.name} cleanup will retry:`, error.message)
+            );
+        }
+      })
     );
   const resolveHost = async (settings, link, host, game, directory = 0, providerId) => {
     if (settings?.debridEnabled !== true)

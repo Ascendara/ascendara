@@ -12,6 +12,8 @@ export const isSupportedUrl = (link, domains = getCachedSupportedHosts()) =>
   matchesSupportedUrl(link, domains);
 export const { getCachedSupportedHosts, getSupportedHosts } = createSupportedHostCache({
   cacheKey: "debridLinkSupportedHosts",
+  // Short, because offline hosts are left out of the list.
+  ttl: 15 * 60 * 1000,
   loadDomains: async () => {
     const response = await fetch(
       `${API_BASE_URL}/downloader/hosts?types=host&keys=domains,status`,

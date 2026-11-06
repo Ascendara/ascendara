@@ -23,6 +23,8 @@ export default {
   seamlessHosts: ["gofile", "pixeldrain", "buzzheavier", "megadb"],
   // No cloud page: torrents being prepared are listed on the local Downloads page.
   hasDownloadsPage: false,
+  // Torrents take minutes to hours in the cloud; no need to ask every 5 seconds.
+  pollIntervalMs: 30 * 1000,
   downloadsPath: "/downloads",
   hostDownloadMode: "direct",
   metadataStorageKey: "debridLinkGameData",

@@ -4,7 +4,7 @@ const featureCenterResources = {
       downloadsTitle: "Debrid Downloads",
       removeAfterDone: "Remove from the service when done",
       removeAfterDoneDescription:
-        "Once a torrent's game is fully on your PC, delete the torrent from your account to free its slot.",
+        "Once a torrent's game is fully on your PC, delete the torrent from your account to free its slot. This also applies to games you downloaded before turning it on.",
       sentToCloud:
         "Sent to {{provider}}. It downloads to your PC once it is ready there.",
       cloud: {
@@ -13,12 +13,16 @@ const featureCenterResources = {
           "These start downloading to your PC by themselves once they are ready.",
         queued: "Queued",
         downloading: "Downloading in the cloud",
-        ready: "Ready, starting on your PC",
+        ready: "Ready, waiting to download to your PC",
         failed: "Failed",
         stalled: "Stalled",
         error: "Could not check",
         remove: "Remove",
         removed: "Removed from {{provider}}",
+        confirmTitle: "Remove this torrent?",
+        confirm:
+          "{{name}} will be deleted from your {{provider}} account and will not download.",
+        alreadyStarted: "{{name}} is already downloading to your PC, so it was kept.",
       },
       downloadsDescription:
         "Cloud downloads from your debrid accounts. Finished torrents move to your PC automatically.",

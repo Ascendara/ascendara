@@ -1,7 +1,11 @@
 const HOST_CACHE_TTL = 24 * 60 * 60 * 1000;
 const HOST_RETRY_DELAY = 5 * 60 * 1000;
 
-export function createSupportedHostCache({ cacheKey, loadDomains }) {
+export function createSupportedHostCache({
+  cacheKey,
+  loadDomains,
+  ttl = HOST_CACHE_TTL,
+}) {
   let hostCache;
   let hostRequest = null;
   let retryHostsAfter = 0;
@@ -54,7 +58,7 @@ export function createSupportedHostCache({ cacheKey, loadDomains }) {
 
   async function getSupportedHosts() {
     const cached = getCachedSupportedHosts();
-    if (hostCache && Date.now() - hostCache.fetchedAt < HOST_CACHE_TTL) return cached;
+    if (hostCache && Date.now() - hostCache.fetchedAt < ttl) return cached;
     if (hostRequest) return hostRequest;
     if (Date.now() < retryHostsAfter) return cached;
     // Share one request across download pages and all visible game cards.

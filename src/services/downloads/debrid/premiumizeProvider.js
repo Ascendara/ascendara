@@ -25,6 +25,8 @@ export default {
   seamlessHosts: ["gofile", "pixeldrain", "buzzheavier", "megadb"],
   // No cloud page: torrents being prepared are listed on the local Downloads page.
   hasDownloadsPage: false,
+  // Torrents take minutes to hours in the cloud; no need to ask every 5 seconds.
+  pollIntervalMs: 30 * 1000,
   downloadsPath: "/downloads",
   hostDownloadMode: "direct",
   metadataStorageKey: "premiumizeGameData",
@@ -52,7 +54,11 @@ export default {
     const state = await this.getTorrentStatus(apiKey, id);
     if (state.status === "missing") return "missing";
     if (state.status === "failed")
-      throw new Error(`Premiumize could not download this torrent: ${state.message}`);
+      // Final: the handoff reports it once instead of retrying.
+      throw Object.assign(
+        new Error(`Premiumize could not download this torrent (${state.message}).`),
+        { terminal: true }
+      );
     if (state.status !== "ready") return null;
     const files = await api.getTransferFiles(apiKey, state.transfer);
     if (!files.length) throw new Error("Premiumize returned an empty torrent file list.");
