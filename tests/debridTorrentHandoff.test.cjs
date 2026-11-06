@@ -421,6 +421,55 @@ test("a torrent that can not start does not hold back the ones behind it", async
   }
 });
 
+test("paused, queued or stuck downloads do not hold back a torrent hand-off", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => Object.assign(global, saved));
+  for (const state of [
+    { paused: true },
+    { waiting: true },
+    { awaitingRecoveryAction: true },
+    { pendingManualInstall: true },
+    { verifyError: [{ file: "data.bin" }] },
+  ]) {
+    let stored = JSON.stringify({
+      "torrent:ready": { game: "Example", autoHandoff: true },
+    });
+    global.localStorage = {
+      getItem: () => stored,
+      setItem: (_k, value) => {
+        stored = value;
+      },
+    };
+    const calls = [];
+    global.window = {
+      electron: {
+        getGames: async () => [
+          { game: "Other", downloadingData: { downloading: true, ...state } },
+        ],
+        downloadFile: async (...args) => {
+          calls.push(args);
+          return { success: true };
+        },
+      },
+    };
+    const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+      fresh: true,
+    });
+    await worker.handoffTorrents(
+      {
+        id: "test",
+        metadataStorageKey: "metadata",
+        getTorrentGame: entry => entry,
+        getTorrentDownload: async () => [
+          { url: "https://example.com/file", filename: "data.bin", size: 10 },
+        ],
+      },
+      "token"
+    );
+    assert.equal(calls.length, 1, JSON.stringify(state));
+  }
+});
+
 test("finished torrents leave the service only once their game is fully on this PC", async t => {
   const saved = { window: global.window, localStorage: global.localStorage };
   t.after(() => Object.assign(global, saved));
