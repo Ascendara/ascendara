@@ -144,22 +144,29 @@ export const controlTorrent = async (apiKey, options) => {
   return data;
 };
 
+// TorBox's mylist can serve a cached copy that still holds a just-deleted item.
+// Hide those until a list arrives without them.
+const deletedKeys = new Set();
+
 /**
  * Control either a web download or torrent using its normalized TorBox type.
  * TorBox has no stop operation for torrents or web downloads, so stop is a delete.
  */
 export const controlDownload = async (apiKey, download, operation) => {
   const apiOperation = operation === "stop" ? "delete" : operation;
-  if (download?._torboxType === "torrent") {
-    return controlTorrent(apiKey, {
-      torrent_id: download.id,
-      operation: apiOperation,
-    });
-  }
-  return controlWebDownload(apiKey, {
-    webdl_id: download?.id,
-    operation: apiOperation,
-  });
+  const type = download?._torboxType === "torrent" ? "torrent" : "webdl";
+  const data =
+    type === "torrent"
+      ? await controlTorrent(apiKey, {
+          torrent_id: download.id,
+          operation: apiOperation,
+        })
+      : await controlWebDownload(apiKey, {
+          webdl_id: download?.id,
+          operation: apiOperation,
+        });
+  if (apiOperation === "delete") deletedKeys.add(`${type}:${download.id}`);
+  return data;
 };
 
 /**
@@ -433,18 +440,31 @@ export const getTorrentInfo = async (apiKey, id) => {
   return items.find(item => String(item.id) === String(id)) || null;
 };
 
-export const getAllDownloads = async apiKey => {
+// fresh: skip TorBox's list cache (after a change or a manual refresh, not for polling).
+export const getAllDownloads = async (apiKey, { fresh = false } = {}) => {
   try {
+    const params = fresh ? { bypass_cache: "true" } : undefined;
     const results = await Promise.allSettled([
-      getDownloadList(apiKey, "webdl"),
-      getDownloadList(apiKey, "torrent"),
+      getDownloadList(apiKey, "webdl", params),
+      getDownloadList(apiKey, "torrent", params),
     ]);
-    const downloads = results.flatMap(result =>
-      result.status === "fulfilled" ? result.value : []
-    );
     if (results.every(result => result.status === "rejected")) {
       throw results[0].reason;
     }
+    const listed = new Set();
+    const downloads = results
+      .flatMap(result => (result.status === "fulfilled" ? result.value : []))
+      .filter(item => {
+        listed.add(item._storageKey);
+        return !deletedKeys.has(item._storageKey);
+      });
+    results.forEach((result, index) => {
+      if (result.status !== "fulfilled") return;
+      const prefix = index === 0 ? "webdl:" : "torrent:";
+      for (const key of deletedKeys) {
+        if (key.startsWith(prefix) && !listed.has(key)) deletedKeys.delete(key);
+      }
+    });
     results
       .filter(result => result.status === "rejected")
       .forEach(result =>
