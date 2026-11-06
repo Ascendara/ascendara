@@ -2,10 +2,11 @@ import torbox from "./debrid/torboxProvider";
 import realDebrid from "./debrid/realDebridProvider";
 import allDebrid from "./debrid/allDebridProvider";
 import premiumize from "./debrid/premiumizeProvider";
+import debridLink from "./debrid/debridLinkProvider";
 import { handoffTorrents } from "./debridTorrentHandoff";
 
 // TorBox is first by default; only an explicitly saved order overrides this.
-export const debridProviders = [torbox, realDebrid, allDebrid, premiumize];
+export const debridProviders = [torbox, realDebrid, allDebrid, premiumize, debridLink];
 
 export function createDebridService(providers) {
   const getProvider = id => providers.find(provider => provider.id === id) || null;

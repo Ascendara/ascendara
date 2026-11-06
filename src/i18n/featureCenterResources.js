@@ -84,6 +84,7 @@ const featureCenterResources = {
       planPremium: "Premium",
       planFree: "Free",
       noPremium: "No active premium",
+      lifetime: "Lifetime premium, no end date",
       changeKey: "Change key",
       disconnect: "Disconnect",
       disconnected: "{{provider}} disconnected",

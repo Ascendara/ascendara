@@ -494,6 +494,7 @@ export const settingsSearchData = [
       "real-debrid",
       "alldebrid",
       "premiumize",
+      "debridlink",
       "priority",
       "order",
       "account",

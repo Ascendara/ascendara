@@ -5,6 +5,7 @@ const ROUTES = {
   realdebrid: "https://api.real-debrid.com/rest/1.0",
   rdoauth: "https://api.real-debrid.com/oauth/v2",
   torbox: "https://api.torbox.app/v1/api",
+  debridlink: "https://debrid-link.com/api/v2",
   premiumize: "https://www.premiumize.me/api",
   alldebrid: "https://api.alldebrid.com",
   flingtrainer: "https://flingtrainer.com",
@@ -13,7 +14,7 @@ const ROUTES = {
 const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 
 function getProxyTarget(rawUrl) {
-  const match = /^\/api\/(khinsider|torbox|realdebrid|rdoauth|alldebrid|premiumize|flingtrainer|analytics)(?=\/|\?|$)/.exec(rawUrl);
+  const match = /^\/api\/(khinsider|torbox|realdebrid|rdoauth|alldebrid|premiumize|debridlink|flingtrainer|analytics)(?=\/|\?|$)/.exec(rawUrl);
   if (!match) return null;
   return new URL(ROUTES[match[1]] + rawUrl.slice(match[0].length));
 }

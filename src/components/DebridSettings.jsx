@@ -640,7 +640,7 @@ function AccountSummary({
               ? t("debrid.expires", {
                   date: new Date(details.expiresAt).toLocaleDateString(),
                 })
-              : t("debrid.noPremium")}
+              : details.expiryNote || t("debrid.noPremium")}
           </p>
           {details.stats?.length > 0 && (
             <dl className="mt-3 grid grid-cols-2 gap-2">
