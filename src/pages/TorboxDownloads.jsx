@@ -314,7 +314,7 @@ const TorboxDownloads = () => {
       );
     } catch (error) {
       console.error("[TorboxDownloads] Error deleting download:", error);
-      toast.error(t("torbox.error_deleting_download"));
+      toast.error(t("torbox.error_deleting_download"), { description: error?.message });
     }
   };
 
@@ -738,7 +738,9 @@ const TorboxDownloads = () => {
                   fetchTorboxDownloads();
                 } catch (error) {
                   console.error("Error stopping download:", error);
-                  toast.error(t("torbox.error_stopping_download"));
+                  toast.error(t("torbox.error_stopping_download"), {
+                    description: error?.message,
+                  });
                 }
                 setConfirmStop(null);
               }}
