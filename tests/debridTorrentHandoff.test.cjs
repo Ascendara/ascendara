@@ -938,7 +938,7 @@ test("a cloud torrent with no progress for 3 days is reported once and no longer
   assert.equal(statusCalls.length, 3, "a stalled torrent is not polled again");
 });
 
-test("P9-326: an installed game whose name the folder drops characters from is never sent again", async t => {
+test("an installed game whose name the folder drops characters from is never sent again", async t => {
   const saved = { window: global.window, localStorage: global.localStorage };
   t.after(() => Object.assign(global, saved));
   const name = "Enshrouded Deluxe Edition – Bonuses";

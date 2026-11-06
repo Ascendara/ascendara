@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 
 const { loadModule } = require("./helpers/loadModule.cjs");
 
-// P9-325: a deleted hosted link stayed in Ready because TorBox's mylist cache still listed it.
+// A deleted hosted link stayed in Ready because TorBox's mylist cache still listed it.
 test("TorBox delete keeps a web download out of a stale cached list", async t => {
   const originalFetch = global.fetch;
   const originalWindow = global.window;

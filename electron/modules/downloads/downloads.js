@@ -608,12 +608,15 @@ function registerDownloadHandlers() {
             // Running, or listed in Downloads where the user can resume it.
             if (sameTransfer && (running || tracked?.downloadingData))
               return { success: true, alreadyStarted: true };
-            // Leftovers start again in their folder, like Redownload: an unfinished
-            // download with nothing running, or files with no game record. A running
-            // download or an installed game is never overwritten, even by the transfer
-            // that downloaded it: the downloader writes its game file with downloadingData,
-            // so a game file without it is a finished game.
-            if (!running && (!fs.existsSync(trackedPath) || tracked?.downloadingData))
+            // Leftovers start again in their folder, like Redownload: an unfinished cloud
+            // torrent download with nothing running, or files with no game record. A
+            // running download, a paused normal download or an installed game is never
+            // overwritten, even by the transfer that downloaded it: the downloader writes
+            // its game file with downloadingData, so a game file without it is a finished game.
+            // Normal downloads always leave a cache entry without fileList.
+            const unfinishedTorrent =
+              tracked?.downloadingData && (!cached || cached.fileList === true);
+            if (!running && (!fs.existsSync(trackedPath) || unfinishedTorrent))
               console.log(`Starting over the leftover folder of ${sanitizedGame}`);
             else
               throw new Error(

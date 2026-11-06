@@ -167,7 +167,7 @@ test("a leftover of the same torrent with nothing running starts downloading aga
   assert.equal(again.success, true);
   assert.equal(again.alreadyStarted, undefined, "nothing was running");
   assert.equal(spawns.length, 2, "the download really starts again");
-  // P9-326: the same torrent, finished and installed, is never downloaded over again.
+  // The same torrent, finished and installed, is never downloaded over again.
   fs.writeFileSync(gameFile, JSON.stringify({ game: "Example" }));
   await assert.rejects(startFresh()(...args), /folder already exists/);
   assert.equal(spawns.length, 2);
