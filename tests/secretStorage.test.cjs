@@ -438,3 +438,44 @@ test("the backup goes after 7 days, never while a saved secret can not be read",
     { safeStorage: fakeSafeStorage() }
   );
 });
+
+test("logins from removed features stay out of recovery points", async () => {
+  await withSettings(
+    async ({ boot, encryptWith, file, userData }) => {
+      fs.writeFileSync(
+        file,
+        JSON.stringify({
+          theme: "blue",
+          twitchClientId: encryptWith("machine-a", "old-client-id"),
+          twitchSecret: encryptWith("machine-a", "old-secret"),
+        })
+      );
+      const manager = boot();
+      const { createRecoveryPoint, restoreRecoveryPoint } = require(RECOVERY);
+      const { id } = await createRecoveryPoint("test", "0.0.0");
+      const saved = readDisk(
+        path.join(userData, "recovery-points", `${id}.json`)
+      ).settings;
+      assert.equal(saved.theme, "blue");
+      assert.equal("twitchClientId" in saved, false);
+      assert.equal("twitchSecret" in saved, false);
+
+      // A point made by an older version still holds them.
+      const older = path.join(userData, "recovery-points", "settings-1000000000000.json");
+      fs.writeFileSync(
+        older,
+        JSON.stringify({ settings: { theme: "red", twitchSecret: "plain-old-secret" } })
+      );
+      fs.writeFileSync(file, JSON.stringify({ theme: "blue" }));
+      manager.settings = manager.loadSettings();
+      await restoreRecoveryPoint("settings-1000000000000");
+      assert.equal(readDisk(file).theme, "red");
+      assert.equal(
+        "twitchSecret" in readDisk(file),
+        false,
+        "a restore does not bring it back"
+      );
+    },
+    { safeStorage: fakeSafeStorage() }
+  );
+});
