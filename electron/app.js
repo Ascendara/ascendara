@@ -43,6 +43,7 @@ const { proxyLocalRequest } = require("./modules/core/local-api-proxy");
 const fs = require("fs-extra");
 const { isLinux } = require("./modules/core/config");
 const {
+  closeAppServers,
   holdAppPort,
   isAllowedLocalRequest,
   resolvePublicFile,
@@ -565,14 +566,9 @@ async function initializeApp() {
       pendingUrls.push(protocolUrl);
     }
     if (pendingUrls.length > 0) {
-      const deliverPendingUrls = () => {
+      windowModule.whenFirstPageLoads(mainWindow, () => {
         pendingUrls.forEach(url => protocol.handleProtocolUrl(url));
-      };
-      if (mainWindow.webContents.isLoading()) {
-        mainWindow.webContents.once("did-finish-load", deliverPendingUrls);
-      } else {
-        deliverPendingUrls();
-      }
+      });
     }
 
     // Force repaint after system resume or display wake to fix idle black screens
@@ -610,14 +606,7 @@ async function initializeApp() {
     console.log("App is quitting...");
 
     // Close local server if running
-    for (const server of localServers) {
-      console.log("Closing local HTTP server...");
-      server.close(() => {
-        console.log("Local server closed");
-      });
-      // Force close all connections
-      server.closeAllConnections?.();
-    }
+    closeAppServers(localServers);
     localServers = [];
 
     // Notify renderer to set status to invisible
