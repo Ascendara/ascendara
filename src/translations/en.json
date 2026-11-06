@@ -1831,10 +1831,11 @@
     "betaFeature": "Woah... this is still in beta!",
     "by": "by",
     "canRun": {
+      "close": "Close",
       "fail": "Below it",
       "freeSpace": "{{free}} free",
       "needsSpace": "{{free}} free, needs {{needed}}",
-      "note": "Checked on this PC. CPU and GPU models aren't ranked, so compare those yourself.",
+      "note": "Checked on this PC. CPU and GPU use rough performance tiers, so treat those as a guide.",
       "pass": "Meets it",
       "unknown": "Can't tell",
       "yours": "Yours: {{value}}"
