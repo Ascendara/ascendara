@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest an idea or improvement for Ascendara.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the suggestion. Please search existing issues first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem would this solve, or what is missing today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe what you would like to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any other approaches or workarounds you have tried.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, mockups or links that help explain the idea.
