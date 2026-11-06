@@ -251,7 +251,8 @@ function PublicDownloadPage() {
           setSteamData(data);
         } else {
           console.log("No game data found for:", gameData.game);
-          setSteamError("No game data found");
+          // Not an error: the overview shows its empty state
+          setSteamError(null);
         }
       } catch (error) {
         console.error("Error fetching game data:", error);
@@ -1553,7 +1554,7 @@ function PublicDownloadPage() {
       setCachedImage(prepared.cachedImage);
       setArtworkReady(true);
       setSteamData(prepared.steamData);
-      setSteamError(prepared.steamData ? null : "No game data found");
+      setSteamError(null);
       setSteamLoading(false);
     };
 
