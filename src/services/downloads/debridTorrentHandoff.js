@@ -31,6 +31,33 @@ export function requestHandoffNow() {
   globalThis.window?.dispatchEvent?.(new Event("debrid-handoff-now"));
 }
 
+// The name the main process gives the game's folder and game file (sanitizeText then
+// sanitizeGameName in electron/modules/core/utils.js): "Game – Bonuses" is stored as
+// "Game  Bonuses", so the torrent's own name never matched the game list.
+export const localGameName = name =>
+  String(name || "")
+    .replace(/ŌĆÖ/g, "'")
+    .replace(/ŌĆō/g, "-")
+    .replace(/├Č/g, "ö")
+    .replace(/ŌĆ£/g, '"')
+    .replace(/ŌĆØ/g, '"')
+    .replace(/ŌĆ"/g, "...")
+    .replace(/ŌĆś/g, "'")
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[/:]/g, "-")
+    .replace(/[<>:"/\\|?*]/g, "")
+    .trim()
+    .replace(/[^\w\-.() ]/g, "");
+
+// This torrent's game in the game list, by its stored name or its folder.
+const isGame = name => {
+  const local = localGameName(name);
+  return item => item.game === name || item.game === local || item._folderName === local;
+};
+const isRunning = (running, name) =>
+  running.has(name) || running.has(localGameName(name));
+
 // Only starts made since this check existed (localDownloadSeen false) are confirmed, so a
 // game the user deleted on purpose is never downloaded again.
 async function confirmStarts(provider) {
@@ -47,11 +74,10 @@ async function confirmStarts(provider) {
   ]);
   for (const [id, entry] of unconfirmed) {
     const name = provider.getTorrentGame(entry)?.game;
-    if (games.some(item => item.game === name))
-      updateRecord(provider, id, { localDownloadSeen: true });
+    if (games.some(isGame(name))) updateRecord(provider, id, { localDownloadSeen: true });
     // A downloader still running for it is never started a second time.
     else if (
-      !running.has(name) &&
+      !isRunning(running, name) &&
       Date.now() - (entry.localDownloadStartedAt || 0) >= CONFIRM_MS
     ) {
       warn(name, "did not appear on this PC, starting again");
@@ -190,16 +216,17 @@ export function handoffTorrents(provider, apiKey, settings) {
           runningDownloads(),
         ]);
         const isLive = item => running.has(item._folderName ?? item.game);
+        const isThisGame = isGame(game.game);
         // This game already downloading here: never start a second copy.
         if (
-          running.has(game.game) ||
-          games.some(item => item.game === game.game && isLive(item))
+          isRunning(running, game.game) ||
+          games.some(item => isThisGame(item) && isLive(item))
         )
           continue;
         const blocker = games.find(item => {
           const data = item.downloadingData;
           return (
-            item.game !== game.game &&
+            !isThisGame(item) &&
             data &&
             isLive(item) &&
             !isDownloadHalted(data) &&
@@ -388,7 +415,7 @@ export async function removeFinishedTorrents(provider, apiKey) {
   const games = await window.electron.getGames();
   for (const [id, entry] of finished) {
     const name = provider.getTorrentGame(entry)?.game;
-    const game = games.find(item => item.game === name);
+    const game = games.find(isGame(name));
     if (!game) {
       if (Date.now() - (entry.localDownloadStartedAt || 0) > APPEAR_MS)
         updateRecord(provider, id, { cloudTorrentKept: true });
