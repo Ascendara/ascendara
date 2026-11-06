@@ -72,4 +72,26 @@ async function holdAppPort(createServer, { port = 46859, tries = 3, waitMs = 500
   return { owned: true, servers };
 }
 
-module.exports = { holdAppPort, isAllowedLocalRequest, resolvePublicFile };
+/**
+ * Close the servers holdAppPort returned, logging once for the whole set.
+ * @param {Object[]} servers - Servers to close
+ */
+function closeAppServers(servers) {
+  if (servers.length === 0) return;
+  console.log("Closing local HTTP server...");
+  let open = servers.length;
+  for (const server of servers) {
+    server.close(() => {
+      if (--open === 0) console.log("Local server closed");
+    });
+    // Force close all connections
+    server.closeAllConnections?.();
+  }
+}
+
+module.exports = {
+  closeAppServers,
+  holdAppPort,
+  isAllowedLocalRequest,
+  resolvePublicFile,
+};

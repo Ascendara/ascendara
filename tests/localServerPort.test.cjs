@@ -3,7 +3,10 @@ const assert = require("node:assert/strict");
 const os = require("node:os");
 const Module = require("node:module");
 const http = require("node:http");
-const { holdAppPort } = require("../electron/modules/core/local-server-security.js");
+const {
+  closeAppServers,
+  holdAppPort,
+} = require("../electron/modules/core/local-server-security.js");
 
 const freePort = () =>
   new Promise(resolve => {
@@ -144,6 +147,8 @@ test("no window trusts the port before the answer, and only a yes grants it", as
     assert.equal(trusted.length, 0, "no trust for a port someone else holds");
     assert.equal(windows[0].urls.length, 1);
     assert.match(windows[0].urls[0], /^data:text\/html/);
+    assert.match(windows[0].urls[0], /netstat -ano/, "says how to find the holder");
+    assert.doesNotMatch(windows[0].urls[0], /Visual C\+\+|Antivirus/);
 
     const owned = fresh();
     owned.createWindow();
@@ -151,9 +156,41 @@ test("no window trusts the port before the answer, and only a yes grants it", as
     await new Promise(setImmediate);
     assert.equal(trusted.length, 1);
     assert.deepEqual(windows[1].urls, ["http://localhost:46859"]);
+
+    // A deep link at cold start: right after createWindow() the page has not started
+    // loading, so delivery must wait for did-finish-load instead of isLoading().
+    const listeners = {};
+    const startup = {
+      webContents: {
+        isLoading: () => false,
+        once: (event, fn) => (listeners[event] = fn),
+      },
+    };
+    const delivered = [];
+    owned.whenFirstPageLoads(startup, () => delivered.push("ascendara://game/1"));
+    await new Promise(setImmediate);
+    assert.deepEqual(delivered, [], "nothing is sent before a page exists");
+    listeners["did-finish-load"]();
+    assert.deepEqual(delivered, ["ascendara://game/1"]);
   } finally {
     console.log = realLog;
     Module._load = realLoad;
     delete require.cache[modulePath];
   }
+});
+
+test("closing the app's servers logs once for the set", async () => {
+  const port = await freePort();
+  const servers = [await listen(port, "127.0.0.1"), await listen(0, "127.0.0.1")];
+  const lines = [];
+  const realLog = console.log;
+  console.log = line => lines.push(line);
+  try {
+    closeAppServers(servers);
+    await new Promise(resolve => setTimeout(resolve, 50));
+  } finally {
+    console.log = realLog;
+  }
+  assert.deepEqual(lines, ["Closing local HTTP server...", "Local server closed"]);
+  assert.equal(servers.filter(server => server.listening).length, 0);
 });
