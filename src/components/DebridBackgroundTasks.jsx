@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useSettings } from "@/context/SettingsContext";
 import { resumePendingTorrents } from "@/services/downloads/debridService";
 import { toast } from "sonner";
+import TorrentPartsDialog from "@/components/debrid/TorrentPartsDialog";
 
 export default function DebridBackgroundTasks() {
   const { settings } = useSettings();
@@ -31,5 +32,5 @@ export default function DebridBackgroundTasks() {
     const timer = setInterval(poll, 5000);
     return () => clearInterval(timer);
   }, [settings]);
-  return null;
+  return <TorrentPartsDialog />;
 }
