@@ -392,6 +392,16 @@ function ServiceCard({ provider, position, account, onRetry }) {
       "debrid.preferSeamlessDescription",
       false,
     ],
+    ...(provider.removeAfterDoneSetting
+      ? [
+          [
+            provider.removeAfterDoneSetting,
+            "debrid.removeAfterDone",
+            "debrid.removeAfterDoneDescription",
+            false,
+          ],
+        ]
+      : []),
     ...(provider.torrentFallbackSetting
       ? [
           [

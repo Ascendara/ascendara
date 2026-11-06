@@ -254,3 +254,12 @@ test("AllDebrid torrent status and removal for the in-cloud list", async t => {
   assert.equal(calls[0].url, "/api/alldebrid/v4/magnet/delete");
   assert.equal(calls[0].body.get("id"), "1");
 });
+
+test("removing an AllDebrid torrent that is already gone is not an error", async t => {
+  const provider = (await loadProvider()).default;
+  assert.equal(provider.removeAfterDoneSetting, "allDebridRemoveAfterDone");
+  stubFetch(t, () => fail("MAGNET_INVALID_ID"));
+  await provider.removeTorrent("key", "1");
+  stubFetch(t, () => fail("AUTH_BAD_APIKEY"));
+  await assert.rejects(provider.removeTorrent("key", "1"), /API key is invalid/);
+});

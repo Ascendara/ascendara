@@ -125,3 +125,37 @@ export function handoffTorrents(provider, apiKey) {
   inFlight.set(key, task);
   return task;
 }
+
+// Opt-in: once a torrent's game is on this PC, delete the torrent from the service.
+// A game still downloading, stopped, failed or deleted locally keeps its cloud copy.
+export async function removeFinishedTorrents(provider, apiKey) {
+  if (!provider.removeTorrent || !globalThis.window?.electron?.getGames) return;
+  const read = () =>
+    JSON.parse(localStorage.getItem(provider.metadataStorageKey) || "{}");
+  const finished = Object.entries(read()).filter(
+    ([id, entry]) =>
+      id.startsWith("torrent:") &&
+      entry?.localDownloadStarted &&
+      !entry.cloudTorrentCleaned
+  );
+  if (!finished.length) return;
+  const games = await window.electron.getGames();
+  for (const [id, entry] of finished) {
+    const name = provider.getTorrentGame(entry)?.game;
+    const game = games.find(item => item.game === name);
+    if (!game || game.downloadingData) continue;
+    try {
+      await provider.removeTorrent(apiKey, id.slice(8));
+    } catch (error) {
+      console.warn(
+        `[Debrid] Could not remove a finished ${provider.name} torrent:`,
+        error.message
+      );
+      continue;
+    }
+    const latest = read();
+    if (!latest[id]) continue;
+    latest[id] = { ...latest[id], cloudTorrentCleaned: true };
+    localStorage.setItem(provider.metadataStorageKey, JSON.stringify(latest));
+  }
+}

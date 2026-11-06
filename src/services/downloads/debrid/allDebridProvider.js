@@ -24,6 +24,7 @@ export default {
   apiKeySetting: "allDebridApiKey",
   torrentSetting: "useAllDebridForTorrents",
   prioritizeSetting: "prioritizeAllDebridOverSeamless",
+  removeAfterDoneSetting: "allDebridRemoveAfterDone",
   seamlessHosts: ["gofile", "pixeldrain", "buzzheavier", "megadb"],
   // No cloud page: torrents being prepared are listed on the local Downloads page.
   hasDownloadsPage: false,
@@ -75,7 +76,14 @@ export default {
     }
     return downloads;
   },
-  removeTorrent: (apiKey, id) => api.deleteMagnet(apiKey, id),
+  async removeTorrent(apiKey, id) {
+    try {
+      await api.deleteMagnet(apiKey, id);
+    } catch (error) {
+      // Already gone from the account
+      if (error.code !== "MAGNET_INVALID_ID") throw error;
+    }
+  },
   async submitMagnet(link, apiKey) {
     const result = await api.createTorrentFromMagnet(link, apiKey);
     return { id: result.id };

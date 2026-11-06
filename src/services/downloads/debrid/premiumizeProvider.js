@@ -17,6 +17,7 @@ export default {
   apiKeySetting: "premiumizeApiKey",
   torrentSetting: "usePremiumizeForTorrents",
   prioritizeSetting: "prioritizePremiumizeOverSeamless",
+  removeAfterDoneSetting: "premiumizeRemoveAfterDone",
   seamlessHosts: ["gofile", "pixeldrain", "buzzheavier", "megadb"],
   // No cloud page: torrents being prepared are listed on the local Downloads page.
   hasDownloadsPage: false,

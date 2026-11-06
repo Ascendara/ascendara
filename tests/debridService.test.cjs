@@ -461,3 +461,40 @@ test("priority chooses the first compatible host or magnet handler without retry
     "an API failure must not create another submission on a lower-priority account"
   );
 });
+
+test("removing finished torrents is opt-in per service", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => Object.assign(global, saved));
+  const records = {
+    "torrent:x": { game: "G", autoHandoff: true, localDownloadStarted: true },
+  };
+  global.localStorage = {
+    getItem: () => JSON.stringify(records),
+    setItem: () => {},
+  };
+  global.window = { electron: { getGames: async () => [{ game: "G" }] } };
+  const { createDebridService } = await loadModule(
+    "src/services/downloads/debridService.js",
+    {
+      fresh: true,
+    }
+  );
+  const removed = [];
+  const provider = {
+    id: "test",
+    name: "Test",
+    apiKeySetting: "testKey",
+    torrentSetting: "useTest",
+    removeAfterDoneSetting: "testRemoveAfterDone",
+    metadataStorageKey: "testData",
+    getTorrentGame: entry => entry,
+    getTorrentDownload: async () => null,
+    removeTorrent: async (_key, id) => removed.push(id),
+  };
+  const debrid = createDebridService([provider]);
+  const settings = { debridEnabled: true, testKey: "k" };
+  await debrid.resumePendingTorrents(settings);
+  assert.deepEqual(removed, []);
+  await debrid.resumePendingTorrents({ ...settings, testRemoveAfterDone: true });
+  assert.deepEqual(removed, ["x"]);
+});

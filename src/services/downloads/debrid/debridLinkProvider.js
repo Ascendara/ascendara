@@ -19,6 +19,7 @@ export default {
   apiKeySetting: "debridLinkApiKey",
   torrentSetting: "useDebridLinkForTorrents",
   prioritizeSetting: "prioritizeDebridLinkOverSeamless",
+  removeAfterDoneSetting: "debridLinkRemoveAfterDone",
   seamlessHosts: ["gofile", "pixeldrain", "buzzheavier", "megadb"],
   // No cloud page: torrents being prepared are listed on the local Downloads page.
   hasDownloadsPage: false,
@@ -62,7 +63,14 @@ export default {
       size: file.size ?? null,
     }));
   },
-  removeTorrent: (apiKey, id) => api.deleteTorrent(apiKey, id),
+  async removeTorrent(apiKey, id) {
+    try {
+      await api.deleteTorrent(apiKey, id);
+    } catch (error) {
+      // Already gone from the account
+      if (error.code !== "badId") throw error;
+    }
+  },
   async submitMagnet(link, apiKey) {
     const result = await api.createTorrentFromMagnet(link, apiKey);
     return { id: result.id };

@@ -353,3 +353,43 @@ test("a torrent that can not start does not hold back the ones behind it", async
     t.mock.restoreAll();
   }
 });
+
+test("finished torrents leave the service only once their game is fully on this PC", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => Object.assign(global, saved));
+  let stored = JSON.stringify({
+    "torrent:done": { game: "Done", autoHandoff: true, localDownloadStarted: true },
+    "torrent:busy": { game: "Busy", autoHandoff: true, localDownloadStarted: true },
+    "torrent:deleted": { game: "Deleted", autoHandoff: true, localDownloadStarted: true },
+    "torrent:waiting": { game: "Waiting", autoHandoff: true },
+  });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_key, value) => {
+      stored = value;
+    },
+  };
+  global.window = {
+    electron: {
+      getGames: async () => [
+        { game: "Done" },
+        { game: "Busy", downloadingData: { downloading: true } },
+        { game: "Waiting" },
+      ],
+    },
+  };
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  const removed = [];
+  const provider = {
+    name: "Test",
+    metadataStorageKey: "metadata",
+    getTorrentGame: entry => entry,
+    removeTorrent: async (_key, id) => removed.push(id),
+  };
+  await worker.removeFinishedTorrents(provider, "token");
+  await worker.removeFinishedTorrents(provider, "token");
+  assert.deepEqual(removed, ["done"], "only the finished game, and only once");
+  assert.equal(JSON.parse(stored)["torrent:done"].cloudTorrentCleaned, true);
+});

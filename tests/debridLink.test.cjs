@@ -278,3 +278,12 @@ test("Debrid-Link torrent status and removal for the in-cloud list", async t => 
   assert.equal(calls[0].url, "/api/debridlink/seedbox/t/remove");
   assert.equal(calls[0].options.method, "DELETE");
 });
+
+test("removing a Debrid-Link torrent that is already gone is not an error", async t => {
+  const provider = (await loadProvider()).default;
+  assert.equal(provider.removeAfterDoneSetting, "debridLinkRemoveAfterDone");
+  stubFetch(t, () => fail("badId"));
+  await provider.removeTorrent("key", "t");
+  stubFetch(t, () => fail("badToken", 401));
+  await assert.rejects(provider.removeTorrent("key", "t"), /API key is invalid/);
+});
