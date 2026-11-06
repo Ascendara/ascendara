@@ -440,13 +440,11 @@ function Settings() {
     };
 
     checkController();
-    const interval = setInterval(checkController, 2000);
 
     window.addEventListener("gamepadconnected", checkController);
     window.addEventListener("gamepaddisconnected", checkController);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener("gamepadconnected", checkController);
       window.removeEventListener("gamepaddisconnected", checkController);
     };

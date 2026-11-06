@@ -466,7 +466,6 @@ const ControllerDetectionPrompt = () => {
   const { settings } = useSettings();
   const [showPrompt, setShowPrompt] = useState(false);
   const hasPromptedRef = useRef(false);
-  const checkIntervalRef = useRef(null);
   const controllerType = settings?.controllerType || "xbox";
   const buttons = getControllerButtons(controllerType);
   const [selectedButton, setSelectedButton] = useState("confirm");
@@ -486,23 +485,16 @@ const ControllerDetectionPrompt = () => {
       if (hasController && !hasPromptedRef.current) {
         setShowPrompt(true);
         hasPromptedRef.current = true;
-        if (checkIntervalRef.current) {
-          clearInterval(checkIntervalRef.current);
-          checkIntervalRef.current = null;
-        }
       }
     };
 
     checkForController();
 
-    checkIntervalRef.current = setInterval(checkForController, 2000);
-
+    // Chromium only exposes a controller once it is used, and fires
+    // gamepadconnected at that moment, so polling adds nothing.
     window.addEventListener("gamepadconnected", checkForController);
 
     return () => {
-      if (checkIntervalRef.current) {
-        clearInterval(checkIntervalRef.current);
-      }
       window.removeEventListener("gamepadconnected", checkForController);
     };
   }, [location.pathname]);

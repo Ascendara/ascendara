@@ -185,6 +185,9 @@ function useBigPicturePage() {
 
   // --- DOWNLOAD POLLING ---
   useEffect(() => {
+    let disposed = false;
+    let timeoutId;
+    let active = false;
     const fetchDownloadingGames = async () => {
       try {
         const games = await window.electron.getGames();
@@ -201,22 +204,43 @@ function useBigPicturePage() {
               downloadingData.error)
           );
         });
-        setDownloadingGames(downloading);
+        active = downloading.some(
+          ({ downloadingData }) =>
+            downloadingData.downloading ||
+            downloadingData.extracting ||
+            downloadingData.updating ||
+            downloadingData.verifying
+        );
+        // Keep the same array while nothing is listed so the idle view does not re-render
+        setDownloadingGames(prev =>
+          prev.length === 0 && downloading.length === 0 ? prev : downloading
+        );
       } catch (error) {
         console.error("Error polling downloads:", error);
       }
     };
 
-    fetchDownloadingGames();
-    const intervalId = setInterval(fetchDownloadingGames, 1000);
-    return () => clearInterval(intervalId);
+    // Reading games touches every game folder: poll every second only while
+    // something is in progress
+    const poll = async () => {
+      await fetchDownloadingGames();
+      if (disposed) return;
+      timeoutId = setTimeout(poll, active ? 1000 : 5000);
+    };
+    poll();
+    return () => {
+      disposed = true;
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   // --- QUEUE POLLING ---
   useEffect(() => {
     const fetchQueuedDownloads = () => {
       const queue = getDownloadQueue();
-      setQueuedDownloads(queue);
+      setQueuedDownloads(prev =>
+        JSON.stringify(prev) === JSON.stringify(queue) ? prev : queue
+      );
     };
     fetchQueuedDownloads();
     const queueIntervalId = setInterval(fetchQueuedDownloads, 1000);

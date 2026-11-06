@@ -62,7 +62,8 @@ function createWindow() {
       webSecurity: false,
       // Must be explicitly true for openDevTools() to work in packaged builds
       devTools: true,
-      // Prevent rendering stalls when the window is idle or in the background
+      // Keep rendering at full rate while visible to avoid idle black screens.
+      // Throttling is switched on while hidden or minimized (see setIdle below).
       backgroundThrottling: false,
     },
   });
@@ -90,6 +91,7 @@ function createWindow() {
 
     if (shouldStartHidden) {
       mainWindowHidden = true;
+      mainWindow.webContents.setBackgroundThrottling(true);
       console.log("Window kept hidden due to --hidden flag");
     } else {
       mainWindow.show();
@@ -205,16 +207,28 @@ function createWindow() {
     return { action: "deny" };
   });
 
+  // While hidden or minimized (e.g. during gameplay), let Chromium throttle
+  // timers and stop painting. Restore full rate and repaint when shown again.
+  const setIdle = idle => {
+    if (mainWindow.isDestroyed()) return;
+    mainWindow.webContents.setBackgroundThrottling(idle);
+    if (!idle) mainWindow.webContents.invalidate();
+  };
+  mainWindow.on("minimize", () => setIdle(true));
+  mainWindow.on("restore", () => setIdle(false));
+
   // Add window event listeners
   mainWindow.on("hide", () => {
     mainWindowHidden = true;
     console.log("Window hidden event fired");
     // Notify renderer to set status to invisible when hiding to tray
     mainWindow.webContents.send("app-hidden");
+    setIdle(true);
   });
 
   mainWindow.on("show", () => {
     mainWindowHidden = false;
+    setIdle(false);
     console.log("Window shown event fired");
     // Notify renderer to restore status when showing from tray
     mainWindow.webContents.send("app-shown");

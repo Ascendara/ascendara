@@ -737,13 +737,19 @@ const Downloads = () => {
       }
     };
 
-    fetchDownloadingGames();
-    // Poll every 1 second for more responsive progress updates
-    const intervalId = setInterval(fetchDownloadingGames, 1000);
+    // Poll every second while something is downloading for responsive
+    // progress, and every 3 seconds otherwise to keep the idle page cheap.
+    let timeoutId;
+    const poll = async () => {
+      await fetchDownloadingGames();
+      if (disposed) return;
+      timeoutId = setTimeout(poll, hasLiveDownloadRef.current ? 1000 : 3000);
+    };
+    poll();
     // Only run this effect on mount/unmount (not on downloadingGames change)
     return () => {
       disposed = true;
-      clearInterval(intervalId);
+      clearTimeout(timeoutId);
       stopCommandChecking();
     };
   }, [startCommandChecking, stopCommandChecking]);
@@ -752,7 +758,9 @@ const Downloads = () => {
   useEffect(() => {
     const fetchQueuedDownloads = () => {
       const queue = getDownloadQueue();
-      setQueuedDownloads(queue);
+      setQueuedDownloads(prev =>
+        JSON.stringify(prev) === JSON.stringify(queue) ? prev : queue
+      );
     };
     fetchQueuedDownloads();
     const queueIntervalId = setInterval(fetchQueuedDownloads, 1000);

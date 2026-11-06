@@ -17,6 +17,11 @@ let commandsInFlight = false;
 // Stopped, failed and waiting downloads stay in the list indefinitely, so an
 // unchanged list is only re-sent this often instead of on every tick.
 const UNCHANGED_SYNC_INTERVAL = 30000;
+// Reading downloads touches every game folder, so with none running only check
+// this often. Starting a download forces a sync right away.
+const IDLE_SYNC_INTERVAL = 30000;
+let lastDownloadCount = 0;
+let lastCheckAt = 0;
 
 // Back off after failed requests so a broken endpoint or rejected session
 // isn't retried at full polling speed forever.
@@ -109,6 +114,10 @@ const syncDownloads = async (force = false) => {
     return;
   }
 
+  if (!force && lastDownloadCount === 0 && Date.now() - lastCheckAt < IDLE_SYNC_INTERVAL) {
+    return;
+  }
+
   if (syncInFlight) {
     syncRequested ||= force;
     return;
@@ -124,6 +133,8 @@ const syncDownloads = async (force = false) => {
     // Get current downloads from electron
     const downloads = await window.electron.getDownloads();
     const downloadsArray = (downloads || []).filter(download => !download.privateSource);
+    lastDownloadCount = downloadsArray.length;
+    lastCheckAt = Date.now();
     if (user !== currentUser) return;
 
     // Empty snapshots clear stale server state too. Retry failures on the next tick.

@@ -16,6 +16,8 @@ const HELPERS = /Ascendara(Downloader|GofileHelper|TorrentHandler)/i;
 // Metadata written this recently may belong to a helper that is still starting.
 const GRACE_MS = 30000;
 const CHECK_INTERVAL_MS = 15000;
+// With no active downloads only new ones need noticing, so check less often.
+const IDLE_CHECK_INTERVAL_MS = 60000;
 // Caps restarts so a helper that keeps crashing cannot loop forever.
 const MAX_ATTEMPTS = 3;
 // A running helper that makes no progress this long is reported as stalled.
@@ -26,6 +28,10 @@ const recoveries = new Map();
 // game folder -> { game, since, stalled } for downloads whose helper is running.
 const progressWatch = new Map();
 let checking = false;
+let lastActiveCount = 0;
+// metadata file -> { mtimeMs, active, hasDownloadingData }, so unchanged files
+// are not re-read on every check.
+const metadataCache = new Map();
 
 function isActive(data) {
   return Boolean(data && (data.downloading || data.extracting || data.verifying));
@@ -144,6 +150,7 @@ function interruptedState(data, info, message) {
 
 async function activeMetadata(directories) {
   const found = [];
+  const seen = new Set();
   for (const directory of directories) {
     let entries;
     try {
@@ -154,13 +161,27 @@ async function activeMetadata(directories) {
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const file = path.join(directory, entry.name, `${entry.name}.ascendara.json`);
+      seen.add(file);
       try {
-        const info = await fs.readJson(file);
-        if (isActive(info.downloadingData)) found.push({ file, folder: entry.name });
-        else if (!info.downloadingData) recoveries.delete(entry.name);
-      } catch {}
+        const { mtimeMs } = await fs.stat(file);
+        let cached = metadataCache.get(file);
+        if (!cached || cached.mtimeMs !== mtimeMs) {
+          const info = await fs.readJson(file);
+          cached = {
+            mtimeMs,
+            active: isActive(info.downloadingData),
+            hasDownloadingData: Boolean(info.downloadingData),
+          };
+          metadataCache.set(file, cached);
+        }
+        if (cached.active) found.push({ file, folder: entry.name });
+        else if (!cached.hasDownloadingData) recoveries.delete(entry.name);
+      } catch {
+        metadataCache.delete(file);
+      }
     }
   }
+  for (const file of metadataCache.keys()) if (!seen.has(file)) metadataCache.delete(file);
   return found;
 }
 
@@ -169,6 +190,7 @@ async function check({ getDirectories, retryExtraction, resumeDownload }) {
   checking = true;
   try {
     const active = await activeMetadata(getDirectories());
+    lastActiveCount = active.length;
     const watched = new Set();
     try {
       if (!active.length) return;
@@ -260,8 +282,13 @@ function getDownloadStalls() {
  */
 function startDownloadWatchdog(options) {
   const run = () => check(options).catch(error => console.error("[downloads]", error));
-  setTimeout(run, 5000).unref?.();
-  setInterval(run, CHECK_INTERVAL_MS).unref?.();
+  const schedule = delay => {
+    setTimeout(async () => {
+      await run();
+      schedule(lastActiveCount ? CHECK_INTERVAL_MS : IDLE_CHECK_INTERVAL_MS);
+    }, delay).unref?.();
+  };
+  schedule(5000);
 }
 
 module.exports = { startDownloadWatchdog, getDownloadStalls };

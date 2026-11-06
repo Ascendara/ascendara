@@ -871,9 +871,12 @@ const Library = () => {
     const interval = setInterval(() => {
       const hasDownloading = games.some(g => g._isDownloading);
       if (hasDownloading) loadGames();
-      // Always refresh queue state
+      // Refresh queue state, keeping the same array when nothing changed so an
+      // idle Library does not re-render every 3 seconds
       const queue = getDownloadQueue();
-      setQueuedGames(queue);
+      setQueuedGames(prev =>
+        JSON.stringify(prev) === JSON.stringify(queue) ? prev : queue
+      );
     }, 3000);
     return () => clearInterval(interval);
   }, [games]);

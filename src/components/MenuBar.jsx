@@ -72,7 +72,6 @@ const MenuBar = () => {
   const [hasController, setHasController] = useState(false);
   const [audioDownloadCount, setAudioDownloadCount] = useState(0);
   const mainContentRef = useRef(null);
-  const checkIntervalRef = useRef(null);
 
   const platform = navigator.userAgentData?.platform || navigator.platform || "";
   const modifierKey = platform.toUpperCase().includes("MAC") ? "⌘" : "Ctrl";
@@ -139,8 +138,9 @@ const MenuBar = () => {
       // Initial delay before first check
       initialTimeout = setTimeout(checkDownloadStatus, 1000);
 
-      // Set up interval for subsequent checks
-      interval = setInterval(checkDownloadStatus, 1000);
+      // Progress and ready events update the state right away, so this is
+      // only a slow fallback (e.g. for a failed download).
+      interval = setInterval(checkDownloadStatus, 10000);
     }
 
     return () => {
@@ -152,12 +152,16 @@ const MenuBar = () => {
   useEffect(() => {
     const handleDownloadProgress = progress => {
       setDownloadProgress(progress);
+      setIsDownloadingUpdate(true);
     };
+    const handleUpdateReady = () => setIsDownloadingUpdate(false);
 
     const unsubscribe = window.electron.onUpdateDownloadProgress(handleDownloadProgress);
+    const unsubscribeReady = window.electron.onUpdateReady?.(handleUpdateReady);
 
     return () => {
       unsubscribe();
+      if (typeof unsubscribeReady === "function") unsubscribeReady();
     };
   }, []);
 
@@ -172,15 +176,12 @@ const MenuBar = () => {
 
     checkForController();
 
-    checkIntervalRef.current = setInterval(checkForController, 2000);
-
+    // Chromium only exposes a controller once it is used, and fires
+    // gamepadconnected at that moment, so polling adds nothing.
     window.addEventListener("gamepadconnected", checkForController);
     window.addEventListener("gamepaddisconnected", checkForController);
 
     return () => {
-      if (checkIntervalRef.current) {
-        clearInterval(checkIntervalRef.current);
-      }
       window.removeEventListener("gamepadconnected", checkForController);
       window.removeEventListener("gamepaddisconnected", checkForController);
     };
