@@ -385,11 +385,14 @@ const getDownloadList = async (apiKey, type, params) => {
   if (base.startsWith("/")) {
     base = window.location.origin + base;
   }
-  const query = params ? `?${new URLSearchParams(params)}` : "";
-  const url = `${base}/${type === "torrent" ? "torrents" : "webdl"}/mylist${query}`;
+  // TorBox serves mylist from a server cache by default, which keeps showing
+  // finished or removed items for minutes. Always ask for the live list.
+  const query = new URLSearchParams({ bypass_cache: "true", ...params });
+  const url = `${base}/${type === "torrent" ? "torrents" : "webdl"}/mylist?${query}`;
 
   const response = await fetch(url, {
     method: "GET",
+    cache: "no-store",
     headers: {
       Authorization: `Bearer ${apiKey}`,
     },
