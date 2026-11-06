@@ -102,8 +102,8 @@ function useAccounts(providers, settings) {
   return [accounts, provider => load(provider, apiKeyOf(settings, provider))];
 }
 
-// The Debrid settings page: the order the services are tried in first, then what
-// debrid does and where downloads go, then each account.
+// The Debrid settings page: the master switch and where downloads go first, then the
+// order services are tried in, then each account. Everything sits flat on the page.
 export default function DebridSettings() {
   const { settings, setSettings } = useSettings();
   const { t } = useLanguage();
@@ -126,6 +126,8 @@ export default function DebridSettings() {
 
   return (
     <>
+      <Overview providers={providers} accounts={accounts} />
+
       {debridEnabled && (
         <section id="debrid-order" className="py-8">
           <SectionHeader
@@ -138,7 +140,7 @@ export default function DebridSettings() {
             }
           />
           <ol
-            className="overflow-hidden rounded-xl border border-border/70"
+            className="border-y border-border/60"
             aria-label={t("debrid.priorityOrder")}
           >
             {providers.map((item, index) => (
@@ -183,15 +185,13 @@ export default function DebridSettings() {
         </section>
       )}
 
-      <Overview providers={providers} accounts={accounts} />
-
       {debridEnabled && (
         <section id="debrid-accounts" className="py-8">
           <SectionHeader
             title={t("debrid.accountsTitle")}
             description={t("debrid.accountsDescription")}
           />
-          <div className="space-y-4">
+          <div className="divide-y divide-border/60 border-t border-border/60">
             {providers.map((item, index) => (
               <ServiceCard
                 key={item.id}
@@ -295,20 +295,18 @@ function Overview({ providers, accounts }) {
       </div>
 
       {debridEnabled ? (
-        <>
-          <dl className="mt-6 grid gap-3 sm:grid-cols-3">
+        <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-4 border-y border-border/60 py-4">
+          <dl className="flex flex-1 flex-wrap items-center gap-x-8 gap-y-4">
             {routes.map(({ icon: Icon, label, value, provider, muted }) => (
-              <div
-                key={label}
-                className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-4 py-3"
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60">
-                  {provider ? (
-                    <DebridIcon provider={provider} className="h-4 w-4 text-primary" />
-                  ) : (
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </div>
+              <div key={label} className="flex min-w-0 items-center gap-2.5">
+                {provider ? (
+                  <DebridIcon
+                    provider={provider}
+                    className="h-4 w-4 shrink-0 text-primary"
+                  />
+                ) : (
+                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                )}
                 <div className="min-w-0">
                   <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
                     {label}
@@ -329,23 +327,25 @@ function Overview({ providers, accounts }) {
             <Button
               variant="ghost"
               size="sm"
-              className="mt-3 gap-1.5 px-2 text-primary"
+              className="-mr-2 gap-1.5 px-2 text-primary"
               onClick={() => navigate("/debriddownloads")}
             >
               {t("debrid.openDownloads")}
               <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           )}
-        </>
+        </div>
       ) : (
-        <ul className="mt-6 grid gap-3 sm:grid-cols-3">
+        <ul className="mt-6 grid gap-x-8 gap-y-5 border-t border-border/60 pt-6 sm:grid-cols-3">
           {features.map(([Icon, title, description]) => (
-            <li key={title} className="rounded-xl bg-muted/40 p-4">
-              <Icon className="mb-3 h-5 w-5 text-primary" />
-              <p className="text-sm font-medium text-foreground">{t(title)}</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {t(description)}
-              </p>
+            <li key={title} className="flex gap-3">
+              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{t(title)}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {t(description)}
+                </p>
+              </div>
             </li>
           ))}
         </ul>
@@ -436,14 +436,9 @@ function ServiceCard({ provider, position, account, onRetry }) {
   ];
 
   return (
-    <article
-      id={`debrid-${provider.id}`}
-      className="overflow-hidden rounded-2xl border border-border/70 bg-card/40"
-    >
-      <header className="flex items-center gap-4 border-b border-border/60 bg-muted/20 px-5 py-4">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-          <DebridIcon provider={provider} className="h-5 w-5 text-primary" />
-        </div>
+    <article id={`debrid-${provider.id}`} className="py-6">
+      <header className="flex items-center gap-3">
+        <DebridIcon provider={provider} className="h-6 w-6 shrink-0 text-primary" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="mb-0 truncate text-base font-semibold text-foreground">
@@ -493,8 +488,8 @@ function ServiceCard({ provider, position, account, onRetry }) {
         />
       </header>
 
-      <div className="grid lg:grid-cols-2 lg:divide-x lg:divide-border/60">
-        <div className="min-w-0 p-5">
+      <div className="mt-5 grid gap-x-10 gap-y-6 pl-9 lg:grid-cols-2">
+        <div className="min-w-0">
           <h5 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {t("debrid.accountTitle")}
           </h5>
@@ -518,7 +513,7 @@ function ServiceCard({ provider, position, account, onRetry }) {
           )}
         </div>
 
-        <div className="min-w-0 border-t border-border/60 p-5 lg:border-t-0">
+        <div className="min-w-0">
           <h5 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {t("debrid.optionsTitle")}
           </h5>
@@ -579,7 +574,7 @@ function OrderRow({
       draggable
       {...{ onDragStart, onDragOver, onDrop, onDragEnd }}
       className={cn(
-        "relative flex items-center gap-3 border-b border-border/60 bg-card/40 px-4 py-3 transition-colors last:border-b-0",
+        "relative flex items-center gap-3 border-b border-border/40 px-2 py-2.5 transition-colors last:border-b-0 hover:bg-muted/30",
         isDragTarget &&
           "bg-primary/5 before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-primary",
         isDragged && "opacity-50"
@@ -686,9 +681,9 @@ function AccountSummary({
               : details.expiryNote || t("debrid.noPremium")}
           </p>
           {details.stats?.length > 0 && (
-            <dl className="mt-3 grid grid-cols-2 gap-2">
+            <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3">
               {details.stats.map(stat => (
-                <div key={stat.label} className="rounded-lg bg-muted/40 px-3 py-2">
+                <div key={stat.label} className="border-l-2 border-primary/30 pl-3">
                   <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
                     {stat.label}
                   </dt>
