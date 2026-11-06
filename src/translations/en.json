@@ -320,6 +320,8 @@
       "title": "Oh you liking Ascendara a bit?"
     },
     "testimonialDialog": {
+      "alreadySent": "Review Already Sent",
+      "alreadySentDesc": "You've already shared a review from this device. Thanks again!",
       "failed": "Review Failed",
       "failedDesc": "Your review was not submitted. Sorry about that!",
       "featuredGame": "Show off a game",

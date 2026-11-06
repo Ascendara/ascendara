@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { API_URL } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
-import { verifyAscendAccess } from "@/services/firebase/firebaseService";
 import {
   Dialog,
   DialogContent,
@@ -82,12 +81,9 @@ const TestimonialDialog = ({ installedAt, onClose }) => {
       const { token } = await tokenResponse.json();
       if (!token) throw new Error("No auth token available");
 
-      let hasAscend = false;
-      if (user) {
-        const hardwareId = (await window.electron.getHardwareId?.()) ?? null;
-        const access = await verifyAscendAccess(hardwareId).catch(() => null);
-        hasAscend = !!access?.hasAccess;
-      }
+      const hardwareId = (await window.electron.getHardwareId?.()) ?? null;
+      // The server reads the account and its Ascend access from this token
+      const ascendToken = user ? await user.getIdToken() : null;
 
       const featured = playedGames.find(game => game.name === featuredGame);
       const totalPlayTime = playedGames.reduce((sum, game) => sum + game.playTime, 0);
@@ -97,6 +93,7 @@ const TestimonialDialog = ({ installedAt, onClose }) => {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          ...(ascendToken && { "X-Ascend-Token": ascendToken }),
         },
         body: JSON.stringify({
           action: "testimonial",
@@ -104,7 +101,6 @@ const TestimonialDialog = ({ installedAt, onClose }) => {
           name: name.trim() || null,
           installedAt,
           daysWithAscendara: Math.floor((Date.now() - installedAt) / DAY_MS),
-          hasAscend,
           featuredGame: featured
             ? {
                 name: featured.name,
@@ -115,9 +111,16 @@ const TestimonialDialog = ({ installedAt, onClose }) => {
             : null,
           totalHours: toHours(totalPlayTime),
           gamesPlayed: playedGames.length,
-          uid: user?.uid || null,
+          hardwareId,
         }),
       });
+      if (response.status === 409) {
+        toast(t("app.testimonialDialog.alreadySent"), {
+          description: t("app.testimonialDialog.alreadySentDesc"),
+        });
+        onClose();
+        return;
+      }
       if (!response.ok) throw new Error(`Request failed: ${response.status}`);
 
       toast.success(t("app.testimonialDialog.thanks"), {
