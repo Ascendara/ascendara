@@ -14,6 +14,47 @@ const startLocalDownload = async (...args) => {
   }
 };
 
+// Torrents often use names Windows cannot store ("Game: Edition", "notes."), which made
+// the whole handoff fail on every retry. Each folder and file name is made storable here;
+// the main process still validates the result.
+export const storableFilename = name =>
+  typeof name !== "string" || !name
+    ? name
+    : name
+        .replaceAll("\\", "/")
+        .split("/")
+        .filter(Boolean)
+        .map(part => {
+          let safe = [...part]
+            .map(char => (/[<>:"|?*]/.test(char) || char.charCodeAt(0) < 32 ? "_" : char))
+            .join("")
+            .replace(/[. ]+$/, "");
+          if (!safe || safe === ".") safe = "_";
+          if (/^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(safe))
+            safe = `_${safe}`;
+          // Names the app keeps for its own files
+          const lower = safe.toLowerCase();
+          if (lower.startsWith(".ascendara")) safe = `_${safe}`;
+          if (lower.endsWith(".ascendara.json")) safe = `${safe}_`;
+          return safe;
+        })
+        .join("/");
+
+// Names that only differ after that, or by case, get " (2)", " (3)"... before the extension.
+export const storableFiles = files => {
+  const used = new Set();
+  return files.map(file => {
+    const name = storableFilename(file.filename);
+    if (typeof name !== "string" || !name) return file;
+    const [, stem, extension] = /^(.*?)(\.[^./]*)?$/.exec(name);
+    let unique = name;
+    for (let copy = 2; used.has(unique.toLowerCase()); copy++)
+      unique = `${stem} (${copy})${extension || ""}`;
+    used.add(unique.toLowerCase());
+    return { ...file, filename: unique };
+  });
+};
+
 export function handoffTorrents(provider, apiKey) {
   if (!globalThis.window?.electron?.downloadFile || !provider.getTorrentDownload)
     return Promise.resolve();
@@ -92,7 +133,10 @@ export function handoffTorrents(provider, apiKey) {
             return;
         }
         const result = await startLocalDownload(
-          { transferId: `${provider.id}:${id}`, files },
+          {
+            transferId: `${provider.id}:${id}`,
+            files: storableFiles(files),
+          },
           game.game,
           game.online || false,
           game.dlc || false,
