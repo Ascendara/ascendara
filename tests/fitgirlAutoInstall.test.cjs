@@ -23,6 +23,16 @@ function makePack({ badPart = false } = {}) {
 
 const options = { verify: true, silent: true, limitRam: false, deletePack: true };
 
+// Silent runs go through the takeover; adapt a runSetup-style fake to it.
+const asTakeover = runSetup => async (installer, args) => {
+  const code = await runSetup(installer, args);
+  if (code === 1223) return { code, result: null };
+  return {
+    code: 0,
+    result: { succeeded: code === 0 || code === null, exitCode: code, extras: [] },
+  };
+};
+
 test("auto-install verifies, runs setup with args, finishes and cleans the pack", async () => {
   const pack = makePack();
   const stages = [];
@@ -32,11 +42,11 @@ test("auto-install verifies, runs setup with args, finishes and cleans the pack"
     gameName: "Game",
     options,
     onStage: update => stages.push(update.stage),
-    runSetup: async (installer, args) => {
+    runTakeover: asTakeover(async (installer, args) => {
       ranWith = { installer, args };
       fs.outputFileSync(path.join(pack.gameDirectory, "Game", "game.exe"), "x");
       return 0;
-    },
+    }),
     completeInstall: async () => ({ success: true }),
   });
   assert.equal(result.success, true);
@@ -57,7 +67,7 @@ test("a bad part stops before setup and keeps the pack", async () => {
     ...pack,
     gameName: "Game",
     options,
-    runSetup: async () => (ran = true),
+    runTakeover: asTakeover(async () => (ran = true)),
     completeInstall: async () => ({ success: true }),
     onStage: update => updates.push(update),
   });
@@ -84,7 +94,7 @@ test("setup failure or a declined admin prompt keeps the pack and gives a reason
       ...pack,
       gameName: "Game",
       options,
-      runSetup: async () => code,
+      runTakeover: asTakeover(async () => code),
       completeInstall: async () => (completed = true),
     });
     assert.equal(result.success, false);
@@ -100,7 +110,7 @@ test("an unknown exit code counts only when the game folder has an exe", async (
     ...pack,
     gameName: "Game",
     options: { ...options, verify: false },
-    runSetup: async () => null,
+    runTakeover: asTakeover(async () => null),
     completeInstall: async () => ({ success: true }),
   });
   assert.equal(missing.success, false);
@@ -110,10 +120,10 @@ test("an unknown exit code counts only when the game folder has an exe", async (
     ...pack,
     gameName: "Game",
     options: { ...options, verify: false, deletePack: false },
-    runSetup: async () => {
+    runTakeover: asTakeover(async () => {
       fs.outputFileSync(path.join(pack.gameDirectory, "Game", "bin", "game.exe"), "x");
       return null;
-    },
+    }),
     completeInstall: async () => ({ success: true }),
   });
   assert.equal(found.success, true);
@@ -141,7 +151,7 @@ test("an installer outside the download folder never runs", async () => {
     installerPath: path.join(os.tmpdir(), "setup.exe"),
     gameName: "Game",
     options,
-    runSetup: async () => (ran = true),
+    runTakeover: asTakeover(async () => (ran = true)),
     completeInstall: async () => ({ success: true }),
   });
   assert.equal(result.success, false);

@@ -7,6 +7,11 @@ const fs = require("fs-extra");
 const path = require("path");
 const { spawn } = require("child_process");
 const fitgirl = require("./fitgirlInstall");
+const {
+  buildTakeoverScript,
+  parseTakeoverResult,
+  extraOk,
+} = require("./fitgirlTakeover");
 
 const UAC_DECLINED = 1223;
 const log = (...args) => console.log("[autoinstall]", ...args);
@@ -53,6 +58,65 @@ function runElevatedSetup(installerPath, args, spawnProcess = spawn) {
   });
 }
 
+const encodePs = script => Buffer.from(script, "utf16le").toString("base64");
+
+/**
+ * Silent takeover: one UAC prompt runs the takeover script elevated (see
+ * fitgirlTakeover.js). Resolves { code, result }: code 1223 when the prompt was
+ * declined, result null when the script left no readable result file.
+ */
+async function runElevatedTakeover(
+  installerPath,
+  args,
+  { logPath, resultPath, installDir, redists, hostsRedirect },
+  { spawnProcess = spawn, fsApi = fs } = {}
+) {
+  for (const value of [installerPath, ...args, logPath, resultPath, installDir]) {
+    if ([...String(value)].some(char => char < " " || char === "\u007f")) {
+      throw new Error("Installer path has control characters");
+    }
+  }
+  const inner = encodePs(
+    buildTakeoverScript({
+      setup: installerPath,
+      args,
+      logPath,
+      resultPath,
+      installDir,
+      redists,
+      hostsRedirect,
+    })
+  );
+  // The outer, non-elevated shell only forwards the inner command (base64 text).
+  const outer =
+    "try { $p = Start-Process -FilePath 'powershell.exe' -ArgumentList " +
+    "('-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand ' + $env:ASCENDARA_FG_TAKEOVER) " +
+    "-Verb RunAs -WindowStyle Hidden -Wait -PassThru -ErrorAction Stop; exit 0 } " +
+    `catch { exit ${UAC_DECLINED} }`;
+  try {
+    fsApi.removeSync(resultPath);
+  } catch {}
+  const code = await new Promise((resolve, reject) => {
+    const child = spawnProcess(
+      "powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodePs(outer)],
+      {
+        windowsHide: true,
+        stdio: "ignore",
+        env: { ...process.env, ASCENDARA_FG_TAKEOVER: inner },
+      }
+    );
+    child.once("error", reject);
+    child.once("exit", resolve);
+  });
+  if (code === UAC_DECLINED) return { code, result: null };
+  try {
+    return { code, result: parseTakeoverResult(fsApi.readFileSync(resultPath, "utf8")) };
+  } catch {
+    return { code, result: null };
+  }
+}
+
 const hasExe = (dir, fsApi) => {
   const stack = [dir];
   while (stack.length) {
@@ -74,7 +138,7 @@ const hasExe = (dir, fsApi) => {
 
 /**
  * deps: { gameDirectory, gameName, installerPath, options, fsApi, runSetup,
- *         completeInstall, onStage, signal }
+ *         runTakeover, completeInstall, onStage, signal }
  * Resolves { success, stage, error?, verify?, removed?, cleanupErrors? }.
  */
 async function runAutoInstall({
@@ -84,6 +148,7 @@ async function runAutoInstall({
   options,
   fsApi = fs,
   runSetup = runElevatedSetup,
+  runTakeover = runElevatedTakeover,
   completeInstall,
   onStage = () => {},
   signal,
@@ -130,18 +195,51 @@ async function runAutoInstall({
     fitgirl.checkInstaller(installerPath, gameDirectory);
     if (!fsApi.existsSync(installerPath)) return fail("Installer not found");
     const installDir = fitgirl.chooseInstallDir(gameDirectory, packDir, gameName);
+    const logPath = path.join(packDir, "ascendara-install.log");
     const args = fitgirl.buildSetupArgs({
       silent: options.silent,
       limitRam: options.limitRam,
       installDir,
-      logPath: path.join(packDir, "ascendara-install.log"),
+      logPath,
     });
     onStage({ stage });
-    log(`${gameName}: running setup into ${installDir}`);
-    const code = await runSetup(installerPath, args);
-    log(`${gameName}: setup exit code ${code === null ? "unknown" : code}`);
-    if (code === UAC_DECLINED) return fail("The admin prompt was declined");
-    if (code !== null && code !== 0) return fail(`Setup exited with code ${code}`);
+    // Silent setup is taken over so FitGirl's Run entries never start; a visible
+    // wizard (silent off or the RAM limit) shows FitGirl's own finish checkboxes.
+    const takeover = args.includes("/SILENT");
+    let takeoverResult;
+    if (takeover) {
+      log(`${gameName}: silent takeover into ${installDir}`);
+      const { code, result } = await runTakeover(installerPath, args, {
+        logPath,
+        resultPath: path.join(packDir, "ascendara-install-result.json"),
+        installDir,
+        redists: options.redists === true,
+        hostsRedirect: options.hostsRedirect === true,
+      });
+      if (code === UAC_DECLINED) return fail("The admin prompt was declined");
+      if (!result) return fail("Setup gave no result");
+      log(
+        `${gameName}: takeover succeeded ${result.succeeded}, killed after success ` +
+          `${result.killedAfterSuccess}, run entry started ${result.runEntrySeen}, ` +
+          `exit code ${result.exitCode}, temp ${result.tempDir}`
+      );
+      for (const extra of result.extras) {
+        log(
+          `${gameName}: extra ${extra.name} ${extra.error || `exit ${extra.exitCode}`}`
+        );
+      }
+      if (result.error) return fail(`Setup script failed: ${result.error}`);
+      if (!result.succeeded) {
+        return fail(`Setup exited with code ${result.exitCode ?? "unknown"}`);
+      }
+      takeoverResult = result;
+    } else {
+      log(`${gameName}: running setup with its window into ${installDir}`);
+      const code = await runSetup(installerPath, args);
+      log(`${gameName}: setup exit code ${code === null ? "unknown" : code}`);
+      if (code === UAC_DECLINED) return fail("The admin prompt was declined");
+      if (code !== null && code !== 0) return fail(`Setup exited with code ${code}`);
+    }
     if (!hasExe(installDir, fsApi)) return fail(`No game found in ${installDir}`);
 
     const completed = await completeInstall();
@@ -151,6 +249,8 @@ async function runAutoInstall({
       success: true,
       stage: "done",
       verify,
+      takeover: takeoverResult,
+      extrasFailed: (takeoverResult?.extras || []).filter(extra => !extraOk(extra)),
       removed: [],
       cleanupErrors: [],
     };
@@ -184,4 +284,4 @@ async function runAutoInstall({
   }
 }
 
-module.exports = { runAutoInstall, runElevatedSetup, UAC_DECLINED };
+module.exports = { runAutoInstall, runElevatedSetup, runElevatedTakeover, UAC_DECLINED };
