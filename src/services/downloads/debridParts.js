@@ -87,3 +87,55 @@ export function selectTorrentParts(
     return part.kind === "game" || languages.has(part.language);
   });
 }
+
+// Picks the parts of a torrent record: the user's earlier choice, else the setting.
+// Returns null while the user still has to choose.
+export function resolveTorrentParts(files, entry, mode, systemLanguage) {
+  if (Array.isArray(entry?.chosenFileIds)) {
+    const chosen = new Set(entry.chosenFileIds.map(String));
+    return files.filter(file => chosen.has(String(file.id)));
+  }
+  const selected = selectTorrentParts(files, mode, systemLanguage);
+  // Never download nothing: if every part looks like an extra, keep them all.
+  return selected && !selected.length ? files : selected;
+}
+
+const readRecords = storageKey => JSON.parse(localStorage.getItem(storageKey) || "{}");
+const updateRecord = (storageKey, recordKey, update) => {
+  const records = readRecords(storageKey);
+  if (!records[recordKey]) return;
+  records[recordKey] = update(records[recordKey]);
+  localStorage.setItem(storageKey, JSON.stringify(records));
+};
+
+// Parks a torrent until the user picks its parts in the checklist dialog.
+export const requestPartChoice = (storageKey, recordKey, files) =>
+  updateRecord(storageKey, recordKey, record => ({
+    ...record,
+    partFiles: files.map(({ id, name, size }) => ({ id, name, size: size ?? null })),
+  }));
+
+export const saveTorrentPartChoice = (storageKey, recordKey, fileIds) =>
+  updateRecord(storageKey, recordKey, record => {
+    const next = { ...record, chosenFileIds: fileIds };
+    delete next.partFiles;
+    return next;
+  });
+
+// Torrents waiting for the user, across the given storage keys.
+export const getPendingPartChoices = storageKeys =>
+  storageKeys.flatMap(storageKey =>
+    Object.entries(readRecords(storageKey))
+      .filter(
+        ([key, record]) =>
+          key.startsWith("torrent:") &&
+          Array.isArray(record?.partFiles) &&
+          !Array.isArray(record.chosenFileIds)
+      )
+      .map(([recordKey, record]) => ({
+        storageKey,
+        recordKey,
+        name: record.name || record.game || record.gameData?.game || "",
+        files: record.partFiles,
+      }))
+  );

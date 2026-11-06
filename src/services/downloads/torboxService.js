@@ -267,7 +267,12 @@ export const createPremiumDownloadLink = async (link, apiKey) => {
  * @returns {Promise<string>} - The direct download URL
  * @throws {Error} - If the API request fails
  */
-export const getDirectDownloadLink = async (apiKey, downloadId, type = "webdl") => {
+export const getDirectDownloadLink = async (
+  apiKey,
+  downloadId,
+  type = "webdl",
+  fileId = null
+) => {
   if (!apiKey) {
     throw new Error("API key is required");
   }
@@ -302,8 +307,9 @@ export const getDirectDownloadLink = async (apiKey, downloadId, type = "webdl") 
     url.searchParams.append("token", apiKey);
     url.searchParams.append(type === "torrent" ? "torrent_id" : "web_id", downloadId);
 
-    // Always set zip_link to true (as string)
-    url.searchParams.append("zip_link", "true");
+    // One file of a torrent, or the whole download as a zip.
+    if (fileId != null) url.searchParams.append("file_id", fileId);
+    else url.searchParams.append("zip_link", "true");
 
     console.log("[Torbox] Requesting direct download link:", {
       type,
@@ -312,7 +318,7 @@ export const getDirectDownloadLink = async (apiKey, downloadId, type = "webdl") 
     console.log("[Torbox] Download link params:", {
       type,
       downloadId,
-      zip_link: "true",
+      fileId,
     });
 
     const response = await fetch(url.toString(), {

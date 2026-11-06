@@ -1,4 +1,5 @@
 import { isDownloadHalted } from "./downloadState";
+import { requestPartChoice, resolveTorrentParts } from "./debridParts";
 import { isPendingTorrent, readRecords, updateRecord } from "./debridRecords";
 
 // One local transfer per cloud torrent, independent of the currently open page.
@@ -158,7 +159,7 @@ export const storableFiles = files => {
   });
 };
 
-export function handoffTorrents(provider, apiKey) {
+export function handoffTorrents(provider, apiKey, settings) {
   if (!globalThis.window?.electron?.downloadFile || !provider.getTorrentDownload)
     return Promise.resolve();
   const key = `${provider.id}:${apiKey}`;
@@ -242,9 +243,17 @@ export function handoffTorrents(provider, apiKey) {
             continue;
           lastPolled.set(retryKey, Date.now());
         }
+        // Providers that can pick files use this; the others download every part.
+        const pickParts = files =>
+          resolveTorrentParts(
+            files,
+            entry,
+            settings?.debridTorrentParts,
+            globalThis.navigator?.language
+          );
         let files;
         try {
-          files = await provider.getTorrentDownload(apiKey, id.slice(8));
+          files = await provider.getTorrentDownload(apiKey, id.slice(8), pickParts);
         } catch (error) {
           warn(game.game, `could not get the links: ${error.message}`);
           // A torrent the service gave up on is reported once, then left for Remove.
@@ -257,6 +266,10 @@ export function handoffTorrents(provider, apiKey) {
               )
             );
           } else fail(retryKey, error);
+          continue;
+        }
+        if (files?.chooseFrom) {
+          requestPartChoice(provider.metadataStorageKey, id, files.chooseFrom);
           continue;
         }
         // Removed from the cloud: stop polling it once the grace period is over, and say so once.

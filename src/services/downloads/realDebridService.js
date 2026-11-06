@@ -86,9 +86,9 @@ async function request(apiKey, path, method = "GET", data, canRefresh = true) {
 export const getUserInfo = apiKey => request(apiKey, "/user");
 export const getTorrentInfo = (apiKey, id) =>
   request(apiKey, `/torrents/info/${encodeURIComponent(id)}`);
-export const selectFiles = (apiKey, id) =>
+export const selectFiles = (apiKey, id, fileIds = "all") =>
   request(apiKey, `/torrents/selectFiles/${encodeURIComponent(id)}`, "POST", {
-    files: "all",
+    files: Array.isArray(fileIds) ? fileIds.join(",") : fileIds,
   });
 
 export async function createTorrentFromMagnet(magnet, apiKey) {

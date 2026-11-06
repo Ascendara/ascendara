@@ -129,12 +129,14 @@ export function createDebridService(providers) {
     });
     // Start metadata-ready torrents immediately; the app-wide task retries conversions.
     if (provider.resumePendingTorrents) {
-      void provider.resumePendingTorrents(getApiKey(settings, provider)).catch(error => {
-        console.warn(
-          `[Debrid] ${provider.name} torrent startup will retry:`,
-          error.message
-        );
-      });
+      void provider
+        .resumePendingTorrents(getApiKey(settings, provider), settings)
+        .catch(error => {
+          console.warn(
+            `[Debrid] ${provider.name} torrent startup will retry:`,
+            error.message
+          );
+        });
     }
     return { ...result, providerId: provider.id, downloadsPath: provider.downloadsPath };
   };
@@ -149,8 +151,8 @@ export function createDebridService(providers) {
             settings[provider.torrentSetting] === false
           )
             return undefined;
-          await provider.resumePendingTorrents?.(apiKey);
-          return await handoffTorrents(provider, apiKey);
+          await provider.resumePendingTorrents?.(apiKey, settings);
+          return await handoffTorrents(provider, apiKey, settings);
         } finally {
           // Also when this service's handoff failed, or its torrent toggle is off.
           if (settings[provider.removeAfterDoneSetting])
