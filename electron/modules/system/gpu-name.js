@@ -10,8 +10,10 @@ const isVirtual = name =>
 
 // "AMD Radeon(TM) Graphics", "AMD Radeon 780M Graphics", "Intel(R) UHD Graphics 770",
 // "Intel(R) Arc(TM) Graphics". Dedicated cards carry a model: "Radeon RX ...", "Arc A770".
+// Ryzen APUs also say RX: "AMD Radeon(TM) RX Vega 11 Graphics" is integrated.
 const isIntegrated = name =>
-  (/\bradeon\b.*\bgraphics\b/i.test(name) && !/\brx\b/i.test(name)) ||
+  (/\bradeon\b.*\bgraphics\b/i.test(name) &&
+    (!/\brx\b/i.test(name) || /\bvega\s*\d+\b/i.test(name))) ||
   (/\bintel\b.*\bgraphics\b/i.test(name) && !/\b[ab]\d{3}\b/i.test(name));
 
 function pickGpuName(output) {
