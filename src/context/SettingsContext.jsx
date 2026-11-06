@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
 } from "react";
+import { keepRenewedTokens, noteRenewedTokens } from "./renewedTokens";
 
 export const SettingsContext = createContext();
 
@@ -92,6 +93,8 @@ export function SettingsProvider({ children }) {
     extraGameOptions: false,
   });
   const settingsRef = useRef(settings);
+  // Real-Debrid tokens a background renewal replaced, so a stale snapshot keeps the new ones.
+  const renewedRef = useRef({});
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -101,10 +104,13 @@ export function SettingsProvider({ children }) {
   const setSettings = useCallback(
     async newSettings => {
       // If newSettings is a function, call it with current settings from ref
-      const updatedSettings =
+      const updatedSettings = keepRenewedTokens(
         typeof newSettings === "function"
           ? newSettings(settingsRef.current)
-          : newSettings; // Don't merge - use newSettings directly to avoid losing values
+          : newSettings, // Don't merge - use newSettings directly to avoid losing values
+        settingsRef.current,
+        renewedRef.current
+      );
 
       // Persist only changed keys so a stale snapshot cannot reset values
       // written by the main process (including the active index path).
@@ -196,6 +202,7 @@ export function SettingsProvider({ children }) {
 
     // Listen for settings changes from other parts of the app
     const handleSettingsChange = (event, newSettings) => {
+      noteRenewedTokens(renewedRef.current, settingsRef.current, newSettings);
       const updatedSettings = { ...settingsRef.current, ...newSettings };
       settingsRef.current = updatedSettings;
       setSettingsState(updatedSettings);
