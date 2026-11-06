@@ -354,7 +354,10 @@ export default function DownloadPanel({
               </Warning>
             )}
           {isTorrentMode && cloudTorrent && (
-            <p className="text-sm text-muted-foreground">{debridProvider?.name}</p>
+            <div className="flex items-center gap-2 rounded-lg bg-primary/5 p-3 text-sm text-primary">
+              <DebridIcon provider={debridProvider} className="h-4 w-4 shrink-0" />
+              {t("debrid.torrentVia", { provider: debridProvider?.name })}
+            </div>
           )}
           {isTorrentMode && downloadButton}
 

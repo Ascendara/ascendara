@@ -117,6 +117,7 @@ const featureCenterResources = {
       preferenceDescription:
         "Choose which configured service handles eligible downloads. If it is not configured, the first configured service is used.",
       hostInstructions: "Process this host link with {{provider}}.",
+      torrentVia: "{{provider}} downloads this torrent in the cloud.",
       enable: "Enable {{provider}} for this download",
       disable: "Disable {{provider}} for this download",
       torrentFallback: "Cloud torrent submission failed. Falling back to qBittorrent.",
