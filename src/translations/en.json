@@ -1814,6 +1814,7 @@
       "close": "Close",
       "fail": "Below it",
       "freeSpace": "{{free}} free",
+      "matchedAs": "Matched as: {{name}}",
       "needsSpace": "{{free}} free, needs {{needed}}",
       "note": "Checked on this PC. CPU and GPU use rough performance tiers, so treat those as a guide.",
       "pass": "Meets it",
