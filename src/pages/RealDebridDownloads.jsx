@@ -8,6 +8,7 @@ import * as realDebrid from "@/services/downloads/realDebridService";
 import realDebridProvider from "@/services/downloads/debrid/realDebridProvider";
 import {
   DebridAccountBar,
+  DebridAction,
   DebridEmpty,
   DebridItem,
   DebridList,
@@ -30,6 +31,7 @@ export default function RealDebridDownloads() {
   const [userError, setUserError] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [working, setWorking] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [files, setFiles] = useState({});
   const [metadata, setMetadata] = useState({});
@@ -110,6 +112,16 @@ export default function RealDebridDownloads() {
       },
     });
   };
+
+  const sendToPc = (item, link, filename, id) =>
+    run(async () => {
+      setWorking(id);
+      try {
+        await download(item, link, filename);
+      } finally {
+        setWorking(null);
+      }
+    });
 
   const toggleFiles = item =>
     run(async () => {
@@ -229,7 +241,7 @@ export default function RealDebridDownloads() {
       ) : visible.length === 0 ? (
         <DebridEmpty title={t(empty[0])} description={t(empty[1])} />
       ) : (
-        <DebridList>
+        <DebridList key={tab}>
           {visible.map(({ item, tone, status }) => {
             const key = itemKey(item);
             const isTorrent = item.type === "torrent";
@@ -242,14 +254,14 @@ export default function RealDebridDownloads() {
             let action = null;
             if (!isTorrent) {
               action = (
-                <Button
-                  size="sm"
+                <DebridAction
+                  state={working === key ? "working" : "idle"}
+                  icon={Download}
+                  label={t("debrid.downloadToPc")}
+                  workingLabel={t("debrid.preparing")}
                   disabled={busy}
-                  onClick={() => run(() => download(item, item.link, item.filename))}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  {t("debrid.downloadToPc")}
-                </Button>
+                  onClick={() => sendToPc(item, item.link, item.filename, key)}
+                />
               );
             } else if (tone === "done") {
               action = (
@@ -265,6 +277,7 @@ export default function RealDebridDownloads() {
               action = (
                 <Button
                   size="sm"
+                  className="text-secondary"
                   disabled={busy}
                   onClick={() =>
                     run(async () => {
@@ -281,6 +294,7 @@ export default function RealDebridDownloads() {
                 <Button
                   size="sm"
                   variant={files[key] ? "outline" : "default"}
+                  className={files[key] ? undefined : "text-secondary"}
                   disabled={busy}
                   onClick={() => toggleFiles(item)}
                 >
@@ -318,7 +332,7 @@ export default function RealDebridDownloads() {
                 ]}
               >
                 {files[key] && (
-                  <ul className="mt-3 space-y-1 rounded-lg bg-muted/30 p-2">
+                  <ul className="ml-14 mt-3 space-y-1 rounded-lg border border-border/50 bg-background/40 p-2">
                     {files[key].map(file => (
                       <li
                         key={file.link}
@@ -327,20 +341,23 @@ export default function RealDebridDownloads() {
                         <span className="min-w-0 truncate text-muted-foreground">
                           {file.name}
                         </span>
-                        <Button
-                          size="sm"
+                        <DebridAction
                           variant="ghost"
                           className="h-7 shrink-0"
+                          state={working === file.link ? "working" : "idle"}
+                          icon={Download}
+                          label={t("debrid.downloadToPc")}
+                          workingLabel={t("debrid.preparing")}
                           disabled={busy}
                           onClick={() =>
-                            run(() =>
-                              download(item, file.link, file.name.split("/").pop())
+                            sendToPc(
+                              item,
+                              file.link,
+                              file.name.split("/").pop(),
+                              file.link
                             )
                           }
-                        >
-                          <Download className="mr-1.5 h-3.5 w-3.5" />
-                          {t("debrid.downloadToPc")}
-                        </Button>
+                        />
                       </li>
                     ))}
                   </ul>

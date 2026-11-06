@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -18,6 +19,7 @@ import { AlertCircle, Download, StopCircle, Trash } from "lucide-react";
 import torboxProvider from "@/services/downloads/debrid/torboxProvider";
 import {
   DebridAccountBar,
+  DebridAction,
   DebridEmpty,
   DebridItem,
   DebridList,
@@ -103,6 +105,7 @@ const TorboxDownloads = () => {
   const { t } = useLanguage();
   const { settings } = useSettings();
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   // State for TorBox downloads
   const [torboxDownloads, setTorboxDownloads] = useState([]);
@@ -323,12 +326,25 @@ const TorboxDownloads = () => {
     }
   };
 
-  // Handle download to PC
+  // Per-item send state for the "Download to PC" button: "working" or "done"
+  const [sending, setSending] = useState({});
+  const setSendState = (key, state) =>
+    setSending(current => {
+      const next = { ...current };
+      if (state) next[key] = state;
+      else delete next[key];
+      return next;
+    });
+
+  // Handle download to PC: one toast that updates in place, and the button
+  // shows progress then a check before the item moves to the Sent tab
   const handleDownloadToPC = async download => {
     if (!download || !download.id) {
       toast.error(t("torbox.error_invalid_download"));
       return;
     }
+    const key = getDownloadKey(download);
+    if (sending[key]) return;
 
     // Check download queue limit for non-Ascend users
     if (!isAuthenticated) {
@@ -341,80 +357,58 @@ const TorboxDownloads = () => {
       setDownloadLock();
     }
 
+    const apiKey = getApiKey(settings);
+    if (!apiKey) {
+      toast.error(t("torbox.error_no_api_key"));
+      clearDownloadLock();
+      return;
+    }
+
+    const torboxData = manageStoredGameNames();
+    const storedData = getStoredDownloadData(torboxData, download);
+    const gameData = storedData?.gameData || null;
+    const name = gameData?.game || displayName(download);
+    const toastId = `debrid-send-${key}`;
+
+    setSendState(key, "working");
+    toast.loading(t("debrid.sendingToast", { name }), {
+      id: toastId,
+      description: t("debrid.sendingToastDesc"),
+    });
+
     try {
-      // Get the API key early - needed for both stored and fallback paths
-      const apiKey = getApiKey(settings);
-      if (!apiKey) {
-        toast.error(t("torbox.error_no_api_key"));
-        clearDownloadLock();
-        return;
-      }
-
-      // Try to get stored download data from local storage
-      const torboxData = manageStoredGameNames();
-      const storedData = getStoredDownloadData(torboxData, download);
-      const hasStoredGameData = storedData && storedData.gameData;
-
       // Always request a fresh direct download link from TorBox.
       // Relying on download.files[0].url breaks for zip downloads and for any
       // download that was added to TorBox outside of Ascendara.
-      toast.info(
-        t("torbox.processing_download", {
-          name: hasStoredGameData
-            ? storedData.gameData.game
-            : download.name || t("common.file"),
-        })
-      );
-
-      const downloadUrlResponse = await getDirectDownloadLink(
+      const response = await getDirectDownloadLink(
         apiKey,
         download.id,
         download._torboxType
       );
 
-      if (!downloadUrlResponse) {
-        throw new Error("Failed to get direct download URL");
-      }
-
-      console.log(
-        "Download URL response structure:",
-        JSON.stringify(downloadUrlResponse, null, 2)
-      );
-
       let directUrl = null;
-
-      if (typeof downloadUrlResponse === "string") {
-        directUrl = downloadUrlResponse;
-      } else if (downloadUrlResponse && typeof downloadUrlResponse === "object") {
+      if (typeof response === "string") {
+        directUrl = response;
+      } else if (response && typeof response === "object") {
         directUrl =
-          downloadUrlResponse.download_url ||
-          downloadUrlResponse.url ||
-          (typeof downloadUrlResponse.data === "string"
-            ? downloadUrlResponse.data
-            : null) ||
-          downloadUrlResponse.data?.download_url ||
-          downloadUrlResponse.data?.url;
+          response.download_url ||
+          response.url ||
+          (typeof response.data === "string" ? response.data : null) ||
+          response.data?.download_url ||
+          response.data?.url;
       }
-
       if (!directUrl || typeof directUrl !== "string") {
-        console.error("Invalid download URL format:", downloadUrlResponse);
+        console.error("Invalid download URL format:", response);
         throw new Error("Failed to extract download URL from response");
       }
-
       if (!directUrl.startsWith("http")) {
         directUrl = `https://${directUrl.replace(/^(?:https?:\/\/)?/, "")}`;
       }
 
-      console.log("Extracted direct URL:", directUrl);
-      toast.success(t("torbox.download_ready"));
-
-      if (hasStoredGameData) {
-        const { gameData } = storedData;
-        const sanitizedGameName = gameData.game.replace(/[<>:"/\\|?*]/g, "");
-
+      if (gameData) {
         await window.electron.downloadFile(
           directUrl,
-          sanitizedGameName,
+          gameData.game.replace(/[<>:"/\\|?*]/g, ""),
           gameData.online || false,
           gameData.dlc || false,
           gameData.vr || false,
@@ -425,20 +419,10 @@ const TorboxDownloads = () => {
           0,
           gameData.gameID || ""
         );
-
-        toast.success(t("torbox.download_started", { name: gameData.game }));
       } else {
-        const fileName =
-          storedData?.name ||
-          download.name ||
-          download.files?.[0]?.short_name ||
-          download.files?.[0]?.name ||
-          t("common.file");
-        const sanitizedName = fileName.replace(/[<>:"/\\|?*]/g, "");
-
         await window.electron.downloadFile(
           directUrl,
-          sanitizedName,
+          name.replace(/[<>:"/\\|?*]/g, ""),
           false,
           false,
           false,
@@ -449,26 +433,38 @@ const TorboxDownloads = () => {
           0,
           ""
         );
-
-        toast.success(t("torbox.download_started", { name: fileName }));
       }
 
-      // Mark this download as downloaded to PC
-      const updatedDownloadedToPc = {
-        ...downloadedToPc,
-        [getDownloadKey(download)]: {
-          timestamp: Date.now(),
-          name: hasStoredGameData
-            ? storedData.gameData.game
-            : download.name || t("common.file"),
+      toast.success(t("debrid.sentToast", { name }), {
+        id: toastId,
+        description: t("debrid.sentToastDesc"),
+        action: {
+          label: t("debrid.viewDownload"),
+          onClick: () => navigate("/downloads"),
         },
-      };
+      });
+      setSendState(key, "done");
 
-      setDownloadedToPc(updatedDownloadedToPc);
-      localStorage.setItem("torboxDownloadedToPc", JSON.stringify(updatedDownloadedToPc));
+      // Let the check show for a moment, then move the item to the Sent tab
+      setTimeout(() => {
+        setDownloadedToPc(current => {
+          const next = { ...current, [key]: { timestamp: Date.now(), name } };
+          try {
+            localStorage.setItem("torboxDownloadedToPc", JSON.stringify(next));
+          } catch {
+            /* Remembering sent items is optional */
+          }
+          return next;
+        });
+        setSendState(key, null);
+      }, 1100);
     } catch (error) {
       console.error("[TorboxDownloads] Error downloading to PC:", error);
-      toast.error(t("torbox.error_downloading_to_pc"));
+      toast.error(t("torbox.error_downloading_to_pc"), {
+        id: toastId,
+        description: null,
+      });
+      setSendState(key, null);
       clearDownloadLock();
     }
   };
@@ -486,25 +482,41 @@ const TorboxDownloads = () => {
       t("common.unknown")
     );
   };
+  // TorBox's state string lags behind (finished torrents report "uploading"
+  // while seeding), so the finished/present/expiry flags decide first.
   const describe = download => {
     const state = (download.download_state || download.status || "").toLowerCase();
+    const finished =
+      download.download_finished === true || state === "completed" || state === "cached";
+    // expires_at is only when TorBox's own copy lapses; cached items stay
+    // downloadable after it, so only missing files mean the item is gone.
+    const expired =
+      state === "expired" || (finished && download.download_present === false);
+    if (expired) return null;
     const stored = getStoredDownloadData(storedDownloads, download);
     const sent =
       downloadedToPc[getDownloadKey(download)] ||
       downloadedToPc[download.id] ||
       stored?.localDownloadStarted;
-    const ready = state === "completed" || state === "cached";
+    const ready = finished;
     if (sent && ready)
       return { group: "sent", tone: "done", status: t("debrid.statusSent"), ready };
     if (ready)
       return { group: "ready", tone: "ready", status: t("debrid.statusReady"), ready };
     if (state === "error" || state.startsWith("failed"))
       return { group: "cloud", tone: "error", status: t("debrid.statusFailed"), ready };
-    if (/download|upload|metadl|checking/.test(state))
+    if (download.active !== false && /download|metadl|checking/.test(state))
       return {
         group: "cloud",
         tone: "active",
         status: t("debrid.statusDownloading"),
+        ready,
+      };
+    if (state.startsWith("stalled") || (download.active === false && state))
+      return {
+        group: "cloud",
+        tone: "waiting",
+        status: t("debrid.cloud.stalled"),
         ready,
       };
     return {
@@ -524,10 +536,10 @@ const TorboxDownloads = () => {
       : typeof download.percent === "number"
         ? download.percent
         : 0;
-  const described = torboxDownloads.map(download => ({
-    download,
-    ...describe(download),
-  }));
+  const described = torboxDownloads.flatMap(download => {
+    const info = describe(download);
+    return info ? [{ download, ...info }] : [];
+  });
   const counts = { ready: 0, cloud: 0, sent: 0 };
   for (const entry of described) counts[entry.group]++;
   const visible = described.filter(entry => entry.group === tab);
@@ -613,7 +625,7 @@ const TorboxDownloads = () => {
         ) : visible.length === 0 ? (
           <DebridEmpty title={t(empty[0])} description={t(empty[1])} />
         ) : (
-          <DebridList>
+          <DebridList key={tab}>
             {visible.map(({ download, tone, status, ready }, idx) => {
               const size = formatSize(download.size);
               const speed =
@@ -636,10 +648,14 @@ const TorboxDownloads = () => {
                   meta={meta}
                   action={
                     tone === "ready" ? (
-                      <Button size="sm" onClick={() => handleDownloadToPC(download)}>
-                        <Download className="mr-2 h-4 w-4" />
-                        {t("debrid.downloadToPc")}
-                      </Button>
+                      <DebridAction
+                        state={sending[getDownloadKey(download)]}
+                        icon={Download}
+                        label={t("debrid.downloadToPc")}
+                        workingLabel={t("debrid.preparing")}
+                        doneLabel={t("debrid.sent")}
+                        onClick={() => handleDownloadToPC(download)}
+                      />
                     ) : null
                   }
                   menu={[
