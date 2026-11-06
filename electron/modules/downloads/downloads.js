@@ -202,6 +202,14 @@ function registerDownloadHandlers() {
     }
   });
 
+  // Game folders whose downloader process is still alive. A finished process stays in
+  // the map, so its exit state is checked too.
+  ipcMain.handle("get-running-downloads", () =>
+    [...downloadProcesses]
+      .filter(([, child]) => child && child.exitCode == null && child.signalCode == null)
+      .map(([folder]) => folder)
+  );
+
   // Get current downloads
   ipcMain.handle("get-downloads", async () => {
     try {

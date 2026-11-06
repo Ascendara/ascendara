@@ -168,7 +168,10 @@ test("handoff waits for readiness and active local jobs, respects disabling, and
     global.window = {
       electron: {
         getGames: async () =>
-          scenario === "busy" ? [{ downloadingData: { downloading: true } }] : [],
+          scenario === "busy"
+            ? [{ game: "Other", downloadingData: { downloading: true } }]
+            : [],
+        getRunningDownloads: async () => ["Other"],
         getSettings: async () => ({
           debridEnabled: scenario !== "disabled",
           key: "token",
@@ -230,6 +233,7 @@ test("a hand-off that stops early says why in the log, without links past the ho
           scenario === "busy"
             ? [{ game: "Other", downloadingData: { downloading: true } }]
             : [],
+        getRunningDownloads: async () => ["Other"],
         getSettings: async () => ({
           debridEnabled: scenario !== "disabled",
           key: "token",
@@ -262,7 +266,7 @@ test("a hand-off that stops early says why in the log, without links past the ho
     await worker.handoffTorrents(provider, "token").catch(() => {});
   }
   assert.deepEqual(warnings, [
-    "[debrid-handoff] Example: waiting, another download is running",
+    "[debrid-handoff] Example: waiting for Other to finish",
     "[debrid-handoff] Example: not started, debrid is off or the key changed",
     "[debrid-handoff] Example: could not start: refused cdn.example.com",
     "[debrid-handoff] Example: could not get the links: busy at [file]",
@@ -612,6 +616,70 @@ test("paused, queued or stuck downloads do not hold back a torrent hand-off", as
     );
     assert.equal(calls.length, 1, JSON.stringify(state));
   }
+});
+
+test("only a download with a live process holds back a hand-off, and the log names it", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => {
+    Object.assign(global, saved);
+    t.mock.restoreAll();
+  });
+  const warnings = [];
+  t.mock.method(console, "warn", message => warnings.push(message));
+  for (const scenario of ["leftover", "own", "live"]) {
+    let stored = JSON.stringify({
+      "torrent:ready": { game: "Enshrouded", autoHandoff: true },
+    });
+    global.localStorage = {
+      getItem: () => stored,
+      setItem: (_k, value) => {
+        stored = value;
+      },
+    };
+    const calls = [];
+    global.window = {
+      electron: {
+        // A killed earlier run left both folders saying "downloading".
+        getGames: async () => [
+          {
+            game: "Victoria 3",
+            _folderName: "Victoria 3",
+            downloadingData: { downloading: true },
+          },
+          {
+            game: "Enshrouded",
+            _folderName: "Enshrouded",
+            downloadingData: { downloading: true },
+          },
+        ],
+        // "own": this game is already downloading, so no second copy and no blocker.
+        getRunningDownloads: async () =>
+          ({ live: ["Victoria 3"], own: ["Enshrouded"] })[scenario] || [],
+        downloadFile: async (...args) => {
+          calls.push(args);
+          return { success: true };
+        },
+      },
+    };
+    const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+      fresh: true,
+    });
+    await worker.handoffTorrents(
+      {
+        id: "test",
+        metadataStorageKey: "metadata",
+        getTorrentGame: entry => entry,
+        getTorrentDownload: async () => [
+          { url: "https://example.com/file", filename: "data.bin", size: 10 },
+        ],
+      },
+      "token"
+    );
+    assert.equal(calls.length, scenario === "leftover" ? 1 : 0, scenario);
+  }
+  assert.deepEqual(warnings, [
+    "[debrid-handoff] Enshrouded: waiting for Victoria 3 to finish",
+  ]);
 });
 
 test("finished torrents leave the service only once their game is fully on this PC", async t => {
