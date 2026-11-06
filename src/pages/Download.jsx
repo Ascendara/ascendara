@@ -2152,6 +2152,8 @@ function PublicDownloadPage() {
             />
             <SystemRequirements
               minReqs={gameData.minReqs}
+              gameName={gameData.game}
+              steamData={steamData}
               downloadSize={parseSize(gameData.size)}
               downloadDirectory={settings.downloadDirectory}
             />

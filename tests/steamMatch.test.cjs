@@ -4,6 +4,14 @@ const { loadModule } = require("./helpers/loadModule.cjs");
 
 const load = () => loadModule("src/lib/steamMatch.js", { fresh: true });
 
+const STEAM_MINIMUM =
+  "Minimum:Requires a 64-bit processor and operating systemOS *: Windows 10Processor: Intel Core i5-4590 / AMD FX 8350Memory: 8 GB RAMGraphics: NVIDIA GeForce GTX 970 / AMD Radeon R9 290DirectX: Version 11Storage: 10 GB available spaceAdditional Notes: SSD recommended";
+
+const steamGame = name => ({
+  name,
+  system_requirements: { minimum: STEAM_MINIMUM, recommended: "" },
+});
+
 test("index names lose bundle, soundtrack, bonus, edition, version and repack tags", async () => {
   const { cleanGameTitle } = await load();
   const cases = {
@@ -224,11 +232,6 @@ test("a subtitle Steam adds counts only when Steam calls it a game", async () =>
   assert.ok(!isConfidentMatch("Game", "Game: Soundtrack", "music"));
 });
 
-const steamGame = name => ({
-  name,
-  system_requirements: { minimum: "", recommended: "" },
-});
-
 test("a FitGirl name finds its Steam page through the cleaned name", async () => {
   const { findGameDetails } = await load();
   const asked = [];
@@ -356,4 +359,108 @@ test("a first answer that is a different game, demo, soundtrack or DLC is never 
     });
     assert.equal(details?.name ?? null, shown, index);
   }
+});
+
+test("Steam minimum text with run-together labels splits into card fields", async () => {
+  const { parseSteamMinimum } = await load();
+  assert.deepEqual(parseSteamMinimum(STEAM_MINIMUM), {
+    os: "Windows 10",
+    cpu: "Intel Core i5-4590 / AMD FX 8350",
+    ram: "8 GB RAM",
+    gpu: "NVIDIA GeForce GTX 970 / AMD Radeon R9 290",
+    directx: "Version 11",
+    storage: "10 GB available space",
+  });
+  assert.deepEqual(
+    parseSteamMinimum("Minimum:OS: Windows 7Hard Drive: 2 GB available space"),
+    {
+      os: "Windows 7",
+      storage: "2 GB available space",
+    }
+  );
+  assert.equal(parseSteamMinimum("Minimum: a potato"), null);
+  assert.equal(parseSteamMinimum(""), null);
+  assert.equal(parseSteamMinimum(undefined), null);
+});
+
+test("the lookup gets the cleaned name and its answer must match strictly", async () => {
+  const { matchRequirements } = await load();
+  const asked = [];
+  const lookup = async name => {
+    asked.push(name);
+    return steamGame("Lightyear Frontier");
+  };
+  const match = await matchRequirements(
+    "Lightyear Frontier & Soundtrack Bundle – -Bonuses",
+    {
+      lookup,
+    }
+  );
+  assert.deepEqual(asked, ["Lightyear Frontier"]);
+  assert.equal(match.name, "Lightyear Frontier");
+  assert.equal(match.minReqs.ram, "8 GB RAM");
+
+  // Steam's own matcher accepts loose hits; those show nothing
+  const loose = await matchRequirements("Hades", {
+    lookup: async () => steamGame("Hades II"),
+  });
+  assert.equal(loose, null);
+  assert.equal(
+    await matchRequirements("Nothing Here", { lookup: async () => null }),
+    null
+  );
+  assert.equal(
+    await matchRequirements("No Specs", {
+      lookup: async () => ({ name: "No Specs", system_requirements: { minimum: "" } }),
+    }),
+    null
+  );
+});
+
+test("page data is used first, and each title is looked up once per session", async () => {
+  const { matchRequirements } = await load();
+  let calls = 0;
+  const lookup = async () => {
+    calls += 1;
+    return steamGame("Dredge");
+  };
+  const fromKnown = await matchRequirements("Dredge Deluxe Edition", {
+    known: steamGame("DREDGE"),
+    lookup,
+  });
+  assert.equal(fromKnown.name, "DREDGE");
+  assert.equal(calls, 0);
+
+  // A wrong page match falls through to the lookup, then is cached
+  const first = await matchRequirements("Dome Keeper", {
+    known: steamGame("Dome Keeper 2"),
+    lookup: async () => {
+      calls += 1;
+      return steamGame("Dome Keeper");
+    },
+  });
+  const again = await matchRequirements("Dome Keeper v4.2", { lookup });
+  assert.equal(first.name, "Dome Keeper");
+  assert.deepEqual(again, first);
+  assert.equal(calls, 1);
+});
+
+test("a failed lookup shows nothing and is tried again later", async () => {
+  const { matchRequirements } = await load();
+  const original = console.error;
+  console.error = () => {};
+  try {
+    const failed = await matchRequirements("Flaky Game", {
+      lookup: async () => {
+        throw new Error("offline");
+      },
+    });
+    assert.equal(failed, null);
+  } finally {
+    console.error = original;
+  }
+  const retried = await matchRequirements("Flaky Game", {
+    lookup: async () => steamGame("Flaky Game"),
+  });
+  assert.equal(retried.name, "Flaky Game");
 });

@@ -9,7 +9,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/LanguageContext";
 import { checkCanRun } from "@/lib/canRunCheck";
+import { matchRequirements } from "@/lib/steamMatch";
 import { formatBytes } from "@/services/app/systemHealthService";
+import steamService from "@/services/games/gameInfoService";
 import {
   AlertCircle,
   CheckCircle2,
@@ -70,12 +72,38 @@ function Verdict({ specKey, verdict }) {
   );
 }
 
-export default function SystemRequirements({ minReqs, downloadSize, downloadDirectory }) {
+export default function SystemRequirements({
+  minReqs: indexReqs,
+  gameName,
+  steamData,
+  downloadSize,
+  downloadDirectory,
+}) {
   const { t } = useLanguage();
   const [showCompareDialog, setShowCompareDialog] = useState(false);
   const [systemSpecs, setSystemSpecs] = useState(null);
   const [systemSpecsLoading, setSystemSpecsLoading] = useState(false);
   const [verdicts, setVerdicts] = useState({});
+  const [found, setFound] = useState({ title: null, match: null });
+
+  // Unofficial indexes list no requirements: borrow Steam's when the name matches
+  const hasIndexReqs = !!indexReqs && CARD_KEYS.some(key => indexReqs[key]);
+  useEffect(() => {
+    if (hasIndexReqs || !gameName) return undefined;
+    let cancelled = false;
+    matchRequirements(gameName, {
+      known: steamData,
+      lookup: steamService.getGameDetails,
+    }).then(match => {
+      if (!cancelled) setFound({ title: gameName, match });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasIndexReqs, gameName, steamData]);
+
+  const matched = !hasIndexReqs && found.title === gameName ? found.match : null;
+  const minReqs = hasIndexReqs ? indexReqs : matched?.minReqs;
 
   useEffect(() => {
     if (!minReqs) return undefined;
@@ -140,6 +168,11 @@ export default function SystemRequirements({ minReqs, downloadSize, downloadDire
           </div>
         ))}
       </dl>
+      {matched && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          {t("download.canRun.matchedAs", { name: matched.name })}
+        </p>
+      )}
       {hasVerdicts && (
         <p className="mt-3 text-xs text-muted-foreground">{t("download.canRun.note")}</p>
       )}
