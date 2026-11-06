@@ -248,9 +248,76 @@ test("handoff skips legacy records and stops polling torrents removed from the c
   };
   await worker.handoffTorrents(provider, "token");
   await worker.handoffTorrents(provider, "token");
-  assert.deepEqual(lookups, ["gone"], "legacy and removed skipped, missing checked once");
+  assert.deepEqual(
+    lookups,
+    ["gone", "gone"],
+    "legacy and removed skipped, missing torrent retried"
+  );
+  assert.equal(JSON.parse(stored)["torrent:gone"].cloudTorrentMissing, undefined);
+  t.mock.method(Date, "now", () => realNow() + 10 * 60 * 1000);
+  await worker.handoffTorrents(provider, "token");
+  await worker.handoffTorrents(provider, "token");
+  assert.deepEqual(lookups, ["gone", "gone", "gone"], "missing torrent stops polling");
   assert.equal(calls.length, 0);
   assert.equal(JSON.parse(stored)["torrent:gone"].cloudTorrentMissing, true);
+});
+
+test("a TorBox torrent not listed on the first check is handed off once it shows up", async t => {
+  const saved = {
+    fetch: global.fetch,
+    window: global.window,
+    localStorage: global.localStorage,
+  };
+  t.after(() => Object.assign(global, saved));
+  let stored = JSON.stringify({
+    "torrent:7": { autoHandoff: true, gameData: { game: "Example" } },
+  });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_k, value) => {
+      stored = value;
+    },
+  };
+  const calls = [];
+  global.window = {
+    location: { origin: "http://localhost:5173" },
+    electron: {
+      getGames: async () => [],
+      downloadFile: async (...args) => {
+        calls.push(args);
+        return { success: true };
+      },
+    },
+  };
+  let listed = false;
+  const requests = [];
+  global.fetch = async raw => {
+    const url = new URL(raw);
+    requests.push(url.pathname);
+    if (url.pathname.endsWith("/torrents/mylist"))
+      return Response.json({
+        success: true,
+        data: listed ? { id: 7, download_finished: true, download_present: true } : [],
+      });
+    assert.ok(url.pathname.endsWith("/torrents/requestdl"));
+    return Response.json({ success: true, data: "https://cdn.example/torrent.zip" });
+  };
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  const { default: provider } = await loadModule(
+    "src/services/downloads/debrid/torboxProvider.js"
+  );
+  await worker.handoffTorrents(provider, "key");
+  assert.equal(JSON.parse(stored)["torrent:7"].cloudTorrentMissing, undefined);
+  listed = true;
+  assert.deepEqual(await worker.handoffTorrents(provider, "key"), {
+    game: "Example",
+    providerId: "torbox",
+  });
+  assert.ok(requests.some(path => path.endsWith("/torrents/requestdl")));
+  assert.equal(calls.length, 1);
+  assert.equal(JSON.parse(stored)["torrent:7"].localDownloadStarted, true);
 });
 
 test("a refused torrent asks Real-Debrid for its links once per retry, not on every poll", async t => {
