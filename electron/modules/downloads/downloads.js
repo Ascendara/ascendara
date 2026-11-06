@@ -1180,6 +1180,10 @@ function registerDownloadHandlers() {
   // FitGirl packs: verify, run setup elevated with arguments, finish, clean up.
   const fitgirlInstalls = new Map();
   ipcMain.handle("fitgirl-autoinstall-status", () => Object.fromEntries(fitgirlInstalls));
+  // Trigger decisions from the renderer (ask or install, and why) for the main log.
+  ipcMain.handle("fitgirl-autoinstall-log", (_, message) =>
+    console.log("[autoinstall]", sanitizeText(String(message)).slice(0, 500))
+  );
   ipcMain.handle("fitgirl-autoinstall", async (event, game, options = {}) => {
     const sanitizedGame = sanitizeGameName(sanitizeText(game));
     const running = fitgirlInstalls.get(sanitizedGame);
@@ -1211,6 +1215,7 @@ function registerDownloadHandlers() {
       return { success: false, error: error.message };
     }
     const pick = key => options[key] === true;
+    console.log(`[autoinstall] ${sanitizedGame}: start with ${JSON.stringify(options)}`);
     send({ stage: "checking" });
     return require("./fitgirlAutoInstall").runAutoInstall({
       gameDirectory,
@@ -1220,6 +1225,10 @@ function registerDownloadHandlers() {
         verify: pick("verify"),
         silent: pick("silent"),
         limitRam: pick("limitRam"),
+        verifyInstalled: pick("verifyInstalled"),
+        redists: pick("redists"),
+        hostsRedirect: pick("hostsRedirect"),
+        openSite: pick("openSite"),
         deletePack: pick("deletePack"),
       },
       completeInstall: () => completeManualInstall(sanitizedGame),

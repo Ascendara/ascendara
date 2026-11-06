@@ -98,3 +98,37 @@ test("card text: Verifying N%, Installing, Cleaning up, Done, Failed: stage: rea
   );
   assert.equal(describeFitgirlState(null), null);
 });
+
+test("each trigger decision is logged with the ask value and where it came from", async () => {
+  const { takeFitgirlActions } = await load();
+  const lines = [];
+  takeFitgirlActions([pack("A"), pack("B"), pack("C"), pack("D")], {
+    settings: { fitgirlAskInstall: true },
+    handled: new Set(),
+    readChoice: game => (game === "B" ? { ask: false } : null),
+    states: { D: { stage: "installing" } },
+    log: line => lines.push(line),
+  });
+  assert.deepEqual(lines, [
+    "A: ask=true (from Settings), action=ask",
+    "B: ask=false (from download choice), action=install",
+    "C: ask=true (from Settings), action=ask",
+    "D: skip, main process already has stage installing",
+  ]);
+  const fromDefault = [];
+  takeFitgirlActions([pack("E")], {
+    settings: {},
+    handled: new Set(),
+    log: line => fromDefault.push(line),
+  });
+  assert.deepEqual(fromDefault, ["E: ask=true (from default), action=ask"]);
+});
+
+test("the installed-file check is a running stage with its own line", async () => {
+  const { describeFitgirlState, isFitgirlInstallActive } = await load();
+  assert.equal(isFitgirlInstallActive({ stage: "verifyingInstall" }), true);
+  assert.deepEqual(describeFitgirlState({ stage: "verifyingInstall", percent: 7 }), {
+    key: "fitgirlInstall.verifyingInstall",
+    values: { percent: 7 },
+  });
+});

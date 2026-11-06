@@ -256,3 +256,25 @@ test("cleanup lists only this pack's files and never the installed game", () => 
     []
   );
 });
+
+test("an installed list resolves ..\\ paths from its own folder and stays inside", () => {
+  const path = require("node:path");
+  const {
+    parseMd5List,
+    installedMd5ListPath,
+  } = require("../electron/modules/downloads/fitgirlInstall");
+  const app = path.resolve("/games/Game");
+  const listDir = path.dirname(installedMd5ListPath(app));
+  assert.equal(path.basename(listDir), "_Redist");
+  const hash = "0".repeat(32);
+  const entries = parseMd5List(
+    `${hash} *..\\bin\\game.exe\n${hash} *data\\a.pak\n`,
+    app,
+    listDir
+  );
+  assert.deepEqual(
+    entries.map(item => item.filePath),
+    [path.join(app, "bin", "game.exe"), path.join(app, "data", "a.pak")]
+  );
+  assert.throws(() => parseMd5List(`${hash} *..\\..\\x.exe\n`, app, listDir), /outside/);
+});

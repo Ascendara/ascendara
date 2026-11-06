@@ -12,7 +12,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { readDownloadChoice } from "@/services/downloads/fitgirlInstallOptions";
+import {
+  readDownloadChoice,
+  saveDownloadChoice,
+} from "@/services/downloads/fitgirlInstallOptions";
+import { FitgirlInstallSwitches } from "@/components/FitgirlInstallToggles";
 import { takeFitgirlActions } from "@/services/downloads/fitgirlAutoInstallTrigger";
 
 // Start the FitGirl verify + install in the main process and toast the result.
@@ -34,6 +38,14 @@ export async function runFitgirlInstall(game, options, t) {
     return { success: false, error: error.message };
   }
 }
+
+// Trigger decisions go to the DevTools console and the main-process log.
+const logDecision = message => {
+  console.log("[autoinstall]", message);
+  try {
+    window.electron?.fitgirlAutoInstallLog?.(message)?.catch?.(() => {});
+  } catch {}
+};
 
 // App-wide: when a FitGirl pack finishes downloading, ask or install, on any page.
 export default function FitgirlAutoInstallTasks() {
@@ -58,6 +70,7 @@ export default function FitgirlAutoInstallTasks() {
           readChoice: readDownloadChoice,
           handled: handled.current,
           states: states || {},
+          log: logDecision,
         });
         for (const action of actions) {
           if (action.action === "ask") setAsks(current => [...current, action]);
@@ -75,7 +88,16 @@ export default function FitgirlAutoInstallTasks() {
   }, [settings, t]);
 
   const current = asks[0];
+  // This pack's switches, prefilled from its download choice or Settings.
+  const [choice, setChoice] = useState(null);
+  useEffect(() => setChoice(current ? { ...current.options } : null), [current]);
   const next = () => setAsks(list => list.slice(1));
+  const install = () => {
+    const options = { ...(choice || current.options), ask: true };
+    saveDownloadChoice(current.game, options);
+    logDecision(`${current.game}: install chosen in the pop-up`);
+    void runFitgirlInstall(current.game, options, t);
+  };
   return (
     <AlertDialog open={!!current} onOpenChange={open => !open && next()}>
       {current && (
@@ -88,13 +110,22 @@ export default function FitgirlAutoInstallTasks() {
               {t("fitgirlInstall.promptDescription", { path: current.installerPath })}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {choice && (
+            <FitgirlInstallSwitches
+              value={choice}
+              onChange={setChoice}
+              idPrefix="fitgirl-ask"
+              hide={["ask"]}
+            />
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel className="text-foreground">
+            <AlertDialogCancel
+              className="text-foreground"
+              onClick={() => logDecision(`${current.game}: not now chosen in the pop-up`)}
+            >
               {t("fitgirlInstall.notNow")}
             </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void runFitgirlInstall(current.game, current.options, t)}
-            >
+            <AlertDialogAction onClick={install}>
               {t("fitgirlInstall.install")}
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -562,6 +562,8 @@ contextBridge.exposeInMainWorld("electron", {
   fitgirlAutoInstall: (game, options) =>
     ipcRenderer.invoke("fitgirl-autoinstall", game, options),
   fitgirlAutoInstallStatus: () => ipcRenderer.invoke("fitgirl-autoinstall-status"),
+  fitgirlAutoInstallLog: message =>
+    ipcRenderer.invoke("fitgirl-autoinstall-log", message),
   onFitgirlAutoInstallProgress: callback => {
     const listener = (_, state) => callback(state);
     ipcRenderer.on("fitgirl-autoinstall-progress", listener);
