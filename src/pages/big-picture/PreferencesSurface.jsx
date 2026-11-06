@@ -10,6 +10,7 @@ import {
   Users,
   ChevronRight,
   Check,
+  Sparkles,
 } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
@@ -22,22 +23,18 @@ const categories = [
     icon: Bell,
     description: "Everyday app behavior",
     options: [
-      ["indexes", "Game indexes", "Refresh local and cloud indexes, manage sources and automatic updates."],
       [
-        "notifications",
-        "Notifications",
-        "Show app and download notifications.",
+        "indexes",
+        "Game indexes",
+        "Refresh local and cloud indexes, manage sources and automatic updates.",
       ],
+      ["notifications", "Notifications", "Show app and download notifications."],
       [
         "hideOnGameLaunch",
         "Hide on launch",
         "Move Ascendara out of the way when you play.",
       ],
-      [
-        "rpcEnabled",
-        "Discord activity",
-        "Share what you are playing on Discord.",
-      ],
+      ["rpcEnabled", "Discord activity", "Share what you are playing on Discord."],
     ],
   },
   {
@@ -50,11 +47,7 @@ const categories = [
         "Game shortcuts",
         "Create a shortcut when a game is installed.",
       ],
-      [
-        "singleStream",
-        "Single-stream downloads",
-        "Use one stream for each download.",
-      ],
+      ["singleStream", "Single-stream downloads", "Use one stream for each download."],
       [
         "prioritizeTorboxOverSeamless",
         "Prefer TorBox",
@@ -63,21 +56,33 @@ const categories = [
     ],
   },
   {
+    name: "Motion & Effects",
+    icon: Sparkles,
+    description: "Performance and animation options",
+    options: [
+      [
+        "reduceEffects",
+        "Reduce effects",
+        "Turn off blur, page transitions and looping animations to use less CPU and GPU. Useful on lower-end PCs or while gaming.",
+      ],
+      [
+        "smoothTransitions",
+        "Smooth transitions",
+        "Animate page changes, the startup splash and the Ascend celebration.",
+      ],
+    ],
+  },
+  {
     name: "Big Picture",
     icon: Gamepad2,
     description: "Startup and controller experience",
     options: [
-      ["bigPictureHomeStyle", "Home style", "Ascendara offers a full dashboard. Classic puts your games in a simple cinematic carousel."],
       [
-        "smoothTransitions",
-        "Smooth transitions",
-        "Animate transitions throughout Ascendara.",
+        "bigPictureHomeStyle",
+        "Home style",
+        "Ascendara offers a full dashboard. Classic puts your games in a simple cinematic carousel.",
       ],
-      [
-        "startup",
-        "Start in Big Picture",
-        "Open this experience when Ascendara starts.",
-      ],
+      ["startup", "Start in Big Picture", "Open this experience when Ascendara starts."],
       [
         "controller",
         "Controller & keyboard",
@@ -104,33 +109,35 @@ export function PreferencesSurface({
   const { settings, updateSetting } = useSettings();
   const { user, userData, isAuthenticated, loading } = useAuth();
   const [category, setCategory] = useState("General");
-  const selected = categories.find((item) => item.name === category);
+  const selected = categories.find(item => item.name === category);
   const options = selected.options;
   const rows = profile
     ? []
-    : Array.from(
-        { length: Math.max(categories.length, options.length) },
-        (_, i) =>
-          [
-            categories[i] && `category-${categories[i].name}`,
-            options[i]?.[0],
-          ].filter(Boolean),
+    : Array.from({ length: Math.max(categories.length, options.length) }, (_, i) =>
+        [categories[i] && `category-${categories[i].name}`, options[i]?.[0]].filter(
+          Boolean
+        )
       );
   const { root, focus } = useSurface(navigation, rows, onBack, active);
-  const enabled = (key) =>
+  // Reduce Effects already turns page transitions off, so the saved
+  // Smooth transitions value is kept but shown off and locked
+  const locked = key => key === "smoothTransitions" && settings.reduceEffects === true;
+  const enabled = key =>
     key === "startup"
       ? settings.defaultOpenPage === "bigpicture"
-      : !!settings[key];
-  const toggle = (key) =>
-    key === "bigPictureHomeStyle"
-      ? updateSetting(key, settings[key] === "classic" ? "ascendara" : "classic")
-      : key === "indexes"
-      ? openIndexes()
-      : key === "controller"
-      ? openController()
-      : key === "startup"
-        ? updateSetting("defaultOpenPage", enabled(key) ? "home" : "bigpicture")
-        : updateSetting(key, !settings[key]);
+      : !locked(key) && !!settings[key];
+  const toggle = key =>
+    locked(key)
+      ? undefined
+      : key === "bigPictureHomeStyle"
+        ? updateSetting(key, settings[key] === "classic" ? "ascendara" : "classic")
+        : key === "indexes"
+          ? openIndexes()
+          : key === "controller"
+            ? openController()
+            : key === "startup"
+              ? updateSetting("defaultOpenPage", enabled(key) ? "home" : "bigpicture")
+              : updateSetting(key, !settings[key]);
   return (
     <BigPictureShell
       ref={root}
@@ -224,14 +231,23 @@ export function PreferencesSurface({
                   {...(!["controller", "indexes", "bigPictureHomeStyle"].includes(key)
                     ? { role: "switch", "aria-checked": enabled(key) }
                     : {})}
+                  aria-disabled={locked(key) || undefined}
                   onClick={() => toggle(key)}
                 >
                   <span>
                     <strong>{label}</strong>
-                    <small>{description}</small>
+                    <small>
+                      {locked(key)
+                        ? "Turned off by Reduce effects. Your choice comes back when it is turned off."
+                        : description}
+                    </small>
                   </span>
                   {key === "bigPictureHomeStyle" ? (
-                    <span>{settings.bigPictureHomeStyle === "classic" ? "Classic" : "Ascendara"}</span>
+                    <span>
+                      {settings.bigPictureHomeStyle === "classic"
+                        ? "Classic"
+                        : "Ascendara"}
+                    </span>
                   ) : ["controller", "indexes"].includes(key) ? (
                     <ChevronRight />
                   ) : (
@@ -253,8 +269,7 @@ export function PreferencesSurface({
                   <div>
                     <h3>Primary location</h3>
                     <p>
-                      {settings.downloadDirectory ||
-                        "No download directory configured"}
+                      {settings.downloadDirectory || "No download directory configured"}
                     </p>
                   </div>
                 </article>
@@ -267,9 +282,7 @@ export function PreferencesSurface({
                     </div>
                   </article>
                 ))}
-                <p className="bp-muted">
-                  Manage download locations in desktop Settings.
-                </p>
+                <p className="bp-muted">Manage download locations in desktop Settings.</p>
               </div>
             )}
           </div>

@@ -1172,42 +1172,6 @@ function Settings() {
                     </div>
                   </div>
 
-                  <div
-                    id="smooth-transitions"
-                    className="flex items-center justify-between"
-                  >
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.smoothTransitions")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.smoothTransitionsDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.smoothTransitions}
-                      onCheckedChange={() =>
-                        handleSettingChange(
-                          "smoothTransitions",
-                          !settings.smoothTransitions
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div id="reduce-effects" className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.reduceEffects")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.reduceEffectsDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.reduceEffects === true}
-                      onCheckedChange={() =>
-                        handleSettingChange("reduceEffects", !settings.reduceEffects)
-                      }
-                    />
-                  </div>
-
                   <div id="side-scrollbar" className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label>{t("settings.sideScrollBar")}</Label>
@@ -1270,6 +1234,57 @@ function Settings() {
                       checked={settings.homeSearch}
                       onCheckedChange={() =>
                         handleSettingChange("homeSearch", !settings.homeSearch)
+                      }
+                    />
+                  </div>
+                </div>
+              </SettingsSection>
+
+              <SettingsSection
+                id="motion-settings"
+                title={t("settings.motionEffects")}
+                description={t("settings.motionEffectsDescription")}
+              >
+                <div className="space-y-6">
+                  <div id="reduce-effects" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.reduceEffects")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.reduceEffectsDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.reduceEffects === true}
+                      onCheckedChange={() =>
+                        handleSettingChange("reduceEffects", !settings.reduceEffects)
+                      }
+                    />
+                  </div>
+
+                  {/* Reduce Effects already turns page transitions off, so this
+                      only applies while it is off. The saved value is kept */}
+                  <div
+                    id="smooth-transitions"
+                    className={`flex items-center justify-between transition-opacity ${
+                      settings.reduceEffects ? "opacity-60" : ""
+                    }`}
+                  >
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.smoothTransitions")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {settings.reduceEffects
+                          ? t("settings.smoothTransitionsOverridden")
+                          : t("settings.smoothTransitionsDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={!settings.reduceEffects && settings.smoothTransitions}
+                      disabled={settings.reduceEffects === true}
+                      onCheckedChange={() =>
+                        handleSettingChange(
+                          "smoothTransitions",
+                          !settings.smoothTransitions
+                        )
                       }
                     />
                   </div>

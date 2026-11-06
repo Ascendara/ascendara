@@ -61,7 +61,7 @@ export const settingsSearchData = [
       "motion",
       "page transitions",
     ],
-    section: "Appearance",
+    section: "Motion & Effects",
     scrollTo: "smooth-transitions",
   },
   {
@@ -80,7 +80,7 @@ export const settingsSearchData = [
       "low end",
       "battery",
     ],
-    section: "Appearance",
+    section: "Motion & Effects",
     scrollTo: "reduce-effects",
   },
   {
