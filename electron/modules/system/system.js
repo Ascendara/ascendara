@@ -13,6 +13,7 @@ const { exec, execFile, spawn } = require("child_process");
 const { ipcMain, app, BrowserWindow } = require("electron");
 const unzipper = require("unzipper");
 const { runDependencyInstaller } = require("./dependency-installer");
+const { pickGpuName } = require("./gpu-name");
 const {
   isDev,
   isWindows,
@@ -546,29 +547,20 @@ function registerSystemHandlers() {
     if (process.platform === "win32") {
       try {
         const gpuResult = await new Promise(resolve => {
-          exec("wmic path win32_VideoController get name", (error, stdout) => {
-            if (!error && stdout) {
-              const lines = stdout
-                .split("\n")
-                .map(line => line.trim())
-                .filter(line => line && line !== "Name");
-              const virtualKeywords = [
-                "virtual",
-                "basic",
-                "microsoft",
-                "remote",
-                "vnc",
-                "rdp",
-              ];
-              const realGpu = lines.find(
-                line =>
-                  !virtualKeywords.some(keyword => line.toLowerCase().includes(keyword))
-              );
-              resolve(realGpu || lines[0] || "Unknown");
-            } else {
-              resolve("Unknown");
+          // wmic is gone from current Windows 11 builds, so ask CIM through PowerShell.
+          execFile(
+            "powershell.exe",
+            [
+              "-NoProfile",
+              "-NonInteractive",
+              "-Command",
+              "(Get-CimInstance Win32_VideoController).Name",
+            ],
+            { timeout: 10000, windowsHide: true },
+            (error, stdout) => {
+              resolve(!error && stdout ? pickGpuName(stdout) : "Unknown");
             }
-          });
+          );
         });
         specs.gpu = gpuResult;
 

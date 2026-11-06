@@ -832,8 +832,7 @@ const Profile = () => {
           String(Specs?.os || "")
             .toLowerCase()
             .includes("linux");
-        const LinuxGPURenderer =
-          AmILinux && UnknownDeviceInfo(Specs?.gpu) ? LinuxSystem() : null;
+        const GPURenderer = UnknownDeviceInfo(Specs?.gpu) ? LinuxSystem() : null;
         const LinuxRunner = AmILinux
           ? await window.electron?.resolveRunner?.("auto")
           : null;
@@ -842,7 +841,7 @@ const Profile = () => {
           ...Prev,
           platform: Platform,
           ...(Specs || {}),
-          gpu: LinuxGPURenderer || Specs?.gpu || Prev.gpu,
+          gpu: GPURenderer || Specs?.gpu || Prev.gpu,
           directx: AmILinux
             ? LinuxRunner?.name ||
               (LinuxRunner?.type === "proton"
