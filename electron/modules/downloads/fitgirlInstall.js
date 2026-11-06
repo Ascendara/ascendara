@@ -13,6 +13,12 @@ const PROGRESS_INTERVAL_MS = 250;
 
 const md5ListPath = packDir => path.join(packDir, MD5_DIR, MD5_LIST);
 
+// FitGirl's [Run] list checks the installed game with QuickSFV against this file.
+const INSTALLED_MD5_DIR = "_Redist";
+const INSTALLED_MD5_LIST = "fitgirl.md5";
+const installedMd5ListPath = installDir =>
+  path.join(installDir, INSTALLED_MD5_DIR, INSTALLED_MD5_LIST);
+
 function isFitgirlPack(packDir, fsApi = fs) {
   return Boolean(packDir) && fsApi.existsSync(md5ListPath(packDir));
 }
@@ -25,8 +31,11 @@ const isInside = (parent, child) => {
 // Selective language and optional parts may be left out of a download on purpose.
 const isOptionalPart = name => /^fg-(?:optional|selective)-/i.test(path.basename(name));
 
-/** Parse fitgirl-bins.md5 into [{ hash, name, filePath, optional }] inside packDir. */
-function parseMd5List(text, packDir) {
+/**
+ * Parse fitgirl-bins.md5 into [{ hash, name, filePath, optional }] inside packDir.
+ * listDir is the folder holding the list; "..\" paths are resolved from it.
+ */
+function parseMd5List(text, packDir, listDir = path.join(packDir, MD5_DIR)) {
   const entries = [];
   String(text)
     .split(/\r?\n/)
@@ -40,8 +49,8 @@ function parseMd5List(text, packDir) {
         throw new Error(`MD5 list names a file outside the pack: ${listed}`);
       }
       const parts = listed.split(/[\\/]+/).filter(Boolean);
-      // QuickSFV lists may be written relative to the MD5 folder ("..\fg-01.bin").
-      const base = parts[0] === ".." ? path.join(packDir, MD5_DIR) : packDir;
+      // QuickSFV lists may be written relative to their own folder ("..\fg-01.bin").
+      const base = parts[0] === ".." ? listDir : packDir;
       const filePath = path.resolve(base, ...parts);
       if (!isInside(packDir, filePath)) {
         throw new Error(`MD5 list names a file outside the pack: ${listed}`);
@@ -190,6 +199,7 @@ module.exports = {
   MD5_DIR,
   MD5_LIST,
   md5ListPath,
+  installedMd5ListPath,
   isFitgirlPack,
   isOptionalPart,
   parseMd5List,

@@ -123,3 +123,12 @@ test("each trigger decision is logged with the ask value and where it came from"
   });
   assert.deepEqual(fromDefault, ["E: ask=true (from default), action=ask"]);
 });
+
+test("the installed-file check is a running stage with its own line", async () => {
+  const { describeFitgirlState, isFitgirlInstallActive } = await load();
+  assert.equal(isFitgirlInstallActive({ stage: "verifyingInstall" }), true);
+  assert.deepEqual(describeFitgirlState({ stage: "verifyingInstall", percent: 7 }), {
+    key: "fitgirlInstall.verifyingInstall",
+    values: { percent: 7 },
+  });
+});

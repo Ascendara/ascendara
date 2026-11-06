@@ -1,6 +1,12 @@
 import { FITGIRL_SETTING_KEYS, resolveFitgirlOptions } from "./fitgirlInstallOptions";
 
-const ACTIVE_STAGES = new Set(["checking", "verifying", "installing", "cleaning"]);
+const ACTIVE_STAGES = new Set([
+  "checking",
+  "verifying",
+  "installing",
+  "verifyingInstall",
+  "cleaning",
+]);
 export const isFitgirlInstallActive = state => ACTIVE_STAGES.has(state?.stage);
 
 // Finished FitGirl packs that still wait for setup. Each game is returned once per
@@ -52,8 +58,9 @@ export function describeFitgirlState(state) {
     case "done":
       return { key: `fitgirlInstall.${state.stage}`, values: {} };
     case "verifying":
+    case "verifyingInstall":
       return {
-        key: "fitgirlInstall.verifying",
+        key: `fitgirlInstall.${state.stage}`,
         values: { percent: Math.max(0, Math.min(100, Number(state.percent) || 0)) },
       };
     case "failed":

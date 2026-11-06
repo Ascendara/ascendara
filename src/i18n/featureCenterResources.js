@@ -25,6 +25,7 @@ const featureCenterResources = {
       checking: "Checking the pack",
       verifying: "Verifying {{percent}}%",
       installing: "Installing",
+      verifyingInstall: "Checking installed files {{percent}}%",
       cleaning: "Cleaning up",
       done: "Done",
       failed: "Failed: {{error}}",

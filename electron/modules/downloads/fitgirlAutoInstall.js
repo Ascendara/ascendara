@@ -14,6 +14,7 @@ const {
 } = require("./fitgirlTakeover");
 
 const UAC_DECLINED = 1223;
+const FITGIRL_SITE = "https://fitgirl-repacks.site";
 const log = (...args) => console.log("[autoinstall]", ...args);
 
 /**
@@ -138,8 +139,10 @@ const hasExe = (dir, fsApi) => {
 
 /**
  * deps: { gameDirectory, gameName, installerPath, options, fsApi, runSetup,
- *         runTakeover, completeInstall, onStage, signal }
- * Resolves { success, stage, error?, verify?, removed?, cleanupErrors? }.
+ *         runTakeover, completeInstall, openExternal, onStage, signal }
+ * Order: verify, setup (takeover with its admin extras), verifyInstalled,
+ * finish, openSite, deletePack.
+ * Resolves { success, stage, error?, verify?, verifyInstalled?, removed?, cleanupErrors? }.
  */
 async function runAutoInstall({
   gameDirectory,
@@ -150,6 +153,7 @@ async function runAutoInstall({
   runSetup = runElevatedSetup,
   runTakeover = runElevatedTakeover,
   completeInstall,
+  openExternal = url => require("electron").shell.openExternal(url),
   onStage = () => {},
   signal,
 }) {
@@ -168,11 +172,10 @@ async function runAutoInstall({
     );
     log(`${gameName}: pack ${packDir}, ${entries.length} listed files`);
 
-    let verify;
-    if (options.verify) {
-      stage = "verifying";
+    // Hash a list with progress on the current stage; null when every file passed.
+    const checkFiles = async (list, label) => {
       onStage({ stage, percent: 0 });
-      verify = await fitgirl.verifyPack(entries, {
+      const checked = await fitgirl.verifyPack(list, {
         fsApi,
         signal,
         onProgress: ({ bytesDone, bytesTotal }) =>
@@ -182,13 +185,20 @@ async function runAutoInstall({
           }),
       });
       log(
-        `${gameName}: verify passed ${verify.passed.length}, bad ${verify.bad.length}, ` +
-          `missing ${verify.missing.length}, skipped ${verify.skipped.length}`
+        `${gameName}: ${label} passed ${checked.passed.length}, bad ${checked.bad.length}, ` +
+          `missing ${checked.missing.length}, skipped ${checked.skipped.length}`
       );
-      if (!verify.ok) {
-        const names = [...verify.bad, ...verify.missing].slice(0, 5).join(", ");
-        return { ...fail(`Files failed the MD5 check: ${names}`), verify };
-      }
+      if (checked.ok) return { checked };
+      const names = [...checked.bad, ...checked.missing].slice(0, 5).join(", ");
+      return { checked, failed: fail(`Files failed the MD5 check: ${names}`) };
+    };
+
+    let verify;
+    if (options.verify) {
+      stage = "verifying";
+      const { checked, failed } = await checkFiles(entries, "verify");
+      verify = checked;
+      if (failed) return { ...failed, verify };
     }
 
     stage = "installing";
@@ -242,13 +252,44 @@ async function runAutoInstall({
     }
     if (!hasExe(installDir, fsApi)) return fail(`No game found in ${installDir}`);
 
+    // Installed files against {app}\_Redist\fitgirl.md5, the check FitGirl's
+    // QuickSFV Run entry would do; its paths may start with "..\" from _Redist.
+    let verifyInstalled;
+    if (options.verifyInstalled) {
+      stage = "verifyingInstall";
+      const listPath = fitgirl.installedMd5ListPath(installDir);
+      if (!fsApi.existsSync(listPath)) {
+        log(`${gameName}: no ${listPath}, installed files not checked`);
+      } else {
+        const installed = fitgirl.parseMd5List(
+          fsApi.readFileSync(listPath, "utf8"),
+          installDir,
+          path.dirname(listPath)
+        );
+        const { checked, failed } = await checkFiles(installed, "installed check");
+        verifyInstalled = checked;
+        if (failed) return { ...failed, verify, verifyInstalled };
+      }
+    }
+
+    stage = "installing";
     const completed = await completeInstall();
     if (!completed?.success) return fail(completed?.error || "Could not finish install");
+
+    if (options.openSite) {
+      try {
+        await openExternal(FITGIRL_SITE);
+        log(`${gameName}: opened ${FITGIRL_SITE}`);
+      } catch (error) {
+        log(`${gameName}: could not open ${FITGIRL_SITE}: ${error.message}`);
+      }
+    }
 
     const result = {
       success: true,
       stage: "done",
       verify,
+      verifyInstalled,
       takeover: takeoverResult,
       extrasFailed: (takeoverResult?.extras || []).filter(extra => !extraOk(extra)),
       removed: [],
@@ -284,4 +325,10 @@ async function runAutoInstall({
   }
 }
 
-module.exports = { runAutoInstall, runElevatedSetup, runElevatedTakeover, UAC_DECLINED };
+module.exports = {
+  runAutoInstall,
+  runElevatedSetup,
+  runElevatedTakeover,
+  UAC_DECLINED,
+  FITGIRL_SITE,
+};
