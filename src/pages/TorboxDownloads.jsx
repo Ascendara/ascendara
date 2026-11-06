@@ -141,7 +141,7 @@ const TorboxDownloads = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   // Fetch TorBox downloads
-  const fetchTorboxDownloads = async () => {
+  const fetchTorboxDownloads = async (fresh = false) => {
     if (!settings?.torboxApiKey) {
       setError("TorBox API key not found in settings");
       setIsLoading(false);
@@ -150,7 +150,7 @@ const TorboxDownloads = () => {
 
     try {
       // Use the getAllDownloads service function
-      const downloads = await getAllDownloads(settings.torboxApiKey);
+      const downloads = await getAllDownloads(settings.torboxApiKey, { fresh });
       console.log("[TorboxDownloads] Downloads fetched:", downloads);
       setTorboxDownloads(downloads || []);
       setError(null);
@@ -304,8 +304,11 @@ const TorboxDownloads = () => {
 
       await controlDownload(apiKey, download, "delete");
 
-      // Update the downloads list after successful deletion
-      fetchTorboxDownloads();
+      // Drop it now, then re-read past TorBox's list cache
+      setTorboxDownloads(prev =>
+        prev.filter(item => item._storageKey !== download._storageKey)
+      );
+      fetchTorboxDownloads(true);
 
       toast.success(
         t("torbox.download_deleted_desc", {
@@ -569,7 +572,7 @@ const TorboxDownloads = () => {
           onRefresh={async () => {
             setRefreshing(true);
             try {
-              await Promise.all([fetchTorboxDownloads(), fetchUserInfo()]);
+              await Promise.all([fetchTorboxDownloads(true), fetchUserInfo()]);
             } finally {
               setRefreshing(false);
             }
@@ -596,7 +599,7 @@ const TorboxDownloads = () => {
               variant="outline"
               size="sm"
               className="mt-4"
-              onClick={fetchTorboxDownloads}
+              onClick={() => fetchTorboxDownloads(true)}
             >
               {t("common.retry")}
             </Button>
@@ -734,8 +737,11 @@ const TorboxDownloads = () => {
                     })
                   );
 
-                  // Refresh downloads to show updated status
-                  fetchTorboxDownloads();
+                  // Stop is a delete on TorBox: drop it now, then re-read past the list cache
+                  setTorboxDownloads(prev =>
+                    prev.filter(item => item._storageKey !== confirmStop._storageKey)
+                  );
+                  fetchTorboxDownloads(true);
                 } catch (error) {
                   console.error("Error stopping download:", error);
                   toast.error(t("torbox.error_stopping_download"), {
