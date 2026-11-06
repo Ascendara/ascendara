@@ -308,7 +308,7 @@
       "dismissWarning": "You haven't rated Ascendara yet. Dismiss the rating and continue?",
       "feedback": "Give Feedback",
       "goBack": "Go back",
-      "message": "You're starting to use Ascendara and I would love for you to rate it or give me some feedback. You won't ever see this message again.",
+      "message": "You're starting to use Ascendara and I would love for you to rate it or give me some feedback.",
       "note": "I've spent so much time creating Ascendara as a passion project. Every feature, every line of code is crafted with care. Your support means everything to me and helps me continue making Ascendara even better.",
       "ratings": {
         "1": "Not for me",
@@ -318,6 +318,24 @@
         "5": "Love it!"
       },
       "title": "Oh you liking Ascendara a bit?"
+    },
+    "testimonialDialog": {
+      "failed": "Review Failed",
+      "failedDesc": "Your review was not submitted. Sorry about that!",
+      "featuredGame": "Show off a game",
+      "hours": "{{hours}} hrs",
+      "message": "You've been using Ascendara for over a month now, and I'd love to hear what you think of it. Write a few words about your experience.",
+      "mostPlayed": "Most played",
+      "namePlaceholder": "Your name (optional)",
+      "noGame": "Don't show a game",
+      "notNow": "Not now",
+      "note": "Hearing from people who actually use Ascendara every day is the best part of building it. Thank you for sticking around.",
+      "reviewPlaceholder": "What do you like about Ascendara?",
+      "submit": "Send review",
+      "thanks": "Thanks for your review!",
+      "thanksDesc": "Keep an eye on ascendara.app, you might see it there.",
+      "title": "How has Ascendara been?",
+      "websiteNote": "Your review might be featured on the Ascendara website."
     },
     "toasts": {
       "installAndRestart": "Install & Restart",

@@ -12,6 +12,7 @@ import MenuBar from "@/components/MenuBar";
 import MiniPlayer from "@/components/MiniPlayer";
 import { enablePageTours } from "@/components/PageTours";
 import SupportDialog from "@/components/SupportDialog";
+import TestimonialDialog from "@/components/TestimonialDialog";
 import PlatformWarningDialog from "@/components/PlatformWarningDialog";
 import WatcherWarnDialog from "@/components/WatcherWarnDialog";
 import BrokenVersionDialog from "@/components/BrokenVersionDialog";
@@ -128,6 +129,9 @@ function PageLoading() {
     </div>
   );
 }
+
+const TESTIMONIAL_MIN_LAUNCHES = 15;
+const TESTIMONIAL_MIN_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 const pagePreloads = [];
 
@@ -1334,6 +1338,57 @@ const AppRoutes = () => {
       delete window.showChangelog;
     };
   }, []);
+
+  // Long-time users (a month installed, 15+ launches) are asked once for a
+  // testimonial, after the changelog and any other startup dialogs are done.
+  const [testimonialInstalledAt, setTestimonialInstalledAt] = useState(null);
+  const [showTestimonial, setShowTestimonial] = useState(false);
+  useEffect(() => {
+    if (!startupSettled) return;
+    const checkTestimonial = async () => {
+      const [shown, installedAt, launchCount] = await Promise.all([
+        window.electron.getTimestampValue("hasShownTestimonial"),
+        window.electron.getTimestampValue("timestamp"),
+        window.electron.getLaunchCount(),
+      ]);
+      if (shown || !installedAt || launchCount < TESTIMONIAL_MIN_LAUNCHES) return;
+      if (Date.now() - installedAt < TESTIMONIAL_MIN_AGE_MS) return;
+      setTestimonialInstalledAt(installedAt);
+    };
+    checkTestimonial().catch(error =>
+      console.error("Error checking testimonial eligibility:", error)
+    );
+  }, [startupSettled]);
+
+  // Dev only: window.showTestimonial() opens the testimonial dialog regardless of eligibility
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    window.showTestimonial = () => {
+      setTestimonialInstalledAt(Date.now() - TESTIMONIAL_MIN_AGE_MS);
+      setShowTestimonial(true);
+    };
+    return () => {
+      delete window.showTestimonial;
+    };
+  }, []);
+
+  const startupDialogOpen =
+    showChangelog ||
+    showSupportDialog ||
+    showWatcherWarn ||
+    showBranchWelcome ||
+    showPlatformWarning ||
+    isBrokenVersion ||
+    showFirstIndexDialog ||
+    missingAppFiles.length > 0;
+  useEffect(() => {
+    if (!testimonialInstalledAt || showTestimonial || startupDialogOpen) return;
+    const timer = setTimeout(() => {
+      setShowTestimonial(true);
+      window.electron.setTimestampValue("hasShownTestimonial", true);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [testimonialInstalledAt, showTestimonial, startupDialogOpen]);
   useEffect(() => {
     const initializeApp = async () => {
       if (hasChecked.current) return;
@@ -2054,6 +2109,15 @@ const AppRoutes = () => {
       )}
       {startupSettled && showSupportDialog && (
         <SupportDialog onClose={() => setShowSupportDialog(false)} />
+      )}
+      {showTestimonial && (
+        <TestimonialDialog
+          installedAt={testimonialInstalledAt}
+          onClose={() => {
+            setShowTestimonial(false);
+            setTestimonialInstalledAt(null);
+          }}
+        />
       )}
       {startupSettled && showPlatformWarning && (
         <PlatformWarningDialog onClose={() => setShowPlatformWarning(false)} />
