@@ -7,6 +7,10 @@ let startingUntil = 0;
 // A torrent that could not start waits before its links are requested again.
 const HANDOFF_RETRY_MS = 5 * 60 * 1000;
 const handoffFailures = new Map();
+// A torrent added moments ago may not be listed yet; it counts as removed only
+// after it has stayed unlisted this long.
+const MISSING_GRACE_MS = 10 * 60 * 1000;
+const missingSince = new Map();
 // A cloud torrent with no progress for this long is reported once and no longer polled.
 const STALL_MS = 72 * 60 * 60 * 1000;
 // Services that ask for gentler polling than the 5-second pass set pollIntervalMs.
@@ -129,11 +133,17 @@ export function handoffTorrents(provider, apiKey) {
           } else fail(retryKey, error);
           continue;
         }
-        // Removed from the cloud: stop polling it.
+        // Removed from the cloud: stop polling it once the grace period is over.
         if (files === "missing") {
-          mark(id, "cloudTorrentMissing");
+          const since = missingSince.get(retryKey) ?? Date.now();
+          missingSince.set(retryKey, since);
+          if (Date.now() - since >= MISSING_GRACE_MS) {
+            missingSince.delete(retryKey);
+            mark(id, "cloudTorrentMissing");
+          }
           continue;
         }
+        missingSince.delete(retryKey);
         if (!files) {
           // Progress is checked when first seen, then once per stall window.
           const since = entry.lastProgressAt;
