@@ -1188,6 +1188,24 @@ function Settings() {
                   </div>
 
                   <div
+                    id="compact-dock-on-scroll"
+                    className="flex items-center justify-between"
+                  >
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.compactDockOnScroll")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.compactDockOnScrollDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.compactDockOnScroll !== false}
+                      onCheckedChange={value =>
+                        handleSettingChange("compactDockOnScroll", value)
+                      }
+                    />
+                  </div>
+
+                  <div
                     id="window-controls"
                     className="flex items-center justify-between gap-4"
                   >

@@ -23,7 +23,23 @@ import { prefetchAscendData } from "@/services/ascend/ascendPrefetch";
 // A dock item collapses to no width, and the negative margin cancels the dock's
 // 8px gap, so its neighbours close up fully while it is hidden
 const DOCK_ITEM_HIDDEN = { width: 0, marginLeft: -8, opacity: 0, scale: 0.3, y: 8 };
-const DOCK_ITEM_SHOWN = { width: 48, marginLeft: 0, opacity: 1, scale: 1, y: 0 };
+const DOCK_ITEM_SHOWN = {
+  width: 48,
+  height: 48,
+  marginLeft: 0,
+  opacity: 1,
+  scale: 1,
+  y: 0,
+};
+// While a page is scrolled, the dock shrinks to a row of colour dots; the current page's dot
+// stretches into a short pill
+const dockItemCompact = active => ({
+  ...DOCK_ITEM_SHOWN,
+  width: active ? 22 : 8,
+  height: 8,
+});
+// How far from the top a page has to be scrolled before the dock goes compact
+const COMPACT_MIN_SCROLL = 80;
 const DOCK_ITEM_TRANSITION = {
   type: "spring",
   stiffness: 380,
@@ -48,10 +64,8 @@ const Navigation = memo(({ items }) => {
   // Unseen notifications, plus one while two-step verification is new to this member
   const ascendNotificationCount =
     useAscendNotificationCount() + (useNewSecurityFeature() ? 1 : 0);
-  const [dockVisible, setDockVisible] = useState(true);
   const downloadCountRef = useRef(0);
-  const pointerYRef = useRef(Number.NEGATIVE_INFINITY);
-  const isDownloadPage = location.pathname === "/download";
+  const isGamePage = ["/download", "/gamescreen"].includes(location.pathname);
   // The router renders the next page in a transition, so location only
   // changes once that page is ready. Track the clicked path separately so the
   // dock highlights it on the very next frame instead of after the render.
@@ -89,7 +103,6 @@ const Navigation = memo(({ items }) => {
   const navStyle = useMemo(
     () => ({
       transform: `scale(${size / 100})`,
-      transformOrigin: "bottom center",
     }),
     [size]
   );
@@ -130,32 +143,32 @@ const Navigation = memo(({ items }) => {
         path: "/",
         label: t("common.home"),
         icon: Home,
-        color: "from-blue-500 to-cyan-400",
+        color: "from-blue-400 to-blue-600",
       },
       {
         path: "/search",
         label: t("common.search"),
         icon: Search,
-        color: "from-purple-500 to-pink-400",
+        color: "from-violet-400 to-violet-600",
       },
       {
         path: "/library",
         label: t("common.library"),
         icon: Library,
-        color: "from-green-500 to-emerald-400",
+        color: "from-emerald-400 to-emerald-600",
       },
       {
         path: "/downloads",
         label: t("common.downloads"),
         icon: CircleArrowDown,
-        color: "from-orange-500 to-amber-400",
+        color: "from-orange-400 to-orange-600",
       },
       {
         path: "/debriddownloads",
         label: t("debrid.downloadsTitle"),
         icon: ServerIcon,
         hidden: !debridNavVisible,
-        color: "from-orange-500 to-amber-400",
+        color: "from-yellow-400 to-amber-500",
       },
       // Splits the download pages from the rest of the dock
       { separator: true, path: "separator" },
@@ -165,14 +178,14 @@ const Navigation = memo(({ items }) => {
       path: "/profile",
       label: t("common.profile"),
       icon: User,
-      color: "from-red-500 to-pink-400",
+      color: "from-rose-400 to-rose-600",
     });
 
     items.push({
       path: "/ascend",
       label: t("common.ascend"),
       icon: AtSign,
-      color: "from-pink-200 to-purple-500",
+      color: "from-fuchsia-400 to-fuchsia-600",
     });
 
     if (settings.viewWorkshopPage) {
@@ -180,7 +193,7 @@ const Navigation = memo(({ items }) => {
         path: "/workshopdownloader",
         label: t("common.workshopDownloader"),
         icon: Package,
-        color: "from-rose-500 to-red-400",
+        color: "from-lime-400 to-lime-600",
       });
     }
 
@@ -188,7 +201,7 @@ const Navigation = memo(({ items }) => {
       path: "/settings",
       label: t("common.preferences"),
       icon: Settings2,
-      color: "from-slate-500 to-gray-400",
+      color: "from-slate-400 to-slate-600",
     });
 
     return items;
@@ -311,156 +324,178 @@ const Navigation = memo(({ items }) => {
     };
   }, []);
 
+  const compactEnabled = settings.compactDockOnScroll !== false;
+  const [scrolled, setScrolled] = useState(false);
+  const [dockEngaged, setDockEngaged] = useState(false);
   useEffect(() => {
-    if (!isDownloadPage) {
-      pointerYRef.current = Number.NEGATIVE_INFINITY;
-      setDockVisible(true);
-      return undefined;
-    }
-
-    const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches;
-    if (coarsePointer) {
-      setDockVisible(true);
-      return undefined;
-    }
-
-    const handleScroll = () => {
-      if (window.scrollY <= 120) {
-        setDockVisible(true);
-        return;
-      }
-
-      setDockVisible(
-        current => current && pointerYRef.current >= window.innerHeight - 130
-      );
+    setScrolled(false);
+    if (!compactEnabled) return undefined;
+    // Some pages (Ascend) scroll inside their own container instead of the window,
+    // so listen in the capture phase and follow whichever large area is scrolling.
+    // Either direction counts: the dock stays compact until the page is back near the top
+    const handleScroll = event => {
+      const target = event.target;
+      const isPage = target === document || target === document.documentElement;
+      // Ignore small scrollers like dropdowns and carousels
+      if (!isPage && target.clientHeight < window.innerHeight * 0.5) return;
+      const y = isPage ? window.scrollY : target.scrollTop;
+      setScrolled(y >= COMPACT_MIN_SCROLL);
     };
-
-    const handleMouseMove = event => {
-      pointerYRef.current = event.clientY;
-      if (window.scrollY <= 120) {
-        setDockVisible(true);
-        return;
-      }
-
-      setDockVisible(current =>
-        current
-          ? event.clientY >= window.innerHeight - 130
-          : event.clientY >= window.innerHeight - 24
-      );
-    };
-
-    const handleMouseLeave = () => {
-      pointerYRef.current = Number.NEGATIVE_INFINITY;
-      if (window.scrollY > 120) setDockVisible(false);
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    document.documentElement.addEventListener("mouseleave", handleMouseLeave);
-    handleScroll();
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("mousemove", handleMouseMove);
-      document.documentElement.removeEventListener("mouseleave", handleMouseLeave);
-    };
-  }, [isDownloadPage]);
-
-  const dockIsHidden = isDownloadPage && !dockVisible;
+    window.addEventListener("scroll", handleScroll, { passive: true, capture: true });
+    return () => window.removeEventListener("scroll", handleScroll, { capture: true });
+  }, [compactEnabled, location.pathname]);
+  // The welcome tour folds the dock in and out to show this off, setting or not
+  const [compactPreview, setCompactPreview] = useState(false);
+  useEffect(() => {
+    const handlePreview = event => setCompactPreview(event.detail === true);
+    window.addEventListener("navCompactPreview", handlePreview);
+    return () => window.removeEventListener("navCompactPreview", handlePreview);
+  }, []);
+  // Hovering or tabbing into the dock opens it back up
+  const compact = compactPreview || (compactEnabled && scrolled && !dockEngaged);
+  // Stays parked while hovered, so the opened dock doesn't slide out from under the cursor
+  const parkRight = isGamePage && compactEnabled && scrolled;
 
   return (
-    <div
-      aria-hidden={dockIsHidden}
-      className={`pointer-events-none fixed bottom-0 left-0 right-0 z-40 select-none p-6 transition-all duration-200 ${
-        dockIsHidden
-          ? "invisible translate-y-4 opacity-0"
-          : "visible translate-y-0 opacity-100"
-      }`}
-    >
+    <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 flex select-none justify-center p-6">
+      {/* Scrolled on a game page, the compact dock glides to the bottom-right corner,
+          clear of the content. A transform percentage is the element's own width, so
+          this lands its right edge at the window's padding while it shrinks */}
       <div
-        className="nav-container relative mx-auto max-w-xl"
-        style={navStyle}
-        data-tour="navigation"
+        className="transition-transform duration-500"
+        style={{
+          transform: parkRight ? "translateX(calc(50vw - 50% - 24px))" : "translateX(0)",
+          transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+        }}
       >
-        {/* data-boot-dock: slides up from the window edge as the boot logo lands (app.css) */}
         <div
-          className="pointer-events-auto relative flex items-center justify-center gap-2 rounded-2xl border border-border p-3 shadow-lg backdrop-blur-lg"
-          data-boot-dock
+          className="nav-container relative max-w-xl"
           style={{
-            backgroundColor:
-              "rgb(var(--color-nav-background, var(--color-background)) / 0.8)",
+            ...navStyle,
+            transformOrigin: parkRight ? "bottom right" : "bottom center",
           }}
+          data-tour="navigation"
         >
+          {/* data-boot-dock: slides up from the window edge as the boot logo lands (app.css) */}
           <div
-            className="pointer-events-auto absolute -left-2 -top-2 h-4 w-4 cursor-nw-resize"
-            onMouseDown={e => handleMouseDown(e, true)}
-          />
-          <div
-            className="pointer-events-auto absolute -right-2 -top-2 h-4 w-4 cursor-ne-resize"
-            onMouseDown={e => handleMouseDown(e, false)}
-          />
+            className={`pointer-events-auto relative mx-auto flex w-fit items-center justify-center border border-border shadow-lg backdrop-blur-lg transition-[padding,gap,border-radius] duration-300 ease-out ${
+              compact ? "gap-1.5 rounded-full px-3.5 py-2.5" : "gap-2 rounded-2xl p-3"
+            }`}
+            onPointerEnter={() => setDockEngaged(true)}
+            onPointerLeave={() => setDockEngaged(false)}
+            onFocus={() => setDockEngaged(true)}
+            onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget))
+                setDockEngaged(false);
+            }}
+            data-boot-dock
+            style={{
+              backgroundColor:
+                "rgb(var(--color-nav-background, var(--color-background)) / 0.8)",
+            }}
+          >
+            <div
+              className="pointer-events-auto absolute -left-2 -top-2 h-4 w-4 cursor-nw-resize"
+              onMouseDown={e => handleMouseDown(e, true)}
+            />
+            <div
+              className="pointer-events-auto absolute -right-2 -top-2 h-4 w-4 cursor-ne-resize"
+              onMouseDown={e => handleMouseDown(e, false)}
+            />
 
-          {/* Pages that are switched on or off (debrid, workshop) grow into the dock
+            {/* Pages that are switched on or off (debrid, workshop) grow into the dock
               and shrink back out, pushing their neighbours aside as they go */}
-          <AnimatePresence initial={false}>
-            {navItems.map(item =>
-              item.hidden ? null : item.separator ? (
-                <div key={item.path} className="h-8 w-px shrink-0 bg-border/50" />
-              ) : (
-                <motion.div
-                  key={item.path}
-                  className="flex shrink-0 justify-center"
-                  initial={DOCK_ITEM_HIDDEN}
-                  animate={DOCK_ITEM_SHOWN}
-                  exit={DOCK_ITEM_HIDDEN}
-                  transition={DOCK_ITEM_TRANSITION}
-                >
-                  <Link
-                    to={item.path}
-                    onClick={() => {
-                      if (item.path !== location.pathname) setPendingPath(item.path);
-                    }}
-                    // Fetch Ascend's data on the way to the click
-                    onPointerEnter={
-                      item.path === "/ascend" ? prefetchAscendData : undefined
-                    }
-                    className={`group relative flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300 ${
-                      isActive(item.path)
-                        ? "z-10 scale-110 bg-primary text-background"
-                        : "z-0 scale-100 text-muted-foreground hover:z-10 hover:scale-110 hover:bg-secondary hover:text-foreground"
+            <AnimatePresence initial={false}>
+              {navItems.map(item =>
+                item.hidden ? null : item.separator ? (
+                  <div
+                    key={item.path}
+                    className={`w-px shrink-0 bg-border/50 transition-all duration-300 ${
+                      compact ? "mx-0.5 h-3" : "h-8"
                     }`}
+                  />
+                ) : (
+                  <motion.div
+                    key={item.path}
+                    className="relative flex shrink-0 items-center justify-center"
+                    initial={{ ...DOCK_ITEM_HIDDEN, height: compact ? 8 : 48 }}
+                    animate={
+                      compact ? dockItemCompact(isActive(item.path)) : DOCK_ITEM_SHOWN
+                    }
+                    exit={{ ...DOCK_ITEM_HIDDEN, height: compact ? 8 : 48 }}
+                    transition={DOCK_ITEM_TRANSITION}
                   >
-                    <div
-                      className={`absolute inset-0 rounded-xl bg-gradient-to-br ${item.color} transition-opacity duration-300 ${isActive(item.path) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-                    />
-                    <div
-                      className={`relative flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-200 ${
-                        isActive(item.path)
-                          ? "bg-gradient-to-br " + item.color
-                          : "group-hover:bg-white/10"
+                    <motion.span
+                      aria-hidden="true"
+                      className={`pointer-events-none absolute inset-0 rounded-full bg-gradient-to-br ${item.color} ${
+                        compact && item.icon === CircleArrowDown && downloadCount > 0
+                          ? "animate-pulse"
+                          : ""
                       }`}
+                      initial={false}
+                      animate={{
+                        opacity: compact ? (isActive(item.path) ? 1 : 0.6) : 0,
+                      }}
+                      // The dots and icons overlap as they swap, so the dock never
+                      // looks empty halfway through
+                      transition={{ duration: compact ? 0.2 : 0.35 }}
+                    />
+                    <motion.div
+                      className={`flex shrink-0 ${compact ? "pointer-events-none" : ""}`}
+                      initial={false}
+                      animate={{ opacity: compact ? 0 : 1, scale: compact ? 0.6 : 1 }}
+                      transition={{ duration: compact ? 0.15 : 0.2 }}
                     >
-                      <item.icon className="h-5 w-5" />
-                      {item.icon === CircleArrowDown && downloadCount > 0 && (
-                        <div className="text-primary-foreground absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/30 bg-primary/90 px-1 text-[10px] font-semibold shadow-lg shadow-primary/25 backdrop-blur-sm">
-                          {downloadCount}
+                      <Link
+                        to={item.path}
+                        onClick={() => {
+                          if (item.path !== location.pathname) setPendingPath(item.path);
+                        }}
+                        // Fetch Ascend's data on the way to the click
+                        onPointerEnter={
+                          item.path === "/ascend" ? prefetchAscendData : undefined
+                        }
+                        className={`group relative flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300 ${
+                          isActive(item.path)
+                            ? "z-10 scale-110 bg-primary text-background"
+                            : "z-0 scale-100 text-muted-foreground hover:z-10 hover:scale-110 hover:bg-secondary hover:text-foreground"
+                        }`}
+                      >
+                        <div
+                          className={`absolute inset-0 rounded-xl bg-gradient-to-br ${item.color} transition-opacity duration-300 ${isActive(item.path) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                        />
+                        <div
+                          className={`relative flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-200 ${
+                            isActive(item.path)
+                              ? "bg-gradient-to-br " + item.color
+                              : "group-hover:bg-white/10"
+                          }`}
+                        >
+                          <item.icon className="h-5 w-5" />
+                          {item.icon === CircleArrowDown && downloadCount > 0 && (
+                            <div className="text-primary-foreground absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/30 bg-primary/90 px-1 text-[10px] font-semibold shadow-lg shadow-primary/25 backdrop-blur-sm">
+                              {downloadCount}
+                            </div>
+                          )}
+                          {item.path === "/ascend" && ascendNotificationCount > 0 && (
+                            <div className="text-primary-foreground absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/30 bg-primary/90 px-1 text-[10px] font-semibold shadow-lg shadow-primary/25 backdrop-blur-sm">
+                              {ascendNotificationCount > 99
+                                ? "99+"
+                                : ascendNotificationCount}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {item.path === "/ascend" && ascendNotificationCount > 0 && (
-                        <div className="text-primary-foreground absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/30 bg-primary/90 px-1 text-[10px] font-semibold shadow-lg shadow-primary/25 backdrop-blur-sm">
-                          {ascendNotificationCount > 99 ? "99+" : ascendNotificationCount}
+                        <div className="pointer-events-none absolute -top-10 translate-y-2 transform whitespace-nowrap rounded-lg border border-border bg-background/95 px-3 py-1.5 text-sm font-medium text-foreground opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+                          {item.label}
+                          <ChevronRight className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-90 transform text-border" />
                         </div>
-                      )}
-                    </div>
-                    <div className="pointer-events-none absolute -top-10 translate-y-2 transform whitespace-nowrap rounded-lg border border-border bg-background/95 px-3 py-1.5 text-sm font-medium text-foreground opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-                      {item.label}
-                      <ChevronRight className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-90 transform text-border" />
-                    </div>
-                  </Link>
-                </motion.div>
-              )
-            )}
-          </AnimatePresence>
+                      </Link>
+                    </motion.div>
+                  </motion.div>
+                )
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </div>

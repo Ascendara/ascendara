@@ -62,6 +62,7 @@ class SettingsManager {
       gameSource: "steamrip",
       autoCreateShortcuts: true,
       smoothTransitions: true,
+      compactDockOnScroll: true,
       reduceEffects: false,
       bigPictureHomeStyle: "ascendara",
       windowControlsStyle: "icons",

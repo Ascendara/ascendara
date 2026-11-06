@@ -65,6 +65,14 @@ export const settingsSearchData = [
     scrollTo: "smooth-transitions",
   },
   {
+    id: "compact-dock-on-scroll",
+    title: "Compact Navigation on Scroll",
+    description: "Shrink the navigation bar to colored dots while scrolling",
+    keywords: ["navigation", "dock", "navbar", "compact", "scroll", "minimal", "dots"],
+    section: "Appearance",
+    scrollTo: "compact-dock-on-scroll",
+  },
+  {
     id: "reduce-effects",
     title: "Reduce Effects",
     description: "Turn off blur and looping animations to use less CPU and GPU",

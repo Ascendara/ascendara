@@ -17,6 +17,7 @@ import {
   Compass,
   Library,
   Maximize2,
+  Minimize2,
   Rocket,
   Search,
   Settings2,
@@ -64,6 +65,13 @@ const getSteps = t => [
     content: t("tour.resizing.content"),
     spotlight: "[data-tour='navigation']",
     showResizeHint: true,
+  },
+  {
+    icon: Minimize2,
+    title: t("tour.compactDock.title"),
+    content: t("tour.compactDock.content"),
+    spotlight: "[data-tour='navigation']",
+    showCompactHint: true,
   },
   {
     icon: Search,
@@ -344,6 +352,25 @@ function Tour({ onClose, steps: customSteps, onFinish, sound = true }) {
       window.dispatchEvent(new CustomEvent("navResize"));
     };
   }, [step.showResizeHint]);
+
+  // Shows the dock folding into its compact scroll form and back, on a loop
+  useEffect(() => {
+    if (!step.showCompactHint) return;
+    const preview = compact =>
+      window.dispatchEvent(new CustomEvent("navCompactPreview", { detail: compact }));
+    let compact = false;
+    let timer;
+    const toggle = () => {
+      compact = !compact;
+      preview(compact);
+      timer = setTimeout(toggle, compact ? 1800 : 1400);
+    };
+    timer = setTimeout(toggle, 600);
+    return () => {
+      clearTimeout(timer);
+      preview(false);
+    };
+  }, [step.showCompactHint]);
 
   useEffect(() => {
     const handleNavResize = () => {

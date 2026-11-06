@@ -4951,6 +4951,8 @@
     },
     "communityThemes": "Community Themes",
     "communityThemesDescription": "Browse and apply themes created by the community. Want to submit your own?",
+    "compactDockOnScroll": "Compact Navigation on Scroll",
+    "compactDockOnScrollDescription": "Shrink the navigation bar to colored dots while scrolling.",
     "components": "Application Components",
     "componentsDescription": "View all official app sidecars and check which game dependencies are installed. You can also reinstall required dependencies from this page.",
     "controllerConnected": "Controller Connected",
@@ -5636,6 +5638,10 @@
       "title": "Ascend"
     },
     "back": "Back",
+    "compactDock": {
+      "content": "While you scroll through a page, the navigation bar shrinks to a row of colored dots so it stays out of the way. Hover over it or go back to the top to bring it back. You can turn this off anytime in Preferences under Appearance.",
+      "title": "Compact Navigation"
+    },
     "downloads": {
       "content": "This is your Downloads area. You can track your current downloads, check progress, and manage the downloads here.",
       "title": "Downloads"
