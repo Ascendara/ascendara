@@ -1204,6 +1204,21 @@ function Settings() {
                       }
                     />
                   </div>
+ 
+                  <div id="home-search" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.homeSearch")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.homeSearchDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.homeSearch}
+                      onCheckedChange={() =>
+                        handleSettingChange("homeSearch", !settings.homeSearch)
+                      }
+                    />
+                  </div>
 
                   <div
                     id="window-controls"
@@ -1241,20 +1256,6 @@ function Settings() {
                     />
                   </div>
 
-                  <div id="home-search" className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.homeSearch")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.homeSearchDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.homeSearch}
-                      onCheckedChange={() =>
-                        handleSettingChange("homeSearch", !settings.homeSearch)
-                      }
-                    />
-                  </div>
                 </div>
               </SettingsSection>
 
