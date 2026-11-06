@@ -518,6 +518,11 @@ function registerSystemHandlers() {
   ipcMain.handle("fetch-system-specs", async () => {
     const specs = {
       os: `${os.type()} ${os.release()}`,
+      // Raw values for comparing against a game's minimum requirements
+      platform: process.platform,
+      osRelease: os.release(),
+      arch: os.arch(),
+      totalMemory: os.totalmem(),
       cpu: os.cpus()[0]?.model || "Unknown",
       ram: `${Math.round(os.totalmem() / (1024 * 1024 * 1024))} GB`,
       gpu: "Unknown",
