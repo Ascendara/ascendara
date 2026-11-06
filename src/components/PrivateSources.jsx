@@ -58,7 +58,7 @@ const empty = {
 };
 const learnMore = () =>
   window.electron.openURL(
-    "https://www.ascendara.app/docs/features/external-sources#self-hosted-sources"
+    "https://www.ascendara.app/docs/downloads/external-sources#self-hosted-sources"
   );
 const connections = [
   {

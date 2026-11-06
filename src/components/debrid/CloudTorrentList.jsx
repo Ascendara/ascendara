@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Cloud, Loader2, Trash2 } from "lucide-react";
+import { Cloud, ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -134,7 +134,18 @@ export default function CloudTorrentList({ cloud }) {
         </h2>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        {t("debrid.cloud.description")}
+        {t("debrid.cloud.description")}&nbsp;
+        <a
+          onClick={() =>
+            window.electron.openURL(
+              "https://ascendara.app/docs/downloads/debrid-services#following-cloud-torrents"
+            )
+          }
+          className="inline-flex cursor-pointer items-center text-primary hover:underline"
+        >
+          {t("common.learnMore")}
+          <ExternalLink className="ml-1 h-3 w-3" />
+        </a>
       </p>
       <DebridList>
         {cloud.items.map(item => (

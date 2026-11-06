@@ -2,6 +2,7 @@ const featureCenterResources = {
   en: {
     debrid: {
       downloadsTitle: "Debrid Downloads",
+      setupGuide: "Setup guide",
       removeAfterDone: "Remove from the service when done",
       removeAfterDoneDescription:
         "Once a torrent's game is fully on your PC, delete the torrent from your account to free its slot. This also applies to games you downloaded before turning it on.",

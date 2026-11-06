@@ -49,7 +49,22 @@ const STATUS_TONES = {
   },
 };
 
+const DOCS_URL = "https://ascendara.app/docs/downloads/debrid-services";
+
 const apiKeyOf = (settings, provider) => settings[provider.apiKeySetting]?.trim() || "";
+
+function DocsLink({ url, children }) {
+  const { t } = useLanguage();
+  return (
+    <a
+      onClick={() => window.electron.openURL(url)}
+      className="inline-flex cursor-pointer items-center text-primary hover:underline"
+    >
+      {children || t("common.learnMore")}
+      <ExternalLink className="ml-1 h-3 w-3" />
+    </a>
+  );
+}
 
 const statusOf = (settings, provider, account) => {
   if (settings.debridProviderEnabled?.[provider.id] === false) return "paused";
@@ -137,7 +152,12 @@ export default function DebridSettings() {
         <section id="debrid-order" className="py-8">
           <SectionHeader
             title={t("debrid.priorityOrder")}
-            description={t("debrid.priorityDescription")}
+            description={
+              <>
+                {t("debrid.priorityDescription")}&nbsp;
+                <DocsLink url={`${DOCS_URL}#download-order`} />
+              </>
+            }
           />
           <ol
             className="overflow-hidden rounded-xl border border-border/70"
@@ -260,7 +280,8 @@ function Overview({ providers, accounts }) {
             {t("debrid.settingsTitle")}
           </Label>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            {t("debrid.settingsDescription")}
+            {t("debrid.settingsDescription")}&nbsp;
+            <DocsLink url={DOCS_URL} />
           </p>
         </div>
         <Switch
@@ -432,6 +453,12 @@ function ServiceCard({ provider, position, account, onRetry }) {
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {t("debrid.position", { position })}
+            {provider.docsUrl && (
+              <>
+                {" · "}
+                <DocsLink url={provider.docsUrl}>{t("debrid.setupGuide")}</DocsLink>
+              </>
+            )}
           </p>
         </div>
         {status === "connected" && (

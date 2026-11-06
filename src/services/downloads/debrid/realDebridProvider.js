@@ -6,6 +6,7 @@ export default {
   id: "realdebrid",
   name: "Real-Debrid",
   apiKeyUrl: "https://real-debrid.com/apitoken",
+  docsUrl: "https://ascendara.app/docs/downloads/real-debrid",
   signIn: {
     start: signIn.startCodeSignIn,
     poll: signIn.pollCodeSignIn,

@@ -3,7 +3,8 @@ import * as api from "../torboxService";
 export default {
   id: "torbox",
   name: "TorBox",
-  apiKeyUrl: "https://ascendara.app/docs/features/torbox-integration",
+  apiKeyUrl: "https://ascendara.app/docs/downloads/torbox-integration",
+  docsUrl: "https://ascendara.app/docs/downloads/torbox-integration",
   getUserInfo: api.getUserInfo,
   describeAccount: (user, t) => ({
     name: user.email,

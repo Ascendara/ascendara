@@ -4,6 +4,7 @@ export default {
   id: "debridlink",
   name: "Debrid-Link",
   apiKeyUrl: "https://debrid-link.com/webapp/apikey",
+  docsUrl: "https://ascendara.app/docs/downloads/debrid-link",
   getUserInfo: api.getUserInfo,
   // accountType: 0 free, 1 premium, 2 lifetime (no end date).
   describeAccount: (user, t) => ({

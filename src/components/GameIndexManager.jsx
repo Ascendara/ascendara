@@ -1576,7 +1576,7 @@ const GameIndexManager = ({
                   className="inline-flex cursor-pointer items-center text-sm text-primary hover:underline"
                   onClick={() =>
                     window.electron.openURL(
-                      "https://ascendara.app/docs/features/external-sources"
+                      "https://ascendara.app/docs/downloads/external-sources"
                     )
                   }
                 >
@@ -2664,7 +2664,7 @@ const GameIndexManager = ({
                   className="h-7 px-3 text-xs text-primary"
                   onClick={() => {
                     window.electron.openURL(
-                      "https://ascendara.app/docs/features/external-sources"
+                      "https://ascendara.app/docs/downloads/external-sources"
                     );
                   }}
                 >

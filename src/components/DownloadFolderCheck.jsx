@@ -4,13 +4,13 @@ import { useTranslation } from "react-i18next";
 import { Progress } from "@/components/ui/progress";
 
 export const DOWNLOAD_FOLDER_CHECK_DOCS =
-  "https://ascendara.app/docs/features/downloading#download-folder-check";
+  "https://ascendara.app/docs/downloads/downloading#download-folder-check";
 
 // Docs section explaining each kind of failed check
 const ISSUE_DOCS = {
-  basic: "https://ascendara.app/docs/features/downloading#folder-access-problems",
-  antivirus: "https://ascendara.app/docs/features/downloading#antivirus-interference",
-  download: "https://ascendara.app/docs/features/downloading#check-could-not-finish",
+  basic: "https://ascendara.app/docs/downloads/downloading#folder-access-problems",
+  antivirus: "https://ascendara.app/docs/downloads/downloading#antivirus-interference",
+  download: "https://ascendara.app/docs/downloads/downloading#check-could-not-finish",
 };
 
 /**

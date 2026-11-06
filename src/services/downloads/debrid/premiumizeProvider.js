@@ -7,6 +7,7 @@ export default {
   id: "premiumize",
   name: "Premiumize",
   apiKeyUrl: "https://www.premiumize.me/account",
+  docsUrl: "https://ascendara.app/docs/downloads/premiumize",
   getUserInfo: api.getUserInfo,
   describeAccount: (user, t) => ({
     name: String(user.customer_id ?? ""),

@@ -954,7 +954,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                     className="inline-flex cursor-pointer items-center text-xs text-primary hover:underline"
                     onClick={() =>
                       window.electron.openURL(
-                        "https://ascendara.app/docs/features/external-sources"
+                        "https://ascendara.app/docs/downloads/external-sources"
                       )
                     }
                   >

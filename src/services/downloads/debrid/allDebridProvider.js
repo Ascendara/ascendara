@@ -5,6 +5,7 @@ export default {
   id: "alldebrid",
   name: "AllDebrid",
   apiKeyUrl: "https://alldebrid.com/apikeys/",
+  docsUrl: "https://ascendara.app/docs/downloads/alldebrid",
   signIn: {
     start: signIn.startCodeSignIn,
     poll: signIn.pollCodeSignIn,
