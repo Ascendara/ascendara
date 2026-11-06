@@ -231,3 +231,26 @@ test("AllDebrid keeps a record only for torrents, and comes after the existing s
   const ids = debrid.getOrderedProviders({}).map(item => item.id);
   assert.deepEqual(ids.slice(0, 3), ["torbox", "realdebrid", "alldebrid"]);
 });
+
+test("AllDebrid torrent status and removal for the in-cloud list", async t => {
+  const provider = (await loadProvider()).default;
+  assert.equal(provider.hasDownloadsPage, false);
+  stubFetch(t, () =>
+    ok({
+      magnets: { id: 1, statusCode: 1, size: 200, downloaded: 50, status: "Downloading" },
+    })
+  );
+  assert.deepEqual(await provider.getTorrentStatus("key", "1"), {
+    status: "downloading",
+    progress: 25,
+  });
+  stubFetch(t, () => ok({ magnets: { id: 1, statusCode: 8, status: "Too many files" } }));
+  assert.deepEqual(await provider.getTorrentStatus("key", "1"), {
+    status: "failed",
+    message: "Too many files",
+  });
+  const calls = stubFetch(t, () => ok({ message: "Magnet was successfully deleted" }));
+  await provider.removeTorrent("key", "1");
+  assert.equal(calls[0].url, "/api/alldebrid/v4/magnet/delete");
+  assert.equal(calls[0].body.get("id"), "1");
+});

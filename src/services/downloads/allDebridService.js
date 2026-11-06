@@ -113,6 +113,8 @@ export async function createTorrentFromMagnet(magnet, apiKey) {
   return added;
 }
 
+export const deleteMagnet = (apiKey, id) => request(apiKey, "/v4/magnet/delete", { id });
+
 export async function getMagnetStatus(apiKey, id) {
   const data = await request(apiKey, "/v4.1/magnet/status", { id });
   return (Array.isArray(data.magnets) ? data.magnets[0] : data.magnets) || null;

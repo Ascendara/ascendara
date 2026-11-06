@@ -20,7 +20,8 @@ export default {
   torrentSetting: "useDebridLinkForTorrents",
   prioritizeSetting: "prioritizeDebridLinkOverSeamless",
   seamlessHosts: ["gofile", "pixeldrain", "buzzheavier", "megadb"],
-  // No cloud page: finished torrents move to the local downloads list.
+  // No cloud page: torrents being prepared are listed on the local Downloads page.
+  hasDownloadsPage: false,
   downloadsPath: "/downloads",
   hostDownloadMode: "direct",
   metadataStorageKey: "debridLinkGameData",
@@ -28,26 +29,40 @@ export default {
   getSupportedHosts: api.getSupportedHosts,
   isSupportedUrl: api.isSupportedUrl,
   getTorrentGame: entry => entry,
-  async getTorrentDownload(apiKey, id) {
+  async getTorrentStatus(apiKey, id) {
     let torrent;
     try {
       torrent = await api.getTorrent(apiKey, id);
     } catch (error) {
-      if (error.code === "badId") return "missing";
+      if (error.code === "badId") return { status: "missing" };
       throw error;
     }
-    if (!torrent) return "missing";
+    if (!torrent) return { status: "missing" };
     const files = api.flattenFiles(torrent.files);
-    // A file is ready when it reaches 100 percent.
-    if (!files.length || !files.every(file => file.downloadPercent === 100)) return null;
-    if (files.some(file => !file.downloadUrl))
+    // A file is ready when it reaches 100 percent. Debrid-Link reports no failed state.
+    if (files.length && files.every(file => file.downloadPercent === 100))
+      return { status: "ready", progress: 100, files };
+    return {
+      status: torrent.status === 4 ? "downloading" : "queued",
+      progress:
+        typeof torrent.downloadPercent === "number"
+          ? Math.round(torrent.downloadPercent)
+          : null,
+    };
+  },
+  async getTorrentDownload(apiKey, id) {
+    const state = await this.getTorrentStatus(apiKey, id);
+    if (state.status === "missing") return "missing";
+    if (state.status !== "ready") return null;
+    if (state.files.some(file => !file.downloadUrl))
       throw new Error("Debrid-Link returned an incomplete torrent file list.");
-    return files.map(file => ({
+    return state.files.map(file => ({
       url: file.downloadUrl,
       filename: file.path,
       size: file.size ?? null,
     }));
   },
+  removeTorrent: (apiKey, id) => api.deleteTorrent(apiKey, id),
   async submitMagnet(link, apiKey) {
     const result = await api.createTorrentFromMagnet(link, apiKey);
     return { id: result.id };

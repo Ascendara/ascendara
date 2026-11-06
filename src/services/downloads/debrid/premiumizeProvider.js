@@ -18,7 +18,8 @@ export default {
   torrentSetting: "usePremiumizeForTorrents",
   prioritizeSetting: "prioritizePremiumizeOverSeamless",
   seamlessHosts: ["gofile", "pixeldrain", "buzzheavier", "megadb"],
-  // No cloud page: finished torrents move to the local downloads list.
+  // No cloud page: torrents being prepared are listed on the local Downloads page.
+  hasDownloadsPage: false,
   downloadsPath: "/downloads",
   hostDownloadMode: "direct",
   metadataStorageKey: "premiumizeGameData",
@@ -26,18 +27,35 @@ export default {
   getSupportedHosts: api.getSupportedHosts,
   isSupportedUrl: api.isSupportedUrl,
   getTorrentGame: entry => entry,
-  async getTorrentDownload(apiKey, id) {
+  async getTorrentStatus(apiKey, id) {
     const transfer = await api.getTransfer(apiKey, id);
-    if (!transfer) return "missing";
+    if (!transfer) return { status: "missing" };
     if (transfer.status === "error")
-      throw new Error(
-        `Premiumize could not download this torrent: ${transfer.message || "error"}`
-      );
+      return { status: "failed", message: transfer.message || "error" };
     // A seeding transfer is already complete in the cloud.
-    if (!["finished", "seeding"].includes(transfer.status)) return null;
-    const files = await api.getTransferFiles(apiKey, transfer);
+    if (["finished", "seeding"].includes(transfer.status))
+      return { status: "ready", progress: 100, transfer };
+    return {
+      status: transfer.status === "running" ? "downloading" : "queued",
+      progress:
+        typeof transfer.progress === "number"
+          ? Math.round(transfer.progress * 100)
+          : null,
+    };
+  },
+  async getTorrentDownload(apiKey, id) {
+    const state = await this.getTorrentStatus(apiKey, id);
+    if (state.status === "missing") return "missing";
+    if (state.status === "failed")
+      throw new Error(`Premiumize could not download this torrent: ${state.message}`);
+    if (state.status !== "ready") return null;
+    const files = await api.getTransferFiles(apiKey, state.transfer);
     if (!files.length) throw new Error("Premiumize returned an empty torrent file list.");
     return files.map(file => ({ url: file.url, filename: file.path, size: file.size }));
+  },
+  async removeTorrent(apiKey, id) {
+    const transfer = await api.getTransfer(apiKey, id);
+    if (transfer) await api.deleteTransfer(apiKey, transfer);
   },
   async submitMagnet(link, apiKey) {
     const result = await api.createTorrentFromMagnet(link, apiKey);

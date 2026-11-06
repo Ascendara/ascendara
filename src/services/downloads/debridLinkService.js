@@ -51,10 +51,10 @@ const ERROR_MESSAGES = {
   torrentTooBig: "This torrent is too big for Debrid-Link.",
 };
 
-async function request(apiKey, path, form) {
+async function request(apiKey, path, form, method = form ? "POST" : "GET") {
   if (!apiKey?.trim()) throw new Error("Debrid-Link API key is missing.");
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: form ? "POST" : "GET",
+    method,
     headers: {
       Authorization: `Bearer ${apiKey.trim()}`,
       ...(form ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
@@ -143,3 +143,6 @@ export async function getTorrent(apiKey, id) {
     ) || null
   );
 }
+
+export const deleteTorrent = (apiKey, id) =>
+  request(apiKey, `/seedbox/${encodeURIComponent(id)}/remove`, null, "DELETE");

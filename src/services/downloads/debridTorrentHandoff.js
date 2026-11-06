@@ -38,7 +38,8 @@ export function handoffTorrents(provider, apiKey) {
           id.startsWith("torrent:") &&
           entry?.autoHandoff === true &&
           !entry.localDownloadStarted &&
-          !entry.cloudTorrentMissing
+          !entry.cloudTorrentMissing &&
+          !entry.cloudTorrentRemoved
       );
       let failure;
       const fail = (retryKey, error) => {

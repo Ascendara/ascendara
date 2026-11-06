@@ -25,7 +25,8 @@ export default {
   torrentSetting: "useAllDebridForTorrents",
   prioritizeSetting: "prioritizeAllDebridOverSeamless",
   seamlessHosts: ["gofile", "pixeldrain", "buzzheavier", "megadb"],
-  // No cloud page: finished torrents move to the local downloads list.
+  // No cloud page: torrents being prepared are listed on the local Downloads page.
+  hasDownloadsPage: false,
   downloadsPath: "/downloads",
   hostDownloadMode: "direct",
   metadataStorageKey: "allDebridGameData",
@@ -33,21 +34,34 @@ export default {
   getSupportedHosts: api.getSupportedHosts,
   isSupportedUrl: api.isSupportedUrl,
   getTorrentGame: entry => entry,
-  async getTorrentDownload(apiKey, id) {
+  async getTorrentStatus(apiKey, id) {
     let magnet;
     try {
       magnet = await api.getMagnetStatus(apiKey, id);
     } catch (error) {
-      if (error.code === "MAGNET_INVALID_ID") return "missing";
+      if (error.code === "MAGNET_INVALID_ID") return { status: "missing" };
       throw error;
     }
-    if (!magnet) return "missing";
+    if (!magnet) return { status: "missing" };
     // 0-3 are queued to uploading, 4 is ready, 5 and up are failures.
-    if (magnet.statusCode >= 5)
-      throw new Error(`AllDebrid could not download this torrent: ${magnet.status}`);
-    if (magnet.statusCode !== 4) return null;
-    const files = magnet.files
-      ? api.flattenFiles(magnet.files)
+    if (magnet.statusCode >= 5) return { status: "failed", message: magnet.status };
+    if (magnet.statusCode === 4)
+      return { status: "ready", progress: 100, files: magnet.files };
+    return {
+      status: magnet.statusCode === 0 ? "queued" : "downloading",
+      progress:
+        magnet.size > 0 ? Math.round((100 * magnet.downloaded) / magnet.size) : null,
+    };
+  },
+  async getTorrentDownload(apiKey, id) {
+    const state = await this.getTorrentStatus(apiKey, id);
+    if (state.status === "missing") return "missing";
+    if (state.status === "failed")
+      throw new Error(`AllDebrid could not download this torrent: ${state.message}`);
+    if (state.status !== "ready") return null;
+    // The status of one magnet usually carries its file tree already.
+    const files = state.files
+      ? api.flattenFiles(state.files)
       : await api.getMagnetFiles(apiKey, id);
     if (!files.length) throw new Error("AllDebrid returned an empty torrent file list.");
     const downloads = [];
@@ -61,6 +75,7 @@ export default {
     }
     return downloads;
   },
+  removeTorrent: (apiKey, id) => api.deleteMagnet(apiKey, id),
   async submitMagnet(link, apiKey) {
     const result = await api.createTorrentFromMagnet(link, apiKey);
     return { id: result.id };

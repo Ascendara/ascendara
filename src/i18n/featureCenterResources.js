@@ -2,6 +2,21 @@ const featureCenterResources = {
   en: {
     debrid: {
       downloadsTitle: "Debrid Downloads",
+      sentToCloud:
+        "Sent to {{provider}}. It downloads to your PC once it is ready there.",
+      cloud: {
+        title: "Waiting at your debrid service",
+        description:
+          "These start downloading to your PC by themselves once they are ready.",
+        queued: "Queued",
+        downloading: "Downloading in the cloud",
+        ready: "Ready, starting on your PC",
+        failed: "Failed",
+        stalled: "Stalled",
+        error: "Could not check",
+        remove: "Remove",
+        removed: "Removed from {{provider}}",
+      },
       downloadsDescription:
         "Cloud downloads from your debrid accounts. Finished torrents move to your PC automatically.",
       chooseService: "Choose debrid service",

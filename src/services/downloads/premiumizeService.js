@@ -122,21 +122,51 @@ async function collectFolder(apiKey, id, folder = "", seen = new Set()) {
   return files;
 }
 
-// A finished transfer points at its file, or at a folder: its own or the one it landed in.
-export async function getTransferFiles(apiKey, transfer) {
-  if (transfer.file_id) {
-    const item = await request(
-      apiKey,
-      `/item/details?id=${encodeURIComponent(transfer.file_id)}`
-    );
-    return item.link ? [toFile(item, "")] : [];
-  }
-  if (!transfer.folder_id) return [];
+// Where a finished transfer's content is: its own file, its own folder, or the entry
+// with its name in the folder it landed in. Null when that is not certain.
+async function findTransferContent(apiKey, transfer) {
+  if (transfer.file_id) return { type: "file", id: transfer.file_id };
+  if (!transfer.folder_id) return null;
   const folder = await getFolder(apiKey, transfer.folder_id);
-  if (folder.name === transfer.name) return collectFolder(apiKey, transfer.folder_id);
+  if (folder.name === transfer.name)
+    return { type: "folder", id: transfer.folder_id, path: "" };
   const entry = (Array.isArray(folder.content) ? folder.content : []).find(
     item => item.name === transfer.name
   );
-  if (entry?.type === "folder") return collectFolder(apiKey, entry.id, `${entry.name}/`);
-  return entry?.link ? [toFile(entry, "")] : [];
+  if (!entry) return null;
+  return entry.type === "folder"
+    ? { type: "folder", id: entry.id, path: `${entry.name}/` }
+    : { type: "file", id: entry.id, entry };
+}
+
+export async function getTransferFiles(apiKey, transfer) {
+  const content = await findTransferContent(apiKey, transfer);
+  if (!content) return [];
+  if (content.type === "folder") return collectFolder(apiKey, content.id, content.path);
+  const item = content.entry?.link
+    ? content.entry
+    : await request(apiKey, `/item/details?id=${encodeURIComponent(content.id)}`);
+  return item.link ? [toFile(item, "")] : [];
+}
+
+// Deletes the transfer and, once it finished, the files Premiumize ties to it: its file,
+// or its own folder. Never a folder found only by name, and never the root folder.
+export async function deleteTransfer(apiKey, transfer) {
+  if (["finished", "seeding"].includes(transfer.status)) {
+    if (transfer.file_id) {
+      await request(apiKey, "/item/delete", { id: transfer.file_id });
+    } else if (transfer.folder_id) {
+      const [folder, root] = await Promise.all([
+        getFolder(apiKey, transfer.folder_id),
+        request(apiKey, "/folder/list"),
+      ]);
+      if (
+        folder.name === transfer.name &&
+        root.folder_id != null &&
+        String(root.folder_id) !== String(transfer.folder_id)
+      )
+        await request(apiKey, "/folder/delete", { id: transfer.folder_id });
+    }
+  }
+  await request(apiKey, "/transfer/delete", { id: transfer.id });
 }

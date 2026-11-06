@@ -255,3 +255,26 @@ test("Debrid-Link keeps a record only for torrents", async () => {
   });
   assert.ok(debrid.getOrderedProviders({}).some(item => item.id === "debridlink"));
 });
+
+test("Debrid-Link torrent status and removal for the in-cloud list", async t => {
+  const provider = (await loadProvider()).default;
+  assert.equal(provider.hasDownloadsPage, false);
+  stubFetch(t, () =>
+    ok([
+      {
+        id: "t",
+        status: 4,
+        downloadPercent: 61.4,
+        files: [{ name: "a", downloadPercent: 61 }],
+      },
+    ])
+  );
+  assert.deepEqual(await provider.getTorrentStatus("key", "t"), {
+    status: "downloading",
+    progress: 61,
+  });
+  const calls = stubFetch(t, () => ok(["t"]));
+  await provider.removeTorrent("key", "t");
+  assert.equal(calls[0].url, "/api/debridlink/seedbox/t/remove");
+  assert.equal(calls[0].options.method, "DELETE");
+});

@@ -224,3 +224,51 @@ test("Premiumize keeps a record only for torrents, and comes after the existing 
   assert.deepEqual(ids.slice(0, 2), ["torbox", "realdebrid"]);
   assert.ok(ids.includes("premiumize"));
 });
+
+test("Premiumize torrent status for the in-cloud list", async t => {
+  const provider = (await loadProvider()).default;
+  assert.equal(provider.hasDownloadsPage, false);
+  stubFetch(t, () => ok({ transfers: [{ id: "a", status: "running", progress: 0.42 }] }));
+  assert.deepEqual(await provider.getTorrentStatus("key", "a"), {
+    status: "downloading",
+    progress: 42,
+  });
+});
+
+const removal = async (t, transfer, folder) => {
+  const calls = stubFetch(t, url => {
+    if (url === "/api/premiumize/transfer/list") return ok({ transfers: [transfer] });
+    if (url === "/api/premiumize/folder/list")
+      return ok({ folder_id: "root", name: "root" });
+    if (url.startsWith("/api/premiumize/folder/list?id=")) return ok(folder);
+    return ok({});
+  });
+  const provider = (await loadProvider()).default;
+  await provider.removeTorrent("key", transfer.id);
+  return calls.filter(call => call.body).map(call => [call.url, call.body.get("id")]);
+};
+
+test("Premiumize removal deletes only what Premiumize ties to the transfer", async t => {
+  const done = { id: "a", status: "finished", name: "Game" };
+  assert.deepEqual(await removal(t, { ...done, file_id: "f" }), [
+    ["/api/premiumize/item/delete", "f"],
+    ["/api/premiumize/transfer/delete", "a"],
+  ]);
+  assert.deepEqual(await removal(t, { ...done, folder_id: "own" }, { name: "Game" }), [
+    ["/api/premiumize/folder/delete", "own"],
+    ["/api/premiumize/transfer/delete", "a"],
+  ]);
+  // Landed in a parent folder: a same-named entry there might be the user's own.
+  const parent = { name: "root", content: [{ id: "g", type: "folder", name: "Game" }] };
+  assert.deepEqual(await removal(t, { ...done, folder_id: "root" }, parent), [
+    ["/api/premiumize/transfer/delete", "a"],
+  ]);
+  // The root folder is never deleted, even if its name matches.
+  assert.deepEqual(
+    await removal(t, { ...done, name: "root", folder_id: "root" }, parent),
+    [["/api/premiumize/transfer/delete", "a"]]
+  );
+  assert.deepEqual(await removal(t, { id: "a", status: "running", folder_id: "own" }), [
+    ["/api/premiumize/transfer/delete", "a"],
+  ]);
+});

@@ -304,7 +304,7 @@ function Overview({ providers, accounts }) {
               </div>
             ))}
           </dl>
-          {connected.length > 0 && (
+          {connected.some(provider => provider.hasDownloadsPage !== false) && (
             <Button
               variant="ghost"
               size="sm"
@@ -429,7 +429,13 @@ function ServiceCard({ provider, position, account, onRetry }) {
             variant="ghost"
             size="sm"
             className="hidden gap-1.5 text-muted-foreground sm:inline-flex"
-            onClick={() => navigate(`/debriddownloads?service=${provider.id}`)}
+            onClick={() =>
+              navigate(
+                provider.hasDownloadsPage === false
+                  ? "/downloads"
+                  : `/debriddownloads?service=${provider.id}`
+              )
+            }
           >
             {t("debrid.viewDownloads")}
             <ArrowRight className="h-3.5 w-3.5" />

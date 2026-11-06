@@ -214,6 +214,7 @@ test("handoff skips legacy records and stops polling torrents removed from the c
   let stored = JSON.stringify({
     "torrent:legacy": { game: "Old" },
     "torrent:gone": { game: "Gone", autoHandoff: true },
+    "torrent:removed": { game: "Removed", autoHandoff: true, cloudTorrentRemoved: true },
   });
   global.localStorage = {
     getItem: () => stored,
@@ -247,7 +248,7 @@ test("handoff skips legacy records and stops polling torrents removed from the c
   };
   await worker.handoffTorrents(provider, "token");
   await worker.handoffTorrents(provider, "token");
-  assert.deepEqual(lookups, ["gone"], "legacy skipped, missing torrent checked once");
+  assert.deepEqual(lookups, ["gone"], "legacy and removed skipped, missing checked once");
   assert.equal(calls.length, 0);
   assert.equal(JSON.parse(stored)["torrent:gone"].cloudTorrentMissing, true);
 });

@@ -1002,7 +1002,12 @@ function PublicDownloadPage() {
       toast.info(t("download.toast.processingLink"));
       try {
         const result = await debrid.submitMagnet(settings, magnet, gameData, dir ?? 0);
-        toast.success(t("download.toast.downloadQueued"));
+        const provider = debrid.getProvider(result.providerId);
+        toast.success(
+          provider?.hasDownloadsPage === false
+            ? t("debrid.sentToCloud", { provider: provider.name })
+            : t("download.toast.downloadQueued")
+        );
         navigate(result.downloadsPath);
         return true;
       } catch (error) {
