@@ -107,6 +107,37 @@ function toMatch(details, indexTitle) {
   return minReqs ? { name: details.name, minReqs } : null;
 }
 
+// One Steam lookup per cleaned title for the session, shared by the game page
+// and the requirements card; only an exact name match is kept, and a failed
+// lookup may be retried
+const steamMatches = new Map();
+
+export function matchSteamDetails(title, lookup) {
+  const key = titleKey(title);
+  if (!key || !lookup) return Promise.resolve(null);
+  if (!steamMatches.has(key)) {
+    const pending = Promise.resolve()
+      .then(() => lookup(cleanGameTitle(title)))
+      .then(details =>
+        details?.name && isConfidentMatch(title, details.name) ? details : null
+      )
+      .catch(error => {
+        steamMatches.delete(key);
+        throw error;
+      });
+    steamMatches.set(key, pending);
+  }
+  return steamMatches.get(key);
+}
+
+// Game page details: the index name first, then the cleaned name, which
+// torrent index names ("Name Deluxe Edition, v1.0 + Bonus") usually need
+export async function findGameDetails(title, lookup) {
+  const details = await lookup(title);
+  if (details || cleanGameTitle(title) === String(title).trim()) return details ?? null;
+  return matchSteamDetails(title, lookup);
+}
+
 // One lookup per title for the session; failed lookups may be retried
 const matches = new Map();
 
@@ -117,7 +148,7 @@ export function matchRequirements(title, { known, lookup } = {}) {
     const pending = (async () => {
       const fromKnown = toMatch(known, title);
       if (fromKnown || !lookup) return fromKnown;
-      return toMatch(await lookup(cleanGameTitle(title)), title);
+      return toMatch(await matchSteamDetails(title, lookup), title);
     })().catch(error => {
       matches.delete(key);
       console.error("Failed to match system requirements:", error);

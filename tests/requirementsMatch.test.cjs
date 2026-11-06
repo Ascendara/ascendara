@@ -164,6 +164,41 @@ test("page data is used first, and each title is looked up once per session", as
   assert.equal(calls, 1);
 });
 
+test("page details fall back to the cleaned name and share its lookup", async () => {
+  const { findGameDetails, matchRequirements } = await load();
+  const asked = [];
+  const lookup = async name => {
+    asked.push(name);
+    return name === "Enshrouded" ? steamGame("Enshrouded") : null;
+  };
+  const raw = "Enshrouded Deluxe Edition – -Bonuses";
+  const details = await findGameDetails(raw, lookup);
+  assert.equal(details.name, "Enshrouded");
+  assert.deepEqual(asked, [raw, "Enshrouded"]);
+
+  // The requirements card reuses that answer instead of asking Steam again
+  const match = await matchRequirements(raw, { lookup });
+  assert.equal(match.minReqs.ram, "8 GB RAM");
+  assert.deepEqual(asked, [raw, "Enshrouded"]);
+
+  // The raw answer wins, a clean name is not asked twice, loose hits are dropped
+  const found = steamGame("Official Game");
+  assert.equal(await findGameDetails("Official Game", async () => found), found);
+  let calls = 0;
+  const none = async () => {
+    calls += 1;
+    return null;
+  };
+  assert.equal(await findGameDetails("Clean Name", none), null);
+  assert.equal(calls, 1);
+  assert.equal(
+    await findGameDetails("Hades + Soundtrack", async name =>
+      name === "Hades" ? steamGame("Hades II") : null
+    ),
+    null
+  );
+});
+
 test("a failed lookup shows nothing and is tried again later", async () => {
   const { matchRequirements } = await load();
   const original = console.error;
