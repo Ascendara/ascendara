@@ -98,8 +98,9 @@ export function createDebridService(providers) {
     }
     return { ...result, providerId: provider.id, downloadsPath: provider.downloadsPath };
   };
+  // Settled per service: one failing must not hide the downloads another one started.
   const resumePendingTorrents = settings =>
-    Promise.all(
+    Promise.allSettled(
       getConfiguredProviders(settings)
         .filter(
           provider =>
