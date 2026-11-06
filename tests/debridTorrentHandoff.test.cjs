@@ -468,6 +468,8 @@ test("a TorBox torrent not listed on the first check is handed off once it shows
   assert.deepEqual(await worker.handoffTorrents(provider, "key"), {
     game: "Example",
     providerId: "torbox",
+    storageKey: "torboxGameNames",
+    recordKey: "torrent:7",
   });
   assert.ok(requests.some(path => path.endsWith("/torrents/requestdl")));
   assert.equal(calls.length, 1);
@@ -567,6 +569,8 @@ test("a torrent that can not start does not hold back the ones behind it", async
     assert.deepEqual(await worker.handoffTorrents(provider, "key"), {
       game: "Second",
       providerId: "test",
+      storageKey: "metadata",
+      recordKey: "torrent:second",
     });
     assert.deepEqual(started, ["Second"]);
     assert.equal(JSON.parse(stored)["torrent:first"].localDownloadStarted, undefined);

@@ -324,7 +324,12 @@ export function handoffTorrents(provider, apiKey, settings) {
           handoffWaitReason: undefined,
           nextHandoffAt: undefined,
         });
-        return { game: game.game, providerId: provider.id };
+        return {
+          game: game.game,
+          providerId: provider.id,
+          storageKey: provider.metadataStorageKey,
+          recordKey: id,
+        };
       }
       if (failure) throw failure;
     })
