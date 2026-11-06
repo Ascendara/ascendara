@@ -50,6 +50,10 @@ module.exports = {
           "0%": { backgroundPosition: "200% 0" },
           "100%": { backgroundPosition: "-200% 0" },
         },
+        glint: {
+          "0%": { backgroundPosition: "100% 0" },
+          "75%, 100%": { backgroundPosition: "0% 0" },
+        },
         "page-fade-in": {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
@@ -66,6 +70,7 @@ module.exports = {
         "collapsible-up": "collapsible-up 0.2s ease-out",
         shimmer: "shimmer 3s ease-in-out infinite",
         shine: "shine 3s ease-in-out infinite",
+        glint: "glint 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         "page-fade-in": "page-fade-in 0.2s ease-out",
         "marquee-vertical": "marquee-vertical 22s linear infinite",
       },

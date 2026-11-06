@@ -208,6 +208,16 @@ const themes = [
   { id: "royal-night", name: "Royal Night", group: "dark", isNew: true },
 ];
 
+// One soft band of full theme color with a brighter core sweeps across the
+// tinted word. The gradient is 3x the text width and doesn't repeat, so only
+// one band is ever visible.
+const GLINT_STYLE = {
+  backgroundImage:
+    "linear-gradient(110deg, rgb(var(--color-primary) / 0.5) 0%, rgb(var(--color-primary) / 0.5) 30%, rgb(var(--color-primary)) 42%, color-mix(in srgb, rgb(var(--color-primary)) 70%, white) 50%, rgb(var(--color-primary)) 58%, rgb(var(--color-primary) / 0.5) 70%, rgb(var(--color-primary) / 0.5) 100%)",
+  backgroundSize: "300% 100%",
+  backgroundRepeat: "no-repeat",
+};
+
 const PREVIEW_CARD_TINTS = [0.55, 0.3, 0.45, 0.2];
 
 // A miniature Ascendara window. data-theme scopes the theme's color tokens to
@@ -281,7 +291,7 @@ function ThemeTile({ theme, selected, onSelect, onPreview }) {
       onFocus={() => onPreview(theme.id)}
       onBlur={() => onPreview(null)}
       aria-pressed={selected}
-      className={`flex w-[calc(50%-0.25rem)] items-center gap-3 rounded-xl border p-1.5 text-left outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/60 sm:w-[calc((100%-1rem)/3)] lg:w-full lg:flex-1 ${
+      className={`flex w-[calc(50%-0.25rem)] items-center gap-2.5 rounded-lg border px-1.5 py-1 text-left outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/60 sm:w-[calc((100%-1rem)/3)] lg:w-full lg:flex-1 ${
         selected
           ? "border-primary bg-primary/10"
           : "border-border/60 bg-card/40 hover:border-primary/40 hover:bg-card/70"
@@ -289,14 +299,35 @@ function ThemeTile({ theme, selected, onSelect, onPreview }) {
     >
       <span
         data-theme={theme.id}
-        className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background"
+        className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-background"
       >
         <span className="absolute inset-y-0 right-0 w-1/2 bg-card" />
-        <span className="relative h-3 w-3 rounded-full bg-primary shadow-sm" />
+        <span className="relative h-2.5 w-2.5 rounded-full bg-primary shadow-sm" />
       </span>
       <span className="min-w-0 flex-1 truncate text-sm font-medium">{theme.name}</span>
       {selected && <CircleCheck className="h-4 w-4 shrink-0 text-primary" />}
     </button>
+  );
+}
+
+// Ascend logo from the website, falling back to the crown icon when offline.
+function AscendLogo() {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        <Crown className="h-4 w-4" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src="https://www.ascendara.app/ascend.png"
+      alt=""
+      draggable={false}
+      onError={() => setFailed(true)}
+      className="h-8 w-8 shrink-0 rounded-lg object-contain"
+    />
   );
 }
 
@@ -312,7 +343,7 @@ function WelcomeStepIcon({ icon: Icon }) {
 // fit the window without scrolling; short windows drop the icon and tighten spacing.
 // forwardRef lets AnimatePresence's popLayout mode measure the exiting step.
 const SetupStep = forwardRef(function SetupStep(
-  { icon: Icon, title, subtitle, children, footer, wide = false },
+  { icon: Icon, title, subtitle, children, footer, wide = false, compact = false },
   ref
 ) {
   const direction = useContext(StepDirectionContext);
@@ -327,10 +358,20 @@ const SetupStep = forwardRef(function SetupStep(
       exit="exit"
     >
       <motion.div
-        className="mb-6 max-w-2xl [@media(max-height:760px)]:mb-4"
+        className={`max-w-2xl ${
+          compact
+            ? "mb-4 [@media(max-height:900px)]:mb-3"
+            : "mb-6 [@media(max-height:760px)]:mb-4"
+        }`}
         variants={stepItemVariants}
       >
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 [@media(max-height:760px)]:hidden">
+        <div
+          className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 ${
+            compact
+              ? "[@media(max-height:900px)]:hidden"
+              : "[@media(max-height:760px)]:hidden"
+          }`}
+        >
           <Icon className="h-6 w-6 text-primary" />
         </div>
         <h2 className="mb-2 text-3xl font-bold text-primary [@media(max-height:760px)]:text-2xl">
@@ -350,7 +391,11 @@ const SetupStep = forwardRef(function SetupStep(
       </motion.div>
       {footer && (
         <motion.div
-          className="mt-6 flex flex-col items-center gap-2 [@media(max-height:760px)]:mt-4"
+          className={`flex flex-col items-center gap-2 ${
+            compact
+              ? "mt-4 [@media(max-height:900px)]:mt-3"
+              : "mt-6 [@media(max-height:760px)]:mt-4"
+          }`}
           variants={stepItemVariants}
         >
           {footer}
@@ -1110,7 +1155,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   Ascendara&nbsp;
                 </span>
                 <span className="relative">
-                  <span className="inline-block animate-shine bg-[linear-gradient(110deg,var(--shine-from),45%,var(--shine-via),55%,var(--shine-to))] bg-[length:200%_100%] bg-clip-text text-transparent">
+                  <span
+                    className="inline-block animate-glint bg-clip-text text-transparent"
+                    style={GLINT_STYLE}
+                  >
                     v7
                   </span>
                 </span>
@@ -1369,7 +1417,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
                           {t("welcome.welcomeTo")}&nbsp;
                         </span>
                         <span className="relative">
-                          <span className="inline-block animate-shine bg-[linear-gradient(110deg,var(--shine-from),45%,var(--shine-via),55%,var(--shine-to))] bg-[length:200%_100%] bg-clip-text text-transparent">
+                          <span
+                            className="inline-block animate-glint bg-clip-text text-transparent"
+                            style={GLINT_STYLE}
+                          >
                             Ascendara
                           </span>
                         </span>
@@ -1581,9 +1632,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   </div>
 
                   <div className="mt-3 flex items-start gap-3 rounded-xl border border-border/60 bg-card/20 p-4 text-left">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                      <Crown className="h-4 w-4" />
-                    </div>
+                    <AscendLogo />
                     <div>
                       <h3 className="mb-1 font-semibold">
                         {t("welcome.setup.about.ascendTitle")}
@@ -2043,6 +2092,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                   title={t("welcome.setup.personalize.title")}
                   subtitle={t("welcome.setup.personalize.subtitle")}
                   wide
+                  compact
                   footer={
                     <Button size="lg" onClick={handleNext} className={primaryButtonClass}>
                       {t("welcome.continue")}
@@ -2052,7 +2102,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                 >
                   {/* The list sets the row height and the preview stretches to
                       match, so seven themes fill one even column */}
-                  <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
                     <div className="hidden lg:block">
                       <ThemePreview
                         themeId={previewTheme || selectedTheme}
@@ -2060,7 +2110,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       />
                     </div>
 
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2">
                       <div className="relative grid grid-cols-2 rounded-xl border border-border/60 bg-card/40 p-1">
                         {[true, false].map(light => {
                           const ModeIcon = light ? Sun : Moon;
@@ -2099,7 +2149,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                         })}
                       </div>
 
-                      <div className="flex flex-1 flex-wrap justify-center gap-2 lg:flex-col lg:flex-nowrap lg:gap-1.5">
+                      <div className="flex flex-1 flex-wrap justify-center gap-2 lg:flex-col lg:flex-nowrap lg:gap-1">
                         {themes
                           .filter(
                             theme =>
@@ -2118,9 +2168,11 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    <div className={`${cardClass} flex items-center gap-4 text-left`}>
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <div className="mt-3 grid gap-2.5 lg:grid-cols-2">
+                    <div
+                      className={`${cardClass} flex items-center gap-3 !py-2.5 text-left`}
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                         <AppWindow className="h-5 w-5" />
                       </div>
                       <p className="min-w-0 flex-1 font-semibold">
@@ -2133,8 +2185,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       />
                     </div>
 
-                    <div className={`${cardClass} flex items-center gap-4 text-left`}>
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <div
+                      className={`${cardClass} flex items-center gap-3 !py-2.5 text-left`}
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                         <ArrowLeftRight className="h-5 w-5" />
                       </div>
                       <p className="min-w-0 flex-1 font-semibold">
@@ -2148,10 +2202,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     </div>
 
                     <div
-                      className={`${cardClass} flex cursor-pointer items-center gap-4 text-left lg:col-span-2`}
+                      className={`${cardClass} flex cursor-pointer items-center gap-3 !py-2.5 text-left lg:col-span-2`}
                       onClick={() => handleAutoUpdateToggle(!autoUpdate)}
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                         <RefreshCw className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
