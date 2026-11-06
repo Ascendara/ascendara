@@ -53,6 +53,7 @@ export default {
       throw error;
     }
     if (info.status !== "downloaded") return null;
+    // Parts were already chosen when the torrent's files were selected on Real-Debrid.
     const selected = info.files.filter(file => file.selected);
     if (!selected.length || !info.links?.length)
       throw new Error("Real-Debrid returned an incomplete torrent file list.");
