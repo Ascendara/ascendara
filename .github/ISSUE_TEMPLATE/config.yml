@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discord community
+    url: https://ascendara.app/discord
+    about: Ask questions and get help from the community.
+  - name: Developer docs
+    url: https://ascendara.app/docs/developer/build-from-source
+    about: How to run and build Ascendara from source.
