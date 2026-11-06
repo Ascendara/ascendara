@@ -91,7 +91,7 @@ async function runAutoInstall({
   let stage = "checking";
   const fail = error => {
     log(`${gameName}: failed while ${stage}: ${error}`);
-    onStage({ stage: "failed", error });
+    onStage({ stage: "failed", failedStage: stage, error });
     return { success: false, stage, error };
   };
   try {

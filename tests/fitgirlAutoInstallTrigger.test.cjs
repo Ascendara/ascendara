@@ -75,3 +75,26 @@ test("only checking, verifying, installing and cleaning count as running", async
   for (const state of [{ stage: "done" }, { stage: "failed" }, null, undefined])
     assert.equal(isFitgirlInstallActive(state), false);
 });
+
+test("card text: Verifying N%, Installing, Cleaning up, Done, Failed: stage: reason", async () => {
+  const { describeFitgirlState } = await load();
+  assert.deepEqual(describeFitgirlState({ stage: "verifying", percent: 42 }), {
+    key: "fitgirlInstall.verifying",
+    values: { percent: 42 },
+  });
+  assert.equal(
+    describeFitgirlState({ stage: "verifying", percent: 250 }).values.percent,
+    100
+  );
+  for (const stage of ["checking", "installing", "cleaning", "done"])
+    assert.equal(describeFitgirlState({ stage }).key, `fitgirlInstall.${stage}`);
+  assert.deepEqual(
+    describeFitgirlState({ stage: "failed", failedStage: "installing", error: "code 2" }),
+    { key: "fitgirlInstall.failed", values: { error: "installing: code 2" } }
+  );
+  assert.equal(
+    describeFitgirlState({ stage: "failed", error: "Windows only" }).values.error,
+    "Windows only"
+  );
+  assert.equal(describeFitgirlState(null), null);
+});

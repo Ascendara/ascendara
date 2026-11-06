@@ -52,15 +52,22 @@ test("auto-install verifies, runs setup with args, finishes and cleans the pack"
 test("a bad part stops before setup and keeps the pack", async () => {
   const pack = makePack({ badPart: true });
   let ran = false;
+  const updates = [];
   const result = await runAutoInstall({
     ...pack,
     gameName: "Game",
     options,
     runSetup: async () => (ran = true),
     completeInstall: async () => ({ success: true }),
+    onStage: update => updates.push(update),
   });
   assert.equal(result.success, false);
   assert.equal(result.stage, "verifying");
+  assert.deepEqual(updates.at(-1), {
+    stage: "failed",
+    failedStage: "verifying",
+    error: result.error,
+  });
   assert.match(result.error, /fg-01\.bin/);
   assert.equal(ran, false);
   assert.equal(fs.existsSync(path.join(pack.packDir, "fg-01.bin")), true);

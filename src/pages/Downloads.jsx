@@ -51,6 +51,7 @@ import {
   Coffee,
   Pause,
   CheckCircle2,
+  RefreshCw,
   X,
   Zap,
   Play,
@@ -61,6 +62,15 @@ import {
   Info,
 } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
+import { runFitgirlInstall } from "@/components/FitgirlAutoInstallTasks";
+import {
+  readDownloadChoice,
+  resolveFitgirlOptions,
+} from "@/services/downloads/fitgirlInstallOptions";
+import {
+  describeFitgirlState,
+  isFitgirlInstallActive,
+} from "@/services/downloads/fitgirlAutoInstallTrigger";
 import {
   processNextInQueue,
   getDownloadQueue,
@@ -1627,6 +1637,35 @@ const DownloadCard = ({
     }
   };
 
+  // FitGirl auto-install state from the main process (status on mount, then events).
+  const [fitgirlState, setFitgirlState] = useState(null);
+  useEffect(() => {
+    if (!isPendingManualInstall || !window.electron?.onFitgirlAutoInstallProgress)
+      return undefined;
+    let alive = true;
+    window.electron
+      .fitgirlAutoInstallStatus()
+      .then(states => alive && states?.[game.game] && setFitgirlState(states[game.game]))
+      .catch(() => {});
+    const off = window.electron.onFitgirlAutoInstallProgress(state => {
+      if (state?.game === game.game) setFitgirlState(state);
+    });
+    return () => {
+      alive = false;
+      off?.();
+    };
+  }, [isPendingManualInstall, game.game]);
+  const fitgirlText = describeFitgirlState(fitgirlState);
+  const fitgirlBusy =
+    isFitgirlInstallActive(fitgirlState) || fitgirlState?.stage === "done";
+  const fitgirlFailed = fitgirlState?.stage === "failed";
+  const handleFitgirlRetry = () =>
+    runFitgirlInstall(
+      game.game,
+      resolveFitgirlOptions(settings, readDownloadChoice(game.game)),
+      t
+    );
+
   // Check if this error was already reported
   const [wasReported, setWasReported] = useState(() => {
     try {
@@ -2188,8 +2227,25 @@ const DownloadCard = ({
             </div>
           </div>
         )}
-        {isPendingManualInstall && !downloadingData?.privatePackage && (
+        {isPendingManualInstall && !downloadingData?.privatePackage && fitgirlBusy && (
+          <div className="flex items-center gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+            {fitgirlState.stage === "done" ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-amber-600" />
+            ) : (
+              <Loader className="h-4 w-4 shrink-0 animate-spin text-amber-600" />
+            )}
+            <p className="text-sm font-medium text-amber-600">
+              {t(fitgirlText.key, fitgirlText.values)}
+            </p>
+          </div>
+        )}
+        {isPendingManualInstall && !downloadingData?.privatePackage && !fitgirlBusy && (
           <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+            {fitgirlFailed && (
+              <p className="text-destructive break-words text-sm font-medium">
+                {t(fitgirlText.key, fitgirlText.values)}
+              </p>
+            )}
             <div className="flex items-start gap-2.5">
               {installerLaunched ? (
                 <Loader className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-amber-600" />
@@ -2250,6 +2306,17 @@ const DownloadCard = ({
                   <ShieldAlert className="h-4 w-4" />
                 )}
                 {t("downloads.runAsAdmin") || "Run Installer as Admin"}
+              </Button>
+            )}
+            {fitgirlFailed && !installerLaunched && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleFitgirlRetry}
+                className="ml-2 gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                {t("fitgirlInstall.retry")}
               </Button>
             )}
           </div>
