@@ -131,7 +131,13 @@ async function runAutoInstall({
     const completed = await completeInstall();
     if (!completed?.success) return fail(completed?.error || "Could not finish install");
 
-    const result = { success: true, stage: "done", verify, removed: [], cleanupErrors: [] };
+    const result = {
+      success: true,
+      stage: "done",
+      verify,
+      removed: [],
+      cleanupErrors: [],
+    };
     if (options.deletePack) {
       stage = "cleaning";
       onStage({ stage });

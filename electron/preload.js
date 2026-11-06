@@ -559,6 +559,14 @@ contextBridge.exposeInMainWorld("electron", {
   runElevatedInstaller: installerPath =>
     ipcRenderer.invoke("run-elevated-installer", installerPath),
   completeManualInstall: game => ipcRenderer.invoke("complete-manual-install", game),
+  fitgirlAutoInstall: (game, options) =>
+    ipcRenderer.invoke("fitgirl-autoinstall", game, options),
+  fitgirlAutoInstallStatus: () => ipcRenderer.invoke("fitgirl-autoinstall-status"),
+  onFitgirlAutoInstallProgress: callback => {
+    const listener = (_, state) => callback(state);
+    ipcRenderer.on("fitgirl-autoinstall-progress", listener);
+    return () => ipcRenderer.removeListener("fitgirl-autoinstall-progress", listener);
+  },
   resumeDownload: game => ipcRenderer.invoke("resume-download", game),
   retryDownload: (link, game, online, dlc, version) =>
     ipcRenderer.invoke("retry-download", link, game, online, dlc, version),

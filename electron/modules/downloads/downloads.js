@@ -388,6 +388,12 @@ function registerDownloadHandlers() {
                           downloadingData.awaitingRecoveryAction || false,
                         recoverableError: downloadingData.recoverableError || null,
                         manualInstallerPath: downloadingData.manualInstallerPath || null,
+                        fitgirlPack:
+                          !!downloadingData.pendingManualInstall &&
+                          !!downloadingData.manualInstallerPath &&
+                          require("./fitgirlInstall").isFitgirlPack(
+                            path.dirname(downloadingData.manualInstallerPath)
+                          ),
                         progressCompleted: downloadingData.progressCompleted,
                         progressDownloadSpeeds: downloadingData.progressDownloadSpeeds,
                         timeUntilComplete: downloadingData.timeUntilComplete,
@@ -1054,7 +1060,7 @@ function registerDownloadHandlers() {
   // Called when the user confirms they've finished running a manual installer
   // (e.g. torrent repack setup.exe). Detects the resulting executable and
   // clears the pendingManualInstall state so the game shows as fully installed.
-  ipcMain.handle("complete-manual-install", async (_, game) => {
+  async function completeManualInstall(game) {
     try {
       const settings = settingsManager.getSettings();
       if (!settings.downloadDirectory) {
@@ -1130,6 +1136,57 @@ function registerDownloadHandlers() {
       console.error("Error completing manual install:", error);
       return { success: false, error: error.message };
     }
+  }
+  ipcMain.handle("complete-manual-install", (_, game) => completeManualInstall(game));
+
+  // FitGirl packs: verify, run setup elevated with arguments, finish, clean up.
+  const fitgirlInstalls = new Map();
+  ipcMain.handle("fitgirl-autoinstall-status", () => Object.fromEntries(fitgirlInstalls));
+  ipcMain.handle("fitgirl-autoinstall", async (event, game, options = {}) => {
+    const sanitizedGame = sanitizeGameName(sanitizeText(game));
+    const running = fitgirlInstalls.get(sanitizedGame);
+    if (running && !["done", "failed"].includes(running.stage)) {
+      return { success: false, error: "Already installing" };
+    }
+    const send = update => {
+      const state = { game: sanitizedGame, ...update };
+      fitgirlInstalls.set(sanitizedGame, state);
+      if (!event.sender.isDestroyed()) {
+        event.sender.send("fitgirl-autoinstall-progress", state);
+      }
+    };
+    if (process.platform !== "win32") {
+      send({ stage: "failed", error: "Auto-install runs on Windows only" });
+      return { success: false, error: "Auto-install runs on Windows only" };
+    }
+    const settings = settingsManager.getSettings();
+    const gameDirectory = path.join(settings.downloadDirectory || "", sanitizedGame);
+    const gameInfoPath = path.join(gameDirectory, `${sanitizedGame}.ascendara.json`);
+    let installerPath;
+    try {
+      const info = JSON.parse(fs.readFileSync(gameInfoPath, "utf8"));
+      if (!info.downloadingData?.pendingManualInstall)
+        throw new Error("Nothing to install");
+      installerPath = info.downloadingData.manualInstallerPath;
+    } catch (error) {
+      send({ stage: "failed", error: error.message });
+      return { success: false, error: error.message };
+    }
+    const pick = key => options[key] === true;
+    send({ stage: "checking" });
+    return require("./fitgirlAutoInstall").runAutoInstall({
+      gameDirectory,
+      gameName: sanitizedGame,
+      installerPath,
+      options: {
+        verify: pick("verify"),
+        silent: pick("silent"),
+        limitRam: pick("limitRam"),
+        deletePack: pick("deletePack"),
+      },
+      completeInstall: () => completeManualInstall(sanitizedGame),
+      onStage: send,
+    });
   });
 
   // Stop download handler
