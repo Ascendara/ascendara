@@ -40,9 +40,32 @@ const {
   stopHelpers,
   createOperationLock,
   waitForSpawn,
+  watchEarlyExit,
 } = require("./downloadControl");
 const withDownloadOperation = createOperationLock();
 const downloadProcesses = new Map();
+// Helpers the user stopped, so their exit is not reported as a failed start.
+const stoppedProcesses = new WeakSet();
+const earlyExitMessage = code =>
+  `The downloader quit right after starting (exit code ${code}). It may be outdated or blocked; check downloadmanager.log.`;
+
+// Records an early downloader exit in the game file, the way the downloader reports its own errors.
+async function recordEarlyExit(jsonFile, code) {
+  try {
+    if (!(await fs.pathExists(jsonFile))) return;
+    const current = await fs.readJson(jsonFile);
+    if (!current.downloadingData || current.downloadingData.stopped) return;
+    current.downloadingData = {
+      ...current.downloadingData,
+      downloading: false,
+      error: true,
+      message: earlyExitMessage(code),
+    };
+    await fs.writeJson(jsonFile, current, { spaces: 4 });
+  } catch (error) {
+    console.error("Could not record early downloader exit:", error);
+  }
+}
 const retryDownloadProcesses = new Map();
 const dllRepair = require("./dllRepair");
 const { validateFileList } = require("./downloadManifest");
@@ -950,6 +973,21 @@ function registerDownloadHandlers() {
           });
 
           await waitForSpawn(downloadProcess);
+          watchEarlyExit(downloadProcess, code => {
+            if (stoppedProcesses.has(downloadProcess)) return;
+            console.error(
+              `Downloader for ${sanitizedGame} exited with code ${code} right after starting`
+            );
+            if (!event.sender.isDestroyed())
+              event.sender.send("download-error", {
+                game: sanitizedGame,
+                error: earlyExitMessage(code),
+              });
+            recordEarlyExit(
+              path.join(gameDirectory, `${sanitizedGame}.ascendara.json`),
+              code
+            );
+          });
           const analyticsParams = {
             game: sanitizedGame,
             game_id: gameID,
@@ -1218,6 +1256,10 @@ function registerDownloadHandlers() {
                 before.downloadingData.awaitingRecoveryAction)
             ) {
               throw new Error("This download is no longer in a pausable stage.");
+            }
+            for (const map of [downloadProcesses, retryDownloadProcesses]) {
+              const child = map.get(sanitizedGame);
+              if (child) stoppedProcesses.add(child);
             }
             const knownPids = [
               before.downloadingData?.ownerPid,
@@ -1975,6 +2017,13 @@ function registerDownloadHandlers() {
             throw error;
           }
           downloadProcess.on("error", error => console.error("Downloader error:", error));
+          watchEarlyExit(downloadProcess, code => {
+            if (stoppedProcesses.has(downloadProcess)) return;
+            console.error(
+              `Downloader for ${sanitizedGame} exited with code ${code} right after resuming`
+            );
+            recordEarlyExit(jsonFile, code);
+          });
           downloadProcess.once("exit", () => {
             if (downloadProcesses.get(sanitizedGame) === downloadProcess)
               downloadProcesses.delete(sanitizedGame);
