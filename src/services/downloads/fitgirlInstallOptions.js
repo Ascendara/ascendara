@@ -32,3 +32,27 @@ export function resolveFitgirlOptions(settings, override) {
 }
 
 export const looksLikeFitgirl = name => /fit\s*girl/i.test(String(name || ""));
+
+// Per-download choices, keyed by game name, so they survive a restart while the
+// pack downloads. Game info JSON is rewritten by the downloader, so they live here.
+const CHOICES_KEY = "fitgirlInstallChoices";
+const readChoices = storage => {
+  try {
+    return JSON.parse(storage?.getItem(CHOICES_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+};
+
+export function readDownloadChoice(game, storage = globalThis.localStorage) {
+  return readChoices(storage)[String(game)] || null;
+}
+
+export function saveDownloadChoice(game, options, storage = globalThis.localStorage) {
+  const choices = readChoices(storage);
+  if (options) choices[String(game)] = { ...options };
+  else delete choices[String(game)];
+  try {
+    storage?.setItem(CHOICES_KEY, JSON.stringify(choices));
+  } catch {}
+}

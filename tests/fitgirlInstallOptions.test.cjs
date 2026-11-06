@@ -62,3 +62,21 @@ test("both settings stores carry the same FitGirl defaults", async () => {
     }
   }
 });
+
+test("a per-download choice is saved per game and can be cleared", async () => {
+  const { readDownloadChoice, saveDownloadChoice } = await load();
+  const data = new Map();
+  const storage = {
+    getItem: key => data.get(key) ?? null,
+    setItem: (key, value) => data.set(key, value),
+  };
+  assert.equal(readDownloadChoice("Game", storage), null);
+  saveDownloadChoice("Game", { ask: false }, storage);
+  saveDownloadChoice("Other", { verify: false }, storage);
+  assert.deepEqual(readDownloadChoice("Game", storage), { ask: false });
+  saveDownloadChoice("Game", null, storage);
+  assert.equal(readDownloadChoice("Game", storage), null);
+  assert.deepEqual(readDownloadChoice("Other", storage), { verify: false });
+  data.set("fitgirlInstallChoices", "not json");
+  assert.equal(readDownloadChoice("Other", storage), null);
+});

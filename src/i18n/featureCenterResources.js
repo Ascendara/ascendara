@@ -1,5 +1,36 @@
 const featureCenterResources = {
   en: {
+    fitgirlInstall: {
+      title: "FitGirl auto-install",
+      description:
+        "What happens when a FitGirl repack finishes downloading. A download can change these in its parts dialog.",
+      afterDownload: "After this FitGirl pack downloads",
+      ask: "Ask after each download",
+      askDescription:
+        "Ask before installing. When off, a finished pack installs by itself.",
+      verify: "Check files with MD5",
+      verifyDescription: "Check every part against the pack's MD5 list first.",
+      silent: "Silent setup",
+      silentDescription: "Run setup without its wizard pages.",
+      limitRam: "Limit installer to 2 GB of RAM",
+      limitRamDescription:
+        "Setup has no switch for this, so it opens its own window and you tick the box there.",
+      deletePack: "Delete pack after install",
+      deletePackDescription:
+        "Removes only the pack's own files after a good install, never the game.",
+      promptTitle: "Verify and install {{game}} now?",
+      promptDescription: "Setup asks for admin rights. It runs: {{path}}",
+      install: "Install",
+      notNow: "Not now",
+      checking: "Checking the pack",
+      verifying: "Verifying {{percent}}%",
+      installing: "Installing",
+      cleaning: "Cleaning up",
+      done: "Done",
+      failed: "Failed: {{error}}",
+      installed: "{{game}} is installed",
+      retry: "Verify and install",
+    },
     debrid: {
       downloadsTitle: "Debrid Downloads",
       setupGuide: "Setup guide",
