@@ -87,8 +87,8 @@ function useAccounts(providers, settings) {
   return [accounts, provider => load(provider, apiKeyOf(settings, provider))];
 }
 
-// The Debrid settings page: what debrid does and where downloads go, each account,
-// then the order the services are tried in.
+// The Debrid settings page: the order the services are tried in first, then what
+// debrid does and where downloads go, then each account.
 export default function DebridSettings() {
   const { settings, setSettings } = useSettings();
   const { t } = useLanguage();
@@ -111,28 +111,6 @@ export default function DebridSettings() {
 
   return (
     <>
-      <Overview providers={providers} accounts={accounts} />
-
-      {debridEnabled && (
-        <section id="debrid-accounts" className="py-8">
-          <SectionHeader
-            title={t("debrid.accountsTitle")}
-            description={t("debrid.accountsDescription")}
-          />
-          <div className="space-y-4">
-            {providers.map((item, index) => (
-              <ServiceCard
-                key={item.id}
-                provider={item}
-                position={index + 1}
-                account={accounts[item.id]}
-                onRetry={() => reloadAccount(item)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
       {debridEnabled && (
         <section id="debrid-order" className="py-8">
           <SectionHeader
@@ -182,6 +160,28 @@ export default function DebridSettings() {
             ))}
           </ol>
           <p className="mt-3 text-xs text-muted-foreground">{t("debrid.dragHint")}</p>
+        </section>
+      )}
+
+      <Overview providers={providers} accounts={accounts} />
+
+      {debridEnabled && (
+        <section id="debrid-accounts" className="py-8">
+          <SectionHeader
+            title={t("debrid.accountsTitle")}
+            description={t("debrid.accountsDescription")}
+          />
+          <div className="space-y-4">
+            {providers.map((item, index) => (
+              <ServiceCard
+                key={item.id}
+                provider={item}
+                position={index + 1}
+                account={accounts[item.id]}
+                onRetry={() => reloadAccount(item)}
+              />
+            ))}
+          </div>
         </section>
       )}
     </>
