@@ -39,7 +39,6 @@ import {
   ArrowUpFromLine,
   Eye,
   Star,
-  Tag,
 } from "lucide-react";
 import gameService from "@/services/games/gameService";
 import { subscribeToStatus, getCurrentStatus } from "@/services/app/serverStatus";
@@ -1522,6 +1521,7 @@ const MemoizedGameCard = memo(
     return (
       <div
         ref={viewRef}
+        className="h-full"
         data-game-name={game.game}
         onContextMenu={e => onContextMenu?.(e, game)}
       >
@@ -1614,13 +1614,11 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) 
     [onDownload]
   );
 
-  const gameCategories = Array.isArray(game.category) ? game.category.slice(0, 4) : [];
-
   return (
     <div
       ref={viewRef}
       className="group relative col-span-1 cursor-pointer overflow-hidden rounded-xl border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/15 md:col-span-2"
-      style={{ minHeight: "380px" }}
+      style={{ minHeight: "320px" }}
       onClick={handleClick}
       onContextMenu={e => onContextMenu?.(e, game)}
       data-game-name={game.game}
@@ -1630,16 +1628,24 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) 
         <div className="absolute inset-0 animate-pulse rounded-xl bg-muted" />
       )}
       {cachedImage && (
-        <img
-          src={cachedImage}
-          alt={game.game}
-          className="absolute inset-0 h-full w-full rounded-xl object-cover transition-all duration-500 group-hover:scale-105"
-        />
+        <>
+          {/* Blurred fill behind the uncropped image */}
+          <img
+            src={cachedImage}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full scale-110 rounded-xl object-cover blur-2xl"
+          />
+          <img
+            src={cachedImage}
+            alt={game.game}
+            className="absolute inset-0 h-full w-full rounded-xl object-contain"
+          />
+        </>
       )}
 
-      {/* Gradient overlays */}
-      <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-black/60 via-transparent to-transparent" />
+      {/* Bottom fade so the info bar sits on the art */}
+      <div className="absolute inset-x-0 bottom-0 h-1/3 rounded-b-xl bg-gradient-to-t from-black/70 to-transparent" />
 
       {/* Top: Featured badge + status */}
       <div className="absolute left-0 right-0 top-0 flex items-start justify-between p-4">
@@ -1670,15 +1676,11 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) 
         )}
       </div>
 
-      {/* Bottom: title, meta, categories, button — all overlaid */}
-      <div className="absolute bottom-0 left-0 right-0 p-5">
-        <h2 className="mb-1 text-2xl font-bold leading-tight text-white drop-shadow-lg">
-          {sanitizeText(game.game)}
-        </h2>
-
-        {/* Stats: rating, views, features */}
-        {(gameRating > 0 || viewCount > 0 || game.dlc || game.online) && (
-          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-white/80">
+      {/* Bottom: the art already shows the title, so keep this to a slim info bar */}
+      <h2 className="sr-only">{sanitizeText(game.game)}</h2>
+      <div className="absolute inset-x-0 bottom-0 p-3">
+        <div className="flex items-center gap-3 rounded-lg bg-black/55 p-2 pl-3 text-xs text-white/90 backdrop-blur-md">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
             {gameRating > 0 && (
               <span
                 className="flex items-center gap-1 font-semibold text-white"
@@ -1693,10 +1695,24 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) 
                 className="flex items-center gap-1"
                 title={t("gameCard.viewsTooltip")}
               >
-                <Eye className="h-3.5 w-3.5" />
+                <Eye className="h-3.5 w-3.5 text-white/60" />
                 <span className="tabular-nums">
                   {t("gameCard.views", { views: formatCompactNumber(viewCount) })}
                 </span>
+              </span>
+            )}
+            {game.size && (
+              <span className="flex items-center gap-1">
+                <HardDrive className="h-3.5 w-3.5 text-white/60" />
+                <span className="font-semibold tabular-nums">
+                  {catalogSizeText(game, t)}
+                </span>
+              </span>
+            )}
+            {game.latest_update && (
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3.5 w-3.5 text-white/60" />
+                <span>{formatLatestUpdate(game.latest_update)}</span>
               </span>
             )}
             {game.dlc && (
@@ -1712,75 +1728,33 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) 
               </span>
             )}
           </div>
-        )}
 
-        {/* Specs: size / version / updated */}
-        {(game.size || game.version || game.latest_update) && (
-          <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs text-white/90">
-            {game.size && (
-              <span className="flex items-center gap-1.5 rounded-md bg-black/40 px-2 py-1 backdrop-blur-sm">
-                <HardDrive className="h-3 w-3 text-white/60" />
-                <span className="font-semibold tabular-nums">
-                  {catalogSizeText(game, t)}
-                </span>
+          <div className="shrink-0" onClick={e => e.stopPropagation()}>
+            <Button
+              size="sm"
+              className={`gap-2 font-semibold shadow-lg transition-all duration-200 ${
+                needsUpdate
+                  ? "bg-amber-500 text-white hover:bg-amber-600"
+                  : isInstalled
+                    ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                    : "bg-primary text-secondary hover:bg-primary/90"
+              }`}
+              variant={needsUpdate ? "default" : isInstalled ? "secondary" : "default"}
+              onClick={handleDownloadClick}
+              disabled={isInstalled && !needsUpdate}
+            >
+              {isInstalled && !needsUpdate && <Check className="h-4 w-4" />}
+              {!isInstalled && !needsUpdate && <Info className="h-4 w-4" />}
+              {needsUpdate && <ArrowUpFromLine className="h-4 w-4" />}
+              <span>
+                {needsUpdate
+                  ? t("gameCard.update")
+                  : isInstalled
+                    ? t("gameCard.installed")
+                    : t("gameCard.viewDetails")}
               </span>
-            )}
-            {game.version && (
-              <span className="flex items-center gap-1.5 rounded-md bg-black/40 px-2 py-1 backdrop-blur-sm">
-                <Tag className="h-3 w-3 text-white/60" />
-                <span className="font-semibold tabular-nums">{game.version}</span>
-              </span>
-            )}
-            {game.latest_update && (
-              <span className="flex items-center gap-1.5 rounded-md bg-black/40 px-2 py-1 backdrop-blur-sm">
-                <Calendar className="h-3 w-3 text-white/60" />
-                <span className="font-semibold">
-                  {formatLatestUpdate(game.latest_update)}
-                </span>
-              </span>
-            )}
+            </Button>
           </div>
-        )}
-
-        {/* Categories */}
-        {gameCategories.length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-1.5">
-            {gameCategories.map(cat => (
-              <span
-                key={cat}
-                className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs text-white/90 backdrop-blur-sm"
-              >
-                {cat}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Button */}
-        <div onClick={e => e.stopPropagation()}>
-          <Button
-            className={`gap-2 font-semibold shadow-lg transition-all duration-200 ${
-              needsUpdate
-                ? "bg-amber-500 text-white hover:bg-amber-600"
-                : isInstalled
-                  ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                  : "bg-primary text-secondary hover:bg-primary/90"
-            }`}
-            variant={needsUpdate ? "default" : isInstalled ? "secondary" : "default"}
-            onClick={handleDownloadClick}
-            disabled={isInstalled && !needsUpdate}
-          >
-            {isInstalled && !needsUpdate && <Check className="h-4 w-4" />}
-            {!isInstalled && !needsUpdate && <Info className="h-4 w-4" />}
-            {needsUpdate && <ArrowUpFromLine className="h-4 w-4" />}
-            <span>
-              {needsUpdate
-                ? t("gameCard.update")
-                : isInstalled
-                  ? t("gameCard.installed")
-                  : t("gameCard.viewDetails")}
-            </span>
-          </Button>
         </div>
       </div>
     </div>

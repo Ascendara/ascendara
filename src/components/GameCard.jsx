@@ -465,7 +465,7 @@ function GameCardContent({ game, compact, viewCount }) {
           }}
           onPointerLeave={() => clearTimeout(prefetchTimer.current)}
           aria-busy={isLoading}
-          className="press group relative flex h-[420px] cursor-pointer flex-col overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10"
+          className="press group relative flex h-full cursor-pointer flex-col overflow-hidden border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10"
         >
           {/* Image Section */}
           <div className="relative shrink-0 overflow-hidden rounded-t-lg">
