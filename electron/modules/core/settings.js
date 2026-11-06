@@ -30,6 +30,7 @@ class SettingsManager {
       "realDebridOauthClientSecret",
       "realDebridOauthRefreshToken",
       "allDebridApiKey",
+      "premiumizeApiKey",
     ];
     this.secrets = createSecretStore({
       safeStorage,
@@ -86,6 +87,9 @@ class SettingsManager {
       debridProviderEnabled: {},
       prioritizeRealDebridOverSeamless: false,
       useRealDebridForTorrents: true,
+      premiumizeApiKey: "",
+      prioritizePremiumizeOverSeamless: false,
+      usePremiumizeForTorrents: true,
       allDebridApiKey: "",
       allDebridSignedIn: false,
       prioritizeAllDebridOverSeamless: false,

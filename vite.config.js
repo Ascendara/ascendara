@@ -55,6 +55,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: path => path.replace(/^\/api\/alldebrid/, ""),
       },
+      "/api/premiumize": {
+        target: "https://www.premiumize.me/api",
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api\/premiumize/, ""),
+      },
       "/api/torbox": {
         target: "https://api.torbox.app/v1/api",
         changeOrigin: true,

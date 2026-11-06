@@ -493,6 +493,7 @@ export const settingsSearchData = [
       "realdebrid",
       "real-debrid",
       "alldebrid",
+      "premiumize",
       "priority",
       "order",
       "account",

@@ -130,6 +130,7 @@ test("every sensitive setting gets the stored format", async () => {
         "realDebridOauthClientSecret",
         "realDebridOauthRefreshToken",
         "allDebridApiKey",
+        "premiumizeApiKey",
       ];
       assert.deepEqual(manager.sensitiveKeys, names);
       for (const name of names)
