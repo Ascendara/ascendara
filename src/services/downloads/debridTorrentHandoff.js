@@ -5,6 +5,8 @@ let startingUntil = 0;
 // A torrent that could not start waits before its links are requested again.
 const HANDOFF_RETRY_MS = 5 * 60 * 1000;
 const handoffFailures = new Map();
+// A cloud torrent with no progress for this long is reported once and no longer polled.
+const STALL_MS = 72 * 60 * 60 * 1000;
 
 const startLocalDownload = async (...args) => {
   try {
@@ -26,12 +28,13 @@ export function handoffTorrents(provider, apiKey) {
       if (Date.now() < startingUntil) return;
       const read = () =>
         JSON.parse(localStorage.getItem(provider.metadataStorageKey) || "{}");
-      const mark = (id, flag) => {
+      const update = (id, fields) => {
         const latest = read();
         if (!latest[id]) return;
-        latest[id] = { ...latest[id], [flag]: true };
+        latest[id] = { ...latest[id], ...fields };
         localStorage.setItem(provider.metadataStorageKey, JSON.stringify(latest));
       };
+      const mark = (id, flag) => update(id, { [flag]: true });
       // Only torrents added since auto-handoff existed; older records were handled manually.
       const entries = Object.entries(read()).filter(
         ([id, entry]) =>
@@ -39,7 +42,8 @@ export function handoffTorrents(provider, apiKey) {
           entry?.autoHandoff === true &&
           !entry.localDownloadStarted &&
           !entry.cloudTorrentMissing &&
-          !entry.cloudTorrentRemoved
+          !entry.cloudTorrentRemoved &&
+          !entry.cloudTorrentStalled
       );
       let failure;
       const fail = (retryKey, error) => {
@@ -81,7 +85,32 @@ export function handoffTorrents(provider, apiKey) {
           mark(id, "cloudTorrentMissing");
           continue;
         }
-        if (!files) continue;
+        if (!files) {
+          // Progress is checked when first seen, then once per stall window.
+          const since = entry.lastProgressAt;
+          if (
+            provider.getTorrentStatus &&
+            (since == null || Date.now() - since >= STALL_MS)
+          ) {
+            const state = await provider
+              .getTorrentStatus(apiKey, id.slice(8))
+              .catch(() => null);
+            if (!state) continue;
+            const progress = state.progress ?? -1;
+            if (since == null || progress > (entry.lastProgress ?? -1)) {
+              update(id, { lastProgress: progress, lastProgressAt: Date.now() });
+            } else {
+              mark(id, "cloudTorrentStalled");
+              fail(
+                retryKey,
+                new Error(
+                  `${provider.name} made no progress on ${game.game} for 3 days. Remove it from Downloads or try another source.`
+                )
+              );
+            }
+          }
+          continue;
+        }
         if (window.electron.getSettings) {
           const current = await window.electron.getSettings();
           if (

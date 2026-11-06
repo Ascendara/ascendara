@@ -24,6 +24,13 @@ const readRecords = key => {
   }
 };
 
+const updateRecord = (provider, key, fields) => {
+  const records = readRecords(provider.metadataStorageKey);
+  if (!records[key]) return;
+  records[key] = { ...records[key], ...fields };
+  localStorage.setItem(provider.metadataStorageKey, JSON.stringify(records));
+};
+
 // Torrents sent to a service that has no page of its own, until they reach this PC.
 export function useCloudTorrents(settings) {
   const providers = getConfiguredProviders(settings).filter(
@@ -52,6 +59,7 @@ export function useCloudTorrents(settings) {
           id: key.slice(8),
           name: entry.game || key.slice(8),
           stalled: entry.cloudTorrentStalled === true,
+          lastProgress: entry.lastProgress ?? -1,
           provider,
         }))
     );
@@ -62,7 +70,17 @@ export function useCloudTorrents(settings) {
             apiKeyOf(item.provider),
             item.id
           );
-          return { ...item, ...state, status: item.stalled ? "stalled" : state.status };
+          // A stalled torrent that moves again goes back to the handoff.
+          const moved =
+            state.status === "ready" || (state.progress ?? -1) > item.lastProgress;
+          if (item.stalled && moved)
+            updateRecord(item.provider, item.recordKey, {
+              cloudTorrentStalled: false,
+              lastProgress: state.progress ?? -1,
+              lastProgressAt: Date.now(),
+            });
+          const stalled = item.stalled && !moved;
+          return { ...item, ...state, status: stalled ? "stalled" : state.status };
         } catch (error) {
           return { ...item, status: "error", message: error.message };
         }
@@ -81,11 +99,7 @@ export function useCloudTorrents(settings) {
 
   const remove = async item => {
     await item.provider.removeTorrent(apiKeyOf(item.provider), item.id);
-    const records = readRecords(item.provider.metadataStorageKey);
-    if (records[item.recordKey]) {
-      records[item.recordKey] = { ...records[item.recordKey], cloudTorrentRemoved: true };
-      localStorage.setItem(item.provider.metadataStorageKey, JSON.stringify(records));
-    }
+    updateRecord(item.provider, item.recordKey, { cloudTorrentRemoved: true });
     setItems(current => current.filter(entry => entry.key !== item.key));
   };
 
