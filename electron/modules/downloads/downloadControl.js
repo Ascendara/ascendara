@@ -121,7 +121,17 @@ function waitForSpawn(child) {
   });
 }
 
+// A helper that fails right after starting (for example one too old for its
+// arguments) never writes its own error, so the start would look successful.
+function watchEarlyExit(child, onEarlyExit, windowMs = 5000) {
+  const startedAt = Date.now();
+  child.once("exit", (code, signal) => {
+    if (code && !signal && Date.now() - startedAt < windowMs) onEarlyExit(code);
+  });
+}
+
 module.exports = {
+  watchEarlyExit,
   matchingHelpers,
   listHelpers,
   stopHelpers,
