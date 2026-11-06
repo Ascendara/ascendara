@@ -9,7 +9,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { canUseCloudTorrents } from "@/services/downloads/debridService";
 import DebridIcon from "@/components/DebridIcon";
 import { useLanguage } from "@/context/LanguageContext";
 import { VERIFIED_PROVIDERS } from "@/config/providers";
@@ -140,8 +139,11 @@ export default function DownloadPanel({
   onProviderChange,
   debridProvider,
   debridAvailable,
-  debridDisabledForSession,
-  onDebridDisabledChange,
+  cloudTorrent,
+  debridPick,
+  debridPickOptions,
+  onDebridPickChange,
+  debridPickUnsupported,
   torrentRunning,
   isStartingDownload,
   isDev,
@@ -165,8 +167,7 @@ export default function DownloadPanel({
   const { t } = useLanguage();
   if (filesUnavailable) return <FilesUnavailable />;
 
-  const usingDebrid = debridAvailable && !debridDisabledForSession;
-  const cloudTorrent = !debridDisabledForSession && canUseCloudTorrents(settings);
+  const usingDebrid = debridAvailable && debridPick !== "none";
   const opensInBrowser =
     !usingDebrid && (selectedProvider === "buzzheavier" || selectedProvider === "megadb");
   // Buzzheavier downloads in a hidden window, so only MegaDB needs the click tip
@@ -204,7 +205,8 @@ export default function DownloadPanel({
   }[mode];
 
   const downloadDisabled =
-    isTorrentMode && cloudTorrent
+    debridPickUnsupported ||
+    (isTorrentMode && cloudTorrent
       ? isStartingDownload
       : mode === "fitgirl"
         ? isStartingDownload || !torrentRunning
@@ -212,7 +214,7 @@ export default function DownloadPanel({
           ? isStartingDownload || !settings.torrentEnabled || !torrentRunning
           : mode === "seamless"
             ? isStartingDownload || !!linkStage
-            : isStartingDownload || !selectedProvider || !inputLink || !isValidLink;
+            : isStartingDownload || !selectedProvider || !inputLink || !isValidLink);
 
   const linkStageLabel = {
     opening: t("download.downloadOptions.openingDownloadPage"),
@@ -287,23 +289,9 @@ export default function DownloadPanel({
           {/* Provider selection */}
           {mode !== "fitgirl" && (
             <div className="space-y-1.5">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <Label className="text-xs font-medium text-muted-foreground">
-                  {t("download.downloadOptions.downloadSource")}
-                </Label>
-                {/* Above the trigger, so the open source list never covers it */}
-                {mode === "seamless" && debridAvailable && (
-                  <button
-                    type="button"
-                    onClick={() => onDebridDisabledChange(!debridDisabledForSession)}
-                    className="text-xs text-muted-foreground underline transition-colors hover:text-foreground"
-                  >
-                    {t(debridDisabledForSession ? "debrid.enable" : "debrid.disable", {
-                      provider: debridProvider?.name,
-                    })}
-                  </button>
-                )}
-              </div>
+              <Label className="text-xs font-medium text-muted-foreground">
+                {t("download.downloadOptions.downloadSource")}
+              </Label>
               {providers.length > 0 ? (
                 <Select value={selectedProvider} onValueChange={onProviderChange}>
                   <SelectTrigger className="w-full">
@@ -334,6 +322,39 @@ export default function DownloadPanel({
                 <p className="text-sm text-muted-foreground">
                   {t("download.downloadOptions.noProviders")}
                 </p>
+              )}
+            </div>
+          )}
+
+          {/* Debrid service for this download only; never changes the saved order */}
+          {debridPickOptions?.length > 2 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">
+                {t("debrid.pickLabel")}
+              </Label>
+              <Select value={debridPick} onValueChange={onDebridPickChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {debridPickOptions.map(option => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.id === "default"
+                        ? t("debrid.pickDefault")
+                        : option.id === "none"
+                          ? t("debrid.pickNone")
+                          : option.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {debridPickUnsupported && (
+                <Warning>
+                  {t("debrid.pickUnsupported", {
+                    provider: debridPickOptions.find(option => option.id === debridPick)
+                      ?.name,
+                  })}
+                </Warning>
               )}
             </div>
           )}
