@@ -58,6 +58,10 @@ const warn = (game, text) =>
     )}`
   );
 
+// Game folders with a live downloader process in the main process.
+const runningDownloads = async () =>
+  new Set((await window.electron.getRunningDownloads?.().catch(() => null)) || []);
+
 const startLocalDownload = async (...args) => {
   try {
     return await window.electron.downloadFile(...args);
@@ -142,18 +146,31 @@ export function handoffTorrents(provider, apiKey, settings) {
           continue;
         }
         // Wait for the current local transfer; cloud preparation can continue meanwhile.
-        const games = await window.electron.getGames();
+        // Only a download whose process is alive counts: a folder left by a killed run
+        // still says "downloading" with nothing behind it.
+        const [games, running] = await Promise.all([
+          window.electron.getGames(),
+          runningDownloads(),
+        ]);
+        const isLive = item => running.has(item._folderName ?? item.game);
+        // This game already downloading here: never start a second copy.
         if (
-          games.some(item => {
-            const data = item.downloadingData;
-            return (
-              data &&
-              !isDownloadHalted(data) &&
-              (data.downloading || data.extracting || data.verifying || data.updating)
-            );
-          })
-        ) {
-          warn(game.game, "waiting, another download is running");
+          running.has(game.game) ||
+          games.some(item => item.game === game.game && isLive(item))
+        )
+          continue;
+        const blocker = games.find(item => {
+          const data = item.downloadingData;
+          return (
+            item.game !== game.game &&
+            data &&
+            isLive(item) &&
+            !isDownloadHalted(data) &&
+            (data.downloading || data.extracting || data.verifying || data.updating)
+          );
+        });
+        if (blocker) {
+          warn(game.game, `waiting for ${blocker.game} to finish`);
           return;
         }
         if (provider.pollIntervalMs) {
