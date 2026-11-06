@@ -39,6 +39,14 @@ const featureCenterResources = {
       statusWaitingFiles: "Waiting for files",
       statusFailed: "Failed",
       statusSent: "On your PC",
+      handoff: {
+        startingIn: "Starting on your PC in {{seconds}} s",
+        startingNow: "Starting on your PC now",
+        retryingIn: "Retrying in {{seconds}} s",
+        waitingFor: "Waiting for {{game}} to finish",
+        folderHasInstall:
+          "Folder already has an install: remove it or pick another download folder",
+      },
       emptyReady: "Nothing ready yet",
       emptyReadyDesc: "Finished cloud downloads wait here until they are on your PC.",
       emptyCloud: "Nothing in the cloud",

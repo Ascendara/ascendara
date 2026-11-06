@@ -171,6 +171,7 @@ export function DebridItem({
   tone = "waiting",
   progress,
   meta,
+  note,
   action,
   menu = [],
   children,
@@ -201,6 +202,7 @@ export function DebridItem({
             {kind && <span>{kind}</span>}
             {meta && <span className="tabular-nums">{meta}</span>}
           </div>
+          {note}
         </div>
         {action}
         {menu.length > 0 && (

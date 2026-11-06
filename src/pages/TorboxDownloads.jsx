@@ -30,6 +30,7 @@ import {
   DebridTabs,
   formatBytes as formatSize,
 } from "@/components/debrid/DebridDownloadParts";
+import HandoffCountdown from "@/components/debrid/HandoffCountdown";
 import "@/lib/utils";
 import {
   getUserInfo,
@@ -624,6 +625,14 @@ const TorboxDownloads = () => {
                   tone={tone}
                   progress={ready ? undefined : progressOf(download)}
                   meta={meta}
+                  note={
+                    download._torboxType === "torrent" && tone !== "done" ? (
+                      <HandoffCountdown
+                        storageKey={torboxProvider.metadataStorageKey}
+                        recordKey={getDownloadKey(download)}
+                      />
+                    ) : null
+                  }
                   action={
                     tone === "ready" ? (
                       <Button size="sm" onClick={() => handleDownloadToPC(download)}>
