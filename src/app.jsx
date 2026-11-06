@@ -27,6 +27,7 @@ import { TourProvider } from "@/context/TourContext";
 import { ThemeProvider, useTheme, isDarkTheme } from "@/context/ThemeContext";
 import { SettingsProvider, useSettings } from "@/context/SettingsContext";
 import DebridBackgroundTasks from "@/components/DebridBackgroundTasks";
+import FitgirlAutoInstallTasks from "@/components/FitgirlAutoInstallTasks";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { SearchProvider } from "@/context/SearchContext";
 import GlobalSearch from "@/components/GlobalSearch";
@@ -2318,6 +2319,7 @@ function App() {
         <LanguageProvider>
           <SettingsProvider>
             <DebridBackgroundTasks />
+            <FitgirlAutoInstallTasks />
             <AuthProvider>
               <TourProvider>
                 <SearchProvider>
