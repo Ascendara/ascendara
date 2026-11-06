@@ -299,10 +299,14 @@ test("a hand-off whose game never shows up on this PC is started again, once con
   };
   const started = [];
   let listed = [];
+  // Lost's downloader is alive but slow to publish its game.
+  let running = [];
   global.window = {
     electron: {
       getGames: async () => listed,
+      getRunningDownloads: async () => running,
       downloadFile: async (_data, game) => {
+        if (game === "Lost") running = ["Lost"];
         started.push(game);
         return { success: true };
       },
@@ -335,8 +339,10 @@ test("a hand-off whose game never shows up on this PC is started again, once con
   now += 20000;
   await worker.handoffTorrents(provider, "token");
   assert.equal(record("listed").localDownloadSeen, true);
-  assert.deepEqual(started, ["Lost", "Listed"], "no restart inside the confirm window");
-  now += 2 * 60 * 1000;
+  assert.deepEqual(started, ["Lost", "Listed"], "no second copy while it still runs");
+  // Its process ended without the game ever showing up: restarted 15 s later.
+  running = [];
+  now += 15000;
   await worker.handoffTorrents(provider, "token");
   assert.deepEqual(
     started,
@@ -537,6 +543,8 @@ test("a torrent that can not start does not hold back the ones behind it", async
     global.window = {
       electron: {
         getGames: async () => [],
+        // Second's downloader keeps running past the confirm window.
+        getRunningDownloads: async () => started,
         downloadFile: async (_data, game) => {
           if (game === "First") return { success: false, error: "refused" };
           started.push(game);
@@ -680,6 +688,76 @@ test("only a download with a live process holds back a hand-off, and the log nam
   assert.deepEqual(warnings, [
     "[debrid-handoff] Enshrouded: waiting for Victoria 3 to finish",
   ]);
+});
+
+test("a hand-off says on its record why and until when it waits, and starts as soon as parts are picked", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => {
+    Object.assign(global, saved);
+    t.mock.restoreAll();
+  });
+  t.mock.method(console, "warn", () => {});
+  let stored = JSON.stringify({
+    "torrent:a": { game: "ContractVille", autoHandoff: true },
+  });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_k, value) => {
+      stored = value;
+    },
+  };
+  let running = ["Victoria 3"];
+  let result = { success: false, error: "The game folder already exists. Resolve it." };
+  const events = [];
+  global.window = {
+    dispatchEvent: event => events.push(event.type),
+    electron: {
+      getGames: async () => [
+        { game: "Victoria 3", downloadingData: { downloading: true } },
+      ],
+      getRunningDownloads: async () => running,
+      downloadFile: async () => result,
+    },
+  };
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  let polls = 0;
+  const provider = {
+    id: "test",
+    metadataStorageKey: "metadata",
+    pollIntervalMs: 30000,
+    getTorrentGame: entry => entry,
+    getTorrentDownload: async () => {
+      polls++;
+      return [{ url: "https://example.com/file", filename: "data.bin", size: 10 }];
+    },
+  };
+  let now = realNow();
+  t.mock.method(Date, "now", () => now);
+  const record = () => JSON.parse(stored)["torrent:a"];
+
+  await worker.handoffTorrents(provider, "token");
+  assert.equal(record().handoffWaitReason, "waiting-for:Victoria 3");
+  assert.equal(record().nextHandoffAt, now + 5000);
+  running = [];
+  await worker.handoffTorrents(provider, "token").catch(() => {});
+  assert.equal(record().handoffWaitReason, "folder-has-install");
+  assert.ok(record().nextHandoffAt > now);
+  result = { success: false, error: "disk busy" };
+  now = record().nextHandoffAt;
+  await worker.handoffTorrents(provider, "token").catch(() => {});
+  assert.equal(record().handoffWaitReason, "retrying");
+  // Picking parts asks the background poller for a pass right away.
+  worker.requestHandoffNow();
+  assert.deepEqual(events, ["debrid-handoff-now"]);
+  result = { success: true };
+  now = record().nextHandoffAt;
+  await worker.handoffTorrents(provider, "token");
+  assert.ok(polls > 0);
+  assert.equal(record().localDownloadStarted, true);
+  assert.equal(record().handoffWaitReason, undefined);
+  assert.equal(record().nextHandoffAt, undefined);
 });
 
 test("finished torrents leave the service only once their game is fully on this PC", async t => {

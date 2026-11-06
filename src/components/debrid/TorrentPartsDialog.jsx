@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatBytes } from "@/components/debrid/DebridDownloadParts";
 import { useLanguage } from "@/context/LanguageContext";
+import { requestHandoffNow } from "@/services/downloads/debridTorrentHandoff";
 import {
   getPendingPartChoices,
   saveTorrentPartChoice,
@@ -69,6 +70,7 @@ export default function TorrentPartsDialog() {
       current.recordKey,
       chosen.map(file => file.id)
     );
+    requestHandoffNow();
     setPending(list => list.filter(choice => keyOf(choice) !== currentKey));
   };
 

@@ -18,7 +18,15 @@ const STALL_MS = 72 * 60 * 60 * 1000;
 // Services that ask for gentler polling than the 5-second pass set pollIntervalMs.
 const lastPolled = new Map();
 // A started hand-off whose game is not in the game list by then is handed off again.
-const CONFIRM_MS = 2 * 60 * 1000;
+const CONFIRM_MS = 15 * 1000;
+// The background poller runs a pass this often.
+const PASS_MS = 5000;
+
+// Asks the background poller for a pass now (parts picked), skipping slow-poll waits.
+export function requestHandoffNow() {
+  lastPolled.clear();
+  globalThis.window?.dispatchEvent?.(new Event("debrid-handoff-now"));
+}
 
 // Only starts made since this check existed (localDownloadSeen false) are confirmed, so a
 // game the user deleted on purpose is never downloaded again.
@@ -30,14 +38,25 @@ async function confirmStarts(provider) {
       entry.localDownloadSeen === false
   );
   if (!unconfirmed.length) return;
-  const games = await window.electron.getGames();
+  const [games, running] = await Promise.all([
+    window.electron.getGames(),
+    runningDownloads(),
+  ]);
   for (const [id, entry] of unconfirmed) {
     const name = provider.getTorrentGame(entry)?.game;
     if (games.some(item => item.game === name))
       updateRecord(provider, id, { localDownloadSeen: true });
-    else if (Date.now() - (entry.localDownloadStartedAt || 0) >= CONFIRM_MS) {
+    // A downloader still running for it is never started a second time.
+    else if (
+      !running.has(name) &&
+      Date.now() - (entry.localDownloadStartedAt || 0) >= CONFIRM_MS
+    ) {
       warn(name, "did not appear on this PC, starting again");
-      updateRecord(provider, id, { localDownloadStarted: false });
+      updateRecord(provider, id, {
+        localDownloadStarted: false,
+        handoffWaitReason: "retrying",
+        nextHandoffAt: Date.now(),
+      });
     }
   }
 }
@@ -124,6 +143,9 @@ export function handoffTorrents(provider, apiKey, settings) {
       await confirmStarts(provider);
       const update = (id, fields) => updateRecord(provider, id, fields);
       const mark = (id, flag) => update(id, { [flag]: true });
+      // For the countdown: why a ready torrent waits and when the next try is.
+      const wait = (id, handoffWaitReason, nextHandoffAt) =>
+        update(id, { handoffWaitReason, nextHandoffAt });
       // Stalled and failed torrents wait in the Downloads list for the user to remove.
       const entries = Object.entries(readRecords(provider.metadataStorageKey)).filter(
         ([id, entry]) =>
@@ -171,6 +193,7 @@ export function handoffTorrents(provider, apiKey, settings) {
         });
         if (blocker) {
           warn(game.game, `waiting for ${blocker.game} to finish`);
+          wait(id, `waiting-for:${blocker.game}`, Date.now() + PASS_MS);
           return;
         }
         if (provider.pollIntervalMs) {
@@ -259,6 +282,7 @@ export function handoffTorrents(provider, apiKey, settings) {
             return;
           }
         }
+        wait(id, "starting", Date.now());
         const result = await startLocalDownload(
           {
             transferId: `${provider.id}:${id}`,
@@ -282,6 +306,13 @@ export function handoffTorrents(provider, apiKey, settings) {
             retryKey,
             new Error(result?.error || "Could not start the local debrid download.")
           );
+          wait(
+            id,
+            /folder already exists/i.test(result?.error)
+              ? "folder-has-install"
+              : "retrying",
+            handoffFailures.get(retryKey).retryAt
+          );
           continue;
         }
         handoffFailures.delete(retryKey);
@@ -290,6 +321,8 @@ export function handoffTorrents(provider, apiKey, settings) {
           localDownloadStarted: true,
           localDownloadStartedAt: Date.now(),
           localDownloadSeen: false,
+          handoffWaitReason: undefined,
+          nextHandoffAt: undefined,
         });
         return { game: game.game, providerId: provider.id };
       }
