@@ -411,8 +411,15 @@ const getDownloadList = async (apiKey, type, params) => {
   }));
 };
 
+// null when the torrent is not on the account (TorBox answers a deleted one with an error).
 export const getTorrentInfo = async (apiKey, id) => {
-  const items = await getDownloadList(apiKey, "torrent", { id, bypass_cache: "true" });
+  let items;
+  try {
+    items = await getDownloadList(apiKey, "torrent", { id, bypass_cache: "true" });
+  } catch (error) {
+    if (/no torrents found/i.test(error.message)) return null;
+    throw error;
+  }
   return items.find(item => String(item.id) === String(id)) || null;
 };
 
