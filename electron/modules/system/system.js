@@ -514,8 +514,18 @@ function registerSystemHandlers() {
     }
   });
 
-  // Fetch system specs
-  ipcMain.handle("fetch-system-specs", async () => {
+  // The hardware doesn't change while the app runs and reading it starts
+  // helper processes on Windows, so every page shares one read per run
+  let systemSpecsRequest = null;
+  ipcMain.handle("fetch-system-specs", () => {
+    systemSpecsRequest ??= readSystemSpecs().catch(error => {
+      systemSpecsRequest = null;
+      throw error;
+    });
+    return systemSpecsRequest;
+  });
+
+  async function readSystemSpecs() {
     const specs = {
       os: `${os.type()} ${os.release()}`,
       // Raw values for comparing against a game's minimum requirements
@@ -582,7 +592,7 @@ function registerSystemHandlers() {
     }
 
     return specs;
-  });
+  }
 
   // Check game dependencies
   ipcMain.handle("check-game-dependencies", async () => {

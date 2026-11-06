@@ -22,17 +22,6 @@ const VERDICT_STYLE = {
   unknown: { Icon: HelpCircle, className: "text-muted-foreground" },
 };
 
-// The specs don't change while the app runs and reading them starts helper
-// processes on Windows, so every game page shares one read
-let specsRequest = null;
-function loadSystemSpecs() {
-  specsRequest ??= window.electron.fetchSystemSpecs().catch(error => {
-    specsRequest = null;
-    throw error;
-  });
-  return specsRequest;
-}
-
 // Room on the emptiest-looking games folder: the folder is picked when the
 // download starts, so any one that fits counts
 async function loadFreeSpace(downloadDirectory) {
@@ -84,7 +73,7 @@ export default function SystemRequirements({ minReqs, downloadSize, downloadDire
     if (!minReqs) return undefined;
     let cancelled = false;
     Promise.all([
-      loadSystemSpecs(),
+      window.electron.fetchSystemSpecs(),
       loadFreeSpace(downloadDirectory).catch(() => undefined),
     ])
       .then(([specs, freeSpace]) => {
@@ -105,7 +94,7 @@ export default function SystemRequirements({ minReqs, downloadSize, downloadDire
     setShowCompareDialog(true);
     setSystemSpecsLoading(true);
     try {
-      const specs = await loadSystemSpecs();
+      const specs = await window.electron.fetchSystemSpecs();
       setSystemSpecs(specs);
     } catch (err) {
       console.error("Failed to fetch system specs:", err);
