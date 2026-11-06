@@ -86,14 +86,18 @@ test("Debrid-Link host list is the public domain list", async t => {
   const calls = stubFetch(t, () =>
     ok([
       { domains: ["1fichier.com", "Alterupload.com"] },
-      { domains: ["rapidgator.net"] },
+      { domains: ["rapidgator.net"], status: 1 },
+      { domains: ["down.example"], status: 0 },
       { name: "no domains" },
     ])
   );
   const dl = await load();
   const hosts = await dl.getSupportedHosts();
   assert.deepEqual(hosts, ["1fichier.com", "alterupload.com", "rapidgator.net"]);
-  assert.equal(calls[0].url, "/api/debridlink/downloader/hosts?types=host&keys=domains");
+  assert.equal(
+    calls[0].url,
+    "/api/debridlink/downloader/hosts?types=host&keys=domains,status"
+  );
   assert.equal(calls[0].options.headers, undefined, "the host list is public");
   assert.equal(dl.isSupportedUrl("https://rapidgator.net/file/1", hosts), true);
 });

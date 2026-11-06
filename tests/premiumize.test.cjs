@@ -52,6 +52,10 @@ test("Premiumize sends the key as a bearer token and returns the account", async
   const details = provider.describeAccount(user, key => key);
   assert.equal(details.plan, "debrid.planPremium");
   assert.equal(details.expiresAt, 4102444800000);
+  assert.deepEqual(
+    provider.describeAccount({ ...user, limit_used: 0.256 }, key => key).stats,
+    [{ label: "debrid.fairUse", value: "26%" }]
+  );
   assert.equal(
     provider.describeAccount({ premium_until: 0 }, key => key).expiresAt,
     null

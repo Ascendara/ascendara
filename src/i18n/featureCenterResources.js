@@ -52,6 +52,7 @@ const featureCenterResources = {
       delete: "Delete",
       points: "Points",
       premiumLeft: "Premium left",
+      fairUse: "Fair use used",
       days: "{{count}} days",
       downloads: "Downloads",
       data: "Data",

@@ -12,7 +12,11 @@ export default {
     name: String(user.customer_id ?? ""),
     plan: premiumUntil(user) ? t("debrid.planPremium") : t("debrid.planFree"),
     expiresAt: premiumUntil(user),
-    stats: [],
+    // Fair use is Premiumize's main limit: limit_used runs from 0 to 1.
+    stats:
+      typeof user.limit_used === "number"
+        ? [{ label: t("debrid.fairUse"), value: `${Math.round(user.limit_used * 100)}%` }]
+        : [],
   }),
   apiKeySetting: "premiumizeApiKey",
   torrentSetting: "usePremiumizeForTorrents",

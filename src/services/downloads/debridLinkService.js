@@ -14,7 +14,7 @@ export const { getCachedSupportedHosts, getSupportedHosts } = createSupportedHos
   cacheKey: "debridLinkSupportedHosts",
   loadDomains: async () => {
     const response = await fetch(
-      `${API_BASE_URL}/downloader/hosts?types=host&keys=domains`,
+      `${API_BASE_URL}/downloader/hosts?types=host&keys=domains,status`,
       {
         signal: AbortSignal.timeout(10000),
       }
@@ -22,9 +22,10 @@ export const { getCachedSupportedHosts, getSupportedHosts } = createSupportedHos
     const result = await response.json().catch(() => null);
     if (!response.ok || result?.success !== true || !Array.isArray(result.value))
       throw new Error("Could not fetch Debrid-Link hosts.");
-    return result.value.flatMap(host =>
-      Array.isArray(host?.domains) ? host.domains : []
-    );
+    // A host is online when its status is 1 or more: offline ones go to another service.
+    return result.value
+      .filter(host => !(host?.status < 1))
+      .flatMap(host => (Array.isArray(host?.domains) ? host.domains : []));
   },
 });
 
