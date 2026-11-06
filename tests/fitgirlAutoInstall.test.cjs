@@ -143,6 +143,27 @@ test("the RAM limit option runs setup with its own window", async () => {
   assert.equal(args.includes("/SILENT"), false);
 });
 
+for (const [label, override] of [
+  ["silent off", { silent: false }],
+  ["RAM limit on", { limitRam: true }],
+]) {
+  test(`${label} uses the visible wizard, never the takeover`, async () => {
+    const pack = makePack();
+    let tookOver = false;
+    let ranSetup = false;
+    await runAutoInstall({
+      ...pack,
+      gameName: "Game",
+      options: { ...options, ...override, redists: true, hostsRedirect: true },
+      runSetup: async () => ((ranSetup = true), 0),
+      runTakeover: async () => ((tookOver = true), { code: 0, result: null }),
+      completeInstall: async () => ({ success: true }),
+    });
+    assert.equal(ranSetup, true);
+    assert.equal(tookOver, false);
+  });
+}
+
 test("an installer outside the download folder never runs", async () => {
   const pack = makePack();
   let ran = false;

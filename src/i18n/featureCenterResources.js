@@ -15,6 +15,17 @@ const featureCenterResources = {
       limitRam: "Limit installer to 2 GB of RAM",
       limitRamDescription:
         "Setup has no switch for this, so it opens its own window and you tick the box there.",
+      verifyInstalled: "Check installed files",
+      verifyInstalledDescription:
+        "After setup, check the installed game against the pack's file list. No extra window.",
+      redists: "Install DirectX and Visual C++",
+      redistsDescription:
+        "Run the pack's DirectX and Visual C++ installers. Most PCs already have them.",
+      hostsRedirect: "Redirect fake FitGirl sites",
+      hostsRedirectDescription:
+        "Run the pack's script that points fake FitGirl sites to the real one.",
+      openSite: "Open the FitGirl site",
+      openSiteDescription: "Open fitgirl-repacks.site in your browser after install.",
       deletePack: "Delete pack after install",
       deletePackDescription:
         "Removes only the pack's own files after a good install, never the game.",

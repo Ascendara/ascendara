@@ -5,6 +5,10 @@ export const FITGIRL_INSTALL_DEFAULTS = Object.freeze({
   verify: true,
   silent: true,
   limitRam: false,
+  verifyInstalled: true,
+  redists: false,
+  hostsRedirect: false,
+  openSite: false,
   deletePack: true,
 });
 
@@ -13,6 +17,10 @@ export const FITGIRL_SETTING_KEYS = Object.freeze({
   verify: "fitgirlVerifyMd5",
   silent: "fitgirlSilentSetup",
   limitRam: "fitgirlLimitRam",
+  verifyInstalled: "fitgirlVerifyInstalled",
+  redists: "fitgirlRedists",
+  hostsRedirect: "fitgirlHostsRedirect",
+  openSite: "fitgirlOpenSite",
   deletePack: "fitgirlDeletePack",
 });
 

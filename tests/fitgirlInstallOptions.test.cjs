@@ -5,13 +5,17 @@ const fs = require("node:fs");
 
 const load = () => loadModule("src/services/downloads/fitgirlInstallOptions.js");
 
-test("FitGirl install defaults: ask, verify, silent and delete on, RAM limit off", async () => {
+test("FitGirl install defaults: ask, checks, silent and delete on; RAM limit and extras off", async () => {
   const { FITGIRL_INSTALL_DEFAULTS, resolveFitgirlOptions } = await load();
   assert.deepEqual(FITGIRL_INSTALL_DEFAULTS, {
     ask: true,
     verify: true,
     silent: true,
     limitRam: false,
+    verifyInstalled: true,
+    redists: false,
+    hostsRedirect: false,
+    openSite: false,
     deletePack: true,
   });
   assert.deepEqual(resolveFitgirlOptions({}, null), FITGIRL_INSTALL_DEFAULTS);
@@ -24,6 +28,7 @@ test("settings set the defaults and a per-download choice wins", async () => {
     fitgirlVerifyMd5: true,
     fitgirlSilentSetup: false,
     fitgirlLimitRam: true,
+    fitgirlRedists: true,
     fitgirlDeletePack: false,
   };
   assert.deepEqual(resolveFitgirlOptions(settings), {
@@ -31,11 +36,30 @@ test("settings set the defaults and a per-download choice wins", async () => {
     verify: true,
     silent: false,
     limitRam: true,
+    verifyInstalled: true,
+    redists: true,
+    hostsRedirect: false,
+    openSite: false,
     deletePack: false,
   });
   assert.deepEqual(
-    resolveFitgirlOptions(settings, { verify: false, deletePack: true, limitRam: "yes" }),
-    { ask: false, verify: false, silent: false, limitRam: true, deletePack: true }
+    resolveFitgirlOptions(settings, {
+      verify: false,
+      deletePack: true,
+      limitRam: "yes",
+      redists: false,
+    }),
+    {
+      ask: false,
+      verify: false,
+      silent: false,
+      limitRam: true,
+      verifyInstalled: true,
+      redists: false,
+      hostsRedirect: false,
+      openSite: false,
+      deletePack: true,
+    }
   );
 });
 
