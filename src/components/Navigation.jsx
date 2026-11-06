@@ -22,8 +22,10 @@ import { prefetchAscendData } from "@/services/ascend/ascendPrefetch";
 const Navigation = memo(({ items }) => {
   const { t } = useLanguage();
   const { settings } = useSettings();
-  // One entry for all services, shown only while debrid is on and a service is in use
-  const debridNavVisible = getConfiguredProviders(settings).length > 0;
+  // One entry for all services with a downloads page, shown only while one is in use
+  const debridNavVisible = getConfiguredProviders(settings).some(
+    provider => provider.hasDownloadsPage !== false
+  );
   const location = useLocation();
   const navigate = useNavigate();
   const [size, setSize] = useState(() => {

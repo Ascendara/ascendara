@@ -304,7 +304,7 @@ function Overview({ providers, accounts }) {
               </div>
             ))}
           </dl>
-          {connected.length > 0 && (
+          {connected.some(provider => provider.hasDownloadsPage !== false) && (
             <Button
               variant="ghost"
               size="sm"
@@ -392,6 +392,16 @@ function ServiceCard({ provider, position, account, onRetry }) {
       "debrid.preferSeamlessDescription",
       false,
     ],
+    ...(provider.removeAfterDoneSetting
+      ? [
+          [
+            provider.removeAfterDoneSetting,
+            "debrid.removeAfterDone",
+            "debrid.removeAfterDoneDescription",
+            false,
+          ],
+        ]
+      : []),
     ...(provider.torrentFallbackSetting
       ? [
           [
@@ -429,7 +439,13 @@ function ServiceCard({ provider, position, account, onRetry }) {
             variant="ghost"
             size="sm"
             className="hidden gap-1.5 text-muted-foreground sm:inline-flex"
-            onClick={() => navigate(`/debriddownloads?service=${provider.id}`)}
+            onClick={() =>
+              navigate(
+                provider.hasDownloadsPage === false
+                  ? "/downloads"
+                  : `/debriddownloads?service=${provider.id}`
+              )
+            }
           >
             {t("debrid.viewDownloads")}
             <ArrowRight className="h-3.5 w-3.5" />
@@ -640,7 +656,7 @@ function AccountSummary({
               ? t("debrid.expires", {
                   date: new Date(details.expiresAt).toLocaleDateString(),
                 })
-              : t("debrid.noPremium")}
+              : details.expiryNote || t("debrid.noPremium")}
           </p>
           {details.stats?.length > 0 && (
             <dl className="mt-3 grid grid-cols-2 gap-2">
@@ -659,7 +675,9 @@ function AccountSummary({
         </div>
       )}
       {signedInWithCode && (
-        <p className="text-xs text-muted-foreground">{t("debrid.signIn.signedIn")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t(provider.signIn.signedInText || "debrid.signIn.signedIn")}
+        </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" className="gap-1.5" onClick={onChangeKey}>

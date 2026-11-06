@@ -71,7 +71,10 @@ test("dragging a priority row saves its new order only when dropped", async () =
   assert.equal(writes, 0);
   actions.onDrop(event);
   assert.equal(writes, 1);
-  assert.deepEqual(Array.from(settings.debridProviderOrder), ["realdebrid", "torbox"]);
+  assert.deepEqual(Array.from(settings.debridProviderOrder).slice(0, 2), [
+    "realdebrid",
+    "torbox",
+  ]);
   assert.equal(settings.debridProvider, "realdebrid");
   assert.equal(context.draggedId, null);
   assert.equal(context.dragTargetId, null);

@@ -1,3 +1,5 @@
+import { isPendingTorrent, readRecords, updateRecord } from "./debridRecords";
+
 // One local transfer per cloud torrent, independent of the currently open page.
 const inFlight = new Map();
 let localStart = Promise.resolve();
@@ -5,6 +7,10 @@ let startingUntil = 0;
 // A torrent that could not start waits before its links are requested again.
 const HANDOFF_RETRY_MS = 5 * 60 * 1000;
 const handoffFailures = new Map();
+// A cloud torrent with no progress for this long is reported once and no longer polled.
+const STALL_MS = 72 * 60 * 60 * 1000;
+// Services that ask for gentler polling than the 5-second pass set pollIntervalMs.
+const lastPolled = new Map();
 
 const startLocalDownload = async (...args) => {
   try {
@@ -65,21 +71,14 @@ export function handoffTorrents(provider, apiKey) {
     .then(async () => {
       // The child process needs a moment to publish its first game metadata.
       if (Date.now() < startingUntil) return;
-      const read = () =>
-        JSON.parse(localStorage.getItem(provider.metadataStorageKey) || "{}");
-      const mark = (id, flag) => {
-        const latest = read();
-        if (!latest[id]) return;
-        latest[id] = { ...latest[id], [flag]: true };
-        localStorage.setItem(provider.metadataStorageKey, JSON.stringify(latest));
-      };
-      // Only torrents added since auto-handoff existed; older records were handled manually.
-      const entries = Object.entries(read()).filter(
+      const update = (id, fields) => updateRecord(provider, id, fields);
+      const mark = (id, flag) => update(id, { [flag]: true });
+      // Stalled and failed torrents wait in the Downloads list for the user to remove.
+      const entries = Object.entries(readRecords(provider.metadataStorageKey)).filter(
         ([id, entry]) =>
-          id.startsWith("torrent:") &&
-          entry?.autoHandoff === true &&
-          !entry.localDownloadStarted &&
-          !entry.cloudTorrentMissing
+          isPendingTorrent(id, entry) &&
+          !entry.cloudTorrentStalled &&
+          !entry.cloudTorrentFailed
       );
       let failure;
       const fail = (retryKey, error) => {
@@ -109,11 +108,25 @@ export function handoffTorrents(provider, apiKey) {
           })
         )
           return;
+        if (provider.pollIntervalMs) {
+          if (Date.now() - (lastPolled.get(retryKey) || 0) < provider.pollIntervalMs)
+            continue;
+          lastPolled.set(retryKey, Date.now());
+        }
         let files;
         try {
           files = await provider.getTorrentDownload(apiKey, id.slice(8));
         } catch (error) {
-          fail(retryKey, error);
+          // A torrent the service gave up on is reported once, then left for Remove.
+          if (error.terminal) {
+            mark(id, "cloudTorrentFailed");
+            fail(
+              retryKey,
+              new Error(
+                `${game.game}: ${error.message} Remove it from Downloads or try another source.`
+              )
+            );
+          } else fail(retryKey, error);
           continue;
         }
         // Removed from the cloud: stop polling it.
@@ -121,7 +134,32 @@ export function handoffTorrents(provider, apiKey) {
           mark(id, "cloudTorrentMissing");
           continue;
         }
-        if (!files) continue;
+        if (!files) {
+          // Progress is checked when first seen, then once per stall window.
+          const since = entry.lastProgressAt;
+          if (
+            provider.getTorrentStatus &&
+            (since == null || Date.now() - since >= STALL_MS)
+          ) {
+            const state = await provider
+              .getTorrentStatus(apiKey, id.slice(8))
+              .catch(() => null);
+            if (!state) continue;
+            const progress = state.progress ?? -1;
+            if (since == null || progress > (entry.lastProgress ?? -1)) {
+              update(id, { lastProgress: progress, lastProgressAt: Date.now() });
+            } else {
+              mark(id, "cloudTorrentStalled");
+              fail(
+                retryKey,
+                new Error(
+                  `${provider.name} made no progress on ${game.game} for 3 days. Remove it from Downloads or try another source.`
+                )
+              );
+            }
+          }
+          continue;
+        }
         if (window.electron.getSettings) {
           const current = await window.electron.getSettings();
           if (
@@ -158,7 +196,7 @@ export function handoffTorrents(provider, apiKey) {
         }
         handoffFailures.delete(retryKey);
         startingUntil = Date.now() + 15000;
-        mark(id, "localDownloadStarted");
+        update(id, { localDownloadStarted: true, localDownloadStartedAt: Date.now() });
         return { game: game.game, providerId: provider.id };
       }
       if (failure) throw failure;
@@ -167,4 +205,48 @@ export function handoffTorrents(provider, apiKey) {
   localStart = task;
   inFlight.set(key, task);
   return task;
+}
+
+// Opt-in: once a torrent's game is on this PC, delete the torrent from the service.
+// A game still downloading, stopped or failed keeps its cloud copy; one deleted locally
+// keeps it for good.
+const CLEANUP_INTERVAL_MS = 60 * 1000;
+// A new download's game folder appears a moment after the handoff starts it.
+const APPEAR_MS = 10 * 60 * 1000;
+const lastCleanup = new Map();
+
+export async function removeFinishedTorrents(provider, apiKey) {
+  if (!provider.removeTorrent || !globalThis.window?.electron?.getGames) return;
+  // Reading the game list touches every game folder: at most once a minute per service.
+  if (Date.now() - (lastCleanup.get(provider.id) || 0) < CLEANUP_INTERVAL_MS) return;
+  lastCleanup.set(provider.id, Date.now());
+  const finished = Object.entries(readRecords(provider.metadataStorageKey)).filter(
+    ([id, entry]) =>
+      id.startsWith("torrent:") &&
+      entry?.localDownloadStarted &&
+      !entry.cloudTorrentCleaned &&
+      !entry.cloudTorrentKept
+  );
+  if (!finished.length) return;
+  const games = await window.electron.getGames();
+  for (const [id, entry] of finished) {
+    const name = provider.getTorrentGame(entry)?.game;
+    const game = games.find(item => item.game === name);
+    if (!game) {
+      if (Date.now() - (entry.localDownloadStartedAt || 0) > APPEAR_MS)
+        updateRecord(provider, id, { cloudTorrentKept: true });
+      continue;
+    }
+    if (game.downloadingData) continue;
+    try {
+      await provider.removeTorrent(apiKey, id.slice(8));
+    } catch (error) {
+      console.warn(
+        `[Debrid] Could not remove a finished ${provider.name} torrent:`,
+        error.message
+      );
+      continue;
+    }
+    updateRecord(provider, id, { cloudTorrentCleaned: true });
+  }
 }

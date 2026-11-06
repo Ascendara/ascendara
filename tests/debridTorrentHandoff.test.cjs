@@ -214,6 +214,7 @@ test("handoff skips legacy records and stops polling torrents removed from the c
   let stored = JSON.stringify({
     "torrent:legacy": { game: "Old" },
     "torrent:gone": { game: "Gone", autoHandoff: true },
+    "torrent:removed": { game: "Removed", autoHandoff: true, cloudTorrentRemoved: true },
   });
   global.localStorage = {
     getItem: () => stored,
@@ -247,7 +248,7 @@ test("handoff skips legacy records and stops polling torrents removed from the c
   };
   await worker.handoffTorrents(provider, "token");
   await worker.handoffTorrents(provider, "token");
-  assert.deepEqual(lookups, ["gone"], "legacy skipped, missing torrent checked once");
+  assert.deepEqual(lookups, ["gone"], "legacy and removed skipped, missing checked once");
   assert.equal(calls.length, 0);
   assert.equal(JSON.parse(stored)["torrent:gone"].cloudTorrentMissing, true);
 });
@@ -351,4 +352,100 @@ test("a torrent that can not start does not hold back the ones behind it", async
     await assert.rejects(worker.handoffTorrents(provider, "key"), new RegExp(failure));
     t.mock.restoreAll();
   }
+});
+
+test("finished torrents leave the service only once their game is fully on this PC", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => Object.assign(global, saved));
+  let stored = JSON.stringify({
+    "torrent:done": { game: "Done", autoHandoff: true, localDownloadStarted: true },
+    "torrent:busy": { game: "Busy", autoHandoff: true, localDownloadStarted: true },
+    "torrent:deleted": { game: "Deleted", autoHandoff: true, localDownloadStarted: true },
+    "torrent:waiting": { game: "Waiting", autoHandoff: true },
+  });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_key, value) => {
+      stored = value;
+    },
+  };
+  global.window = {
+    electron: {
+      getGames: async () => [
+        { game: "Done" },
+        { game: "Busy", downloadingData: { downloading: true } },
+        { game: "Waiting" },
+      ],
+    },
+  };
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  const removed = [];
+  const provider = {
+    name: "Test",
+    metadataStorageKey: "metadata",
+    getTorrentGame: entry => entry,
+    removeTorrent: async (_key, id) => removed.push(id),
+  };
+  await worker.removeFinishedTorrents(provider, "token");
+  await worker.removeFinishedTorrents(provider, "token");
+  assert.deepEqual(removed, ["done"], "only the finished game, and only once");
+  assert.equal(JSON.parse(stored)["torrent:done"].cloudTorrentCleaned, true);
+});
+
+test("a cloud torrent with no progress for 3 days is reported once and no longer polled", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => {
+    Object.assign(global, saved);
+    t.mock.restoreAll();
+  });
+  let stored = JSON.stringify({ "torrent:slow": { game: "Slow", autoHandoff: true } });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_key, value) => {
+      stored = value;
+    },
+  };
+  global.window = {
+    electron: { getGames: async () => [], downloadFile: async () => ({}) },
+  };
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  let progress = 10;
+  const statusCalls = [];
+  const provider = {
+    id: "test",
+    name: "Test",
+    apiKeySetting: "key",
+    metadataStorageKey: "metadata",
+    getTorrentGame: entry => entry,
+    getTorrentDownload: async () => null,
+    getTorrentStatus: async () => {
+      statusCalls.push(progress);
+      return { status: "downloading", progress };
+    },
+  };
+  const realNow = Date.now();
+  let now = realNow;
+  t.mock.method(Date, "now", () => now);
+  const day = 24 * 60 * 60 * 1000;
+  const record = () => JSON.parse(stored)["torrent:slow"];
+
+  await worker.handoffTorrents(provider, "token");
+  assert.equal(record().lastProgress, 10, "progress recorded when first seen");
+  now += day;
+  await worker.handoffTorrents(provider, "token");
+  assert.equal(statusCalls.length, 1, "no extra checks inside the window");
+  now += 3 * day;
+  progress = 40;
+  await worker.handoffTorrents(provider, "token");
+  assert.equal(record().lastProgress, 40, "moving torrents get a new window");
+  now += 3 * day + 10 * 60 * 1000;
+  await assert.rejects(worker.handoffTorrents(provider, "token"), /no progress on Slow/);
+  assert.equal(record().cloudTorrentStalled, true);
+  now += 10 * 60 * 1000;
+  await worker.handoffTorrents(provider, "token");
+  assert.equal(statusCalls.length, 3, "a stalled torrent is not polled again");
 });

@@ -78,6 +78,7 @@ import SpeedGraph, { formatSpeed, markDownloadStart } from "@/components/SpeedGr
 import { API_URL } from "@/config/api";
 import { getReporterHeaders } from "@/services/firebase/firebaseService";
 import { useDownloadStall } from "@/hooks/useDownloadStall";
+import CloudTorrentList, { useCloudTorrents } from "@/components/debrid/CloudTorrentList";
 
 // Helper function to check if download speed is above 50 MB/s
 const isHighSpeed = speedString => {
@@ -202,6 +203,7 @@ const Downloads = () => {
   const { t } = useLanguage();
   const { isAuthenticated, user } = useAuth();
   const { settings } = useSettings();
+  const cloud = useCloudTorrents(settings);
 
   // Track processed commands to prevent duplicates
   const processedCommandsRef = useRef(new Set());
@@ -995,7 +997,11 @@ const Downloads = () => {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="container mx-auto max-w-5xl px-4 pb-8">
-        {view === "idle" && nothingLeft ? (
+        {view === "idle" && nothingLeft && cloud.items.length > 0 ? (
+          <div className="mt-6">
+            <CloudTorrentList cloud={cloud} />
+          </div>
+        ) : view === "idle" && nothingLeft ? (
           <div className="flex min-h-[85vh] flex-col items-center justify-center">
             <div className="space-y-4 text-center">
               <Coffee className="mx-auto h-12 w-12 text-primary" style={riseIn(0)} />
@@ -1041,6 +1047,8 @@ const Downloads = () => {
                 </Button>
               </div>
             )}
+
+            <CloudTorrentList cloud={cloud} />
 
             {/* Speed overview */}
             <section

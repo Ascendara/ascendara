@@ -2,6 +2,28 @@ const featureCenterResources = {
   en: {
     debrid: {
       downloadsTitle: "Debrid Downloads",
+      removeAfterDone: "Remove from the service when done",
+      removeAfterDoneDescription:
+        "Once a torrent's game is fully on your PC, delete the torrent from your account to free its slot. This also applies to games you downloaded before turning it on.",
+      sentToCloud:
+        "Sent to {{provider}}. It downloads to your PC once it is ready there.",
+      cloud: {
+        title: "Waiting at your debrid service",
+        description:
+          "These start downloading to your PC by themselves once they are ready.",
+        queued: "Queued",
+        downloading: "Downloading in the cloud",
+        ready: "Ready, waiting to download to your PC",
+        failed: "Failed",
+        stalled: "Stalled",
+        error: "Could not check",
+        remove: "Remove",
+        removed: "Removed from {{provider}}",
+        confirmTitle: "Remove this torrent?",
+        confirm:
+          "{{name}} will be deleted from your {{provider}} account and will not download.",
+        alreadyStarted: "{{name}} is already downloading to your PC, so it was kept.",
+      },
       downloadsDescription:
         "Cloud downloads from your debrid accounts. Finished torrents move to your PC automatically.",
       chooseService: "Choose debrid service",
@@ -34,6 +56,7 @@ const featureCenterResources = {
       delete: "Delete",
       points: "Points",
       premiumLeft: "Premium left",
+      fairUse: "Fair use used",
       days: "{{count}} days",
       downloads: "Downloads",
       data: "Data",
@@ -84,6 +107,7 @@ const featureCenterResources = {
       planPremium: "Premium",
       planFree: "Free",
       noPremium: "No active premium",
+      lifetime: "Lifetime premium, no end date",
       changeKey: "Change key",
       disconnect: "Disconnect",
       disconnected: "{{provider}} disconnected",
@@ -99,6 +123,7 @@ const featureCenterResources = {
         cancel: "Cancel",
         waiting: "Waiting for approval…",
         signedIn: "Signed in with a code. The login renews by itself.",
+        signedInKey: "Signed in with a code.",
         success: "Signed in to {{provider}}",
         failed: "Sign-in failed. Try again.",
         expired: "The code expired. Try again.",

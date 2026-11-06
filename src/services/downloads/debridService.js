@@ -1,9 +1,12 @@
 import torbox from "./debrid/torboxProvider";
 import realDebrid from "./debrid/realDebridProvider";
-import { handoffTorrents } from "./debridTorrentHandoff";
+import allDebrid from "./debrid/allDebridProvider";
+import premiumize from "./debrid/premiumizeProvider";
+import debridLink from "./debrid/debridLinkProvider";
+import { handoffTorrents, removeFinishedTorrents } from "./debridTorrentHandoff";
 
 // TorBox is first by default; only an explicitly saved order overrides this.
-export const debridProviders = [torbox, realDebrid];
+export const debridProviders = [torbox, realDebrid, allDebrid, premiumize, debridLink];
 
 export function createDebridService(providers) {
   const getProvider = id => providers.find(provider => provider.id === id) || null;
@@ -101,17 +104,24 @@ export function createDebridService(providers) {
   // Settled per service: one failing must not hide the downloads another one started.
   const resumePendingTorrents = settings =>
     Promise.allSettled(
-      getConfiguredProviders(settings)
-        .filter(
-          provider =>
-            (provider.resumePendingTorrents || provider.getTorrentDownload) &&
-            settings[provider.torrentSetting] !== false
-        )
-        .map(async provider => {
-          const apiKey = getApiKey(settings, provider);
+      getConfiguredProviders(settings).map(async provider => {
+        const apiKey = getApiKey(settings, provider);
+        try {
+          if (
+            !(provider.resumePendingTorrents || provider.getTorrentDownload) ||
+            settings[provider.torrentSetting] === false
+          )
+            return undefined;
           await provider.resumePendingTorrents?.(apiKey);
-          return handoffTorrents(provider, apiKey);
-        })
+          return await handoffTorrents(provider, apiKey);
+        } finally {
+          // Also when this service's handoff failed, or its torrent toggle is off.
+          if (settings[provider.removeAfterDoneSetting])
+            await removeFinishedTorrents(provider, apiKey).catch(error =>
+              console.warn(`[Debrid] ${provider.name} cleanup will retry:`, error.message)
+            );
+        }
+      })
     );
   const resolveHost = async (settings, link, host, game, directory = 0, providerId) => {
     if (settings?.debridEnabled !== true)

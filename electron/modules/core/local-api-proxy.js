@@ -5,13 +5,19 @@ const ROUTES = {
   realdebrid: "https://api.real-debrid.com/rest/1.0",
   rdoauth: "https://api.real-debrid.com/oauth/v2",
   torbox: "https://api.torbox.app/v1/api",
+  debridlink: "https://debrid-link.com/api/v2",
+  premiumize: "https://www.premiumize.me/api",
+  alldebrid: "https://api.alldebrid.com",
   flingtrainer: "https://flingtrainer.com",
   analytics: "https://analytics.ascendara.app",
 };
 const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 
 function getProxyTarget(rawUrl) {
-  const match = /^\/api\/(khinsider|torbox|realdebrid|rdoauth|flingtrainer|analytics)(?=\/|\?|$)/.exec(rawUrl);
+  const match =
+    /^\/api\/(khinsider|torbox|realdebrid|rdoauth|alldebrid|premiumize|debridlink|flingtrainer|analytics)(?=\/|\?|$)/.exec(
+      rawUrl
+    );
   if (!match) return null;
   return new URL(ROUTES[match[1]] + rawUrl.slice(match[0].length));
 }
@@ -31,11 +37,23 @@ function proxyLocalRequest(req, res) {
   }
   const headers = { ...req.headers, host: target.host };
   // Do not forward app-session credentials or hop-by-hop transport headers.
-  for (const name of ["connection", "cookie", "origin", "referer", "transfer-encoding", "upgrade", "proxy-authorization"]) delete headers[name];
+  for (const name of [
+    "connection",
+    "cookie",
+    "origin",
+    "referer",
+    "transfer-encoding",
+    "upgrade",
+    "proxy-authorization",
+  ])
+    delete headers[name];
   const fail = (status, message) => {
     if (res.destroyed || res.writableEnded) return;
     if (res.headersSent) res.destroy();
-    else { res.writeHead(status); res.end(message); }
+    else {
+      res.writeHead(status);
+      res.end(message);
+    }
   };
   if (Number(headers["content-length"]) > MAX_REQUEST_BYTES) {
     fail(413, "Request too large");
@@ -44,7 +62,10 @@ function proxyLocalRequest(req, res) {
   }
   const upstream = https.request(target, { method: req.method, headers }, response => {
     response.on("error", () => fail(502, "Proxy response interrupted"));
-    if (res.writableEnded || res.destroyed) { response.destroy(); return; }
+    if (res.writableEnded || res.destroyed) {
+      response.destroy();
+      return;
+    }
     res.writeHead(response.statusCode, response.headers);
     response.pipe(res);
   });
@@ -52,7 +73,10 @@ function proxyLocalRequest(req, res) {
   const timeout = setTimeout(() => upstream.destroy(new Error("Proxy timed out")), 30000);
   timeout.unref();
   upstream.on("error", () => fail(502, "Proxy error"));
-  res.on("close", () => { clearTimeout(timeout); upstream.destroy(); });
+  res.on("close", () => {
+    clearTimeout(timeout);
+    upstream.destroy();
+  });
   req.on("error", () => upstream.destroy());
   let bytes = 0;
   req.on("data", chunk => {
