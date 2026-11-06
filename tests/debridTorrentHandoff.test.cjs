@@ -937,3 +937,68 @@ test("a cloud torrent with no progress for 3 days is reported once and no longer
   await worker.handoffTorrents(provider, "token");
   assert.equal(statusCalls.length, 3, "a stalled torrent is not polled again");
 });
+
+test("P9-326: an installed game whose name the folder drops characters from is never sent again", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => Object.assign(global, saved));
+  const name = "Enshrouded Deluxe Edition – Bonuses";
+  let stored = JSON.stringify({
+    "torrent:enshrouded": { game: name, autoHandoff: true },
+  });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_k, value) => {
+      stored = value;
+    },
+  };
+  const folder = "Enshrouded Deluxe Edition  Bonuses";
+  const started = [];
+  let listed = [];
+  let running = [];
+  global.window = {
+    electron: {
+      getGames: async () => listed,
+      getRunningDownloads: async () => running,
+      downloadFile: async (_data, game) => {
+        started.push(game);
+        running = [folder];
+        return { success: true };
+      },
+    },
+  };
+  t.mock.method(console, "warn", () => {});
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  assert.equal(worker.localGameName(name), folder, "same name as the main process");
+  const provider = {
+    id: "torbox",
+    metadataStorageKey: "metadata",
+    getTorrentGame: entry => entry,
+    // The finished torrent stays in the cloud account.
+    getTorrentDownload: async () => [
+      { url: "https://example.com/pack.zip", filename: "pack.zip", size: 10 },
+    ],
+  };
+  let now = realNow();
+  t.mock.method(Date, "now", () => now);
+  await worker.handoffTorrents(provider, "token");
+  assert.deepEqual(started, [name]);
+  // Downloading: the game list holds the stored (sanitized) name.
+  listed = [
+    { game: folder, _folderName: folder, downloadingData: { downloading: true } },
+  ];
+  now += 20000;
+  await worker.handoffTorrents(provider, "token");
+  // Finished, installed, download files deleted.
+  listed = [{ game: folder, _folderName: folder }];
+  running = [];
+  for (let pass = 0; pass < 5; pass++) {
+    now += 20 * 60 * 1000;
+    await worker.handoffTorrents(provider, "token");
+  }
+  assert.deepEqual(started, [name], "the installed game is not downloaded again");
+  const record = JSON.parse(stored)["torrent:enshrouded"];
+  assert.equal(record.localDownloadStarted, true);
+  assert.equal(record.localDownloadSeen, true);
+});
