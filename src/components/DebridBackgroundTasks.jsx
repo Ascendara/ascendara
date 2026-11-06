@@ -7,9 +7,14 @@ export default function DebridBackgroundTasks() {
   const { settings } = useSettings();
   useEffect(() => {
     let running = false;
+    let again = false;
     let lastError;
     const poll = async () => {
-      if (running) return;
+      // A pass asked for while one runs follows right after it.
+      if (running) {
+        again = true;
+        return;
+      }
       running = true;
       try {
         const results = await resumePendingTorrents(settings);
@@ -25,11 +30,19 @@ export default function DebridBackgroundTasks() {
         lastError = error.message;
       } finally {
         running = false;
+        if (again) {
+          again = false;
+          void poll();
+        }
       }
     };
     void poll();
     const timer = setInterval(poll, 5000);
-    return () => clearInterval(timer);
+    window.addEventListener("debrid-handoff-now", poll);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("debrid-handoff-now", poll);
+    };
   }, [settings]);
   return null;
 }
