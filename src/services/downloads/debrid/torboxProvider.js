@@ -15,6 +15,10 @@ export default {
         t("torbox.plan_standard"),
       ][user.plan] || null,
     expiresAt: user.plan > 0 ? user.premium_expires_at : null,
+    stats: [
+      { label: t("debrid.downloads"), value: user.total_downloaded ?? 0 },
+      { label: t("debrid.data"), value: user.total_bytes_downloaded ?? 0, unit: "bytes" },
+    ],
   }),
   apiKeySetting: "torboxApiKey",
   torrentSetting: "useTorboxForTorrents",

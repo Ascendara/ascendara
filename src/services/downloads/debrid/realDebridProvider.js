@@ -18,6 +18,18 @@ export default {
     name: user.username || user.email,
     plan: user.type === "premium" ? t("debrid.planPremium") : t("debrid.planFree"),
     expiresAt: user.type === "premium" ? user.expiration : null,
+    stats: [
+      { label: t("debrid.points"), value: user.points ?? 0 },
+      ...(user.premium
+        ? [
+            {
+              label: t("debrid.premiumLeft"),
+              value: Math.floor(user.premium / 86400),
+              unit: "days",
+            },
+          ]
+        : []),
+    ],
   }),
   apiKeySetting: "realDebridApiKey",
   torrentSetting: "useRealDebridForTorrents",

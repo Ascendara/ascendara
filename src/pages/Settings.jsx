@@ -70,6 +70,7 @@ import {
   Gift,
   Check,
   History,
+  CloudDownload,
 } from "lucide-react";
 import gameService from "@/services/games/gameService";
 import { useNavigate } from "react-router-dom";
@@ -838,6 +839,7 @@ function Settings() {
     { id: "general", icon: SlidersHorizontal },
     { id: "game-index", icon: Database },
     { id: "downloads", icon: HardDriveDownload },
+    { id: "debrid", icon: CloudDownload },
     { id: "gaming", icon: Joystick },
     { id: "backups", icon: ArchiveRestore },
     {
@@ -1437,8 +1439,11 @@ function Settings() {
               <GameIndexManager embedded view="index" />
             </SettingsCategory>
 
-            <SettingsCategory {...categoryProps("downloads")}>
+            <SettingsCategory {...categoryProps("debrid")}>
               <DebridSettings />
+            </SettingsCategory>
+
+            <SettingsCategory {...categoryProps("downloads")}>
               <SettingsSection
                 id="download-manager"
                 title={t("settings.downloaderSettings")}
@@ -1904,7 +1909,8 @@ function Settings() {
                               !isOnWindows ||
                               (settings.customSourcesMode &&
                                 settings.customSource?.torrentOnly &&
-                                settings.torrentEnabled && !canUseCloudTorrents(settings))
+                                settings.torrentEnabled &&
+                                !canUseCloudTorrents(settings))
                             }
                           />
                         </div>
@@ -1917,7 +1923,8 @@ function Settings() {
                         </TooltipContent>
                       ) : settings.customSourcesMode &&
                         settings.customSource?.torrentOnly &&
-                        settings.torrentEnabled && !canUseCloudTorrents(settings) ? (
+                        settings.torrentEnabled &&
+                        !canUseCloudTorrents(settings) ? (
                         <TooltipContent>
                           <p className="text-secondary">
                             {t("settings.torrentRequiredBySource") ||
@@ -1930,7 +1937,8 @@ function Settings() {
                 </div>
                 {settings.customSourcesMode &&
                   settings.customSource?.torrentOnly &&
-                  settings.torrentEnabled && !canUseCloudTorrents(settings) && (
+                  settings.torrentEnabled &&
+                  !canUseCloudTorrents(settings) && (
                     <div className="mb-4 rounded-md border border-orange-500/30 bg-orange-500/5 p-3 text-xs text-orange-700 dark:text-orange-300">
                       {(
                         t("settings.torrentLockedBySourceNote") ||

@@ -4898,8 +4898,12 @@
         "descriptionMac": "Run Windows games on your Mac with Highball.",
         "title": "Compatibility"
       },
+      "debrid": {
+        "description": "Debrid accounts, cloud torrents and the order services are tried in.",
+        "title": "Debrid"
+      },
       "downloads": {
-        "description": "How games download, where they go, and torrent and debrid services.",
+        "description": "How games download, where they go, and torrent settings.",
         "title": "Downloads"
       },
       "game-index": {

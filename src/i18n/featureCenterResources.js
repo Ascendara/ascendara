@@ -38,13 +38,35 @@ const featureCenterResources = {
       downloads: "Downloads",
       data: "Data",
       expires: "Premium until {{date}}",
-      settingsTitle: "Debrid services",
+      settingsTitle: "Use debrid services",
       settingsDescription:
-        "Connect your debrid accounts and choose which one handles each download.",
+        "Route premium host links and magnets through your debrid accounts, then pull the finished files to your PC.",
+      featureHosts: "Premium host links",
+      featureHostsDescription:
+        "Download from hosts that are slow or capped for free users at full speed.",
+      featureTorrents: "Cloud torrents",
+      featureTorrentsDescription:
+        "Magnets download on the service's servers, so qBittorrent isn't needed.",
+      featureHandoff: "Straight to your PC",
+      featureHandoffDescription:
+        "Finished cloud downloads move to your PC and install like any other game.",
+      summaryConnected: "Connected",
+      summaryConnectedValue: "{{count}} of {{total}} services",
+      summaryHosts: "Hosted links",
+      summaryMagnets: "Magnets",
+      routeDirect: "Direct download",
+      routeLocal: "qBittorrent",
+      routeNone: "Not handled",
+      openDownloads: "Open debrid downloads",
+      viewDownloads: "Downloads",
+      accountsTitle: "Accounts",
+      accountsDescription:
+        "Connect each service you have an account with. Options only apply to that service.",
+      position: "#{{position}} in the download order",
       priorityOrder: "Download order",
-      dragHint: "Drag cards or use the arrows to reorder.",
+      dragHint: "Drag a service or use the arrows to reorder.",
       priorityDescription:
-        "Connected services are tried in this order. Hosted links go to the first one that supports the host, and magnets go to the first with cloud torrents on.",
+        "Connected services are tried top to bottom. Hosted links go to the first one that supports the host, and magnets go to the first with cloud torrents on.",
       status: {
         connected: "Connected",
         checking: "Checking account…",

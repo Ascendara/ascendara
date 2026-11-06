@@ -1,14 +1,18 @@
-import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowDown,
+  ArrowRight,
   ArrowUp,
-  ChevronRight,
+  CloudDownload,
   ExternalLink,
   GripVertical,
   KeyRound,
+  Link2,
   Loader2,
   LogOut,
+  Magnet,
+  MonitorDown,
   QrCode,
   RefreshCw,
 } from "lucide-react";
@@ -18,25 +22,78 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import DebridIcon from "@/components/DebridIcon";
+import { formatBytes } from "@/components/debrid/DebridDownloadParts";
 import { useSettings } from "@/context/SettingsContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
-import { getOrderedProviders } from "@/services/downloads/debridService";
+import {
+  getOrderedProviders,
+  getPreferredProvider,
+  getTorrentProvider,
+} from "@/services/downloads/debridService";
 
 const STATUS_TONES = {
-  connected: "bg-green-500/10 text-green-600 dark:text-green-400",
-  checking: "bg-muted text-muted-foreground",
-  error: "bg-destructive/10 text-destructive",
-  notConnected: "bg-muted text-muted-foreground",
-  paused: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
+  connected: {
+    pill: "bg-green-500/10 text-green-600 dark:text-green-400",
+    dot: "bg-green-500",
+  },
+  checking: { pill: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/50" },
+  error: { pill: "bg-destructive/10 text-destructive", dot: "bg-destructive" },
+  notConnected: {
+    pill: "bg-muted text-muted-foreground",
+    dot: "bg-muted-foreground/30",
+  },
+  paused: {
+    pill: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
+    dot: "bg-yellow-500",
+  },
 };
 
-// The settings page section for debrid accounts: a master toggle, the order services
-// are tried in, and one card per service with its account and download options.
+const apiKeyOf = (settings, provider) => settings[provider.apiKeySetting]?.trim() || "";
+
+const statusOf = (settings, provider, account) => {
+  if (settings.debridProviderEnabled?.[provider.id] === false) return "paused";
+  if (!apiKeyOf(settings, provider)) return "notConnected";
+  if (account?.status === "error") return "error";
+  return account?.status === "ready" ? "connected" : "checking";
+};
+
+// Loads the account behind each saved key once, so every section can show who is
+// connected without asking the service again.
+function useAccounts(providers, settings) {
+  const [accounts, setAccounts] = useState({});
+  const loadedKeys = useRef({});
+  const load = useCallback((provider, apiKey) => {
+    loadedKeys.current[provider.id] = apiKey;
+    const set = state => setAccounts(current => ({ ...current, [provider.id]: state }));
+    if (!apiKey) return set({ status: "idle" });
+    set({ status: "loading" });
+    const current = () => loadedKeys.current[provider.id] === apiKey;
+    provider
+      .getUserInfo(apiKey)
+      .then(user => current() && set({ status: "ready", user }))
+      .catch(error => current() && set({ status: "error", error: error.message }));
+  }, []);
+  const signature = providers
+    .map(provider => `${provider.id}:${apiKeyOf(settings, provider)}`)
+    .join("|");
+  useEffect(() => {
+    for (const provider of providers) {
+      const apiKey = apiKeyOf(settings, provider);
+      if (loadedKeys.current[provider.id] !== apiKey) load(provider, apiKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature]);
+  return [accounts, provider => load(provider, apiKeyOf(settings, provider))];
+}
+
+// The Debrid settings page: what debrid does and where downloads go, each account,
+// then the order the services are tried in.
 export default function DebridSettings() {
   const { settings, setSettings } = useSettings();
   const { t } = useLanguage();
   const providers = getOrderedProviders(settings);
+  const [accounts, reloadAccount] = useAccounts(providers, settings);
   const [draggedId, setDraggedId] = useState(null);
   const [dragTargetId, setDragTargetId] = useState(null);
   const debridEnabled = settings.debridEnabled === true;
@@ -53,10 +110,148 @@ export default function DebridSettings() {
     });
 
   return (
+    <>
+      <Overview providers={providers} accounts={accounts} />
+
+      {debridEnabled && (
+        <section id="debrid-accounts" className="py-8">
+          <SectionHeader
+            title={t("debrid.accountsTitle")}
+            description={t("debrid.accountsDescription")}
+          />
+          <div className="space-y-4">
+            {providers.map((item, index) => (
+              <ServiceCard
+                key={item.id}
+                provider={item}
+                position={index + 1}
+                account={accounts[item.id]}
+                onRetry={() => reloadAccount(item)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {debridEnabled && (
+        <section id="debrid-order" className="py-8">
+          <SectionHeader
+            title={t("debrid.priorityOrder")}
+            description={t("debrid.priorityDescription")}
+          />
+          <ol
+            className="overflow-hidden rounded-xl border border-border/70"
+            aria-label={t("debrid.priorityOrder")}
+          >
+            {providers.map((item, index) => (
+              <OrderRow
+                key={item.id}
+                provider={item}
+                index={index}
+                count={providers.length}
+                status={statusOf(settings, item, accounts[item.id])}
+                onMove={targetIndex => move(item.id, providers[targetIndex]?.id)}
+                isDragged={draggedId === item.id}
+                isDragTarget={dragTargetId === item.id}
+                onDragStart={event => {
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData(
+                    "application/x-ascendara-debrid-provider",
+                    item.id
+                  );
+                  setDraggedId(item.id);
+                }}
+                onDragOver={event => {
+                  if (!draggedId || draggedId === item.id) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                  setDragTargetId(item.id);
+                }}
+                onDrop={event => {
+                  if (!draggedId) return;
+                  event.preventDefault();
+                  move(draggedId, item.id);
+                  setDraggedId(null);
+                  setDragTargetId(null);
+                }}
+                onDragEnd={() => {
+                  setDraggedId(null);
+                  setDragTargetId(null);
+                }}
+              />
+            ))}
+          </ol>
+          <p className="mt-3 text-xs text-muted-foreground">{t("debrid.dragHint")}</p>
+        </section>
+      )}
+    </>
+  );
+}
+
+function SectionHeader({ title, description, action }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+      <div className="min-w-0 flex-1 space-y-1">
+        <h3 className="mb-0 text-lg font-semibold tracking-tight text-foreground">
+          {title}
+        </h3>
+        {description && (
+          <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>
+        )}
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
+  );
+}
+
+// The master switch, plus either what debrid adds (when off) or where each kind of
+// download goes right now (when on).
+function Overview({ providers, accounts }) {
+  const { settings, setSettings } = useSettings();
+  const { t } = useLanguage();
+  const navigate = useNavigate();
+  const debridEnabled = settings.debridEnabled === true;
+  const connected = providers.filter(
+    provider => statusOf(settings, provider, accounts[provider.id]) === "connected"
+  );
+  const hostProvider = getPreferredProvider(settings);
+  const torrentProvider = getTorrentProvider(settings);
+  const routes = [
+    {
+      icon: CloudDownload,
+      label: t("debrid.summaryConnected"),
+      value: t("debrid.summaryConnectedValue", {
+        count: connected.length,
+        total: providers.length,
+      }),
+      muted: !connected.length,
+    },
+    {
+      icon: Link2,
+      label: t("debrid.summaryHosts"),
+      value: hostProvider?.name || t("debrid.routeDirect"),
+      provider: hostProvider,
+      muted: !hostProvider,
+    },
+    {
+      icon: Magnet,
+      label: t("debrid.summaryMagnets"),
+      value:
+        torrentProvider?.name ||
+        (settings.torrentEnabled ? t("debrid.routeLocal") : t("debrid.routeNone")),
+      provider: torrentProvider,
+      muted: !torrentProvider,
+    },
+  ];
+  const features = [
+    [Link2, "debrid.featureHosts", "debrid.featureHostsDescription"],
+    [Magnet, "debrid.featureTorrents", "debrid.featureTorrentsDescription"],
+    [MonitorDown, "debrid.featureHandoff", "debrid.featureHandoffDescription"],
+  ];
+
+  return (
     <section id="debrid-services" className="py-8">
-      <div
-        className={`flex flex-wrap items-start justify-between gap-x-6 gap-y-3 ${debridEnabled ? "mb-6" : ""}`}
-      >
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-1 space-y-1">
           <Label
             htmlFor="debrid-enabled"
@@ -72,164 +267,96 @@ export default function DebridSettings() {
           id="debrid-enabled"
           className="mt-1 shrink-0"
           checked={debridEnabled}
-          aria-controls="debrid-service-controls"
-          aria-expanded={debridEnabled}
           onCheckedChange={value =>
             setSettings(current => ({ ...current, debridEnabled: value }))
           }
         />
       </div>
 
-      <AnimatePresence initial={false}>
-        {debridEnabled && (
-          <motion.div
-            id="debrid-service-controls"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <PriorityStrip providers={providers} settings={settings} t={t} />
-            <ol className="space-y-3" aria-label={t("debrid.priorityOrder")}>
-              {providers.map((item, index) => (
-                <ProviderCard
-                  key={item.id}
-                  provider={item}
-                  index={index}
-                  count={providers.length}
-                  onMove={targetIndex => move(item.id, providers[targetIndex]?.id)}
-                  isDragged={draggedId === item.id}
-                  isDragTarget={dragTargetId === item.id}
-                  onDragStart={event => {
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData(
-                      "application/x-ascendara-debrid-provider",
-                      item.id
-                    );
-                    setDraggedId(item.id);
-                  }}
-                  onDragOver={event => {
-                    if (!draggedId || draggedId === item.id) return;
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = "move";
-                    setDragTargetId(item.id);
-                  }}
-                  onDrop={event => {
-                    if (!draggedId) return;
-                    event.preventDefault();
-                    move(draggedId, item.id);
-                    setDraggedId(null);
-                    setDragTargetId(null);
-                  }}
-                  onDragEnd={() => {
-                    setDraggedId(null);
-                    setDragTargetId(null);
-                  }}
-                />
-              ))}
-            </ol>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {debridEnabled ? (
+        <>
+          <dl className="mt-6 grid gap-3 sm:grid-cols-3">
+            {routes.map(({ icon: Icon, label, value, provider, muted }) => (
+              <div
+                key={label}
+                className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-4 py-3"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                  {provider ? (
+                    <DebridIcon provider={provider} className="h-4 w-4 text-primary" />
+                  ) : (
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    {label}
+                  </dt>
+                  <dd
+                    className={cn(
+                      "truncate text-sm font-semibold",
+                      muted ? "text-muted-foreground" : "text-foreground"
+                    )}
+                  >
+                    {value}
+                  </dd>
+                </div>
+              </div>
+            ))}
+          </dl>
+          {connected.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-3 gap-1.5 px-2 text-primary"
+              onClick={() => navigate("/debriddownloads")}
+            >
+              {t("debrid.openDownloads")}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </>
+      ) : (
+        <ul className="mt-6 grid gap-3 sm:grid-cols-3">
+          {features.map(([Icon, title, description]) => (
+            <li key={title} className="rounded-xl bg-muted/40 p-4">
+              <Icon className="mb-3 h-5 w-5 text-primary" />
+              <p className="text-sm font-medium text-foreground">{t(title)}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {t(description)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
 
-// One line that reads like the routing itself: which service gets asked first.
-function PriorityStrip({ providers, settings, t }) {
+function StatusPill({ status }) {
+  const { t } = useLanguage();
   return (
-    <div className="mb-4 rounded-xl bg-muted/40 px-4 py-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {t("debrid.priorityOrder")}
-        </span>
-        <ol className="flex flex-wrap items-center gap-1.5">
-          {providers.map((provider, index) => {
-            const active =
-              Boolean(settings[provider.apiKeySetting]?.trim()) &&
-              settings.debridProviderEnabled?.[provider.id] !== false;
-            return (
-              <li key={provider.id} className="flex items-center gap-1.5">
-                {index > 0 && (
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
-                )}
-                <span
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                    active
-                      ? "border-primary/30 bg-background text-foreground"
-                      : "border-dashed border-border text-muted-foreground"
-                  )}
-                >
-                  <span className="tabular-nums text-muted-foreground">{index + 1}</span>
-                  {provider.name}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-        <span className="ml-auto text-xs text-muted-foreground">
-          {t("debrid.dragHint")}
-        </span>
-      </div>
-      <p className="mt-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-        {t("debrid.priorityDescription")}
-      </p>
-    </div>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-2 py-px text-[11px] font-medium",
+        STATUS_TONES[status].pill
+      )}
+    >
+      {status === "checking" && <Loader2 className="h-3 w-3 animate-spin" />}
+      {t(`debrid.status.${status}`)}
+    </span>
   );
 }
 
-// Loads the account behind a saved key, so the card can say who is connected.
-function useAccount(provider, apiKey) {
-  const [state, setState] = useState({ status: "idle" });
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    if (!apiKey) {
-      setState({ status: "idle" });
-      return undefined;
-    }
-    let stopped = false;
-    setState(current => ({ ...current, status: "loading" }));
-    provider
-      .getUserInfo(apiKey)
-      .then(user => !stopped && setState({ status: "ready", user }))
-      .catch(error => !stopped && setState({ status: "error", error: error.message }));
-    return () => {
-      stopped = true;
-    };
-  }, [provider, apiKey, attempt]);
-  return [state, () => setAttempt(value => value + 1)];
-}
-
-function ProviderCard({
-  provider,
-  index,
-  count,
-  onMove,
-  isDragged,
-  isDragTarget,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-}) {
+function ServiceCard({ provider, position, account, onRetry }) {
   const { settings, setSettings } = useSettings();
   const { t } = useLanguage();
-  const apiKey = settings[provider.apiKeySetting]?.trim() || "";
+  const navigate = useNavigate();
+  const apiKey = apiKeyOf(settings, provider);
   const hasKey = Boolean(apiKey);
   const enabled = settings.debridProviderEnabled?.[provider.id] !== false;
-  const [account, retryAccount] = useAccount(provider, apiKey);
+  const status = statusOf(settings, provider, account);
   const [editingKey, setEditingKey] = useState(false);
-  const status = !enabled
-    ? "paused"
-    : !hasKey
-      ? "notConnected"
-      : account.status === "error"
-        ? "error"
-        : account.status === "ready"
-          ? "connected"
-          : "checking";
   const update = (key, value) => setSettings(current => ({ ...current, [key]: value }));
 
   const saveKey = async value => {
@@ -278,93 +405,62 @@ function ProviderCard({
   ];
 
   return (
-    // Spread so the list's handlers stay the only JSX drag attributes in this file
-    <li
-      {...{ onDragOver, onDrop, onDragEnd }}
-      className={cn(
-        "relative overflow-hidden rounded-xl border bg-card/40 transition-[opacity,border-color,box-shadow]",
-        isDragTarget ? "border-primary ring-2 ring-primary/20" : "border-border/70",
-        isDragged && "opacity-50"
-      )}
+    <article
+      id={`debrid-${provider.id}`}
+      className="overflow-hidden rounded-2xl border border-border/70 bg-card/40"
     >
-      <div
-        draggable
-        {...{ onDragStart }}
-        className="flex items-center gap-3 border-b border-border/60 px-4 py-3"
-      >
-        <GripVertical
-          aria-hidden="true"
-          className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
-        />
-        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+      <header className="flex items-center gap-4 border-b border-border/60 bg-muted/20 px-5 py-4">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
           <DebridIcon provider={provider} className="h-5 w-5 text-primary" />
-          <span className="text-primary-foreground absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-background bg-primary px-1 text-[10px] font-bold tabular-nums">
-            {index + 1}
-          </span>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">
-            {provider.name}
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="mb-0 truncate text-base font-semibold text-foreground">
+              {provider.name}
+            </h4>
+            <StatusPill status={status} />
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {t("debrid.position", { position })}
           </p>
-          <span
-            className={cn(
-              "mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-px text-[11px] font-medium",
-              STATUS_TONES[status]
-            )}
-          >
-            {status === "checking" && <Loader2 className="h-3 w-3 animate-spin" />}
-            {t(`debrid.status.${status}`)}
-          </span>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        {status === "connected" && (
           <Button
-            size="icon"
             variant="ghost"
-            className="h-7 w-7"
-            disabled={index === 0}
-            aria-label={t("debrid.moveUp", { provider: provider.name })}
-            onClick={() => onMove(index - 1)}
+            size="sm"
+            className="hidden gap-1.5 text-muted-foreground sm:inline-flex"
+            onClick={() => navigate(`/debriddownloads?service=${provider.id}`)}
           >
-            <ArrowUp className="h-3.5 w-3.5" />
+            {t("debrid.viewDownloads")}
+            <ArrowRight className="h-3.5 w-3.5" />
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7"
-            disabled={index === count - 1}
-            aria-label={t("debrid.moveDown", { provider: provider.name })}
-            onClick={() => onMove(index + 1)}
-          >
-            <ArrowDown className="h-3.5 w-3.5" />
-          </Button>
-          <Switch
-            className="ml-2"
-            checked={enabled}
-            aria-label={t("debrid.useService", { provider: provider.name })}
-            onCheckedChange={value =>
-              setSettings(current => ({
-                ...current,
-                debridProviderEnabled: {
-                  ...current.debridProviderEnabled,
-                  [provider.id]: value,
-                },
-              }))
-            }
-          />
-        </div>
-      </div>
+        )}
+        <Switch
+          checked={enabled}
+          aria-label={t("debrid.useService", { provider: provider.name })}
+          onCheckedChange={value =>
+            setSettings(current => ({
+              ...current,
+              debridProviderEnabled: {
+                ...current.debridProviderEnabled,
+                [provider.id]: value,
+              },
+            }))
+          }
+        />
+      </header>
 
-      <div className="grid gap-x-8 gap-y-5 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="min-w-0">
-          <h4 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="grid lg:grid-cols-2 lg:divide-x lg:divide-border/60">
+        <div className="min-w-0 p-5">
+          <h5 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {t("debrid.accountTitle")}
-          </h4>
+          </h5>
           {hasKey && !editingKey ? (
             <AccountSummary
               provider={provider}
               account={account}
               signedInWithCode={provider.signIn?.isSignedIn(settings)}
-              onRetry={retryAccount}
+              onRetry={onRetry}
               onChangeKey={() => setEditingKey(true)}
               onDisconnect={disconnect}
             />
@@ -379,10 +475,10 @@ function ProviderCard({
           )}
         </div>
 
-        <div className="min-w-0">
-          <h4 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="min-w-0 border-t border-border/60 p-5 lg:border-t-0">
+          <h5 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {t("debrid.optionsTitle")}
-          </h4>
+          </h5>
           {(!hasKey || !enabled) && (
             <p className="mb-1 text-xs text-muted-foreground">
               {t(hasKey ? "debrid.optionsPaused" : "debrid.optionsNeedAccount")}
@@ -392,7 +488,7 @@ function ProviderCard({
             {options.map(([key, label, description, defaultValue]) => {
               const id = `${provider.id}-${key}`;
               return (
-                <div key={key} className="flex items-center justify-between gap-4 py-2.5">
+                <div key={key} className="flex items-center justify-between gap-4 py-3">
                   <div className="min-w-0 space-y-0.5">
                     <Label htmlFor={id} className="text-sm">
                       {t(label)}
@@ -416,6 +512,73 @@ function ProviderCard({
           </div>
         </div>
       </div>
+    </article>
+  );
+}
+
+function OrderRow({
+  provider,
+  index,
+  count,
+  status,
+  onMove,
+  isDragged,
+  isDragTarget,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+}) {
+  const { t } = useLanguage();
+  return (
+    // Spread so the list's handlers stay the only JSX drag attributes in this file
+    <li
+      draggable
+      {...{ onDragStart, onDragOver, onDrop, onDragEnd }}
+      className={cn(
+        "relative flex items-center gap-3 border-b border-border/60 bg-card/40 px-4 py-3 transition-colors last:border-b-0",
+        isDragTarget &&
+          "bg-primary/5 before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-primary",
+        isDragged && "opacity-50"
+      )}
+    >
+      <GripVertical
+        aria-hidden="true"
+        className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
+      />
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold tabular-nums text-foreground">
+        {index + 1}
+      </span>
+      <DebridIcon provider={provider} className="h-5 w-5 shrink-0 text-primary" />
+      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+        {provider.name}
+      </span>
+      <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <span className={cn("h-1.5 w-1.5 rounded-full", STATUS_TONES[status].dot)} />
+        {t(`debrid.status.${status}`)}
+      </span>
+      <div className="flex shrink-0 items-center">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7"
+          disabled={index === 0}
+          aria-label={t("debrid.moveUp", { provider: provider.name })}
+          onClick={() => onMove(index - 1)}
+        >
+          <ArrowUp className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7"
+          disabled={index === count - 1}
+          aria-label={t("debrid.moveDown", { provider: provider.name })}
+          onClick={() => onMove(index + 1)}
+        >
+          <ArrowDown className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </li>
   );
 }
@@ -430,49 +593,71 @@ function AccountSummary({
 }) {
   const { t } = useLanguage();
   const details =
-    account.status === "ready" ? provider.describeAccount?.(account.user, t) : null;
+    account?.status === "ready" ? provider.describeAccount?.(account.user, t) : null;
+  const formatStat = ({ value, unit }) =>
+    unit === "bytes"
+      ? formatBytes(value) || "0 B"
+      : unit === "days"
+        ? t("debrid.days", { count: value })
+        : value.toLocaleString();
 
   return (
-    <div className="space-y-3">
-      <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-        {account.status === "error" ? (
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-destructive min-w-0 text-xs">{account.error}</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 shrink-0 gap-1.5 px-2 text-xs"
-              onClick={onRetry}
-            >
-              <RefreshCw className="h-3 w-3" />
-              {t("featureCenters.common.retry")}
-            </Button>
+    <div className="space-y-4">
+      {account?.status === "error" ? (
+        <div className="border-destructive/30 bg-destructive/5 flex items-start justify-between gap-3 rounded-lg border px-3 py-2.5">
+          <p className="text-destructive min-w-0 text-xs">{account.error}</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 shrink-0 gap-1.5 px-2 text-xs"
+            onClick={onRetry}
+          >
+            <RefreshCw className="h-3 w-3" />
+            {t("featureCenters.common.retry")}
+          </Button>
+        </div>
+      ) : !details ? (
+        <div className="space-y-2">
+          <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+          <div className="h-3 w-28 animate-pulse rounded bg-muted/70" />
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="h-12 animate-pulse rounded-lg bg-muted/60" />
+            <div className="h-12 animate-pulse rounded-lg bg-muted/60" />
           </div>
-        ) : !details ? (
-          <div className="space-y-1.5">
-            <div className="h-4 w-36 animate-pulse rounded bg-muted" />
-            <div className="h-3 w-24 animate-pulse rounded bg-muted/70" />
-          </div>
-        ) : (
-          <>
-            <p className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <span className="truncate">{details.name || provider.name}</span>
-              {details.plan && (
-                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-px text-[10px] font-semibold uppercase tracking-wide text-primary">
-                  {details.plan}
-                </span>
-              )}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {details.expiresAt
-                ? t("debrid.expires", {
-                    date: new Date(details.expiresAt).toLocaleDateString(),
-                  })
-                : t("debrid.noPremium")}
-            </p>
-          </>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div>
+          <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <span className="truncate">{details.name || provider.name}</span>
+            {details.plan && (
+              <span className="shrink-0 rounded-full bg-primary/10 px-2 py-px text-[10px] font-semibold uppercase tracking-wide text-primary">
+                {details.plan}
+              </span>
+            )}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {details.expiresAt
+              ? t("debrid.expires", {
+                  date: new Date(details.expiresAt).toLocaleDateString(),
+                })
+              : t("debrid.noPremium")}
+          </p>
+          {details.stats?.length > 0 && (
+            <dl className="mt-3 grid grid-cols-2 gap-2">
+              {details.stats.map(stat => (
+                <div key={stat.label} className="rounded-lg bg-muted/40 px-3 py-2">
+                  <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    {stat.label}
+                  </dt>
+                  <dd className="text-sm font-semibold tabular-nums text-foreground">
+                    {formatStat(stat)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+      )}
       {signedInWithCode && (
         <p className="text-xs text-muted-foreground">{t("debrid.signIn.signedIn")}</p>
       )}
