@@ -492,6 +492,7 @@ export const settingsSearchData = [
       "torbox",
       "realdebrid",
       "real-debrid",
+      "alldebrid",
       "priority",
       "order",
       "account",

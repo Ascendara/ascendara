@@ -5,13 +5,14 @@ const ROUTES = {
   realdebrid: "https://api.real-debrid.com/rest/1.0",
   rdoauth: "https://api.real-debrid.com/oauth/v2",
   torbox: "https://api.torbox.app/v1/api",
+  alldebrid: "https://api.alldebrid.com",
   flingtrainer: "https://flingtrainer.com",
   analytics: "https://analytics.ascendara.app",
 };
 const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 
 function getProxyTarget(rawUrl) {
-  const match = /^\/api\/(khinsider|torbox|realdebrid|rdoauth|flingtrainer|analytics)(?=\/|\?|$)/.exec(rawUrl);
+  const match = /^\/api\/(khinsider|torbox|realdebrid|rdoauth|alldebrid|flingtrainer|analytics)(?=\/|\?|$)/.exec(rawUrl);
   if (!match) return null;
   return new URL(ROUTES[match[1]] + rawUrl.slice(match[0].length));
 }

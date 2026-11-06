@@ -50,6 +50,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: path => path.replace(/^\/api\/rdoauth/, ""),
       },
+      "/api/alldebrid": {
+        target: "https://api.alldebrid.com",
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api\/alldebrid/, ""),
+      },
       "/api/torbox": {
         target: "https://api.torbox.app/v1/api",
         changeOrigin: true,

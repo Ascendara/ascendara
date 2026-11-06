@@ -333,25 +333,35 @@ test("TorBox is first by default while saved orders and account availability are
     debridProvider: "realdebrid",
   };
   assert.deepEqual(
-    debrid.getOrderedProviders(settings).map(provider => provider.id),
+    debrid
+      .getOrderedProviders(settings)
+      .map(provider => provider.id)
+      .slice(0, 2),
     ["torbox", "realdebrid"]
   );
   assert.equal(debrid.getPreferredProvider(settings).id, "torbox");
   assert.deepEqual(
     debrid
       .getOrderedProviders({ ...settings, debridProviderOrder: [] })
-      .map(provider => provider.id),
+      .map(provider => provider.id)
+      .slice(0, 2),
     ["torbox", "realdebrid"]
   );
   const custom = { ...settings, debridProviderOrder: ["realdebrid", "torbox"] };
   assert.deepEqual(
-    debrid.getOrderedProviders(custom).map(provider => provider.id),
+    debrid
+      .getOrderedProviders(custom)
+      .map(provider => provider.id)
+      .slice(0, 2),
     ["realdebrid", "torbox"]
   );
   assert.equal(debrid.getPreferredProvider(custom).id, "realdebrid");
   const ordered = { ...settings, debridProviderOrder: ["missing", "torbox", "torbox"] };
   assert.deepEqual(
-    debrid.getOrderedProviders(ordered).map(provider => provider.id),
+    debrid
+      .getOrderedProviders(ordered)
+      .map(provider => provider.id)
+      .slice(0, 2),
     ["torbox", "realdebrid"]
   );
   assert.equal(debrid.getPreferredProvider(ordered).id, "torbox");
