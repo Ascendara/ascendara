@@ -208,6 +208,68 @@ test("handoff waits for readiness and active local jobs, respects disabling, and
   }
 });
 
+test("a hand-off that stops early says why in the log, without links past the host", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => {
+    Object.assign(global, saved);
+    t.mock.restoreAll();
+  });
+  const warnings = [];
+  t.mock.method(console, "warn", message => warnings.push(message));
+  for (const scenario of ["busy", "disabled", "start", "links", "status"]) {
+    let stored = JSON.stringify({ "torrent:a": { game: "Example", autoHandoff: true } });
+    global.localStorage = {
+      getItem: () => stored,
+      setItem: (_k, value) => {
+        stored = value;
+      },
+    };
+    global.window = {
+      electron: {
+        getGames: async () =>
+          scenario === "busy"
+            ? [{ game: "Other", downloadingData: { downloading: true } }]
+            : [],
+        getSettings: async () => ({
+          debridEnabled: scenario !== "disabled",
+          key: "token",
+        }),
+        downloadFile: async () => ({
+          success: false,
+          error: "refused https://cdn.example.com/dl/secret-token/file.bin",
+        }),
+      },
+    };
+    const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+      fresh: true,
+    });
+    const provider = {
+      id: "test",
+      apiKeySetting: "key",
+      metadataStorageKey: "metadata",
+      getTorrentGame: entry => entry,
+      getTorrentDownload: async () => {
+        if (scenario === "links")
+          throw new Error("busy at file:///C:/Users/me/x.torrent");
+        return scenario === "status"
+          ? null
+          : [{ url: "https://example.com/file", filename: "data.bin", size: 10 }];
+      },
+      getTorrentStatus: async () => {
+        throw new Error("timed out");
+      },
+    };
+    await worker.handoffTorrents(provider, "token").catch(() => {});
+  }
+  assert.deepEqual(warnings, [
+    "[debrid-handoff] Example: waiting, another download is running",
+    "[debrid-handoff] Example: not started, debrid is off or the key changed",
+    "[debrid-handoff] Example: could not start: refused cdn.example.com",
+    "[debrid-handoff] Example: could not get the links: busy at [file]",
+    "[debrid-handoff] Example: could not read the cloud progress: timed out",
+  ]);
+});
+
 test("a hand-off whose game never shows up on this PC is started again, once confirmed games are left alone", async t => {
   const saved = { window: global.window, localStorage: global.localStorage };
   t.after(() => {
@@ -242,7 +304,8 @@ test("a hand-off whose game never shows up on this PC is started again, once con
       },
     },
   };
-  t.mock.method(console, "warn", () => {});
+  const warnings = [];
+  t.mock.method(console, "warn", message => warnings.push(message));
   const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
     fresh: true,
   });
@@ -276,6 +339,9 @@ test("a hand-off whose game never shows up on this PC is started again, once con
     ["Lost", "Listed", "Lost"],
     "the unconfirmed start is handed off again without a click"
   );
+  assert.deepEqual(warnings, [
+    "[debrid-handoff] Lost: did not appear on this PC, starting again",
+  ]);
   // A confirmed game that later leaves the list (deleted on purpose) stays deleted.
   listed = [];
   now += 10 * 60 * 1000;

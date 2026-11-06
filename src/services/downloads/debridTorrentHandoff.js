@@ -36,11 +36,27 @@ async function confirmStarts(provider) {
     if (games.some(item => item.game === name))
       updateRecord(provider, id, { localDownloadSeen: true });
     else if (Date.now() - (entry.localDownloadStartedAt || 0) >= CONFIRM_MS) {
-      console.warn(`[debrid-handoff] ${name} did not appear on this PC, starting again`);
+      warn(name, "did not appear on this PC, starting again");
       updateRecord(provider, id, { localDownloadStarted: false });
     }
   }
 }
+
+// Hand-off warnings keep only the host of any link: no paths, tokens or file URLs.
+const warn = (game, text) =>
+  console.warn(
+    `[debrid-handoff] ${game}: ${String(text).replace(
+      /\b[a-z][\w+.-]*:\/\/\S+/gi,
+      link => {
+        try {
+          const { protocol, host } = new URL(link);
+          return protocol === "file:" || !host ? "[file]" : host;
+        } catch {
+          return "[link]";
+        }
+      }
+    )}`
+  );
 
 const startLocalDownload = async (...args) => {
   try {
@@ -136,8 +152,10 @@ export function handoffTorrents(provider, apiKey, settings) {
               (data.downloading || data.extracting || data.verifying || data.updating)
             );
           })
-        )
+        ) {
+          warn(game.game, "waiting, another download is running");
           return;
+        }
         if (provider.pollIntervalMs) {
           if (Date.now() - (lastPolled.get(retryKey) || 0) < provider.pollIntervalMs)
             continue;
@@ -155,6 +173,7 @@ export function handoffTorrents(provider, apiKey, settings) {
         try {
           files = await provider.getTorrentDownload(apiKey, id.slice(8), pickParts);
         } catch (error) {
+          warn(game.game, `could not get the links: ${error.message}`);
           // A torrent the service gave up on is reported once, then left for Remove.
           if (error.terminal) {
             mark(id, "cloudTorrentFailed");
@@ -191,7 +210,10 @@ export function handoffTorrents(provider, apiKey, settings) {
           ) {
             const state = await provider
               .getTorrentStatus(apiKey, id.slice(8))
-              .catch(() => null);
+              .catch(error => {
+                warn(game.game, `could not read the cloud progress: ${error.message}`);
+                return null;
+              });
             if (!state) continue;
             const progress = state.progress ?? -1;
             if (since == null || progress > (entry.lastProgress ?? -1)) {
@@ -215,8 +237,10 @@ export function handoffTorrents(provider, apiKey, settings) {
             current.debridProviderEnabled?.[provider.id] === false ||
             current[provider.apiKeySetting]?.trim() !== apiKey ||
             current[provider.torrentSetting] === false
-          )
+          ) {
+            warn(game.game, "not started, debrid is off or the key changed");
             return;
+          }
         }
         const result = await startLocalDownload(
           {
@@ -236,6 +260,7 @@ export function handoffTorrents(provider, apiKey, settings) {
           true
         );
         if (!result?.success) {
+          warn(game.game, `could not start: ${result?.error || "no reason given"}`);
           fail(
             retryKey,
             new Error(result?.error || "Could not start the local debrid download.")
