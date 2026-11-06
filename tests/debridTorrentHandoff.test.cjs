@@ -198,9 +198,10 @@ test("handoff waits for readiness and active local jobs, respects disabling, and
     if (scenario === "failed") {
       await assert.rejects(worker.handoffTorrents(provider, "token"), /start failed/);
       assert.equal(JSON.parse(stored)["torrent:ready"].localDownloadStarted, undefined);
-      await assert.rejects(worker.handoffTorrents(provider, "token"), /start failed/);
+      // The waiting poll does not report the same error again.
+      await worker.handoffTorrents(provider, "token");
       assert.equal(calls.length, 1, "the next poll waits");
-      t.mock.method(Date, "now", () => realNow() + 5 * 60 * 1000);
+      t.mock.method(Date, "now", () => realNow() + 15 * 1000);
       await worker.handoffTorrents(provider, "token");
       assert.equal(JSON.parse(stored)["torrent:ready"].localDownloadStarted, true);
       t.mock.restoreAll();
@@ -500,7 +501,7 @@ test("a refused torrent asks Real-Debrid for its links once per retry, not on ev
   global.window = {
     electron: {
       getGames: async () => [],
-      downloadFile: async () => ({ success: false, error: "Folder already exists" }),
+      downloadFile: async () => ({ success: false, error: "disk busy" }),
     },
   };
   const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
@@ -512,19 +513,93 @@ test("a refused torrent asks Real-Debrid for its links once per retry, not on ev
 
   let now = realNow();
   t.mock.method(Date, "now", () => now);
-  // One minute of the 5 second background poll.
-  for (let poll = 0; poll < 12; poll++) {
-    await assert.rejects(
-      worker.handoffTorrents(provider, "key"),
-      /Folder already exists/
-    );
+  await assert.rejects(worker.handoffTorrents(provider, "key"), /disk busy/);
+  // A minute of the 5 second background poll: retries at 15 s and 45 s only.
+  for (let poll = 1; poll < 12; poll++) {
     now += 5000;
+    await worker.handoffTorrents(provider, "key");
   }
-  assert.equal(requests, 31);
+  assert.equal(requests, 3 * 31);
+});
 
-  now += 5 * 60 * 1000;
-  await assert.rejects(worker.handoffTorrents(provider, "key"), /Folder already exists/);
-  assert.equal(requests, 62);
+test("a refused start retries in 15 s, backs off to 5 min, says each error once, and a start resets it", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => {
+    Object.assign(global, saved);
+    t.mock.restoreAll();
+  });
+  t.mock.method(console, "warn", () => {});
+  let stored = JSON.stringify({ "torrent:a": { game: "Example", autoHandoff: true } });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_k, value) => {
+      stored = value;
+    },
+  };
+  let result = { success: false, error: "disk busy" };
+  global.window = {
+    electron: {
+      getGames: async () => [],
+      getRunningDownloads: async () => [],
+      downloadFile: async () => result,
+    },
+  };
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  const provider = {
+    id: "test",
+    metadataStorageKey: "metadata",
+    getTorrentGame: entry => entry,
+    getTorrentDownload: async () => [
+      { url: "https://example.com/file", filename: "data.bin", size: 10 },
+    ],
+  };
+  let now = realNow();
+  t.mock.method(Date, "now", () => now);
+  const record = () => JSON.parse(stored)["torrent:a"];
+  const delays = [];
+  const reported = [];
+  const pass = async () => {
+    await worker.handoffTorrents(provider, "token").then(
+      () => reported.push(null),
+      error => reported.push(error.message)
+    );
+    delays.push(record().nextHandoffAt - now);
+    now = record().nextHandoffAt;
+  };
+
+  for (let retry = 0; retry < 6; retry++) await pass();
+  assert.deepEqual(delays, [15000, 30000, 60000, 120000, 300000, 300000]);
+  assert.deepEqual(reported, ["disk busy", null, null, null, null, null]);
+  assert.equal(record().handoffWaitReason, "retrying");
+
+  // A new error is said once, and keeps the backoff.
+  result = { success: false, error: "disk full" };
+  await pass();
+  await pass();
+  assert.deepEqual(reported.slice(6), ["disk full", null]);
+  assert.deepEqual(delays.slice(6), [300000, 300000]);
+
+  // A start resets the backoff and the errors already said.
+  result = { success: true };
+  await worker.handoffTorrents(provider, "token");
+  assert.equal(record().localDownloadStarted, true);
+  stored = JSON.stringify({ "torrent:a": { game: "Example", autoHandoff: true } });
+  now += 20000;
+  result = { success: false, error: "disk busy" };
+  reported.length = delays.length = 0;
+  await pass();
+  assert.deepEqual(reported, ["disk busy"]);
+  assert.deepEqual(delays, [15000]);
+
+  // A folder holding an installed game needs the user, not fast retries.
+  stored = JSON.stringify({ "torrent:b": { game: "Installed", autoHandoff: true } });
+  result = { success: false, error: "The game folder already exists." };
+  await worker.handoffTorrents(provider, "token").catch(() => {});
+  const installed = JSON.parse(stored)["torrent:b"];
+  assert.equal(installed.handoffWaitReason, "folder-has-install");
+  assert.equal(installed.nextHandoffAt - now, 300000);
 });
 
 test("a torrent that can not start does not hold back the ones behind it", async t => {

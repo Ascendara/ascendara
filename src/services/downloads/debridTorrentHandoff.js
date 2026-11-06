@@ -6,8 +6,11 @@ import { isPendingTorrent, readRecords, updateRecord } from "./debridRecords";
 const inFlight = new Map();
 let localStart = Promise.resolve();
 let startingUntil = 0;
-// A torrent that could not start waits before its links are requested again.
-const HANDOFF_RETRY_MS = 5 * 60 * 1000;
+// A torrent that could not start waits before its links are requested again: 15 s,
+// 30 s, 1 min, 2 min, then 5 min, back to 15 s once a start succeeds.
+const HANDOFF_RETRY_STEPS_MS = [15, 30, 60, 120, 300].map(seconds => seconds * 1000);
+const HANDOFF_RETRY_MAX_MS = HANDOFF_RETRY_STEPS_MS.at(-1);
+// Per torrent: { error, retryAt, delay, said } where said is the last message reported.
 const handoffFailures = new Map();
 // A torrent added moments ago may not be listed yet; it counts as removed only
 // after it has stayed unlisted this long.
@@ -153,20 +156,32 @@ export function handoffTorrents(provider, apiKey, settings) {
           !entry.cloudTorrentStalled &&
           !entry.cloudTorrentFailed
       );
+      // Each torrent reports a given error once, not on every retry; the countdown
+      // shows the retries.
       let failure;
-      const fail = (retryKey, error) => {
-        handoffFailures.set(retryKey, { error, retryAt: Date.now() + HANDOFF_RETRY_MS });
-        failure ??= error;
+      let failureKey;
+      const fail = (retryKey, error, delay) => {
+        const previous = handoffFailures.get(retryKey);
+        delay ??=
+          HANDOFF_RETRY_STEPS_MS.find(step => step > (previous?.delay ?? 0)) ??
+          HANDOFF_RETRY_MAX_MS;
+        handoffFailures.set(retryKey, {
+          error,
+          retryAt: Date.now() + delay,
+          delay,
+          said: previous?.said,
+        });
+        if (!failure && error.message !== previous?.said) {
+          failure = error;
+          failureKey = retryKey;
+        }
       };
       for (const [id, entry] of entries) {
         const game = provider.getTorrentGame(entry);
         if (!game?.game) continue;
         const retryKey = `${provider.id}:${id}`;
         const previous = handoffFailures.get(retryKey);
-        if (previous && Date.now() < previous.retryAt) {
-          failure ??= previous.error;
-          continue;
-        }
+        if (previous && Date.now() < previous.retryAt) continue;
         // Wait for the current local transfer; cloud preparation can continue meanwhile.
         // Only a download whose process is alive counts: a folder left by a killed run
         // still says "downloading" with nothing behind it.
@@ -302,15 +317,16 @@ export function handoffTorrents(provider, apiKey, settings) {
         );
         if (!result?.success) {
           warn(game.game, `could not start: ${result?.error || "no reason given"}`);
+          // A folder holding an installed game waits for the user: no fast retries.
+          const hasInstall = /folder already exists/i.test(result?.error);
           fail(
             retryKey,
-            new Error(result?.error || "Could not start the local debrid download.")
+            new Error(result?.error || "Could not start the local debrid download."),
+            hasInstall ? HANDOFF_RETRY_MAX_MS : undefined
           );
           wait(
             id,
-            /folder already exists/i.test(result?.error)
-              ? "folder-has-install"
-              : "retrying",
+            hasInstall ? "folder-has-install" : "retrying",
             handoffFailures.get(retryKey).retryAt
           );
           continue;
@@ -331,7 +347,10 @@ export function handoffTorrents(provider, apiKey, settings) {
           recordKey: id,
         };
       }
-      if (failure) throw failure;
+      if (failure) {
+        handoffFailures.get(failureKey).said = failure.message;
+        throw failure;
+      }
     })
     .finally(() => inFlight.delete(key));
   localStart = task;
