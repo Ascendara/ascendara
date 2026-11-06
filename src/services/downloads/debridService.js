@@ -116,14 +116,16 @@ export function createDebridService(providers) {
     if (settings?.debridEnabled !== true)
       throw new Error("Debrid services are disabled.");
     const normalizedLink = link.startsWith("//") ? `https:${link}` : link;
+    // A queued download remembers its service (and no host name). Once that service
+    // is paused or disconnected, another service in use that supports the link takes it.
+    const configured = getConfiguredProviders(settings);
+    const hosts = await getSupportedHosts(settings);
     const provider = providerId
-      ? getProvider(providerId)
-      : getHostProvider(
-          settings,
-          host,
-          normalizedLink,
-          await getSupportedHosts(settings)
-        );
+      ? configured.find(item => item.id === providerId) ||
+        configured.find(
+          item => item.resolveHost && item.isSupportedUrl(normalizedLink, hosts[item.id])
+        )
+      : getHostProvider(settings, host, normalizedLink, hosts);
     if (!provider) throw new Error("No configured debrid service supports this URL.");
     if (!provider.resolveHost || !getApiKey(settings, provider))
       throw new Error("Debrid provider is not configured.");

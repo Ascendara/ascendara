@@ -2,7 +2,7 @@ import React, { useState, useEffect, memo, useCallback, useMemo, useRef } from "
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
-import { debridProviders } from "@/services/downloads/debridService";
+import { getConfiguredProviders } from "@/services/downloads/debridService";
 import {
   Home,
   Search,
@@ -22,10 +22,8 @@ import { prefetchAscendData } from "@/services/ascend/ascendPrefetch";
 const Navigation = memo(({ items }) => {
   const { t } = useLanguage();
   const { settings } = useSettings();
-  // One entry for all services, shown only while debrid is on and a key is saved
-  const debridNavVisible =
-    settings.debridEnabled === true &&
-    debridProviders.some(provider => settings[provider.apiKeySetting]?.trim());
+  // One entry for all services, shown only while debrid is on and a service is in use
+  const debridNavVisible = getConfiguredProviders(settings).length > 0;
   const location = useLocation();
   const navigate = useNavigate();
   const [size, setSize] = useState(() => {
