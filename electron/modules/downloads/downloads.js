@@ -561,17 +561,25 @@ function registerDownloadHandlers() {
               `${sanitizedGame}.json`
             );
             const cached = await fs.readJson(cachePath).catch(() => null);
-            const tracked = fs.existsSync(
-              path.join(gameDirectory, `${sanitizedGame}.ascendara.json`)
+            const trackedPath = path.join(
+              gameDirectory,
+              `${sanitizedGame}.ascendara.json`
             );
+            const sameTransfer = cached?.transferId === fileList.transferId;
+            // Running, or listed in Downloads where the user can resume it.
             if (
-              cached?.transferId === fileList.transferId &&
-              (tracked || downloadProcesses.has(sanitizedGame))
+              sameTransfer &&
+              (downloadProcesses.has(sanitizedGame) ||
+                (await fs.readJson(trackedPath).catch(() => null))?.downloadingData)
             )
               return { success: true, alreadyStarted: true };
-            throw new Error(
-              "The game folder already exists. Resolve the existing download before starting this torrent."
-            );
+            // A leftover of this transfer with nothing running starts again in its folder.
+            if (sameTransfer && fs.existsSync(trackedPath))
+              console.log(`Starting the leftover transfer for ${sanitizedGame} again`);
+            else
+              throw new Error(
+                "The game folder already exists. Resolve the existing download before starting this torrent."
+              );
           }
 
           // If the destination folder already exists and wasn't created by a
