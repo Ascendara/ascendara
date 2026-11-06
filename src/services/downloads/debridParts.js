@@ -138,6 +138,7 @@ export const getPendingPartChoices = storageKeys =>
         storageKey,
         recordKey,
         name: record.name || record.game || record.gameData?.game || "",
+        game: record.game || record.gameData?.game || record.name || "",
         files: record.partFiles,
       }))
   );

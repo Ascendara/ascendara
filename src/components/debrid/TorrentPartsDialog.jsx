@@ -16,6 +16,14 @@ import {
   getPendingPartChoices,
   saveTorrentPartChoice,
 } from "@/services/downloads/debridParts";
+import { useSettings } from "@/context/SettingsContext";
+import { FitgirlInstallSwitches } from "@/components/FitgirlInstallToggles";
+import {
+  looksLikeFitgirl,
+  readDownloadChoice,
+  resolveFitgirlOptions,
+  saveDownloadChoice,
+} from "@/services/downloads/fitgirlInstallOptions";
 
 const STORAGE_KEYS = ["realDebridGameData", "torboxGameNames"];
 const keyOf = choice => `${choice.storageKey}|${choice.recordKey}`;
@@ -24,6 +32,8 @@ const keyOf = choice => `${choice.storageKey}|${choice.recordKey}`;
 // behind a "Choose parts" button, so it is never stuck.
 export default function TorrentPartsDialog() {
   const { t } = useLanguage();
+  const { settings } = useSettings();
+  const [fitgirl, setFitgirl] = useState(null);
   const [pending, setPending] = useState([]);
   const [dismissed, setDismissed] = useState(() => new Set());
   const [ticked, setTicked] = useState({});
@@ -49,6 +59,12 @@ export default function TorrentPartsDialog() {
   useEffect(() => {
     if (current)
       setTicked(Object.fromEntries(current.files.map(file => [file.id, true])));
+    // FitGirl packs: install switches prefilled from this download's choice or Settings.
+    setFitgirl(
+      current && (looksLikeFitgirl(current.name) || looksLikeFitgirl(current.game))
+        ? resolveFitgirlOptions(settings, readDownloadChoice(current.game))
+        : null
+    );
     // Only reset when a different torrent comes up.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentKey]);
@@ -65,6 +81,7 @@ export default function TorrentPartsDialog() {
   const chosenSize = chosen.reduce((sum, file) => sum + (Number(file.size) || 0), 0);
 
   const download = () => {
+    if (fitgirl) saveDownloadChoice(current.game, fitgirl);
     saveTorrentPartChoice(
       current.storageKey,
       current.recordKey,
@@ -105,6 +122,18 @@ export default function TorrentPartsDialog() {
                 </li>
               ))}
             </ul>
+            {fitgirl && (
+              <div className="space-y-3 rounded-xl bg-muted/40 p-4">
+                <h3 className="text-sm font-semibold">
+                  {t("fitgirlInstall.afterDownload")}
+                </h3>
+                <FitgirlInstallSwitches
+                  value={fitgirl}
+                  onChange={setFitgirl}
+                  idPrefix="fitgirl-parts"
+                />
+              </div>
+            )}
             <DialogFooter className="items-center gap-2 sm:justify-between">
               <span className="text-xs text-muted-foreground">
                 {t("debrid.torrentParts.selected", {

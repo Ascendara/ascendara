@@ -99,6 +99,7 @@ test("a part choice is stored, listed while waiting, and cleared once saved", as
       storageKey: "torboxGameNames",
       recordKey: "torrent:5",
       name: "Example",
+      game: "Example",
       files: [{ id: 1, name: "a", size: null }],
     },
   ]);
