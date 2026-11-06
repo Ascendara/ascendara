@@ -251,7 +251,8 @@ function PublicDownloadPage() {
           setSteamData(data);
         } else {
           console.log("No game data found for:", gameData.game);
-          setSteamError("No game data found");
+          // Not an error: the overview shows its empty state
+          setSteamError(null);
         }
       } catch (error) {
         console.error("Error fetching game data:", error);
@@ -399,7 +400,12 @@ function PublicDownloadPage() {
   // Read-only: the ref is never attached, so opening this page does not count a view
   const [, viewCount] = useGameViews(gameData?.gameID, !gameData?.privateSource);
   const [showVerifiedDialog, setShowVerifiedDialog] = useState(false);
-  const [debridDisabledForSession, setDebridDisabledForSession] = useState(false);
+  // Debrid service for this download only: "default", a provider id, or "none"
+  const [debridPick, setDebridPick] = useState("default");
+  const debridDisabledForSession = debridPick === "none";
+  useEffect(() => {
+    setDebridPick("default");
+  }, [gameData?.gameID, gameData?.game]);
   const [isExternalSourcesMode, setIsExternalSourcesMode] = useState(false);
   const [antivirusWarningDismissed, setAntivirusWarningDismissed] = useState(false);
   const [isGameInstalled, setIsGameInstalled] = useState(false);
@@ -917,22 +923,53 @@ function PublicDownloadPage() {
     const supportedHosts = !["torrent", "direct"].includes(downloadProvider)
       ? await debrid.getSupportedHosts(settings)
       : {};
-    const downloadDebridProvider = debrid.getHostProvider(
+    const pickedHost = debrid.getPickedHostProvider(
       settings,
+      debridPick,
       downloadProvider,
       hostSourceLink,
       supportedHosts
     );
-    const debridEligible = Boolean(downloadDebridProvider);
-    const routeThroughDebrid = !debridDisabledForSession && debridEligible;
+    const pickedTorrent = debrid.getPickedTorrentProvider(settings, debridPick);
+    const isTorrentRequest =
+      downloadProvider === "torrent" ||
+      directUrl?.startsWith("magnet:") ||
+      (settings.gameSource === "fitgirl" &&
+        downloadProvider !== "direct" &&
+        gameData.torrentLink?.startsWith("magnet:")) ||
+      (!downloadProvider &&
+        (gameData.download_links?.torrent || []).some?.(link =>
+          link?.trim?.().toLowerCase().startsWith("magnet:")
+        ));
+    if (!(isTorrentRequest ? pickedTorrent.supported : pickedHost.supported)) {
+      toast.error(
+        t("debrid.pickUnsupported", {
+          provider: (isTorrentRequest ? pickedTorrent : pickedHost).provider?.name,
+        })
+      );
+      return;
+    }
+    const downloadDebridProvider = pickedHost.provider;
+    // "No debrid" keeps the old disable-for-this-download path below
+    const debridEligible = Boolean(
+      downloadDebridProvider ||
+      (debridDisabledForSession &&
+        debrid.getHostProvider(
+          settings,
+          downloadProvider,
+          hostSourceLink,
+          supportedHosts
+        ))
+    );
+    const routeThroughDebrid = Boolean(downloadDebridProvider);
 
     // Check if there's an active download
     const hasActive = await hasActiveDownloads();
     console.log("[DL] hasActive:", hasActive, "isAuthenticated:", isAuthenticated);
 
     const cloudTorrentRequest =
-      debrid.canUseCloudTorrents(settings) &&
-      !debridDisabledForSession &&
+      pickedTorrent.supported &&
+      Boolean(pickedTorrent.provider) &&
       (downloadProvider === "torrent" ||
         directUrl?.startsWith("magnet:") ||
         (settings.gameSource === "fitgirl" &&
@@ -995,13 +1032,19 @@ function PublicDownloadPage() {
       isMagnet(directUrl) ||
       (!downloadProvider && torrentLinksFromGame.some(isMagnet));
     const shouldUseCloudTorrent =
-      debrid.canUseCloudTorrents(settings) && !debridDisabledForSession;
+      pickedTorrent.supported && Boolean(pickedTorrent.provider);
     const queueTorrentInDebrid = async magnet => {
       if (isStartingDownload) return true;
       setIsStartingDownload(true);
       toast.info(t("download.toast.processingLink"));
       try {
-        const result = await debrid.submitMagnet(settings, magnet, gameData, dir ?? 0);
+        const result = await debrid.submitMagnet(
+          settings,
+          magnet,
+          gameData,
+          dir ?? 0,
+          pickedTorrent.provider.id
+        );
         const provider = debrid.getProvider(result.providerId);
         toast.success(
           provider?.hasDownloadsPage === false
@@ -1289,7 +1332,8 @@ function PublicDownloadPage() {
           hostSourceLink,
           downloadProvider,
           gameData,
-          dir ?? 0
+          dir ?? 0,
+          downloadDebridProvider.id
         );
         if (result.url) {
           directUrl = result.url;
@@ -1558,7 +1602,7 @@ function PublicDownloadPage() {
       setCachedImage(prepared.cachedImage);
       setArtworkReady(true);
       setSteamData(prepared.steamData);
-      setSteamError(prepared.steamData ? null : "No game data found");
+      setSteamError(null);
       setSteamLoading(false);
     };
 
@@ -1887,13 +1931,27 @@ function PublicDownloadPage() {
   const selectedHostUrl = Array.isArray(selectedLinks)
     ? selectedLinks.find(link => typeof link === "string" && link.trim())
     : selectedLinks;
-  const selectedDebridProvider = debrid.getHostProvider(
+  const pickedHostDebrid = debrid.getPickedHostProvider(
     settings,
+    debridPick,
     selectedProvider,
     selectedHostUrl,
     debridHosts
   );
-  const debridAvailable = Boolean(selectedDebridProvider);
+  const pickedTorrentDebrid = debrid.getPickedTorrentProvider(settings, debridPick);
+  const selectedDebridProvider = pickedHostDebrid.supported
+    ? pickedHostDebrid.provider
+    : null;
+  // With "No debrid" the host still counts as debrid-capable, as the old toggle did
+  const defaultHostDebrid =
+    debridPick === "none"
+      ? debrid.getHostProvider(settings, selectedProvider, selectedHostUrl, debridHosts)
+      : null;
+  const debridAvailable = Boolean(selectedDebridProvider || defaultHostDebrid);
+  const debridPickOptions = debrid.getPickerOptions(settings).map(id => ({
+    id,
+    name: debrid.getProvider(id)?.name || id,
+  }));
   const downloadMode =
     settings.gameSource === "fitgirl" && gameData.torrentLink
       ? "fitgirl"
@@ -2048,11 +2106,22 @@ function PublicDownloadPage() {
               selectedProvider={selectedProvider}
               onProviderChange={setSelectedProvider}
               debridProvider={
-                selectedDebridProvider || debrid.getTorrentProvider(settings)
+                downloadMode === "fitgirl" || downloadMode === "torrent"
+                  ? pickedTorrentDebrid.provider
+                  : selectedDebridProvider || defaultHostDebrid
               }
               debridAvailable={debridAvailable}
-              debridDisabledForSession={debridDisabledForSession}
-              onDebridDisabledChange={setDebridDisabledForSession}
+              cloudTorrent={
+                pickedTorrentDebrid.supported && Boolean(pickedTorrentDebrid.provider)
+              }
+              debridPick={debridPick}
+              debridPickOptions={debridPickOptions}
+              onDebridPickChange={setDebridPick}
+              debridPickUnsupported={
+                downloadMode === "fitgirl" || downloadMode === "torrent"
+                  ? !pickedTorrentDebrid.supported
+                  : !pickedHostDebrid.supported
+              }
               torrentRunning={torrentRunning}
               isStartingDownload={isStartingDownload}
               linkStage={linkStage}

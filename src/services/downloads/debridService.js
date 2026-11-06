@@ -59,6 +59,40 @@ export function createDebridService(providers) {
   };
   const canUseForHost = (settings, host, link, hostsByProvider) =>
     Boolean(getHostProvider(settings, host, link, hostsByProvider));
+  // Per-download picker: "default" keeps the saved order, "none" skips debrid.
+  const getPickerOptions = settings => [
+    "default",
+    ...getConfiguredProviders(settings).map(provider => provider.id),
+    "none",
+  ];
+  const getPickedProvider = (settings, pick) =>
+    getConfiguredProviders(settings).find(provider => provider.id === pick) || null;
+  const getPickedHostProvider = (settings, pick, host, link, hostsByProvider) => {
+    if (!pick || pick === "default")
+      return {
+        provider: getHostProvider(settings, host, link, hostsByProvider),
+        supported: true,
+      };
+    if (pick === "none") return { provider: null, supported: true };
+    const provider = getPickedProvider(settings, pick);
+    const supported = Boolean(
+      provider?.resolveHost &&
+      host &&
+      !["torrent", "direct"].includes(host) &&
+      provider.isSupportedUrl(link, hostsByProvider?.[provider.id])
+    );
+    return { provider, supported };
+  };
+  const getPickedTorrentProvider = (settings, pick) => {
+    if (!pick || pick === "default")
+      return { provider: getTorrentProvider(settings), supported: true };
+    if (pick === "none") return { provider: null, supported: true };
+    const provider = getPickedProvider(settings, pick);
+    const supported = Boolean(
+      provider?.submitMagnet && settings[provider.torrentSetting] !== false
+    );
+    return { provider, supported };
+  };
   const allowsTorrentFallback = settings => {
     const provider = getTorrentProvider(settings);
     return Boolean(
@@ -78,8 +112,11 @@ export function createDebridService(providers) {
       console.warn(`Could not save ${provider.name} download metadata:`, error);
     }
   };
-  const submitMagnet = async (settings, link, game, directory = 0) => {
-    const provider = getTorrentProvider(settings);
+  const submitMagnet = async (settings, link, game, directory = 0, providerId) => {
+    const picked = providerId
+      ? getPickedTorrentProvider(settings, providerId)
+      : { provider: getTorrentProvider(settings), supported: true };
+    const provider = picked.supported ? picked.provider : null;
     if (!provider) throw new Error("No debrid provider is enabled for torrents.");
     const result = await provider.submitMagnet(link, getApiKey(settings, provider), game);
     remember(provider, {
@@ -169,6 +206,9 @@ export function createDebridService(providers) {
     canUseCloudTorrents,
     canDownloadTorrents,
     canUseForHost,
+    getPickerOptions,
+    getPickedHostProvider,
+    getPickedTorrentProvider,
     allowsTorrentFallback,
     submitMagnet,
     resumePendingTorrents,
@@ -187,6 +227,9 @@ export const {
   canUseCloudTorrents,
   canDownloadTorrents,
   canUseForHost,
+  getPickerOptions,
+  getPickedHostProvider,
+  getPickedTorrentProvider,
   allowsTorrentFallback,
   submitMagnet,
   resumePendingTorrents,

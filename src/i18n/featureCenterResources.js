@@ -143,8 +143,12 @@ const featureCenterResources = {
       preferenceDescription:
         "Choose which configured service handles eligible downloads. If it is not configured, the first configured service is used.",
       hostInstructions: "Process this host link with {{provider}}.",
-      enable: "Enable {{provider}} for this download",
-      disable: "Disable {{provider}} for this download",
+      torrentVia: "{{provider}} downloads this torrent in the cloud.",
+      pickLabel: "Debrid service",
+      pickDefault: "Default (your order)",
+      pickNone: "No debrid",
+      pickUnsupported:
+        "{{provider}} can't take this download. Pick another service or Default.",
       torrentFallback: "Cloud torrent submission failed. Falling back to qBittorrent.",
     },
     localRefresh: {

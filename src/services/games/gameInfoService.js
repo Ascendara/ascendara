@@ -14,6 +14,8 @@ const isDev = import.meta.env.DEV;
 // Steam API proxy endpoints - always use proxy to avoid API key exposure
 const STEAM_PROXY_BASE = `${API_URL}/api/proxy/steam`;
 const STEAM_STORE_SEARCH_URL = `${STEAM_PROXY_BASE}/search`;
+// A Steam request that never answers would keep the game page loading forever
+const STEAM_FETCH_TIMEOUT_MS = 15000;
 const STEAM_APP_DETAILS_URL = `${STEAM_PROXY_BASE}/appdetails`;
 
 // UI language, sent so Steam returns descriptions, genres etc. in that language
@@ -107,7 +109,9 @@ const searchGameSteam = async (gameName, apiKey) => {
       );
 
       const storeSearchUrl = `${STEAM_STORE_SEARCH_URL}?term=${encodedSearch}`;
-      const response = await fetch(storeSearchUrl);
+      const response = await fetch(storeSearchUrl, {
+        signal: AbortSignal.timeout(STEAM_FETCH_TIMEOUT_MS),
+      });
       const storeResult = {
         success: response.ok,
         data: response.ok ? await response.json() : null,
@@ -229,7 +233,9 @@ const getGameDetailByIdSteam = async (appId, apiKey) => {
     // Get game details from Steam Store API via proxy
     const url = `${STEAM_APP_DETAILS_URL}?appids=${appId}&lang=${encodeURIComponent(getDetailsLanguage())}`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(STEAM_FETCH_TIMEOUT_MS),
+    });
     if (!response.ok) {
       throw new Error(`Steam API error: ${response.status}`);
     }
