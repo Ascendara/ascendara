@@ -43,6 +43,7 @@ const { proxyLocalRequest } = require("./modules/core/local-api-proxy");
 const fs = require("fs-extra");
 const { isLinux } = require("./modules/core/config");
 const {
+  holdAppPort,
   isAllowedLocalRequest,
   resolvePublicFile,
 } = require("./modules/core/local-server-security");
@@ -91,7 +92,7 @@ if (isDev) {
 
 // Global variables
 let tray = null;
-let localServer = null;
+let localServers = [];
 let watcherProcess = null;
 let devViteProcess = null;
 
@@ -476,7 +477,7 @@ async function initializeApp() {
     // Start local HTTP server in production to serve app from localhost
     // This allows Firebase auth to work since 'localhost' can be added to authorized domains
     if (!isDev) {
-      localServer = http.createServer((req, res) => {
+      const serveLocalRequest = (req, res) => {
         if (!isAllowedLocalRequest(req)) {
           res.writeHead(403);
           res.end("Forbidden");
@@ -511,18 +512,14 @@ async function initializeApp() {
                 res.end("Not found");
               });
           });
-      });
+      };
 
-      await new Promise(resolve => {
-        localServer.once("error", err => {
-          console.error("Local server error:", err.message);
-          resolve();
-        });
-        localServer.listen(46859, "127.0.0.1", () => {
-          console.log("Local server running at http://localhost:46859");
-          resolve();
-        });
-      });
+      const { owned, servers } = await holdAppPort(() =>
+        http.createServer(serveLocalRequest)
+      );
+      localServers = servers;
+      if (owned) console.log("Local server running at http://localhost:46859");
+      windowModule.setAppServerOwned(owned);
     } else {
       await ensureDevServerRunning();
     }
@@ -613,15 +610,15 @@ async function initializeApp() {
     console.log("App is quitting...");
 
     // Close local server if running
-    if (localServer) {
+    for (const server of localServers) {
       console.log("Closing local HTTP server...");
-      localServer.close(() => {
+      server.close(() => {
         console.log("Local server closed");
       });
       // Force close all connections
-      localServer.closeAllConnections?.();
-      localServer = null;
+      server.closeAllConnections?.();
     }
+    localServers = [];
 
     // Notify renderer to set status to invisible
     const mainWindow = windowModule.getMainWindow();

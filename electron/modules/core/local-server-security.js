@@ -30,4 +30,46 @@ function resolvePublicFile(root, rawUrl) {
   return fullPath;
 }
 
-module.exports = { isAllowedLocalRequest, resolvePublicFile };
+const NO_SUCH_ADDRESS = new Set(["EADDRNOTAVAIL", "EAFNOSUPPORT"]);
+
+const listenOnce = (server, port, host) =>
+  new Promise(resolve => {
+    server.once("error", resolve);
+    server.listen(port, host, () => {
+      server.removeListener("error", resolve);
+      resolve(null);
+    });
+  });
+
+/**
+ * Hold the app's port on both loopback addresses. The window opens "localhost", and
+ * the browser may try either one, so another program could be serving the one left
+ * free.
+ * @param {Function} createServer - Makes one server each time it is called
+ * @returns {Promise<{owned: boolean, servers: Object[]}>} When not owned, nothing is
+ *   left listening and that port's page must not be loaded as the app. An earlier
+ *   instance that is still closing gets a moment to let go.
+ */
+async function holdAppPort(createServer, { port = 46859, tries = 3, waitMs = 500 } = {}) {
+  const servers = [];
+  for (const host of ["127.0.0.1", "::1"]) {
+    const server = createServer();
+    let error;
+    for (let attempt = 1; attempt <= tries; attempt++) {
+      error = await listenOnce(server, port, host);
+      if (!error || error.code !== "EADDRINUSE") break;
+      if (attempt < tries) await new Promise(resolve => setTimeout(resolve, waitMs));
+    }
+    if (!error) servers.push(server);
+    // A machine without that address family has nothing there to take the port.
+    else if (host === "::1" && NO_SUCH_ADDRESS.has(error.code)) continue;
+    else {
+      console.error("Local server error:", error.message);
+      await Promise.all(servers.map(held => new Promise(done => held.close(done))));
+      return { owned: false, servers: [] };
+    }
+  }
+  return { owned: true, servers };
+}
+
+module.exports = { holdAppPort, isAllowedLocalRequest, resolvePublicFile };
