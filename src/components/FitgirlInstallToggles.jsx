@@ -10,12 +10,18 @@ import {
 const OPTIONS = Object.keys(FITGIRL_SETTING_KEYS);
 
 // The five FitGirl install switches. Controlled when value/onChange are given
-// (one download), otherwise they edit the Settings defaults.
-export function FitgirlInstallSwitches({ value, onChange, idPrefix = "fitgirl" }) {
+// (one download), otherwise they edit the Settings defaults. `hide` leaves out
+// switches that mean nothing where they are shown (ask, inside the ask pop-up).
+export function FitgirlInstallSwitches({
+  value,
+  onChange,
+  idPrefix = "fitgirl",
+  hide = [],
+}) {
   const { t } = useLanguage();
   return (
     <div className="space-y-3">
-      {OPTIONS.map(option => (
+      {OPTIONS.filter(option => !hide.includes(option)).map(option => (
         <div key={option} className="flex items-start justify-between gap-4">
           <div className="min-w-0 space-y-0.5">
             <Label htmlFor={`${idPrefix}-${option}`}>
