@@ -139,10 +139,7 @@ export default function DebridSettings() {
               </>
             }
           />
-          <ol
-            className="border-y border-border/60"
-            aria-label={t("debrid.priorityOrder")}
-          >
+          <ol className="-mx-3 space-y-0.5" aria-label={t("debrid.priorityOrder")}>
             {providers.map((item, index) => (
               <OrderRow
                 key={item.id}
@@ -191,7 +188,7 @@ export default function DebridSettings() {
             title={t("debrid.accountsTitle")}
             description={t("debrid.accountsDescription")}
           />
-          <div className="divide-y divide-border/60 border-t border-border/60">
+          <div className="space-y-10">
             {providers.map((item, index) => (
               <ServiceCard
                 key={item.id}
@@ -295,7 +292,7 @@ function Overview({ providers, accounts }) {
       </div>
 
       {debridEnabled ? (
-        <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-4 border-y border-border/60 py-4">
+        <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-4">
           <dl className="flex flex-1 flex-wrap items-center gap-x-8 gap-y-4">
             {routes.map(({ icon: Icon, label, value, provider, muted }) => (
               <div key={label} className="flex min-w-0 items-center gap-2.5">
@@ -336,7 +333,7 @@ function Overview({ providers, accounts }) {
           )}
         </div>
       ) : (
-        <ul className="mt-6 grid gap-x-8 gap-y-5 border-t border-border/60 pt-6 sm:grid-cols-3">
+        <ul className="mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-3">
           {features.map(([Icon, title, description]) => (
             <li key={title} className="flex gap-3">
               <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -436,7 +433,7 @@ function ServiceCard({ provider, position, account, onRetry }) {
   ];
 
   return (
-    <article id={`debrid-${provider.id}`} className="py-6">
+    <article id={`debrid-${provider.id}`}>
       <header className="flex items-center gap-3">
         <DebridIcon provider={provider} className="h-6 w-6 shrink-0 text-primary" />
         <div className="min-w-0 flex-1">
@@ -522,7 +519,7 @@ function ServiceCard({ provider, position, account, onRetry }) {
               {t(hasKey ? "debrid.optionsPaused" : "debrid.optionsNeedAccount")}
             </p>
           )}
-          <div className="divide-y divide-border/50">
+          <div>
             {options.map(([key, label, description, defaultValue]) => {
               const id = `${provider.id}-${key}`;
               return (
@@ -574,9 +571,9 @@ function OrderRow({
       draggable
       {...{ onDragStart, onDragOver, onDrop, onDragEnd }}
       className={cn(
-        "relative flex items-center gap-3 border-b border-border/40 px-2 py-2.5 transition-colors last:border-b-0 hover:bg-muted/30",
+        "relative flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/40",
         isDragTarget &&
-          "bg-primary/5 before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-primary",
+          "bg-primary/5 before:absolute before:inset-x-3 before:-top-px before:h-0.5 before:rounded-full before:bg-primary",
         isDragged && "opacity-50"
       )}
     >
