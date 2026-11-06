@@ -130,7 +130,9 @@ export const getPendingPartChoices = storageKeys =>
         ([key, record]) =>
           key.startsWith("torrent:") &&
           Array.isArray(record?.partFiles) &&
-          !Array.isArray(record.chosenFileIds)
+          !Array.isArray(record.chosenFileIds) &&
+          !record.localDownloadStarted &&
+          !record.cloudTorrentMissing
       )
       .map(([recordKey, record]) => ({
         storageKey,

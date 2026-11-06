@@ -7,6 +7,7 @@ import {
 import { readRecords } from "@/services/downloads/debridRecords";
 import { toast } from "sonner";
 import HandoffCountdown from "@/components/debrid/HandoffCountdown";
+import TorrentPartsDialog from "@/components/debrid/TorrentPartsDialog";
 
 // One toast per torrent: its id is shared by the countdown and the "Downloading" toast,
 // so each new state replaces the last one instead of stacking.
@@ -79,5 +80,5 @@ export default function DebridBackgroundTasks() {
       window.removeEventListener("debrid-handoff-now", poll);
     };
   }, [settings]);
-  return null;
+  return <TorrentPartsDialog />;
 }
