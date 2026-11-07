@@ -740,6 +740,7 @@ contextBridge.exposeInMainWorld("electron", {
   getAnalyticsKey: () => ipcRenderer.invoke("get-analytics-key"),
   getImageKey: () => ipcRenderer.invoke("get-image-key"),
   openURL: (url, options) => ipcRenderer.invoke("open-url", url, options),
+  resolveMegaDbLink: url => ipcRenderer.invoke("resolve-megadb-link", url),
   onExternalWindowBlocked: callback =>
     preloadIpc.subscribe("external-window-blocked", callback, {
       selectArgs: args => [args[0]],

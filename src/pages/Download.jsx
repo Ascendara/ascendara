@@ -316,8 +316,10 @@ function PublicDownloadPage() {
   const [selectedProvider, setSelectedProvider] = useState("");
   const [inputLink, setInputLink] = useState("");
   const [isStartingDownload, setIsStartingDownload] = useState(false);
-  // Where a hidden-window download is: "opening", "resolving" or "starting"
+  // Where a hosted link is: "opening", "countdown", "resolving" or "starting"
   const [linkStage, setLinkStage] = useState(null);
+  // When the provider's countdown (MegaDB) finishes, for the button label
+  const [countdownEndsAt, setCountdownEndsAt] = useState(null);
 
   // When provider changes, re-validate the input link
   useEffect(() => {
@@ -1579,10 +1581,13 @@ function PublicDownloadPage() {
   }, []);
 
   useEffect(() => {
-    const removeListener = window.electron.onExternalWindowProgress(({ stage }) => {
-      // Only while a hidden-window download is still being worked on
-      setLinkStage(current => (current ? stage : current));
-    });
+    const removeListener = window.electron.onExternalWindowProgress(
+      ({ stage, endsAt }) => {
+        // Only while a hidden-window download is still being worked on
+        setLinkStage(current => (current ? stage : current));
+        if (stage === "countdown") setCountdownEndsAt(endsAt);
+      }
+    );
     return () => removeListener && removeListener();
   }, []);
 
@@ -1811,14 +1816,37 @@ function PublicDownloadPage() {
       : downloadLinks[selectedProvider][0];
 
     const autoDownload =
-      selectedProvider.toLowerCase() === "buzzheavier" ||
-      /bzzhr\.(?:to|co)|buzzheavier|fafda\.to|fuckingfast\.(?:net|co)/i.test(link);
-    const needsReferrerSpoofing =
-      autoDownload ||
-      selectedProvider.toLowerCase() === "megadb" ||
-      /megadb\.net/i.test(link);
+      ["buzzheavier", "megadb"].includes(selectedProvider.toLowerCase()) ||
+      /bzzhr\.(?:to|co)|buzzheavier|fafda\.to|fuckingfast\.(?:net|co)|megadb\.net/i.test(
+        link
+      );
+    const needsReferrerSpoofing = autoDownload;
 
     const browserLink = { link, needsReferrerSpoofing, autoDownload };
+
+    // MegaDB resolves without any window; the window is only a fallback
+    if (/megadb\.(?:net|xyz)/i.test(link)) {
+      setLinkStage("opening");
+      let result;
+      try {
+        result = await window.electron.resolveMegaDbLink(link);
+      } catch (error) {
+        result = { error: error.message };
+      }
+      if (result?.url) {
+        setLinkStage("starting");
+        try {
+          await whereToDownloadRef.current(result.url);
+        } finally {
+          setLinkStage(null);
+        }
+        return;
+      }
+      console.warn("MegaDB link not resolved, opening its page:", result?.error);
+      await openBrowserLink(browserLink);
+      return;
+    }
+
     // The guide walks through downloading in a browser, which auto downloads skip
     if (!autoDownload && (await checkIfNewUser())) {
       pendingBrowserLinkRef.current = browserLink;
@@ -2125,6 +2153,7 @@ function PublicDownloadPage() {
               torrentRunning={torrentRunning}
               isStartingDownload={isStartingDownload}
               linkStage={linkStage}
+              countdownEndsAt={countdownEndsAt}
               isDev={isDev}
               providerLink={providerLink}
               showCopySuccess={showCopySuccess}

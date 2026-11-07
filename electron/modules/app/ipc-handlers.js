@@ -79,6 +79,64 @@ async function findFolderExecutables(folderPath) {
 /**
  * Register miscellaneous IPC handlers
  */
+// Ad hosts on provider pages (MegaDB, Buzzheavier) and MegaDB's countdown,
+// kept current by the API's provider watch. The built-in values cover a
+// first run and an unreachable API.
+const PROVIDER_WATCH_TTL_MS = 6 * 60 * 60 * 1000;
+const DEFAULT_PROVIDER_WATCH = {
+  blockedHosts: [
+    "aichouphaugn.com",
+    "ay267.com",
+    "bvtpk.com",
+    "luugy.com",
+    "vr-gc.com",
+    "071kk.com",
+    "rtmark.net",
+  ],
+  megadbWaitSeconds: 10,
+};
+const HOSTNAME_RE = /^(?=.{1,253}$)[a-z0-9-]+(\.[a-z0-9-]+)+$/;
+let providerWatch = { ...DEFAULT_PROVIDER_WATCH, fetchedAt: 0 };
+let providerWatchRequest = null;
+
+const getProviderWatch = async () => {
+  if (Date.now() - providerWatch.fetchedAt < PROVIDER_WATCH_TTL_MS) return providerWatch;
+  if (!providerWatchRequest) {
+    providerWatchRequest = axios
+      .get(`${API_URL}/app/json/providerwatch`, { timeout: 4000 })
+      .then(({ data }) => {
+        const hosts = Array.isArray(data?.blockedHosts)
+          ? data.blockedHosts
+              .filter(host => typeof host === "string")
+              .map(host => host.toLowerCase())
+              .filter(host => HOSTNAME_RE.test(host))
+          : [];
+        const wait = Number(data?.megadb?.waitSeconds);
+        providerWatch = {
+          blockedHosts: [...new Set([...DEFAULT_PROVIDER_WATCH.blockedHosts, ...hosts])],
+          megadbWaitSeconds:
+            Number.isFinite(wait) && wait >= 0 && wait <= 120
+              ? wait
+              : DEFAULT_PROVIDER_WATCH.megadbWaitSeconds,
+          fetchedAt: Date.now(),
+        };
+      })
+      .catch(error => {
+        console.warn("Could not refresh provider watch:", error.message);
+        // Try again in a few minutes, not on every window
+        providerWatch = {
+          ...providerWatch,
+          fetchedAt: Date.now() - PROVIDER_WATCH_TTL_MS + 5 * 60 * 1000,
+        };
+      })
+      .finally(() => {
+        providerWatchRequest = null;
+      });
+  }
+  await providerWatchRequest;
+  return providerWatch;
+};
+
 function registerMiscHandlers() {
   const settingsManager = getSettingsManager();
 
@@ -223,6 +281,79 @@ function registerMiscHandlers() {
   const authHelper = require("../core/auth-helper");
   ipcMain.handle("get-auth-headers", () => authHelper.generateAuthHeaders());
 
+  // Resolve a MegaDB page to its file link without opening it: read the final
+  // link from the page, wait out the countdown (the server checks it against
+  // the session cookie), then follow the link with that cookie and the page
+  // as referrer to the file server's redirect. Resolves { url } or { error },
+  // and the renderer falls back to the provider window on an error.
+  ipcMain.handle("resolve-megadb-link", async (ipcEvent, pageUrl) => {
+    const isMegaDbHost = host =>
+      ["megadb.net", "megadb.xyz"].some(
+        domain => host === domain || host.endsWith(`.${domain}`)
+      );
+    try {
+      if (!isSafeExternalUrl(pageUrl)) throw new Error("Invalid link");
+      if (!isMegaDbHost(new URL(pageUrl).hostname.toLowerCase())) {
+        throw new Error("Not a MegaDB link");
+      }
+      const userAgent =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+      const page = await axios.get(pageUrl, {
+        timeout: 20000,
+        responseType: "text",
+        headers: { "User-Agent": userAgent, Referer: "https://steamrip.com/" },
+      });
+      const html = String(page.data || "");
+      const finalUrl = html.match(/finalDownloadUrl\s*=\s*'([^']+)'/)?.[1];
+      if (!finalUrl || !isMegaDbHost(new URL(finalUrl).hostname.toLowerCase())) {
+        throw new Error("Download link not found on page");
+      }
+      const { megadbWaitSeconds } = await getProviderWatch();
+      const pageSeconds = Number(html.match(/var\s+seconds\s*=\s*(\d+)/)?.[1]);
+      const seconds =
+        (Number.isFinite(pageSeconds) && pageSeconds <= 120
+          ? pageSeconds
+          : megadbWaitSeconds) + 1;
+      const cookie = (page.headers["set-cookie"] || [])
+        .map(entry => entry.split(";")[0])
+        .join("; ");
+
+      const sender = ipcEvent.sender;
+      if (sender && !sender.isDestroyed()) {
+        sender.send("external-window-progress", {
+          url: pageUrl,
+          stage: "countdown",
+          endsAt: Date.now() + seconds * 1000,
+        });
+      }
+      await new Promise(resolve => setTimeout(resolve, seconds * 1000));
+      if (sender && !sender.isDestroyed()) {
+        sender.send("external-window-progress", { url: pageUrl, stage: "resolving" });
+      }
+
+      const redirect = await axios.get(finalUrl, {
+        timeout: 20000,
+        maxRedirects: 0,
+        responseType: "text",
+        validateStatus: status => status >= 200 && status < 400,
+        headers: {
+          "User-Agent": userAgent,
+          Referer: pageUrl,
+          ...(cookie ? { Cookie: cookie } : {}),
+        },
+      });
+      const location = redirect.headers.location;
+      const fileUrl = location ? new URL(location, finalUrl).href : null;
+      if (!fileUrl || !isSafeExternalUrl(fileUrl)) {
+        throw new Error("MegaDB did not return a download link");
+      }
+      return { url: fileUrl };
+    } catch (error) {
+      console.error("Failed to resolve MegaDB link:", error.message);
+      return { error: error.message };
+    }
+  });
+
   // Open URL
   ipcMain.handle("open-url", async (ipcEvent, url, options = {}) => {
     if (!isSafeExternalUrl(url)) throw new Error("Only HTTP(S) links are allowed");
@@ -274,7 +405,8 @@ function registerMiscHandlers() {
 
       // Block known ad/tracker hosts and resources from loading in the
       // external window (e.g. injected ad images/scripts on megadb/buzzheavier).
-      const blockedResourceHosts = ["aichouphaugn.com"];
+      const { blockedHosts: blockedResourceHosts, megadbWaitSeconds } =
+        await getProviderWatch();
       externalWindow.webContents.session.webRequest.onBeforeRequest(
         { urls: ["*://*/*"] },
         (details, callback) => {
@@ -308,6 +440,7 @@ function registerMiscHandlers() {
         "fuckingfast.net",
         "fuckingfast.co",
         "megadb.net",
+        "megadb.xyz",
       ];
       externalWindow.webContents.on("will-navigate", (event, navUrl) => {
         try {
@@ -463,10 +596,50 @@ function registerMiscHandlers() {
         settle("shown");
       };
 
+      // MegaDB's ad scripts swallow clicks on its download button, so the
+      // timer never starts and the page seems to loop. Its final link is in
+      // the page already: wait out the timer (the server sends the download
+      // page again if it's used early), then open it with the page as
+      // referrer so it redirects to the file, which will-download catches.
+      const isMegaDb = host => host === "megadb.net" || host.endsWith(".megadb.net");
+      let megaDbStarted = false;
+      externalWindow.webContents.on("did-finish-load", async () => {
+        if (megaDbStarted || blockedHandled || externalWindow.isDestroyed()) return;
+        const pageUrl = externalWindow.webContents.getURL();
+        try {
+          if (!isMegaDb(new URL(pageUrl).hostname.toLowerCase())) return;
+        } catch {
+          return;
+        }
+        try {
+          const finalUrl = await externalWindow.webContents.executeJavaScript(
+            "typeof finalDownloadUrl === 'string' ? finalDownloadUrl : null"
+          );
+          if (!finalUrl || !isMegaDb(new URL(finalUrl).hostname.toLowerCase())) {
+            // A challenge or error page; the real page may load next
+            return;
+          }
+          megaDbStarted = true;
+          if (sender && !sender.isDestroyed()) {
+            sender.send("external-window-progress", { url, stage: "resolving" });
+          }
+          console.log("Waiting out MegaDB timer before opening its download link");
+          // One second past the countdown, which the server enforces
+          await new Promise(resolve =>
+            setTimeout(resolve, (megadbWaitSeconds + 1) * 1000)
+          );
+          if (blockedHandled || externalWindow.isDestroyed()) return;
+          externalWindow.webContents.loadURL(finalUrl, { httpReferrer: pageUrl });
+        } catch (error) {
+          console.error("Failed to start MegaDB download:", error);
+          revealWindow("MegaDB download failed");
+        }
+      });
+
       if (autoDownload) {
         revealTimeout = setTimeout(
           () => revealWindow("Automatic download took too long"),
-          20000
+          30000
         );
 
         // Do what the download button does: request its htmx endpoint and
@@ -475,6 +648,12 @@ function registerMiscHandlers() {
         let downloadTriggered = false;
         externalWindow.webContents.on("did-finish-load", async () => {
           if (downloadTriggered || blockedHandled || externalWindow.isDestroyed()) return;
+          try {
+            // Handled above
+            if (isMegaDb(new URL(externalWindow.webContents.getURL()).hostname)) return;
+          } catch {
+            return;
+          }
           try {
             if (sender && !sender.isDestroyed()) {
               sender.send("external-window-progress", { url, stage: "resolving" });
