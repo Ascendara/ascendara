@@ -7,6 +7,7 @@ import artworkOverrideService from "../images/artworkOverrideService";
 import steamGridImageService from "../images/steamGridImageService";
 import imageCacheService from "../images/imageCacheService";
 import steamService from "./gameInfoService";
+import { findGameDetails } from "../../lib/steamMatch";
 
 // Longest a click waits before opening the page with whatever is ready
 const PREPARE_TIMEOUT_MS = 2500;
@@ -95,7 +96,7 @@ const resolveGamePage = async game => {
   const overridePromise = resolveOverride(game);
   const [override, steamData, indexImage, coverGridUrl] = await Promise.all([
     overridePromise,
-    game.game ? settle(steamService.getGameDetails(game.game)) : null,
+    game.game ? settle(findGameDetails(game.game, steamService.getGameDetails)) : null,
     settle(loadIndexImage(game)),
     resolveCover(game, overridePromise),
   ]);

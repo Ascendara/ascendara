@@ -71,3 +71,42 @@ export function isConfidentMatch(indexTitle, foundTitle) {
   const key = titleKey(indexTitle);
   return key !== "" && key === titleKey(foundTitle);
 }
+
+// One cleaned-name Steam lookup per title for the session, shared by the game
+// page and the page preparer; only an exact name match is kept, and a failed
+// lookup may be retried
+const steamMatches = new Map();
+
+export function matchSteamDetails(title, lookup) {
+  const key = titleKey(title);
+  if (!key || !lookup) return Promise.resolve(null);
+  if (!steamMatches.has(key)) {
+    const pending = Promise.resolve()
+      .then(() => lookup(cleanGameTitle(title)))
+      .then(details =>
+        details?.name && isConfidentMatch(title, details.name) ? details : null
+      )
+      .catch(error => {
+        steamMatches.delete(key);
+        throw error;
+      });
+    steamMatches.set(key, pending);
+  }
+  return steamMatches.get(key);
+}
+
+// Game page details: the index name first, as before. Torrent index names
+// ("Name Deluxe Edition, v1.0 + Bonus") also try the cleaned name when the
+// first answer is missing or a different game, and keep the first answer if
+// the cleaned name finds nothing better
+export async function findGameDetails(title, lookup) {
+  const details = (await lookup(title)) ?? null;
+  if (cleanGameTitle(title) === String(title).trim()) return details;
+  if (details?.name && isConfidentMatch(title, details.name)) return details;
+  try {
+    return (await matchSteamDetails(title, lookup)) ?? details;
+  } catch (error) {
+    if (details) return details;
+    throw error;
+  }
+}

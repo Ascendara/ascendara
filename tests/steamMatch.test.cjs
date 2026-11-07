@@ -78,3 +78,77 @@ test("only the same name after cleaning counts as a match", async () => {
   );
   assert.ok(!isConfidentMatch("", ""));
 });
+
+const steamGame = name => ({
+  name,
+  system_requirements: { minimum: "", recommended: "" },
+});
+
+test("a FitGirl name finds its Steam page through the cleaned name", async () => {
+  const { findGameDetails } = await load();
+  const asked = [];
+  const lookup = async name => {
+    asked.push(name);
+    return name === "Game Name" ? steamGame("Game Name") : null;
+  };
+  const raw = "Game Name: Deluxe Edition - v1.2.3 + 5 DLCs + Bonus";
+  const details = await findGameDetails(raw, lookup);
+  assert.equal(details.name, "Game Name");
+  assert.deepEqual(asked, [raw, "Game Name"]);
+
+  // The same title later reuses the session answer for the cleaned name
+  await findGameDetails(raw, lookup);
+  assert.deepEqual(asked, [raw, "Game Name", raw]);
+});
+
+test("index answers win when they fit, loose ones give way to the cleaned match", async () => {
+  const { findGameDetails } = await load();
+  const found = steamGame("Official Game");
+  assert.equal(await findGameDetails("Official Game", async () => found), found);
+
+  // A clean name is not asked twice
+  let calls = 0;
+  const none = async () => {
+    calls += 1;
+    return null;
+  };
+  assert.equal(await findGameDetails("Clean Name", none), null);
+  assert.equal(calls, 1);
+
+  // Steam's own matcher picked the Friend's Pass app for the raw name
+  const split = await findGameDetails(
+    "Split Fiction, v1.0.2.0 + Friend's Pass",
+    async name =>
+      name === "Split Fiction"
+        ? steamGame("Split Fiction")
+        : steamGame("Split Fiction Friend's Pass")
+  );
+  assert.equal(split.name, "Split Fiction");
+
+  // Nothing better from the cleaned name keeps the old answer
+  const kept = await findGameDetails("Dredge Deluxe Edition", async name =>
+    name === "Dredge" ? null : steamGame("DREDGE Digital Deluxe")
+  );
+  assert.equal(kept.name, "DREDGE Digital Deluxe");
+
+  // A loose cleaned-name hit is dropped
+  assert.equal(
+    await findGameDetails("Hades + Soundtrack", async name =>
+      name === "Hades" ? steamGame("Hades II") : null
+    ),
+    null
+  );
+});
+
+test("a failed cleaned-name lookup is tried again later", async () => {
+  const { findGameDetails } = await load();
+  let fail = true;
+  const lookup = async name => {
+    if (name === "Flaky Game" && fail) throw new Error("offline");
+    return name === "Flaky Game" ? steamGame("Flaky Game") : null;
+  };
+  await assert.rejects(findGameDetails("Flaky Game v1.0", lookup), /offline/);
+  fail = false;
+  const retried = await findGameDetails("Flaky Game v1.0", lookup);
+  assert.equal(retried.name, "Flaky Game");
+});

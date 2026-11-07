@@ -68,6 +68,7 @@ import { checkInstallSpace } from "@/lib/installSpace";
 import { formatBytes } from "@/services/app/systemHealthService";
 import TimemachineDialog from "@/components/TimemachineDialog";
 import steamService from "@/services/games/gameInfoService";
+import { findGameDetails } from "@/lib/steamMatch";
 import hltbService from "@/services/integrations/hltbService";
 import useDebridHosts from "@/hooks/useDebridHosts";
 import * as debrid from "@/services/downloads/debridService";
@@ -244,7 +245,7 @@ function PublicDownloadPage() {
       setSteamError(null);
 
       try {
-        const data = await steamService.getGameDetails(gameName);
+        const data = await findGameDetails(gameName, steamService.getGameDetails);
 
         if (data) {
           setSteamData(data);
