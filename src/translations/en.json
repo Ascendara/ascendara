@@ -5492,6 +5492,38 @@
     "smoothTransitions": "Smooth Transitions",
     "smoothTransitionsDescription": "Animates switching between pages, the startup splash and the Ascend celebration. Turn this off if you only want to skip page animations and keep the rest of the visuals.",
     "smoothTransitionsOverridden": "Turned off by Reduce Effects. Your choice here comes back when Reduce Effects is turned off.",
+    "sounds": {
+      "achievement": "Achievement unlocked",
+      "choose": "Upload sound",
+      "customDescription": "Upload a sound to use it instead of the profile. Supports WAV, MP3, OGG, FLAC and M4A up to 10 MB.",
+      "customSound": "Using your custom sound",
+      "customTitle": "Your own sounds",
+      "description": "Play a sound when a notification appears or an achievement unlocks.",
+      "errors": {
+        "saveFailed": "Ascendara couldn't save that sound.",
+        "tooLarge": "Sound files must be 10 MB or smaller.",
+        "unsupported": "That file type isn't supported. Use WAV, MP3, OGG, FLAC or M4A."
+      },
+      "notification": "Notifications",
+      "preview": "Preview",
+      "previewAchievement": "Preview achievement sound",
+      "previewNotification": "Preview notification sound",
+      "profile": "Sound profile",
+      "profileSound": "Using the {{profile}} profile",
+      "profiles": {
+        "arcade": "Arcade",
+        "arcadeDescription": "Retro chiptune blips",
+        "classic": "Classic",
+        "classicDescription": "Warm, soft bell chimes",
+        "crystal": "Crystal",
+        "crystalDescription": "Bright, airy glass pings",
+        "simple": "Simple",
+        "simpleDescription": "A single soft beat"
+      },
+      "reset": "Remove custom sound",
+      "title": "Sound Effects",
+      "volume": "Volume"
+    },
     "startMinimized": "Start Minimized",
     "startMinimizedDescription": "Launch Ascendara in the background on startup instead of opening the main window.",
     "supportCodeDesc": "Enter your 6 digit support code here to upload logs automatically. Need help?",

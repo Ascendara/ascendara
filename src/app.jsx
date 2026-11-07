@@ -105,6 +105,7 @@ import {
 } from "@/services/app/analyticsService";
 import "./index.css";
 import "./styles/scrollbar.css";
+import "@/services/app/notificationSoundService";
 import { AlertTriangle, RefreshCwIcon, X, Circle, Square, Triangle } from "lucide-react";
 import {
   AlertDialog,

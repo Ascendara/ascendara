@@ -101,6 +101,7 @@ import ProtonOptionsDialog from "@/components/ProtonOptionsDialog";
 import HighballSettings from "@/components/HighballSettings";
 import GameIndexManager from "@/components/GameIndexManager";
 import AchievementFolderSearch from "@/components/AchievementFolderSearch";
+import NotificationSoundSettings from "@/components/NotificationSoundSettings";
 import LibraryTransferSettings from "@/components/LibraryTransferSettings";
 import AppBranchPicker, { getAppBranch } from "@/components/AppBranchPicker";
 import { API_URL } from "@/config/api";
@@ -1478,6 +1479,11 @@ function Settings() {
                       }
                     />
                   </div>
+
+                  <NotificationSoundSettings
+                    settings={settings}
+                    onSettingChange={handleSettingChange}
+                  />
 
                   <div id="open-on-startup" className="flex items-center justify-between">
                     <div className="space-y-0.5">

@@ -1154,10 +1154,17 @@ function registerMiscHandlers() {
         message,
       ]);
     } else {
+      // Ascendara plays its own sound through the window, so keep the system one quiet
+      if (settings.notificationSounds !== false) {
+        BrowserWindow.getAllWindows()[0]?.webContents.send(
+          "play-notification-sound",
+          "notification"
+        );
+      }
       const notification = new Notification({
         title,
         body: message,
-        silent: false,
+        silent: true,
         timeoutType: "default",
         urgency: "normal",
         icon: path.join(app.getAppPath(), "build", "icon.png"),
@@ -1215,6 +1222,94 @@ function registerMiscHandlers() {
     } catch (error) {
       console.error("Error showing preview notification:", error);
       return { success: false, error: error.message };
+    }
+  });
+
+  // Notification sounds. A picked file is copied into userData so it keeps
+  // working if the original is moved, and the helper reads the copy's path.
+  const SOUND_KINDS = ["achievement", "notification"];
+  const SOUND_PROFILES = ["classic", "crystal", "arcade", "simple"];
+  const SOUND_EXTENSIONS = ["wav", "mp3", "ogg", "flac", "m4a"];
+  const SOUND_MIME = {
+    wav: "audio/wav",
+    mp3: "audio/mpeg",
+    ogg: "audio/ogg",
+    flac: "audio/flac",
+    m4a: "audio/mp4",
+  };
+  const MAX_SOUND_BYTES = 10 * 1024 * 1024;
+  const soundsDir = () => path.join(app.getPath("userData"), "notification_sounds");
+
+  ipcMain.handle("pick-notification-sound", async (event, kind) => {
+    if (!SOUND_KINDS.includes(kind)) {
+      return { success: false, error: "Invalid sound type" };
+    }
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(window, {
+      properties: ["openFile"],
+      filters: [{ name: "Audio", extensions: SOUND_EXTENSIONS }],
+    });
+    if (result.canceled || !result.filePaths[0]) {
+      return { success: false, canceled: true };
+    }
+    try {
+      const source = result.filePaths[0];
+      const ext = path.extname(source).slice(1).toLowerCase();
+      if (!SOUND_EXTENSIONS.includes(ext)) {
+        return { success: false, error: "unsupported" };
+      }
+      const { size } = await fs.stat(source);
+      if (size > MAX_SOUND_BYTES) {
+        return { success: false, error: "tooLarge" };
+      }
+      const dir = soundsDir();
+      await fs.ensureDir(dir);
+      // Drop the previous custom sound for this type, whatever its format
+      for (const file of await fs.readdir(dir)) {
+        if (path.parse(file).name === kind) await fs.remove(path.join(dir, file));
+      }
+      const target = path.join(dir, `${kind}.${ext}`);
+      await fs.copy(source, target);
+      return { success: true, path: target, name: path.basename(source) };
+    } catch (error) {
+      console.error("Error saving notification sound:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // The configured sound as a data URL, for previewing in the window and for
+  // notifications that don't go through the helper. Passing a profile previews
+  // that profile's built-in sound and skips any custom upload.
+  ipcMain.handle("get-notification-sound", async (_, kind, previewProfile) => {
+    if (!SOUND_KINDS.includes(kind)) return null;
+    try {
+      const settings = settingsManager.getSettings();
+      const custom = settings[`${kind}SoundPath`];
+      const profile = SOUND_PROFILES.includes(previewProfile)
+        ? previewProfile
+        : SOUND_PROFILES.includes(settings.notificationSoundProfile)
+          ? settings.notificationSoundProfile
+          : SOUND_PROFILES[0];
+      let file = null;
+      if (
+        !previewProfile &&
+        typeof custom === "string" &&
+        path.dirname(path.resolve(custom)) === soundsDir() &&
+        (await fs.pathExists(custom))
+      ) {
+        file = custom;
+      } else {
+        const base = app.isPackaged
+          ? path.join(process.resourcesPath, "public", "sounds")
+          : path.join(__dirname, "../../../src/public/sounds");
+        file = path.join(base, "profiles", profile, `${kind}.wav`);
+      }
+      const ext = path.extname(file).slice(1).toLowerCase();
+      const data = await fs.readFile(file);
+      return `data:${SOUND_MIME[ext] || "audio/wav"};base64,${data.toString("base64")}`;
+    } catch (error) {
+      console.error("Error reading notification sound:", error);
+      return null;
     }
   });
 

@@ -737,6 +737,11 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("show-notification", title, message),
   previewNotification: (colors, achievement) =>
     ipcRenderer.invoke("preview-notification", colors, achievement),
+  pickNotificationSound: kind => ipcRenderer.invoke("pick-notification-sound", kind),
+  getNotificationSound: (kind, profile) =>
+    ipcRenderer.invoke("get-notification-sound", kind, profile),
+  onPlayNotificationSound: callback =>
+    preloadIpc.subscribe("play-notification-sound", callback),
 
   //===========================================================================
   // API & NETWORKING
