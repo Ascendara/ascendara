@@ -21,6 +21,7 @@ import { getControllerButtons } from "./controller";
 import { createFuzzyMatcher } from "./utils";
 import { useDebouncedValue } from "./useDebouncedValue";
 import { useControllerInput } from "./useControllerInput";
+import { playBigPictureSound, setBigPictureSoundsEnabled } from "./bigPictureSounds";
 import { sidebarItems } from "./SidebarMenu";
 import { pageLinks } from "./PageHeader";
 
@@ -36,6 +37,18 @@ function useBigPicturePage() {
   const buttons = getControllerButtons(controllerType);
   const [assetSearchOpen, setAssetSearchOpen] = useState(false);
   const [assetSearchGame, setAssetSearchGame] = useState(null);
+  const soundsEnabled = settings.bigPictureSounds !== false;
+  useEffect(() => {
+    setBigPictureSoundsEnabled(soundsEnabled);
+  }, [soundsEnabled]);
+  // Chime on the way in, after settings have settled so a saved "off" holds
+  useEffect(() => {
+    const timer = setTimeout(() => playBigPictureSound("enter"), 350);
+    return () => {
+      clearTimeout(timer);
+      setBigPictureSoundsEnabled(false);
+    };
+  }, []);
   // Enter full-screen on mount, quit on unmount.
   // Fullscreen is driven through the "set-fullscreen" IPC call (which sets
   // the native BrowserWindow state directly) rather than relying solely on

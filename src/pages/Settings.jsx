@@ -2549,6 +2549,27 @@ function Settings() {
                 </div>
 
                 <div
+                  id="big-picture-sounds"
+                  className="flex items-center justify-between gap-4"
+                >
+                  <div className="min-w-0 space-y-0.5">
+                    <Label>{t("settings.bigPictureSounds")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.bigPictureSoundsDescription")}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.bigPictureSounds !== false}
+                    onCheckedChange={() =>
+                      handleSettingChange(
+                        "bigPictureSounds",
+                        settings.bigPictureSounds === false
+                      )
+                    }
+                  />
+                </div>
+
+                <div
                   id="keyboard-layout"
                   className="flex items-center justify-between gap-4"
                 >

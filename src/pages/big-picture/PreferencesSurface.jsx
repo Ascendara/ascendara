@@ -84,6 +84,11 @@ const categories = [
       ],
       ["startup", "Start in Big Picture", "Open this experience when Ascendara starts."],
       [
+        "bigPictureSounds",
+        "Interface sounds",
+        "Play soft sounds as you move, select and switch pages.",
+      ],
+      [
         "controller",
         "Controller & keyboard",
         "Choose button prompts and on-screen keyboard layout.",

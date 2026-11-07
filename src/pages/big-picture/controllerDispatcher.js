@@ -1,5 +1,6 @@
 import { getGamepadInput, resetGamepadInput } from "./gamepad";
 import { readNavigationInput } from "./controllerNavigation";
+import { playControllerActionSound } from "./bigPictureSounds";
 
 // One poll per animation frame, regardless of how many screens/dialogs are mounted.
 const consumers = new Set();
@@ -54,7 +55,10 @@ function tick(now) {
         options.blocked ||
         changed;
       const action = readNavigationInput(input, consumer.state, now, blocked);
-      if (action) consumer.onAction(action);
+      if (action) {
+        playControllerActionSound(action);
+        consumer.onAction(action);
+      }
     }
     for (const observer of observers) observer(input);
   } finally {

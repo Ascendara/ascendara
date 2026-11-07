@@ -212,6 +212,21 @@ export const settingsSearchData = [
     scrollTo: "notification-sounds",
   },
   {
+    id: "big-picture-sounds",
+    title: "Big Picture Interface Sounds",
+    description: "Play sounds for controller navigation in Big Picture",
+    keywords: [
+      "big picture",
+      "controller",
+      "sounds",
+      "interface sounds",
+      "ui sounds",
+      "navigation sound",
+    ],
+    section: "Gaming",
+    scrollTo: "big-picture-sounds",
+  },
+  {
     id: "language",
     title: "Language / Language Settings",
     description: "Change the application language",

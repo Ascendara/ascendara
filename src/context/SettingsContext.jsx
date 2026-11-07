@@ -35,6 +35,7 @@ export function SettingsProvider({ children }) {
     compactDockOnScroll: true,
     reduceEffects: false,
     bigPictureHomeStyle: "ascendara",
+    bigPictureSounds: true,
     windowControlsStyle: "icons",
     menuBarSide: "left",
     autoUpdate: true,

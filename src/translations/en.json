@@ -1838,6 +1838,7 @@
       "needsSpace": "{{free}} free, needs {{needed}}",
       "note": "Checked on this PC. CPU and GPU use rough performance tiers, so treat those as a guide.",
       "pass": "Meets it",
+      "summary": "Meets {{passed}} of {{total}}",
       "unknown": "Can't tell",
       "yours": "Yours: {{value}}"
     },
@@ -4927,6 +4928,8 @@
       "sleep": "Sleep"
     },
     "bigPictureSettings": "Big Picture Mode",
+    "bigPictureSounds": "Big Picture Interface Sounds",
+    "bigPictureSoundsDescription": "Play soft sounds as you move, select and switch pages with a controller in Big Picture.",
     "browsePublicThemes": "Browse Community Themes",
     "categories": {
       "advanced": {
