@@ -95,12 +95,20 @@ async function existsAndIsYoungerThan(filePath, { timeUnit = "M", time = 6 }) {
   }
 }
 
-// Steam schemas may return icons as bare hash filenames; expand them to CDN URLs
+// Steam schemas may return icons as bare hash filenames or legacy
+// /steamcommunity/public/images/apps/ URLs, which 404 for newer apps.
+// Point both at community_assets, which serves every app.
+const STEAM_ICON_BASE =
+  "https://shared.akamai.steamstatic.com/community_assets/images/apps";
+const LEGACY_STEAM_ICON =
+  /^https?:\/\/[^/]*(?:steamstatic\.com|akamaihd\.net)\/steamcommunity\/public\/images\/apps\/(\d+)\/([^/?#]+)/i;
 function resolveIconUrl(icon, appID) {
   if (!icon || typeof icon !== "string") return icon;
+  const legacy = icon.match(LEGACY_STEAM_ICON);
+  if (legacy) return `${STEAM_ICON_BASE}/${legacy[1]}/${legacy[2]}`;
   if (/^(https?|file|data):/i.test(icon) || path.isAbsolute(icon)) return icon;
   const file = /\.\w+$/.test(icon) ? icon : `${icon}.jpg`;
-  return `https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/${appID}/${file}`;
+  return `${STEAM_ICON_BASE}/${appID}/${file}`;
 }
 module.exports.resolveIconUrl = resolveIconUrl;
 

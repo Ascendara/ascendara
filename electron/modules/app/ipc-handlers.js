@@ -1360,17 +1360,25 @@ function registerMiscHandlers() {
     }
   });
 
-  // Steam schemas may store achievement icons as bare hash filenames, which the
-  // renderer would resolve against its own origin and 404. Expand them to CDN URLs.
+  // Steam schemas may store achievement icons as bare hash filenames (which the
+  // renderer would resolve against its own origin) or as legacy
+  // /steamcommunity/public/images/apps/ URLs, which 404 for newer apps.
+  // Point both at community_assets, which serves every app.
+  const STEAM_ICON_BASE =
+    "https://shared.akamai.steamstatic.com/community_assets/images/apps";
+  const LEGACY_STEAM_ICON =
+    /^https?:\/\/[^/]*(?:steamstatic\.com|akamaihd\.net)\/steamcommunity\/public\/images\/apps\/(\d+)\/([^/?#]+)/i;
   const resolveAchievementIcons = data => {
     if (!data || !Array.isArray(data.achievements)) return data;
     const appid = data.appid;
-    if (!appid) return data;
     const resolve = icon => {
       if (!icon || typeof icon !== "string") return icon;
+      const legacy = icon.match(LEGACY_STEAM_ICON);
+      if (legacy) return `${STEAM_ICON_BASE}/${legacy[1]}/${legacy[2]}`;
       if (/^(https?|file|data):/i.test(icon) || path.isAbsolute(icon)) return icon;
+      if (!appid) return icon;
       const file = /\.\w+$/.test(icon) ? icon : `${icon}.jpg`;
-      return `https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/${appid}/${file}`;
+      return `${STEAM_ICON_BASE}/${appid}/${file}`;
     };
     return {
       ...data,
