@@ -286,3 +286,63 @@ test("a failed cleaned-name lookup is tried again later", async () => {
   const retried = await findGameDetails("Flaky Game v1.0", lookup);
   assert.equal(retried.name, "Flaky Game");
 });
+
+// Wrong matches the index sample showed (report 2026-11-07-steam-misses):
+// [index name, Steam answer for the raw name, answer for the cleaned name,
+// name shown or null]. "You Are Empty Demo" stands in for the near name seen.
+const wrongMatchRows = [
+  ["Backpack Dungeon – 2.0.1", "Backpack Dungeon Demo", "Backpack Dungeon Demo", null],
+  [
+    "Backpack Dungeon – 2.0.1",
+    "Backpack Dungeon Demo",
+    "Backpack Dungeon",
+    "Backpack Dungeon",
+  ],
+  ["Fallout 4: High Resolution Texture Pack", "Fallout 4", "Fallout 4", null],
+  [
+    "Fallout 4: High Resolution Texture Pack",
+    "Fallout 4: High Resolution Texture Pack",
+    null,
+    "Fallout 4: High Resolution Texture Pack",
+  ],
+  ["MEMORIAPOLIS: Fish & Ships Pack", "MEMORIAPOLIS", "MEMORIAPOLIS", null],
+  [
+    "You Are Empty: Absolute Edition Complete – Hotfix 3 + Bonus OST",
+    "You Are Empty Demo",
+    "You Are Empty",
+    "You Are Empty",
+  ],
+  [
+    "Monster Hunter Stories 3: Twisted Reflection – Premium Deluxe Edition, v1.1.01 + 27 DLCs",
+    "Monster Hunter Stories 3: Twisted Reflection Soundtrack",
+    "Monster Hunter Stories 3: Twisted Reflection",
+    "Monster Hunter Stories 3: Twisted Reflection",
+  ],
+  [
+    "Hunting Simulator 2: Elite Edition, v1.0.0.311.66949 + 4 DLCs",
+    "Hunting Simulator 2 Playtest",
+    null,
+    null,
+  ],
+  ["Hades + Soundtrack", "Hades Soundtrack", "Hades Soundtrack", null],
+  ["Hades", "Hades II", null, null],
+  ["Cyberpunk 2077", "Cyberpunk 2077 DLC", null, null],
+  [
+    "Cyberpunk 2077: Phantom Liberty DLC",
+    "Cyberpunk 2077 - Phantom Liberty DLC",
+    null,
+    "Cyberpunk 2077 - Phantom Liberty DLC",
+  ],
+];
+
+test("a first answer that is a different game, demo, soundtrack or DLC is never shown", async () => {
+  for (const [index, rawAnswer, cleanAnswer, shown] of wrongMatchRows) {
+    const { findGameDetails } = await load();
+    const clean = (await load()).cleanGameTitle(index);
+    const details = await findGameDetails(index, async name => {
+      const answer = name === clean && name !== index ? cleanAnswer : rawAnswer;
+      return answer ? steamGame(answer) : null;
+    });
+    assert.equal(details?.name ?? null, shown, index);
+  }
+});

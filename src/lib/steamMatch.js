@@ -93,9 +93,17 @@ export function titleKey(title) {
     .trim();
 }
 
+// Steam entries that are not the game itself; cleaning can strip "Soundtrack"
+// or "DLC", so these are checked on the names before cleaning
+const EXTRA_CONTENT = /\b(?:demo|soundtrack|ost|playtest|dlc)\b/i;
+const ASKS_FOR_DLC = /\b(?:dlcs?|pack)\b/i;
+
 export function isConfidentMatch(indexTitle, foundTitle) {
   const key = titleKey(indexTitle);
-  return key !== "" && key === titleKey(foundTitle);
+  if (key === "" || key !== titleKey(foundTitle)) return false;
+  const extra = String(foundTitle).match(EXTRA_CONTENT)?.[0];
+  if (!extra || EXTRA_CONTENT.test(cleanGameTitle(indexTitle))) return true;
+  return /^dlc$/i.test(extra) && ASKS_FOR_DLC.test(String(indexTitle));
 }
 
 // One cleaned-name Steam lookup per title for the session, shared by the game
@@ -123,8 +131,8 @@ export function matchSteamDetails(title, lookup) {
 
 // Game page details: the index name first, as before. Torrent index names
 // ("Name Deluxe Edition, v1.0 + Bonus") also try the cleaned name when the
-// first answer is missing or a different game, and keep the first answer if
-// the cleaned name finds nothing better
+// first answer is missing or a different game. An answer whose name is not the
+// cleaned name (a Demo, the base game for a DLC pack) is never shown
 // A lookup that throws means Steam was not reached: that is passed on so the
 // page can offer a retry, never turned into "not on Steam"
 export async function findGameDetails(title, lookup) {
@@ -135,15 +143,10 @@ export async function findGameDetails(title, lookup) {
   } catch (error) {
     failure = error;
   }
-  if (cleanGameTitle(title) === String(title).trim()) {
+  const matched = details?.name && isConfidentMatch(title, details.name) ? details : null;
+  if (matched || cleanGameTitle(title) === String(title).trim()) {
     if (failure) throw failure;
-    return details;
+    return matched;
   }
-  if (details?.name && isConfidentMatch(title, details.name)) return details;
-  try {
-    return (await matchSteamDetails(title, lookup)) ?? details;
-  } catch (error) {
-    if (details) return details;
-    throw error;
-  }
+  return matchSteamDetails(title, lookup);
 }
