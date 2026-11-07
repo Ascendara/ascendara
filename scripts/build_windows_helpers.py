@@ -48,6 +48,9 @@ def main():
             for file in ('7z.exe', '7z.dll'):
                 command += ['--add-binary', f'{seven / file};.']
             command += ['--add-data', f'{seven / "License.txt"};licenses/7zip']
+        if name == 'AscendaraNotificationHelper':
+            command += ['--add-data', f'{folder / "src/sounds"};sounds',
+                        '--hidden-import', 'PyQt6.QtMultimedia']
         if name == 'AscendaraDownloader':
             command += ['--add-binary', f'{folder / "src/UnRAR.dll"};.', '--hidden-import', 'unrar.unrarlib']
             command += ['--add-binary', f'{hatchzip};.']

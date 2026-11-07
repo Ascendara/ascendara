@@ -202,7 +202,9 @@ def build_python_binaries_linux():
         ('AscendaraDownloader',         'AscendaraDownloader/src/AscendaraDownloader.py',         downloader_args),
         ('AscendaraLanguageTranslation', 'AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py', []),
         ('AscendaraTorrentHandler',      'AscendaraTorrentHandler/src/AscendaraTorrentHandler.py',  extraction_args),
-        ('AscendaraNotificationHelper',  'AscendaraNotificationHelper/src/AscendaraNotificationHelper.py', ['--windowed']),
+        ('AscendaraNotificationHelper',  'AscendaraNotificationHelper/src/AscendaraNotificationHelper.py',
+         ['--windowed', '--hidden-import', 'PyQt6.QtMultimedia',
+          '--add-data', f'{os.path.join(binaries_dir, "AscendaraNotificationHelper/src/sounds")}:sounds']),
     ]
 
     # 1. Find all the unique folders and clean them up ONCE before compiling

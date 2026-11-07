@@ -175,6 +175,9 @@ def build_arch(arch, args, identity):
             command += ['--add-binary', f'{TOOL_DIR / "7zz"}:.',
                         '--add-data', f'{TOOL_DIR / "License.txt"}:licenses/7zip',
                         '--add-data', f'{TOOL_DIR / "readme.txt"}:licenses/7zip']
+        if name == 'AscendaraNotificationHelper':
+            command += ['--add-data', f'{ROOT / "binaries" / name / "src/sounds"}:sounds',
+                        '--hidden-import', 'PyQt6.QtMultimedia']
         if name == 'AscendaraDownloader':
             command += ['--add-binary', f'{hatchzip}:.']
             for file in setup_hatchzip.LICENSES:
