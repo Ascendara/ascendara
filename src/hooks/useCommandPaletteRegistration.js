@@ -5,6 +5,7 @@ import { useSearch } from "@/context/SearchContext";
 import { FEATURE_CENTER_EVENTS, openFeatureCenter } from "@/lib/featureCenterEvents";
 import { startPreviousVersionRollback } from "@/lib/recoveryActions";
 import { createSettingsRecoveryPoint } from "@/services/app/recoveryService";
+import { checkForUpdates } from "@/services/app/updateCheckingService";
 
 const keywords = {
   system: [
@@ -38,6 +39,18 @@ const keywords = {
     "disco",
     "espaço",
     "pastas",
+  ],
+  about: [
+    "about",
+    "version",
+    "build",
+    "info",
+    "branch",
+    "revision",
+    "system info",
+    "specs",
+    "sobre",
+    "versão",
   ],
   recovery: ["recovery", "safe mode", "rollback", "cache", "recuperação", "modo seguro"],
   profiles: [
@@ -74,8 +87,35 @@ export function useCommandPaletteRegistration() {
         description: t("featureCenters.commandPalette.commands.systemCenter.description"),
         keywords: keywords.system,
         featured: true,
-        onSelect: () =>
-          openFeatureCenter(FEATURE_CENTER_EVENTS.system, { tab: "health" }),
+        onSelect: () => openFeatureCenter(FEATURE_CENTER_EVENTS.system),
+      },
+      {
+        id: "about-ascendara",
+        type: "commands",
+        label: t("featureCenters.commandPalette.commands.about.label"),
+        description: t("featureCenters.commandPalette.commands.about.description"),
+        badge: t("featureCenters.system.tabs.about"),
+        keywords: keywords.about,
+        onSelect: () => openFeatureCenter(FEATURE_CENTER_EVENTS.system, { tab: "about" }),
+      },
+      {
+        id: "check-for-updates",
+        type: "commands",
+        label: t("featureCenters.commandPalette.commands.checkUpdates.label"),
+        description: t("featureCenters.commandPalette.commands.checkUpdates.description"),
+        keywords: ["update", "updates", "upgrade", "new version", "latest", "atualizar"],
+        featured: true,
+        onSelect: () => {
+          checkForUpdates().then(isLatest =>
+            isLatest
+              ? toast.success(t("featureCenters.commandPalette.toasts.upToDate"))
+              : toast.info(t("featureCenters.commandPalette.toasts.updateAvailable"), {
+                  description: t(
+                    "featureCenters.commandPalette.toasts.updateAvailableDescription"
+                  ),
+                })
+          );
+        },
       },
       {
         id: "health-center",
@@ -84,7 +124,6 @@ export function useCommandPaletteRegistration() {
         description: t("featureCenters.commandPalette.commands.health.description"),
         badge: t("featureCenters.system.tabs.health"),
         keywords: keywords.health,
-        featured: true,
         onSelect: () =>
           openFeatureCenter(FEATURE_CENTER_EVENTS.system, { tab: "health" }),
       },
@@ -95,7 +134,6 @@ export function useCommandPaletteRegistration() {
         description: t("featureCenters.commandPalette.commands.storage.description"),
         badge: t("featureCenters.system.tabs.storage"),
         keywords: keywords.storage,
-        featured: true,
         onSelect: () =>
           openFeatureCenter(FEATURE_CENTER_EVENTS.system, { tab: "storage" }),
       },
@@ -106,7 +144,6 @@ export function useCommandPaletteRegistration() {
         description: t("featureCenters.commandPalette.commands.recovery.description"),
         badge: t("featureCenters.system.tabs.recovery"),
         keywords: keywords.recovery,
-        featured: true,
         onSelect: () =>
           openFeatureCenter(FEATURE_CENTER_EVENTS.system, { tab: "recovery" }),
       },
@@ -185,6 +222,7 @@ export function useCommandPaletteRegistration() {
         label: t("featureCenters.commandPalette.commands.bigPicture.label"),
         description: t("featureCenters.commandPalette.commands.bigPicture.description"),
         keywords: ["controller", "tv", "gamepad", "controle"],
+        featured: true,
         onSelect: navigate => navigate("/bigpicture"),
       },
       {
@@ -193,6 +231,7 @@ export function useCommandPaletteRegistration() {
         label: t("featureCenters.commandPalette.commands.localRefresh.label"),
         description: t("featureCenters.commandPalette.commands.localRefresh.description"),
         keywords: ["index", "refresh", "local", "índice", "atualizar"],
+        featured: true,
         onSelect: navigate =>
           navigate("/settings", { state: { scrollTo: "game-index" } }),
       },

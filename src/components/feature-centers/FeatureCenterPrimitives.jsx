@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,6 +17,7 @@ export function FeatureCenterDialog({
   description,
   children,
   maxWidth = "max-w-5xl",
+  headerClassName,
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -24,7 +27,12 @@ export function FeatureCenterDialog({
           maxWidth
         )}
       >
-        <DialogHeader className="shrink-0 border-b border-border px-4 py-4 pr-12 sm:px-6 sm:py-5">
+        <DialogHeader
+          className={cn(
+            "shrink-0 border-b border-border px-4 py-4 pr-12 sm:px-6 sm:py-5",
+            headerClassName
+          )}
+        >
           <DialogTitle className="flex items-center gap-2">
             <span className="truncate">{title}</span>
           </DialogTitle>
@@ -38,32 +46,92 @@ export function FeatureCenterDialog({
   );
 }
 
+// A row of tabs under the dialog header, for a handful of sections
 export function FeatureTabs({ items, activeId, onChange, children }) {
+  const panelRef = useRef(null);
+  const tabRefs = useRef({});
+
+  // Each section starts at its top rather than where the last one was scrolled
+  useEffect(() => {
+    if (panelRef.current) panelRef.current.scrollTop = 0;
+  }, [activeId]);
+
+  const handleKeyDown = event => {
+    const index = items.findIndex(item => item.id === activeId);
+    let next = null;
+    if (event.key === "ArrowRight") next = items[(index + 1) % items.length];
+    if (event.key === "ArrowLeft")
+      next = items[(index - 1 + items.length) % items.length];
+    if (event.key === "Home") next = items[0];
+    if (event.key === "End") next = items[items.length - 1];
+    if (!next) return;
+    event.preventDefault();
+    onChange(next.id);
+    tabRefs.current[next.id]?.focus();
+  };
+
   return (
-    <div className="flex h-full min-h-0 flex-col md:grid md:grid-cols-[190px_minmax(0,1fr)]">
-      <nav
-        className="flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-muted/20 p-2 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r md:p-3"
-        aria-label="Feature center sections"
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 border-b border-border px-4 sm:px-6">
+        <div
+          role="tablist"
+          aria-label="Feature center sections"
+          className="-mb-px flex gap-1 overflow-x-auto"
+          onKeyDown={handleKeyDown}
+        >
+          {items.map(item => {
+            const Icon = item.icon;
+            const active = activeId === item.id;
+            return (
+              <button
+                key={item.id}
+                ref={node => {
+                  tabRefs.current[item.id] = node;
+                }}
+                type="button"
+                role="tab"
+                id={`feature-tab-${item.id}`}
+                aria-selected={active}
+                aria-controls="feature-tab-panel"
+                tabIndex={active ? 0 : -1}
+                onClick={() => onChange(item.id)}
+                className={cn(
+                  "relative flex shrink-0 items-center gap-2 rounded-t-md px-3 pb-3 pt-2 text-sm font-medium outline-none transition-colors focus-visible:bg-muted/60",
+                  active
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {Icon && (
+                  <Icon
+                    className={cn(
+                      "h-4 w-4 transition-colors",
+                      active ? "text-primary" : "text-muted-foreground"
+                    )}
+                  />
+                )}
+                {item.label}
+                {active && (
+                  <motion.span
+                    layoutId="feature-tab-indicator"
+                    className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-primary"
+                    transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <section
+        ref={panelRef}
+        id="feature-tab-panel"
+        role="tabpanel"
+        aria-labelledby={`feature-tab-${activeId}`}
+        className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
       >
-        {items.map(item => {
-          const Icon = item.icon;
-          const active = activeId === item.id;
-          return (
-            <Button
-              key={item.id}
-              type="button"
-              variant={active ? "secondary" : "ghost"}
-              className="shrink-0 justify-start gap-2 md:w-full"
-              aria-pressed={active}
-              onClick={() => onChange(item.id)}
-            >
-              {Icon && <Icon className="h-4 w-4" />}
-              {item.label}
-            </Button>
-          );
-        })}
-      </nav>
-      <section className="min-h-0 overflow-y-auto p-4 sm:p-6">{children}</section>
+        {children}
+      </section>
     </div>
   );
 }

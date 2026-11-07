@@ -179,10 +179,24 @@ const featureCenterResources = {
         category: "Commands",
         empty: "Search games, settings, or run an Ascendara command",
         suggested: "Suggested actions",
+        toasts: {
+          upToDate: "Ascendara is up to date",
+          updateAvailable: "An Ascendara update is available",
+          updateAvailableDescription:
+            "Use the update button in the menu bar to install it.",
+        },
         commands: {
           systemCenter: {
             label: "Open System Center",
-            description: "Health checks, storage and recovery tools",
+            description: "App info, health checks, storage and recovery tools",
+          },
+          about: {
+            label: "About My Ascendara",
+            description: "Version, release channel, build details and system info",
+          },
+          checkUpdates: {
+            label: "Check for updates",
+            description: "See whether a newer version of Ascendara is available",
           },
           health: {
             label: "Run health check",
@@ -240,11 +254,55 @@ const featureCenterResources = {
       system: {
         title: "Ascendara System Center",
         description:
-          "Diagnostics, storage and recovery without changing how Ascendara stores your games.",
+          "Everything about this Ascendara install: app info, health, storage and recovery.",
         tabs: {
+          about: "My Ascendara",
           health: "Health",
           storage: "Storage",
           recovery: "Recovery",
+        },
+        about: {
+          openFromLogo: "My Ascendara",
+          tagline: "Your games, downloads and tools, all in one place.",
+          version: "Version",
+          channel: "Release channel",
+          revision: "Revision",
+          buildType: "Build",
+          installer: "Installer",
+          portable: "Portable",
+          platform: "Platform",
+          upToDate: "Up to date",
+          updateAvailable: "Update available",
+          checking: "Checking for updates…",
+          checkUpdates: "Check for updates",
+          changelog: "Changelog",
+          stats: {
+            games: "Games in library",
+            custom: "{{count}} added manually",
+            launches: "App launches",
+          },
+          thisBuild: "This build",
+          thisPc: "This PC",
+          os: "Operating system",
+          cpu: "Processor",
+          ram: "Memory",
+          gpu: "Graphics",
+          loadingSpecs: "Reading system details…",
+          specsUnavailable: "System details are unavailable.",
+          copyDetails: "Copy details",
+          copied: "Details copied",
+          copiedDescription: "Paste them into a support request or bug report.",
+          copyFailed: "Could not copy details",
+          links: "Links",
+          linkNames: {
+            website: "Website",
+            changelog: "Changelog",
+            docs: "Documentation",
+            discord: "Discord",
+            github: "GitHub",
+            feedback: "Feedback",
+          },
+          unknown: "Unknown",
         },
         status: {
           healthy: "Healthy",

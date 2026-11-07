@@ -35,6 +35,7 @@ import { exportToSvg } from "@/lib/exportToSvg";
 import { useAppIcon } from "@/hooks/useAppIcon";
 import { useSettings } from "@/context/SettingsContext";
 import { WindowControls } from "@/components/WindowControls";
+import { FEATURE_CENTER_EVENTS, openFeatureCenter } from "@/lib/featureCenterEvents";
 
 const MenuBar = () => {
   const { t } = useLanguage();
@@ -285,7 +286,28 @@ const MenuBar = () => {
             className={`flex items-center gap-2 ${mirrored ? "flex-row-reverse" : ""}`}
           >
             {iconData && (
-              <img src={iconData} alt="Ascendara" data-app-logo className="h-6 w-6" />
+              // Opens My Ascendara in the System Center; the logo flies into it
+              <button
+                type="button"
+                onClick={event =>
+                  openFeatureCenter(FEATURE_CENTER_EVENTS.system, {
+                    tab: "about",
+                    origin: event.currentTarget.querySelector("[data-app-logo]"),
+                  })
+                }
+                title={t("featureCenters.system.about.openFromLogo")}
+                aria-label={t("featureCenters.system.about.openFromLogo")}
+                className="rounded-md outline-none transition-transform duration-150 hover:scale-110 focus-visible:ring-2 focus-visible:ring-primary active:scale-95"
+                style={{ WebkitAppRegion: "no-drag" }}
+              >
+                <img
+                  src={iconData}
+                  alt="Ascendara"
+                  data-app-logo
+                  className="block h-6 w-6"
+                  draggable={false}
+                />
+              </button>
             )}
             <span className="text-sm font-medium text-foreground" data-boot-pop>
               Ascendara

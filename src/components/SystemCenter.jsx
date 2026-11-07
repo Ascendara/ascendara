@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -7,6 +7,7 @@ import {
   CircleHelp,
   Database,
   HardDrive,
+  Info,
   RefreshCw,
   RotateCcw,
   ShieldCheck,
@@ -17,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import AboutTab from "@/components/system-center/AboutTab";
 import {
   FeatureCenterDialog,
   FeatureSection,
@@ -27,6 +29,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useFeatureCenterDialog } from "@/hooks/useFeatureCenterDialog";
 import { FEATURE_CENTER_EVENTS } from "@/lib/featureCenterEvents";
+import { flyLogo, prefersReducedMotion, returnLogo } from "@/lib/logoFlight";
 import {
   clearTransientUiState,
   createSettingsRecoveryPoint,
@@ -80,13 +83,16 @@ function HealthRow({ item, onAction, t }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl bg-card/60 p-4 shadow sm:flex-row sm:items-start">
       <div className="flex min-w-0 flex-1 items-start gap-3">
-        <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${meta.className}`} />
+        <Icon className={`mt-px h-5 w-5 shrink-0 ${meta.className}`} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium text-foreground">{item.title}</p>
-            <Badge variant="outline" className={meta.badge}>
-              {t(`featureCenters.system.status.${item.status || "info"}`)}
-            </Badge>
+            <p className="font-medium leading-tight text-foreground">{item.title}</p>
+            {/* The icon already says it's fine; only call out what needs a look */}
+            {(item.status === "warning" || item.status === "error") && (
+              <Badge variant="outline" className={meta.badge}>
+                {t(`featureCenters.system.status.${item.status}`)}
+              </Badge>
+            )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
           {item.detail && (
@@ -113,10 +119,26 @@ function HealthRow({ item, onAction, t }) {
 const SystemCenter = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("health");
+  const [activeTab, setActiveTab] = useState("about");
+  // Opening from the menu bar logo flies that logo into the About hero
+  const flightOriginRef = useRef(null);
+  // The menu bar logo stays away until the dialog closes
+  const parkedLogoRef = useRef(null);
+  const aboutLogoRef = useRef(null);
+  const [logoInFlight, setLogoInFlight] = useState(false);
   const handleOpenEvent = useCallback(detail => {
-    if (["health", "storage", "recovery"].includes(detail?.tab)) {
-      setActiveTab(detail.tab);
+    const tab = ["about", "health", "storage", "recovery"].includes(detail?.tab)
+      ? detail.tab
+      : "about";
+    setActiveTab(tab);
+    if (
+      tab === "about" &&
+      detail?.origin instanceof HTMLElement &&
+      !prefersReducedMotion()
+    ) {
+      flightOriginRef.current = detail.origin;
+      parkedLogoRef.current = detail.origin;
+      setLogoInFlight(true);
     }
   }, []);
   const [open, setOpen] = useFeatureCenterDialog(
@@ -194,6 +216,28 @@ const SystemCenter = () => {
   }, []);
 
   useEffect(() => {
+    const origin = flightOriginRef.current;
+    if (!open || !origin) return;
+    flightOriginRef.current = null;
+    // Closing or switching tabs mid-flight cancels it and shows the slot logo
+    return flyLogo(
+      origin,
+      () => aboutLogoRef.current,
+      () => setLogoInFlight(false)
+    );
+  }, [open, logoInFlight]);
+
+  useEffect(() => {
+    if (open) return;
+    setLogoInFlight(false);
+    returnLogo(parkedLogoRef.current);
+    parkedLogoRef.current = null;
+  }, [open]);
+
+  // Never leave the menu bar without its logo
+  useEffect(() => () => returnLogo(parkedLogoRef.current), []);
+
+  useEffect(() => {
     if (!open) return;
     if (activeTab === "health") runHealthCheck();
     if (activeTab === "storage") refreshStorage();
@@ -231,7 +275,6 @@ const SystemCenter = () => {
   }, [healthItems]);
 
   const healthMeta = STATUS_META[overallHealth];
-  const HealthIcon = healthMeta.icon;
   const driveDirectories = storage?.driveSpace?.directories || [];
   const gameDirectories = storage?.gamesSize?.directorySizes || [];
   const previousVersion = rollbackVersions[0] || null;
@@ -331,6 +374,7 @@ const SystemCenter = () => {
   };
 
   const tabs = [
+    { id: "about", label: t("featureCenters.system.tabs.about"), icon: Info },
     { id: "health", label: t("featureCenters.system.tabs.health"), icon: Activity },
     { id: "storage", label: t("featureCenters.system.tabs.storage"), icon: HardDrive },
     { id: "recovery", label: t("featureCenters.system.tabs.recovery"), icon: Wrench },
@@ -343,15 +387,20 @@ const SystemCenter = () => {
       title={t("featureCenters.system.title")}
       description={t("featureCenters.system.description")}
       icon={ShieldCheck}
+      // The tab bar sits right under the header and draws the dividing line
+      headerClassName="border-b-0 pb-2 sm:pb-3"
     >
       <FeatureTabs items={tabs} activeId={activeTab} onChange={setActiveTab}>
+        {activeTab === "about" && (
+          <AboutTab ref={aboutLogoRef} t={t} hideLogo={logoInFlight} />
+        )}
+
         {activeTab === "health" && (
           <div className="space-y-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <HealthIcon className={`h-6 w-6 ${healthMeta.className}`} />
-                  <h2 className="text-xl font-semibold text-foreground">
+                  <h2 className="mb-0 text-xl font-semibold leading-tight text-foreground">
                     {t("featureCenters.system.health.title")}
                   </h2>
                   {healthItems.length > 0 && (
@@ -398,7 +447,7 @@ const SystemCenter = () => {
           <div className="space-y-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-foreground">
+                <h2 className="mb-0 text-xl font-semibold leading-tight text-foreground">
                   {t("featureCenters.system.storage.title")}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -535,7 +584,7 @@ const SystemCenter = () => {
         {activeTab === "recovery" && (
           <div className="space-y-4">
             <div>
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2 className="mb-0 text-xl font-semibold leading-tight text-foreground">
                 {t("featureCenters.system.recovery.title")}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
