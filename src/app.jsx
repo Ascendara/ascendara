@@ -73,7 +73,10 @@ import {
   verifyAscendAccess,
 } from "@/services/firebase/firebaseService";
 import gameService from "@/services/games/gameService";
-import { checkForUpdates } from "@/services/app/updateCheckingService";
+import {
+  checkForUpdates,
+  startBackgroundUpdateChecks,
+} from "@/services/app/updateCheckingService";
 import checkQbittorrentStatus from "@/services/downloads/qbittorrentCheckService";
 import { startStatusCheck } from "@/services/app/serverStatus";
 import { motion } from "framer-motion";
@@ -1711,6 +1714,12 @@ const AppRoutes = () => {
     navigate("/", { replace: true });
     setShowWelcome(false);
   };
+
+  // Keeps the cached version status fresh so pages like Ascend don't
+  // have to check on every visit
+  useEffect(() => {
+    startBackgroundUpdateChecks();
+  }, []);
 
   useEffect(() => {
     const checkVersion = async () => {

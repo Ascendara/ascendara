@@ -8,7 +8,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { getUserAuthHeaders, userAuthenticatedFetch } from "@/utils/authHelper";
 import { retroBackupPlatform } from "@/services/library/retroService";
 import { restoreCloudSave } from "@/services/cloud/restoreCloudSave";
-import { checkForUpdates } from "@/services/app/updateCheckingService";
+import { useVersionStatus } from "@/services/app/updateCheckingService";
 import {
   calculateLevelFromXP,
   getLevelConstants,
@@ -593,9 +593,9 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [deletingBackup, setDeletingBackup] = useState(null);
   const [restoringBackup, setRestoringBackup] = useState(null);
 
-  // Version check state
-  const [isOutdated, setIsOutdated] = useState(false);
-  const [checkingVersion, setCheckingVersion] = useState(true);
+  // Version status comes from the app-wide background check, so the page
+  // only waits when no check has finished yet this session
+  const { checking: checkingVersion, isOutdated } = useVersionStatus();
 
   // Check if in development mode
   useEffect(() => {
@@ -629,28 +629,6 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const [connectedDevices, setConnectedDevices] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [disconnectingDevice, setDisconnectingDevice] = useState(null);
-
-  // Check if app is on latest version
-  useEffect(() => {
-    let apiRequiresUpdate = false;
-    const requireUpdate = () => {
-      apiRequiresUpdate = true;
-      setIsOutdated(true);
-    };
-    window.addEventListener("ascendara:update-required", requireUpdate);
-    const checkVersion = async () => {
-      try {
-        const isLatest = await checkForUpdates();
-        setIsOutdated(apiRequiresUpdate || !isLatest);
-      } catch (error) {
-        console.error("Error checking version:", error);
-        setIsOutdated(apiRequiresUpdate);
-      }
-      setCheckingVersion(false);
-    };
-    checkVersion();
-    return () => window.removeEventListener("ascendara:update-required", requireUpdate);
-  }, []);
 
   // Handle account pending deletion error
   useEffect(() => {
