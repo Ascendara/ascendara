@@ -5,17 +5,20 @@
 const BUNDLE_WORDS =
   "soundtracks?|ost|bundle|bonus(?:es)?|dlcs?|artbooks?|art book|season pass|expansions?";
 const PACKAGING_WORDS =
-  "super deluxe|deluxe|gold|game of the year|goty|complete|ultimate|ultra|premium|standard|collector'?s|founder'?s|founders|special|limited|anniversary|digital|day one|launch";
+  "super deluxe|deluxe|gold|game of the year|goty|complete|ultimate|ultra|premium|standard|collector'?s|founder'?s|special|limited|anniversary|digital|day one|launch|starter|elite|year one|absolute";
 const RELEASE_GROUPS =
   "codex|plaza|skidrow|reloaded|cpy|empress|tenoke|rune|flt|doge|darksiders|elamigos|fitgirl|dodi|gog|p2p|razor1911|hoodlum|prophet|tinyiso|simplex|kaos";
 
-// "& Soundtrack Bundle", "– -Bonuses", "+ All DLCs", "incl. 5 DLC" up to the end
+// "& Soundtrack Bundle", "– -Bonuses", "+ All DLCs", "+ Skill Battle Booster
+// Pack DLC" up to the end
 const BUNDLE_TAIL = new RegExp(
-  `(?:\\s*[&+,:]|\\s+[\\-–—]|\\s+and\\b|\\s+with\\b|\\s+incl(?:uding|\\.)?)[\\s\\-–—:]*(?:[\\w'’.]+\\s+){0,3}?(?:${BUNDLE_WORDS})\\b.*$`,
+  `(?:\\s*[&+,:]|\\s+[\\-–—]|\\s+and\\b|\\s+with\\b|\\s+incl(?:uding|\\.)?)[\\s\\-–—:]*(?:[\\w'’.]+\\s+){0,4}?(?:${BUNDLE_WORDS})\\b.*$`,
   "i"
 );
+// Stacked words too ("Premium Deluxe Edition"), with a season number in front
+// ("2.0 Starter Edition") or "Complete" after it
 const PACKAGING_EDITION = new RegExp(
-  `\\b(?:digital\\s+)?(?:${PACKAGING_WORDS})\\s+edition\\b`,
+  `(?:\\b\\d+(?:\\.\\d+)+\\s+)?\\b(?:(?:${PACKAGING_WORDS})\\s+){1,4}edition(?:\\s+complete)?\\b`,
   "gi"
 );
 const TRAILING_TAG = new RegExp(
@@ -24,33 +27,56 @@ const TRAILING_TAG = new RegExp(
 );
 const RELEASE_GROUP = new RegExp(`\\s*-\\s*(?:${RELEASE_GROUPS})$`, "i");
 const VERSION_TAGS = [
-  /\bv\d+(?:[._-]\d+)*[a-z]?\b/gi,
-  /\b(?:build|update|patch|version)\s*[#.]?\s*\d[\d.]*\b/gi,
+  /\bv\d+(?:[._-]\d+)*[a-z]?(?:\/v?\d+(?:[._-]\d+)*[a-z]?)*\b/gi,
+  /\bv\.?\s?cl\d+\b/gi,
+  /\b(?:build|update|patch|version|hotfix)\s*[#.]?\s*\d[\d.]*\b/gi,
   /\brepack(?:ed)?(?:\s+by\s+\S+)?/gi,
   /\bmulti\s?\d+\b/gi,
 ];
-// FitGirl lists extras after the version: "Name, v1.0 + Friend's Pass"
-const EXTRAS_TAIL = /\s*,[\s,]*\+.*$/;
+// FitGirl lists extras after the version: "Name, v1.0 + Friend's Pass",
+// "Name, Steam + Multiplayer", or what is left of them: "Name, /Bonuses"
+const EXTRAS_TAIL = /\s*,[^,+]{0,30}\+.*$|\s*,\s*\/.*$/;
+// "+ Windows 7 Fix", "+ Lam Bug Fix"
+const FIX_TAIL = /\s*\+\s*(?:[\w'’.]+\s+){0,3}(?:bug\s*)?fix\b.*$/i;
+// Repack notes left at the end: "– MS Store", "– 2.0.1", "– Hotfix",
+// "Updates posted", "Crackfix", "– for v1.10+"
+const SUFFIX_TAG =
+  /(?:[\s\-–—,+:]+(?:(?:ms|microsoft) store|v?\d+(?:\.\d+){2,}[a-z]?|hotfix|crackfix|updates posted|for)|[\s\-–—:]+v?\d+(?:\.\d+){2,})[\s+]*$/i;
+// ", EU/US"
+const REGION_TAG = /,\s*(?:EU|US|JP|ASIA)(?:\s*\/\s*(?:EU|US|JP|ASIA))*$/;
+// Scene names: "Anno.1800.Crackfix-EMPRESS"
+const SCENE_NAME = /^[\w'’-]+(?:[._][\w'’-]+){2,}$/;
 
 const tidy = text =>
   text
     .replace(/\s+/g, " ")
-    .replace(/^[\s\-–—:&+,.]+|[\s\-–—:&+,]+$/g, "")
+    .replace(/^[\s\-–—:&+,.]+/, "")
+    // keeps the closing dash of a name like "GUILTY GEAR -STRIVE-"
+    .replace(/(\s-[^\s-][^-]*[^\s-]-)?[\s\-–—:&+,]*$/, (_, pair) => pair ?? "")
     .trim();
 
 export function cleanGameTitle(title) {
   if (typeof title !== "string") return "";
-  let text = title.replace(/[™®©]/g, "").normalize("NFKC");
+  let text = title.replace(/[™®©]/g, "").normalize("NFKC").trim();
+  if (SCENE_NAME.test(text)) text = text.replace(/[._]/g, " ");
   text = text.replace(/\([^)]*\)|\[[^\]]*\]|\{[^}]*\}/g, " ");
   for (const tag of VERSION_TAGS) text = text.replace(tag, " ");
   text = text.replace(EXTRAS_TAIL, "");
+  text = text.replace(FIX_TAIL, "");
   text = text.replace(BUNDLE_TAIL, "");
   text = text.replace(PACKAGING_EDITION, " ");
-  text = tidy(text);
+  // An edition taken out of "Name – Deluxe Edition, ..." leaves "Name – ,"
+  text = tidy(text.replace(/\s+[-–—:]\s*,/g, ","));
   let previous;
   do {
     previous = text;
-    text = tidy(text.replace(TRAILING_TAG, "").replace(RELEASE_GROUP, ""));
+    text = tidy(
+      text
+        .replace(TRAILING_TAG, "")
+        .replace(RELEASE_GROUP, "")
+        .replace(SUFFIX_TAG, "")
+        .replace(REGION_TAG, "")
+    );
   } while (text !== previous);
   return text;
 }

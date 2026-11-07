@@ -58,6 +58,140 @@ test("FitGirl extras, language tags and more edition names come off too", async 
   }
 });
 
+// Misses from the FitGirl index sample (reports/2026-11-07-steam-misses.md):
+// [index name, name the app passes after its own tag cleaning, expected]
+const INDEX_MISSES = [
+  [
+    "STAR WARS: Galactic Racer – Deluxe Edition, vCL386500 + 3 DLCs/Bonuses",
+    "STAR WARS: Galactic Racer – Deluxe Edition, vCL386500 /Bonuses",
+    "STAR WARS: Galactic Racer",
+  ],
+  [
+    "The Mound: Omen of Cthulhu – Deluxe Edition, v.CL34308 + 4 DLCs/Bonuses",
+    "The Mound: Omen of Cthulhu – Deluxe Edition, v.CL34308 /Bonuses",
+    "The Mound: Omen of Cthulhu",
+  ],
+  [
+    "Deep Rock Galactic: Deluxe Edition, v1.40.158958.0 + 13 DLCs/Bonuses",
+    "Deep Rock Galactic: Deluxe Edition, /Bonuses",
+    "Deep Rock Galactic",
+  ],
+  [
+    "Ravenswatch: Year One Edition, v1.06.00.04.27511 + 12 DLCs/Bonuses",
+    "Ravenswatch: Year One Edition, /Bonuses",
+    "Ravenswatch",
+  ],
+  [
+    "GUILTY GEAR -STRIVE- 2.0 Starter Edition, Build 23538523 + 39 DLC/Bonuses",
+    "GUILTY GEAR -STRIVE- 2.0 Starter Edition, /Bonuses",
+    "GUILTY GEAR -STRIVE-",
+  ],
+  [
+    "Graviteam Tactics: Mius-Front, v6.00.3598/1 + 29 DLCs",
+    "Graviteam Tactics: Mius-Front,/1",
+    "Graviteam Tactics: Mius-Front",
+  ],
+  [
+    "Red Dead Redemption 2: Ultimate Edition, Build 1491.50 + UE Unlocker + Bonus Content",
+    "Red Dead Redemption 2: Ultimate Edition, .50 + UE Unlocker + Bonus Content",
+    "Red Dead Redemption 2",
+  ],
+  [
+    "HITMAN 3, v3.10.0/v3.10.1 (Update 2) + H1/H2 Missions + Unlocker",
+    "HITMAN 3,/v3.10.1 + H1/H2 Missions + Unlocker",
+    "HITMAN 3",
+  ],
+  [
+    "Monster Hunter Stories 3: Twisted Reflection – Premium Deluxe Edition, v1.1.01 + 27 DLCs",
+    "Monster Hunter Stories 3: Twisted Reflection – Premium Deluxe Edition,",
+    "Monster Hunter Stories 3: Twisted Reflection",
+  ],
+  [
+    "Onimusha: Way of the Sword – Premium Deluxe Edition, v01.000.001 + 23 DLCs",
+    "Onimusha: Way of the Sword – Premium Deluxe Edition,",
+    "Onimusha: Way of the Sword",
+  ],
+  [
+    "Hunting Simulator 2: Elite Edition, v1.0.0.311.66949 + 4 DLCs",
+    "Hunting Simulator 2: Elite Edition,",
+    "Hunting Simulator 2",
+  ],
+  [
+    "You Are Empty: Absolute Edition Complete – Hotfix 3 + Bonus OST",
+    "You Are Empty: Absolute Edition Complete – Hotfix 3 + Bonus OST",
+    "You Are Empty",
+  ],
+  [
+    "Puyo Puyo Tetris 2: Launch Edition + Skill Battle Booster Pack DLC",
+    "Puyo Puyo Tetris 2: Launch Edition + Skill Battle Booster Pack DLC",
+    "Puyo Puyo Tetris 2",
+  ],
+  ["Ascend to ZERO – MS Store v1.0.4.0", "Ascend to ZERO – MS Store", "Ascend to ZERO"],
+  ["Backpack Dungeon – 2.0.1", "Backpack Dungeon – 2.0.1", "Backpack Dungeon"],
+  [
+    "Horizon: Forbidden West – Complete Edition  Updates posted",
+    "Horizon: Forbidden West – Complete Edition Updates posted",
+    "Horizon: Forbidden West",
+  ],
+  [
+    "The Cursed Tape + Windows 7 Fix",
+    "The Cursed Tape + Windows 7 Fix",
+    "The Cursed Tape",
+  ],
+  [
+    "Backrooms Break + Windows 7 Fix",
+    "Backrooms Break + Windows 7 Fix",
+    "Backrooms Break",
+  ],
+  [
+    "Eiyuden Chronicle: Hundred Heroes + 4 DLCs + Lam Bug Fix",
+    "Eiyuden Chronicle: Hundred Heroes + Lam Bug Fix",
+    "Eiyuden Chronicle: Hundred Heroes",
+  ],
+  [
+    "Dying Light 2: Stay Human – Ultimate Edition, v1.30.0 + 31 DLCs + Bonus Content + Windows 7 Fix",
+    "Dying Light 2: Stay Human – Ultimate Edition, + Bonus Content + Windows 7 Fix",
+    "Dying Light 2: Stay Human",
+  ],
+  [
+    "Forza Horizon 4: Ultimate Edition, v1.465.282.0 Steam + All DLCs + Multiplayer",
+    "Forza Horizon 4: Ultimate Edition, Steam + Multiplayer",
+    "Forza Horizon 4",
+  ],
+  [
+    "DRIVECLUB, v1.28 EU/US + All DLCs (Recompiled for PC v0.2.5)",
+    "DRIVECLUB, EU/US",
+    "DRIVECLUB",
+  ],
+  ["Anno.1800.Crackfix-EMPRESS", "Anno.1800.Crackfix-EMPRESS", "Anno 1800"],
+  [
+    "Fallout 4: High Resolution Texture Pack – for v1.10.980.0+",
+    "Fallout 4: High Resolution Texture Pack – for+",
+    "Fallout 4: High Resolution Texture Pack",
+  ],
+  [
+    "Little Kitty, Big City, v1.24.5.8_3487 + Bonus Soundtrack",
+    "Little Kitty, Big City, + Bonus Soundtrack",
+    "Little Kitty, Big City",
+  ],
+];
+
+test("index sample misses clean to the Steam name", async () => {
+  const { cleanGameTitle } = await load();
+  for (const [indexName, appName, clean] of INDEX_MISSES) {
+    assert.equal(cleanGameTitle(indexName), clean, indexName);
+    assert.equal(cleanGameTitle(appName), clean, appName);
+  }
+});
+
+test("long repeated edition words clean quickly", async () => {
+  const { cleanGameTitle } = await load();
+  const start = Date.now();
+  cleanGameTitle(`Game ${"founders ".repeat(40)}x`);
+  cleanGameTitle(`Game ${"premium deluxe ".repeat(40)}Edition`);
+  assert.ok(Date.now() - start < 200);
+});
+
 test("only the same name after cleaning counts as a match", async () => {
   const { isConfidentMatch } = await load();
   assert.ok(
