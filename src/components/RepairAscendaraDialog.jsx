@@ -58,6 +58,7 @@ const RepairAscendaraDialog = ({ open, onOpenChange, missingFiles = [] }) => {
         title={t("app.repair.overlayTitle")}
         description={t("app.repair.overlayDescription")}
         detail={progress < 100 ? t("app.repair.downloading", { progress }) : null}
+        progress={progress}
       />
     );
   }

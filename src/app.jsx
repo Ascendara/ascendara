@@ -1226,6 +1226,9 @@ const AppRoutes = () => {
   const [hasInitialRedirect, setHasInitialRedirect] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
+  // Where the menu bar logo was when Install and Restart was clicked, so the
+  // update overlay's logo can fly out of it
+  const [installLogoFrom, setInstallLogoFrom] = useState(null);
   const iconData = useAppIcon();
   const [splashDone, setSplashDone] = useState(false);
   // The app renders under the splash once initialized; the splash only leaves
@@ -1530,18 +1533,6 @@ const AppRoutes = () => {
           return;
         }
 
-        // Check if we're forcing the installing screen from settings
-        const forceInstalling = localStorage.getItem("forceInstalling");
-        if (forceInstalling) {
-          localStorage.removeItem("forceInstalling");
-          setIsInstalling(true);
-          setTimeout(() => {
-            setIsInstalling(false);
-            window.location.reload();
-          }, 2000);
-          return;
-        }
-
         // Check if we're finishing up from settings
         const finishingUp = localStorage.getItem("finishingUp");
         if (finishingUp) {
@@ -1803,8 +1794,15 @@ const AppRoutes = () => {
     checkBranchWelcome();
   }, [isLoading, showWelcome]);
 
-  const handleInstallAndRestart = async () => {
+  // Shows the update overlay, its logo flying out of the menu bar logo
+  const showInstallingOverlay = () => {
+    const logoRect = document.querySelector("[data-app-logo]")?.getBoundingClientRect();
+    setInstallLogoFrom(logoRect?.width > 0 ? logoRect : "left");
     setIsInstalling(true);
+  };
+
+  const handleInstallAndRestart = async () => {
+    showInstallingOverlay();
     try {
       await window.electron.setTimestampValue("isUpdating", true);
       setIsUpdating(true);
@@ -1851,6 +1849,28 @@ const AppRoutes = () => {
     hasInitialRedirect,
     navigate,
   ]);
+
+  // Settings' screen trigger: the update-ready toast, whose button only
+  // previews the installing screen and then reloads
+  useEffect(() => {
+    const previewUpdateToast = () => {
+      toast(t("app.toasts.updateReady"), {
+        description: t("app.toasts.updateReadyDesc"),
+        action: {
+          label: t("app.toasts.installAndRestart"),
+          onClick: () => {
+            showInstallingOverlay();
+            setTimeout(() => window.location.reload(), 3000);
+          },
+        },
+        duration: Infinity,
+        id: "update-ready-preview",
+      });
+    };
+    window.addEventListener("ascendara:preview-update-toast", previewUpdateToast);
+    return () =>
+      window.removeEventListener("ascendara:preview-update-toast", previewUpdateToast);
+  }, [t]);
 
   // Version check effect
   useEffect(() => {
@@ -1983,7 +2003,7 @@ const AppRoutes = () => {
   }
 
   if (isInstalling) {
-    return <UpdateOverlay />;
+    return <UpdateOverlay flyFrom={installLogoFrom} />;
   }
 
   // Same key in both trees so React keeps the splash mounted (no remount jump)

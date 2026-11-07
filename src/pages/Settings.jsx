@@ -752,9 +752,8 @@ function Settings() {
     try {
       switch (currentScreen) {
         case "updating":
-          // Set installing flag to show UpdateOverlay
-          localStorage.setItem("forceInstalling", "true");
-          window.location.reload();
+          // Same toast a real update shows; its button previews the overlay
+          window.dispatchEvent(new CustomEvent("ascendara:preview-update-toast"));
           break;
 
         case "loading":
