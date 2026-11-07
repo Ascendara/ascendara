@@ -28,8 +28,7 @@ def main():
         if not (seven / name).is_file():
             raise RuntimeError(f'Install 7-Zip x64: missing {seven / name}')
     hatchzip = setup_hatchzip.build()
-    names = ('AscendaraDownloader', 'AscendaraGameHandler', 'AscendaraNotificationHelper',
-             'AscendaraTorrentHandler')
+    names = ('AscendaraDownloader', 'AscendaraNotificationHelper', 'AscendaraTorrentHandler')
     venv = ROOT / '.build_venv' / 'Scripts/python.exe'
     run([sys.executable, '-m', 'venv', venv.parent.parent])
     run([venv, '-m', 'pip', 'install', 'pyinstaller==6.16.0'])
@@ -55,7 +54,8 @@ def main():
             for file in setup_hatchzip.LICENSES:
                 command += ['--add-data', f'{hatchzip.parent / file};licenses/hatchzip']
         run([*command, folder / 'src' / f'{name}.py'])
-    run(['cargo', 'build', '--release', '--locked'], ROOT / 'binaries/AscendaraCrashReporter')
+    for name in ('AscendaraCrashReporter', 'AscendaraGameHandler'):
+        run(['cargo', 'build', '--release', '--locked'], ROOT / 'binaries' / name)
     watcher = ROOT / 'binaries/AscendaraAchievementWatcher'
     run(['yarn.cmd', 'install', '--frozen-lockfile'], watcher)
     run(['yarn.cmd', 'build-win'], watcher)

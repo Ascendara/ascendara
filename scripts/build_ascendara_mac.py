@@ -15,9 +15,10 @@ import build_highball
 
 ROOT = Path(__file__).resolve().parents[1]
 HELPERS = (
-    'AscendaraDownloader', 'AscendaraGameHandler', 'AscendaraLanguageTranslation',
+    'AscendaraDownloader', 'AscendaraLanguageTranslation',
     'AscendaraTorrentHandler', 'AscendaraNotificationHelper',
 )
+RUST_HELPERS = ('AscendaraCrashReporter', 'AscendaraGameHandler')
 
 
 MACH_ARCH = {'arm64': 'arm64', 'x64': 'x86_64'}
@@ -180,15 +181,16 @@ def build_arch(arch, args, identity):
                 command += ['--add-data', f'{hatchzip.parent / file}:licenses/hatchzip']
         command += [ROOT / 'binaries' / name / 'src' / f'{name}.py']
         run(command, env=env)
-    crash = ROOT / 'binaries/AscendaraCrashReporter'
-    run(rust_command('cargo') + ['build', '--release', '--locked', '--target', RUST_TARGET[arch], '--target-dir', crash / 'target'],
-        cwd=crash, env=rust_environment())
-    shutil.copy2(crash / 'target' / RUST_TARGET[arch] / 'release/AscendaraCrashReporter', staging)
+    for name in RUST_HELPERS:
+        crate = ROOT / 'binaries' / name
+        run(rust_command('cargo') + ['build', '--release', '--locked', '--target', RUST_TARGET[arch], '--target-dir', crate / 'target'],
+            cwd=crate, env=rust_environment())
+        shutil.copy2(crate / 'target' / RUST_TARGET[arch] / 'release' / name, staging)
     watcher = ROOT / 'binaries/AscendaraAchievementWatcher'
     run(['yarn', 'install', '--frozen-lockfile'], cwd=watcher)
     run(['yarn', 'pkg', 'src/watchdog.js', '--config', 'package.json', '--target', f'node18-macos-{arch}',
          '--output', staging / 'AscendaraAchievementWatcher'], cwd=watcher)
-    names = [*HELPERS, 'AscendaraCrashReporter', 'AscendaraAchievementWatcher']
+    names = [*HELPERS, *RUST_HELPERS, 'AscendaraAchievementWatcher']
     for name in names:
         binary = staging / name
         run(['lipo', binary, '-verify_arch', MACH_ARCH[arch]])

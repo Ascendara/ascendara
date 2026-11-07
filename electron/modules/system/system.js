@@ -1122,7 +1122,7 @@ function registerSystemHandlers() {
       const helpers = [
         ["AscendaraCrashReporter", "target/release/AscendaraCrashReporter"],
         ["AscendaraDownloader", "src/AscendaraDownloader.py"],
-        ["AscendaraGameHandler", "src/AscendaraGameHandler.py"],
+        ["AscendaraGameHandler", "target/release/AscendaraGameHandler"],
         ["AscendaraLanguageTranslation", "src/AscendaraLanguageTranslation.py"],
         ["AscendaraTorrentHandler", "src/AscendaraTorrentHandler.py"],
         ["AscendaraAchievementWatcher", "dist/AscendaraAchievementWatcher"],

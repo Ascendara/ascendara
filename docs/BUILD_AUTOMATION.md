@@ -45,7 +45,7 @@ Each job verifies required resources before packaging, checks helper executable 
 | Helper              | Windows                               | Linux                               | macOS                             |
 | ------------------- | ------------------------------------- | ----------------------------------- | --------------------------------- |
 | Downloader          | PyInstaller EXE                       | PyInstaller ELF                     | PyInstaller Mach-O per CPU        |
-| GameHandler         | PyInstaller EXE                       | PyInstaller ELF                     | PyInstaller Mach-O per CPU        |
+| GameHandler         | Cargo release EXE                     | Cargo release ELF                   | Cargo release per Rust target     |
 | CrashReporter       | Cargo release EXE                     | Cargo release ELF                   | Cargo release per Rust target     |
 | NotificationHelper  | PyInstaller windowed EXE, PyQt6       | PyInstaller, PyQt6                  | PyInstaller, PyQt6                |
 | AchievementWatcher  | existing `pkg` Node 18 Windows target | existing `pkg` Node 18 Linux target | `pkg` Node 18 matching native CPU |
@@ -55,7 +55,7 @@ Each job verifies required resources before packaging, checks helper executable 
 
 Windows compilation is now checked in as `scripts/build_windows_helpers.py`. The historical batch scripts/specs are ignored and **absent from this checkout**; their exact switches could not be compared. The only local specs found were generated Mac specs, matching the existing Mac builder recipe. All Python sources, requirements, Cargo configuration/build.rs, watcher scripts, and Electron Builder resources were inspected. No tracked native shell/batch build recipes exist.
 
-Windows outputs go to the exact `binaries/NAME/dist/NAME.exe` paths; CrashReporter uses `target/release`. The checked-in UnRAR DLL and Windows-only `unrar` Python wrapper support downloader RAR extraction. The runner's 7-Zip EXE, DLL, and license are bundled for Downloader/TorrentHandler. Missing imports in the checked-in requirements are made explicit (Windows UnRAR wrapper/toasts, LocalRefresh BeautifulSoup, and NotificationHelper requests). Missing files fail immediately; install 7-Zip x64 on a custom Windows host if needed.
+Windows outputs go to the exact `binaries/NAME/dist/NAME.exe` paths; CrashReporter and GameHandler use `target/release`. The checked-in UnRAR DLL and Windows-only `unrar` Python wrapper support downloader RAR extraction. The runner's 7-Zip EXE, DLL, and license are bundled for Downloader/TorrentHandler. Missing imports in the checked-in requirements are made explicit (Windows UnRAR wrapper/toasts, LocalRefresh BeautifulSoup, and NotificationHelper requests). Missing files fail immediately; install 7-Zip x64 on a custom Windows host if needed.
 
 Linux retains its dedicated venv, bundles distro UnRAR plus its license and p7zip's native `7z`/`7z.so` plus copyright notices. The workflow installs `unrar`, `p7zip-full`, `libfuse2`, and FLTK/X11/OpenGL development dependencies. The historical nonexistent `AscendaraGofileHelper.py` entry was removed: Gofile is now an imported module in Downloader, not a packaged extra executable. Missing required scripts/dependency installs fail immediately. The p7zip paths are Ubuntu/Debian paths; other local distributions may require adapting them.
 

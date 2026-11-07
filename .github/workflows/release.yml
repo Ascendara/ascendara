@@ -116,7 +116,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             binaries/AscendaraCrashReporter/target
-          key: cargo-${{ matrix.target }}-1.90.0-${{ hashFiles('binaries/AscendaraCrashReporter/Cargo.lock') }}
+            binaries/AscendaraGameHandler/target
+          key: cargo-${{ matrix.target }}-1.90.0-${{ hashFiles('binaries/AscendaraCrashReporter/Cargo.lock', 'binaries/AscendaraGameHandler/Cargo.lock') }}
       - name: Linux build dependencies
         if: runner.os == 'Linux'
         run: |

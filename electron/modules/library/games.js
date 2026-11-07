@@ -7,7 +7,7 @@ const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
 const axios = require("axios");
-const { spawn, execSync, execFileSync } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const { ipcMain, shell, dialog, BrowserWindow } = require("electron");
 const {
   isDev,
@@ -15,7 +15,6 @@ const {
   isLinux,
   appDirectory,
   linuxUmuBin,
-  getPythonPath,
 } = require("../core/config");
 const {
   sanitizeGameName,
@@ -51,31 +50,10 @@ const { createMacShortcut } = require("./macShortcuts");
 const runGameProcesses = new Map();
 // Games whose compatibility layer is still being prepared before launch
 const preparingGames = new Set();
-let devGameHandlerReady = false;
 
 // Quote an argument for the game handler, which splits launch commands like a shell
 const shellQuote = arg =>
   /^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${String(arg).replace(/'/g, "'\\''")}'`;
-
-/**
- * In developer mode the game handler runs from source, so its Python
- * dependencies must be installed for the interpreter Ascendara uses.
- */
-function checkDevGameHandler(python) {
-  if (devGameHandlerReady) return;
-  try {
-    execFileSync(python, ["-c", "import pypresence, psutil"], {
-      stdio: "ignore",
-      windowsHide: true,
-    });
-    devGameHandlerReady = true;
-  } catch {
-    throw new Error(
-      `Developer mode runs the game handler from source with ${python}, which is missing its dependencies. ` +
-        `Run: ${python} -m pip install -r binaries/AscendaraGameHandler/requirements.txt`
-    );
-  }
-}
 
 function findCustomGame(game, settings, selectedExecutable = null) {
   for (const directory of [
@@ -767,13 +745,19 @@ function registerGameHandlers() {
 
         // Resolve Handler Path
         let executablePath;
-        let handlerScript;
 
         if (isDev) {
-          // Developer mode runs the game handler from source
-          executablePath = getPythonPath();
-          handlerScript = "binaries/AscendaraGameHandler/src/AscendaraGameHandler.py";
-          checkDevGameHandler(executablePath);
+          // Developer mode runs the game handler built from source
+          executablePath = path.resolve(
+            "binaries/AscendaraGameHandler/target/release",
+            isWindows ? "AscendaraGameHandler.exe" : "AscendaraGameHandler"
+          );
+          if (!fs.existsSync(executablePath)) {
+            throw new Error(
+              "Developer mode runs the game handler built from source. " +
+                "Run: cargo build --release in binaries/AscendaraGameHandler"
+            );
+          }
         } else if (isWindows) {
           executablePath = path.join(appDirectory, "/resources/AscendaraGameHandler.exe");
         } else {
@@ -1072,14 +1056,9 @@ function registerGameHandlers() {
           }
         }
 
-        // Build final spawn arguments
-        const spawnArgs = handlerScript
-          ? [handlerScript, ...gameHandlerArgs]
-          : gameHandlerArgs;
-
         const exitMonitor = createGameExitMonitor({ elevated: launchWithAdmin });
         let launchFailed = false;
-        const runGame = spawn(executablePath, spawnArgs, {
+        const runGame = spawn(executablePath, gameHandlerArgs, {
           detached: false,
           stdio: ["pipe", "pipe", "pipe"],
           windowsHide: true,

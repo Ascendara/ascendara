@@ -109,32 +109,26 @@ def build_achievement_watcher():
     print("AscendaraAchievementWatcher built successfully")
     return True
 
-def build_crash_reporter():
-    """Build the AscendaraCrashReporter Rust binary for Linux"""
-    print("Building AscendaraCrashReporter (Rust)...")
-    
-    crash_reporter_dir = os.path.join('binaries', 'AscendaraCrashReporter')
-    if not os.path.exists(crash_reporter_dir):
-        print("Warning: AscendaraCrashReporter directory not found, skipping...")
-        return True
-    
-    # Check if cargo is installed
+def build_rust_binaries():
+    """Build the Rust helpers (CrashReporter, GameHandler) for Linux"""
     if not shutil.which('cargo'):
         print("Error: cargo is not installed. Please install Rust toolchain.")
         return False
-    
-    # Build for Linux using cargo
-    if not run_command(['cargo', 'build', '--release', '--locked'], cwd=crash_reporter_dir):
-        print("Failed to build AscendaraCrashReporter")
-        return False
-    
-    # Make the binary executable
-    binary_path = os.path.join(crash_reporter_dir, 'target', 'release', 'AscendaraCrashReporter')
-    if os.path.exists(binary_path):
-        os.chmod(binary_path, 0o755)
-        print("Made AscendaraCrashReporter executable")
-    
-    print("AscendaraCrashReporter built successfully")
+
+    for name in ('AscendaraCrashReporter', 'AscendaraGameHandler'):
+        print(f"Building {name} (Rust)...")
+        crate_dir = os.path.join('binaries', name)
+        if not run_command(['cargo', 'build', '--release', '--locked'], cwd=crate_dir):
+            print(f"Failed to build {name}")
+            return False
+
+        # Make the binary executable
+        binary_path = os.path.join(crate_dir, 'target', 'release', name)
+        if os.path.exists(binary_path):
+            os.chmod(binary_path, 0o755)
+            print(f"Made {name} executable")
+
+        print(f"{name} built successfully")
     return True
 
 def build_python_binaries_linux():
@@ -206,7 +200,6 @@ def build_python_binaries_linux():
     # Map: (output name, script path relative to binaries_dir, extra PyInstaller args)
     binaries = [
         ('AscendaraDownloader',         'AscendaraDownloader/src/AscendaraDownloader.py',         downloader_args),
-        ('AscendaraGameHandler',         'AscendaraGameHandler/src/AscendaraGameHandler.py',        []),
         ('AscendaraLanguageTranslation', 'AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py', []),
         ('AscendaraTorrentHandler',      'AscendaraTorrentHandler/src/AscendaraTorrentHandler.py',  extraction_args),
         ('AscendaraNotificationHelper',  'AscendaraNotificationHelper/src/AscendaraNotificationHelper.py', ['--windowed']),
@@ -488,9 +481,9 @@ def main():
         print("Failed to build AscendaraAchievementWatcher. Exiting.")
         return 1
 
-    # Step 4: Build AscendaraCrashReporter (Rust) for Linux
-    if not build_crash_reporter():
-        print("Failed to build AscendaraCrashReporter. Exiting.")
+    # Step 4: Build the Rust helpers (CrashReporter, GameHandler) for Linux
+    if not build_rust_binaries():
+        print("Failed to build Rust binaries. Exiting.")
         return 1
 
     # Step 5: Compile Python binaries to standalone ELF executables
