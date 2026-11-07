@@ -8,18 +8,123 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/LanguageContext";
-import { Cpu, Loader } from "lucide-react";
-import { useState } from "react";
+import { checkCanRun } from "@/lib/canRunCheck";
+import { matchRequirements } from "@/lib/steamMatch";
+import { formatBytes } from "@/services/app/systemHealthService";
+import steamService from "@/services/games/gameInfoService";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Cpu,
+  HelpCircle,
+  Loader,
+  XCircle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
 const SPEC_KEYS = ["os", "cpu", "ram", "gpu", "directx"];
+const CARD_KEYS = [...SPEC_KEYS, "storage"];
 
-export default function SystemRequirements({ minReqs }) {
+const VERDICT_STYLE = {
+  pass: { Icon: CheckCircle2, className: "text-green-500" },
+  close: { Icon: AlertCircle, className: "text-amber-500 dark:text-amber-400" },
+  fail: { Icon: XCircle, className: "text-red-500 dark:text-red-400" },
+  unknown: { Icon: HelpCircle, className: "text-muted-foreground" },
+};
+
+// Room on the emptiest-looking games folder: the folder is picked when the
+// download starts, so any one that fits counts
+async function loadFreeSpace(downloadDirectory) {
+  if (!downloadDirectory) return undefined;
+  const space = await window.electron.getDriveSpace(downloadDirectory);
+  const free = (space?.directories || [])
+    .filter(entry => !entry.error)
+    .map(entry => entry.freeSpace);
+  return free.length ? Math.max(...free) : undefined;
+}
+
+function verdictDetail(key, verdict, t) {
+  if (key === "storage" && verdict.have !== undefined) {
+    return verdict.status === "fail"
+      ? t("download.canRun.needsSpace", {
+          free: formatBytes(verdict.have),
+          needed: formatBytes(verdict.needed),
+        })
+      : t("download.canRun.freeSpace", { free: formatBytes(verdict.have) });
+  }
+  if (verdict.have === undefined) return null;
+  const value = key === "ram" ? formatBytes(verdict.have) : verdict.have;
+  return t("download.canRun.yours", { value });
+}
+
+function Verdict({ specKey, verdict }) {
+  const { t } = useLanguage();
+  const { Icon, className } = VERDICT_STYLE[verdict.status];
+  const detail = verdictDetail(specKey, verdict, t);
+  return (
+    <span className={`mt-0.5 flex items-center justify-end gap-1 text-xs ${className}`}>
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      <span>
+        {t(`download.canRun.${verdict.status}`)}
+        {detail && <span className="text-muted-foreground"> · {detail}</span>}
+      </span>
+    </span>
+  );
+}
+
+export default function SystemRequirements({
+  minReqs: indexReqs,
+  gameName,
+  steamData,
+  downloadSize,
+  downloadDirectory,
+}) {
   const { t } = useLanguage();
   const [showCompareDialog, setShowCompareDialog] = useState(false);
   const [systemSpecs, setSystemSpecs] = useState(null);
   const [systemSpecsLoading, setSystemSpecsLoading] = useState(false);
+  const [verdicts, setVerdicts] = useState({});
+  const [found, setFound] = useState({ title: null, match: null });
+
+  // Unofficial indexes list no requirements: borrow Steam's when the name matches
+  const hasIndexReqs = !!indexReqs && CARD_KEYS.some(key => indexReqs[key]);
+  useEffect(() => {
+    if (hasIndexReqs || !gameName) return undefined;
+    let cancelled = false;
+    matchRequirements(gameName, {
+      known: steamData,
+      lookup: steamService.getGameDetails,
+    }).then(match => {
+      if (!cancelled) setFound({ title: gameName, match });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasIndexReqs, gameName, steamData]);
+
+  const matched = !hasIndexReqs && found.title === gameName ? found.match : null;
+  const minReqs = hasIndexReqs ? indexReqs : matched?.minReqs;
+
+  useEffect(() => {
+    if (!minReqs) return undefined;
+    let cancelled = false;
+    Promise.all([
+      window.electron.fetchSystemSpecs(),
+      loadFreeSpace(downloadDirectory).catch(() => undefined),
+    ])
+      .then(([specs, freeSpace]) => {
+        if (!cancelled) {
+          setVerdicts(checkCanRun(minReqs, specs, { freeSpace, downloadSize }));
+        }
+      })
+      .catch(error => console.error("Failed to check system requirements:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [minReqs, downloadSize, downloadDirectory]);
 
   if (!minReqs) return null;
+  const hasVerdicts = Object.keys(verdicts).length > 0;
 
   const handleCompare = async () => {
     setShowCompareDialog(true);
@@ -51,15 +156,26 @@ export default function SystemRequirements({ minReqs }) {
         </Button>
       </div>
       <dl className="divide-y divide-border/40 text-sm">
-        {SPEC_KEYS.filter(key => minReqs[key]).map(key => (
+        {CARD_KEYS.filter(key => minReqs[key]).map(key => (
           <div key={key} className="flex justify-between gap-4 py-2 first:pt-0 last:pb-0">
             <dt className="shrink-0 text-muted-foreground">
               {t(`download.specs.${key}`)}
             </dt>
-            <dd className="text-right font-medium text-foreground">{minReqs[key]}</dd>
+            <dd className="text-right font-medium text-foreground">
+              {minReqs[key]}
+              {verdicts[key] && <Verdict specKey={key} verdict={verdicts[key]} />}
+            </dd>
           </div>
         ))}
       </dl>
+      {matched && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          {t("download.canRun.matchedAs", { name: matched.name })}
+        </p>
+      )}
+      {hasVerdicts && (
+        <p className="mt-3 text-xs text-muted-foreground">{t("download.canRun.note")}</p>
+      )}
 
       <AlertDialog open={showCompareDialog} onOpenChange={setShowCompareDialog}>
         <AlertDialogContent className="max-w-2xl border-border bg-background/95 p-6 backdrop-blur-sm">

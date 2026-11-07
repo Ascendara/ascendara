@@ -1830,6 +1830,17 @@
     "autoUpdates": "Auto Updates",
     "betaFeature": "Woah... this is still in beta!",
     "by": "by",
+    "canRun": {
+      "close": "Close",
+      "fail": "Below it",
+      "freeSpace": "{{free}} free",
+      "matchedAs": "Matched as: {{name}}",
+      "needsSpace": "{{free}} free, needs {{needed}}",
+      "note": "Checked on this PC. CPU and GPU use rough performance tiers, so treat those as a guide.",
+      "pass": "Meets it",
+      "unknown": "Can't tell",
+      "yours": "Yours: {{value}}"
+    },
     "categories": "Categories",
     "cloudSaving": "Cloud Saves",
     "companies": "Companies",
@@ -2115,7 +2126,8 @@
       "directx": "DirectX",
       "gpu": "GPU",
       "os": "OS",
-      "ram": "RAM"
+      "ram": "RAM",
+      "storage": "Storage"
     },
     "steamLoading": "Loading game information...",
     "steamLookupFailed": "Couldn't reach Steam right now. This game may still be on Steam.",

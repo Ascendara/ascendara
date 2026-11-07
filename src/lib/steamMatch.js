@@ -160,3 +160,52 @@ export async function findGameDetails(title, lookup) {
   }
   return matchSteamDetails(title, lookup);
 }
+
+const STEAM_LABELS = {
+  OS: "os",
+  Processor: "cpu",
+  Memory: "ram",
+  Graphics: "gpu",
+  DirectX: "directx",
+  Storage: "storage",
+  "Hard Drive": "storage",
+  "Hard Disk Space": "storage",
+};
+// Steam's HTML loses its line breaks, so labels run straight into the
+// previous value ("...operating systemOS *: Windows 10Processor: ...")
+const STEAM_LABEL =
+  /(OS(?: \*)?|Processor|Memory|Graphics|DirectX|Storage|Hard Drive|Hard Disk Space|Sound Card|Network|Additional Notes|VR Support):\s*/g;
+
+export function parseSteamMinimum(text) {
+  if (typeof text !== "string" || !text) return null;
+  const labels = [...text.matchAll(STEAM_LABEL)];
+  const reqs = {};
+  labels.forEach((match, index) => {
+    const key = STEAM_LABELS[match[1].replace(" *", "")];
+    if (!key || reqs[key]) return;
+    const end = index + 1 < labels.length ? labels[index + 1].index : text.length;
+    const value = text.slice(match.index + match[0].length, end).trim();
+    if (value) reqs[key] = value;
+  });
+  return Object.keys(reqs).length ? reqs : null;
+}
+
+function toRequirements(details, indexTitle) {
+  if (!details?.name || !isConfidentMatch(indexTitle, details.name, details.type))
+    return null;
+  const minReqs = parseSteamMinimum(details.system_requirements?.minimum);
+  return minReqs ? { name: details.name, minReqs } : null;
+}
+
+// PC minimums for games whose index lists none: the page's Steam data when it
+// is the same game, else the shared cleaned-name lookup. Nothing on a miss
+export async function matchRequirements(title, { known, lookup } = {}) {
+  const fromKnown = toRequirements(known, title);
+  if (fromKnown) return fromKnown;
+  try {
+    return toRequirements(await matchSteamDetails(title, lookup), title);
+  } catch (error) {
+    console.error("Failed to match system requirements:", error);
+    return null;
+  }
+}
