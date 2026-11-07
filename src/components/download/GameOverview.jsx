@@ -2,7 +2,11 @@ import GameScreenshots from "@/components/GameScreenshots";
 import SafeHtml from "@/components/SafeHtml";
 import { useLanguage } from "@/context/LanguageContext";
 import steamService from "@/services/games/gameInfoService";
-import { ExternalLink, Loader } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ExternalLink, Loader, RefreshCw } from "lucide-react";
+
+// steamError value for "Steam could not be reached", which can be retried
+export const STEAM_LOOKUP_FAILED = "steamLookupFailed";
 
 function DetailGroup({ title, children }) {
   return (
@@ -16,7 +20,13 @@ function DetailGroup({ title, children }) {
 }
 
 /** Store-page style information about the game: description, facts, screenshots. */
-export default function GameOverview({ gameData, steamData, steamLoading, steamError }) {
+export default function GameOverview({
+  gameData,
+  steamData,
+  steamLoading,
+  steamError,
+  onSteamRetry,
+}) {
   const { t } = useLanguage();
   const categories = gameData.category?.length > 0 ? gameData.category : null;
 
@@ -32,7 +42,17 @@ export default function GameOverview({ gameData, steamData, steamLoading, steamE
   if (!steamData) {
     return (
       <section className="rounded-xl bg-card p-6 text-center shadow">
-        {steamError ? (
+        {steamError === STEAM_LOOKUP_FAILED ? (
+          <>
+            <p className="text-muted-foreground">{t("download.steamLookupFailed")}</p>
+            {onSteamRetry && (
+              <Button variant="outline" size="sm" className="mt-3" onClick={onSteamRetry}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {t("download.steamRetry")}
+              </Button>
+            )}
+          </>
+        ) : steamError ? (
           <>
             <p className="font-medium text-foreground">
               {t("download.gameInfoError", "Error fetching game information")}

@@ -99,9 +99,20 @@ export function matchSteamDetails(title, lookup) {
 // ("Name Deluxe Edition, v1.0 + Bonus") also try the cleaned name when the
 // first answer is missing or a different game, and keep the first answer if
 // the cleaned name finds nothing better
+// A lookup that throws means Steam was not reached: that is passed on so the
+// page can offer a retry, never turned into "not on Steam"
 export async function findGameDetails(title, lookup) {
-  const details = (await lookup(title)) ?? null;
-  if (cleanGameTitle(title) === String(title).trim()) return details;
+  let details = null;
+  let failure = null;
+  try {
+    details = (await lookup(title)) ?? null;
+  } catch (error) {
+    failure = error;
+  }
+  if (cleanGameTitle(title) === String(title).trim()) {
+    if (failure) throw failure;
+    return details;
+  }
   if (details?.name && isConfidentMatch(title, details.name)) return details;
   try {
     return (await matchSteamDetails(title, lookup)) ?? details;

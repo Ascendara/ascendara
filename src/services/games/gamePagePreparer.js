@@ -91,15 +91,26 @@ const resolveCover = async (game, overridePromise) => {
   return game.game ? settle(steamGridImageService.getCover(game.game)) : null;
 };
 
+// Steam could not be reached: the page offers a retry instead of "not found"
+const STEAM_FAILED = Symbol("steamFailed");
+
 const resolveGamePage = async game => {
   const usesOverrides = !!(game.gameID && !game.privateSource);
   const overridePromise = resolveOverride(game);
-  const [override, steamData, indexImage, coverGridUrl] = await Promise.all([
+  const [override, steamResult, indexImage, coverGridUrl] = await Promise.all([
     overridePromise,
-    game.game ? settle(findGameDetails(game.game, steamService.getGameDetails)) : null,
+    game.game
+      ? findGameDetails(game.game, steamService.getGameDetails).catch(error => {
+          console.error("Steam lookup failed:", error);
+          return STEAM_FAILED;
+        })
+      : null,
     settle(loadIndexImage(game)),
     resolveCover(game, overridePromise),
   ]);
+
+  const steamFailed = steamResult === STEAM_FAILED;
+  const steamData = steamFailed ? null : steamResult;
 
   // Same precedence the download page renders with
   const steamCover = steamData?.cover
@@ -121,6 +132,7 @@ const resolveGamePage = async game => {
     usesOverrides,
     override: override || null,
     steamData: steamData || null,
+    steamFailed,
     cachedImage: indexImage || null,
     coverGridUrl: coverGridUrl || null,
   };
@@ -147,6 +159,8 @@ const start = game => {
     .then(result => {
       entry.result = result;
       entry.at = Date.now();
+      // A failed Steam lookup is not kept: the next open asks again
+      if (result.steamFailed && entries.get(key) === entry) entries.delete(key);
       return result;
     })
     .catch(error => {
