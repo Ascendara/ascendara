@@ -31,6 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { EmptyState, Panel, StatStrip } from "@/pages/ascend/primitives";
 
 import { cn as Cn } from "@/lib/utils";
+import { formatGpuRenderer } from "@/lib/gpuRenderer";
 import {
   getUserStatus as GetUserStatus,
   syncProfileToAscend as SyncProfileToAscend,
@@ -128,23 +129,7 @@ const CompareAchievementEntries = (Left, Right) => {
 
 const UnknownDeviceInfo = Value => !Value || Value === "Unknown";
 
-const FormatGPU = Renderer => {
-  if (!Renderer) {
-    return null;
-  }
-
-  const AngleMatch = Renderer.match(
-    /^ANGLE \([^,]+,\s*(.+),\s*(OpenGL|Vulkan|Metal|Direct3D|D3D11).*\)$/i
-  );
-
-  if (AngleMatch?.[1]) {
-    return AngleMatch[1].trim();
-  }
-
-  return Renderer.trim();
-};
-
-const LinuxSystem = () => {
+const WebGLGpuName = () => {
   try {
     const Canvas = document.createElement("canvas");
     const Context = Canvas.getContext("webgl") || Canvas.getContext("experimental-webgl");
@@ -161,9 +146,9 @@ const LinuxSystem = () => {
 
     const Renderer = Context.getParameter(DebugInfo.UNMASKED_RENDERER_WEBGL);
 
-    return FormatGPU(Renderer) || null;
+    return formatGpuRenderer(Renderer);
   } catch (error) {
-    console.warn(`[Profile] Couldn't detect Linux GPU.`, error);
+    console.warn(`[Profile] Couldn't read the GPU from WebGL.`, error);
     return null;
   }
 };
@@ -832,8 +817,7 @@ const Profile = () => {
           String(Specs?.os || "")
             .toLowerCase()
             .includes("linux");
-        const LinuxGPURenderer =
-          AmILinux && UnknownDeviceInfo(Specs?.gpu) ? LinuxSystem() : null;
+        const GPURenderer = UnknownDeviceInfo(Specs?.gpu) ? WebGLGpuName() : null;
         const LinuxRunner = AmILinux
           ? await window.electron?.resolveRunner?.("auto")
           : null;
@@ -842,7 +826,7 @@ const Profile = () => {
           ...Prev,
           platform: Platform,
           ...(Specs || {}),
-          gpu: LinuxGPURenderer || Specs?.gpu || Prev.gpu,
+          gpu: GPURenderer || Specs?.gpu || Prev.gpu,
           directx: AmILinux
             ? LinuxRunner?.name ||
               (LinuxRunner?.type === "proton"
