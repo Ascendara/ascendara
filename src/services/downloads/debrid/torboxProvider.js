@@ -33,21 +33,39 @@ export default {
   getSupportedHosts: api.getSupportedHosts,
   isSupportedUrl: api.isSupportedUrl,
   getTorrentGame: entry => entry.gameData,
-  async getTorrentDownload(apiKey, id) {
+  // pickParts(files) returns the parts to download, or null while the user decides.
+  async getTorrentDownload(apiKey, id, pickParts = files => files) {
     const item = await api.getTorrentInfo(apiKey, id);
     if (!item) return "missing";
     if (!item.download_finished || !item.download_present) return null;
-    const result = await api.getDirectDownloadLink(apiKey, id, "torrent");
-    const url =
-      typeof result === "string"
-        ? result
-        : result.download_url ||
-          result.url ||
-          (typeof result.data === "string"
-            ? result.data
-            : result.data?.download_url || result.data?.url);
-    if (!url) throw new Error("TorBox did not return a torrent download URL.");
-    return [{ url, filename: "torrent.zip", size: null }];
+    const files = (item.files || []).map(file => ({
+      id: file.id,
+      // TorBox names start with the torrent's folder; keep the path inside it.
+      name: String(file.name || file.short_name || "").replace(/^[^/]*\//, ""),
+      size: file.size ?? null,
+    }));
+    const chosen = pickParts(files);
+    if (!chosen) return { chooseFrom: files };
+    const link = async fileId => {
+      const result = await api.getDirectDownloadLink(apiKey, id, "torrent", fileId);
+      const url =
+        typeof result === "string"
+          ? result
+          : result.download_url ||
+            result.url ||
+            (typeof result.data === "string"
+              ? result.data
+              : result.data?.download_url || result.data?.url);
+      if (!url) throw new Error("TorBox did not return a torrent download URL.");
+      return url;
+    };
+    // Every part wanted: one zip of the whole torrent, as before.
+    if (chosen.length === files.length)
+      return [{ url: await link(), filename: "torrent.zip", size: null }];
+    const downloads = [];
+    for (const file of chosen)
+      downloads.push({ url: await link(file.id), filename: file.name, size: file.size });
+    return downloads;
   },
   async submitMagnet(link, apiKey, game) {
     const result = await api.createTorrentFromMagnet(link, apiKey, game.game);

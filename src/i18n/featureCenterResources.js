@@ -88,6 +88,21 @@ const featureCenterResources = {
       routeLocal: "qBittorrent",
       routeNone: "Not handled",
       openDownloads: "Open debrid downloads",
+      torrentParts: {
+        label: "When a torrent has several parts",
+        description:
+          "Skipping extras keeps the game and the language packs for your system language and English, and leaves out bonus content, soundtracks, artbooks and other languages.",
+        ask: "Ask me",
+        all: "Download all parts",
+        skipExtras: "Skip extras automatically",
+        dialogTitle: "Choose the parts to download",
+        dialogDescription: "{{name}} has several parts. Untick the ones you do not want.",
+        selected: "{{count}} of {{total}} parts, {{size}}",
+        download: "Download",
+        later: "Not now",
+        waiting: "Waiting",
+        chooseParts: "Choose parts",
+      },
       viewDownloads: "Downloads",
       accountsTitle: "Accounts",
       accountsDescription:

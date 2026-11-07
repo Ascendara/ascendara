@@ -87,6 +87,7 @@ class SettingsManager {
       realDebridOauthClientSecret: "",
       realDebridOauthRefreshToken: "",
       debridEnabled: false,
+      debridTorrentParts: "ask",
       debridProvider: "torbox",
       debridProviderOrder: [],
       debridProviderEnabled: {},
