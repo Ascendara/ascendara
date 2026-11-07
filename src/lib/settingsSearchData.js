@@ -568,12 +568,12 @@ export const settingsSearchData = [
   },
   {
     id: "prioritize-torbox",
-    title: "Prioritize TorBox Over Seamless",
-    description: "Use TorBox instead of seamless downloads when available",
+    title: "Prioritize TorBox Over Magic Links",
+    description: "Use TorBox instead of Magic Links when available",
     keywords: [
       "prioritize",
       "torbox",
-      "seamless",
+      "magic link",
       "prefer",
       "priority",
       "use torbox",

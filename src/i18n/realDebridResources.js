@@ -8,7 +8,7 @@ export default {
   preferredProvider: "Preferred debrid service",
   preferenceDescription:
     "Used when both services have API keys. If only Real-Debrid is configured, it is used automatically.",
-  prioritize: "Prefer Real-Debrid over seamless downloads",
+  prioritize: "Prefer Real-Debrid over Magic Links",
   useTorrents: "Use Real-Debrid for torrents",
   downloadDescription:
     "Process this host link with Real-Debrid. Host availability depends on your account and Real-Debrid support.",

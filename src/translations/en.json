@@ -93,7 +93,7 @@
       "moreComing": "And More Coming",
       "moreComingDesc": "There are constantly new features for Ascend subscribers. Your subscription helps fund development of exciting new capabilities.",
       "nexusMods": "Nexus Mods Integration",
-      "nexusModsDesc": "Seamlessly manage your Nexus mods for supported games. Browse, install, and organize mods directly within Ascendara.",
+      "nexusModsDesc": "Manage your Nexus mods for supported games. Browse, install, and organize mods directly within Ascendara.",
       "profiles": "Custom Profiles",
       "profilesDesc": "Set up your personalized profile with a custom bio, showcase your gaming preferences, and let others know what you're all about. Make your profile uniquely yours.",
       "reportTracking": "Report Tracking",
@@ -982,7 +982,7 @@
         "title": "And More Coming"
       },
       "nexusMods": {
-        "description": "Seamlessly manage your Nexus mods for supported games. Browse, install, and organize mods directly within Ascendara.",
+        "description": "Manage your Nexus mods for supported games. Browse, install, and organize mods directly within Ascendara.",
         "title": "Nexus Mod Managing"
       },
       "open": "Open",
@@ -1347,7 +1347,7 @@
             "title": "Library Backups"
           },
           "nexusModsIntegration": {
-            "description": "Seamlessly manage your Nexus mods for supported games. Browse, install, and organize mods directly within Ascendara.",
+            "description": "Manage your Nexus mods for supported games. Browse, install, and organize mods directly within Ascendara.",
             "title": "Nexus Mods Integration"
           },
           "realTimeChat": {
@@ -1869,7 +1869,15 @@
         "step2": "Complete the CAPTCHA and start the download",
         "step3": "The extension sends the file link to Ascendara. Review the game name, including games outside your index, then continue to download."
       },
+      "howToDownload": "How to download",
       "invalidLink": "Please enter a valid download link for",
+      "magicBadge": "Magic",
+      "magicFooter": "No ads, popups or countdowns to click through",
+      "magicInstructions": {
+        "description": "Ascendara gets the direct file from the host and starts the download for you",
+        "title": "Magic Link Download"
+      },
+      "manualDescription": "Download from the host's page, then hand the link to Ascendara",
       "manualInstructions": {
         "step1": "Copy and paste the link into your browser",
         "step2": "Complete the CAPTCHA and start the download",
@@ -1879,12 +1887,9 @@
         "step6": "Paste the DDL in the input box and click Download Now"
       },
       "noProviders": "No download providers available for this game.",
+      "openInBrowser": "Open in browser",
       "openingDownloadPage": "Opening download page...",
       "pasteLink": "Paste your direct download link (DDL) here",
-      "seamlessInstructions": {
-        "description": "Ascendara will automatically process the download link and convert it to a direct download link",
-        "title": "Start Seamless Download"
-      },
       "selectProvider": "Select a download provider",
       "selectProviderPrompt": "Please select a download provider to see the instructions.",
       "startingDownload": "Starting download...",
@@ -1899,7 +1904,8 @@
         "noTorrent": "qBittorrent WebUI cannot be accessed. Check settings for more information.",
         "title": "Torrent Download"
       },
-      "waitingForBrowser": "Waiting for your browser to send the download..."
+      "waitingForBrowser": "Waiting for your browser to send the download...",
+      "waitingForCountdown": "MegaDB countdown"
     },
     "downloadSource": "Download Source",
     "enableProtection": "Enable Protection",
@@ -1939,9 +1945,38 @@
     "installSize": "Install Size",
     "latestUpdate": "Last Updated",
     "linkCopied": "Link copied to clipboard",
+    "magicLink": {
+      "description": "Magic Links are hosts Ascendara can download from on its own. Pick one and Ascendara handles the rest.",
+      "gotIt": "Got it",
+      "hosts": "Magic Links currently work with GoFile, PixelDrain, BuzzHeavier and MegaDB. Some hosts have a short countdown, which Ascendara waits out for you.",
+      "points": {
+        "noAds": {
+          "description": "The host page never opens, so there are no ads, popups or fake download buttons.",
+          "title": "No ads or popups"
+        },
+        "noClicks": {
+          "description": "No captchas to solve, buttons to find or timers to click through.",
+          "title": "Nothing to click"
+        },
+        "starts": {
+          "description": "The download goes straight into your downloads, just like any other game.",
+          "title": "Starts in Ascendara"
+        }
+      },
+      "title": "Ascendara Magic Link",
+      "whatIsThis": "What is a Magic Link?"
+    },
     "mainPlusExtras": "Main + Extras",
     "mainStory": "Main Story",
     "medianScore": "Median Score",
+    "miniGame": {
+      "best": "Best {{score}}",
+      "gameOver": "The cat ran into an ad!",
+      "hint": "Press Space or click to play",
+      "jumpHint": "Space or click to jump",
+      "retry": "Press Space or click to try again",
+      "title": "Help the cat dodge the ads while you wait"
+    },
     "modManaging": "Nexus Mods",
     "noDownloadPath": {
       "desc": "You haven't set a download directory yet. Please go to Settings to choose where your games will be saved.",
@@ -5251,8 +5286,8 @@
       "toggleEnabled": "Toggle enabled",
       "warning": "Warning"
     },
-    "prioritizeTorboxOverSeamless": "Prioritize Torbox over Seamless",
-    "prioritizeTorboxOverSeamlessDesc": "Always use Torbox for downloading files from hosts, even if the game supports Seamless downloads. Seamless will be bypassed in favor of Torbox whenever both options are available.",
+    "prioritizeTorboxOverSeamless": "Prioritize Torbox over Magic Links",
+    "prioritizeTorboxOverSeamlessDesc": "Always use Torbox for downloading files from hosts, even if the game has a Magic Link. Magic Links will be bypassed in favor of Torbox whenever both options are available.",
     "promptGameSupport": "Developer Support Reminder",
     "promptGameSupportDescription": "Show a reminder to support developers after playing a game for a while.",
     "publicThemeApplied": "Theme applied! Click Apply Colors to save.",
