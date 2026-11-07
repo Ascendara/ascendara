@@ -202,6 +202,14 @@ function registerDownloadHandlers() {
     }
   });
 
+  // Game folders whose downloader process is still alive. A finished process stays in
+  // the map, so its exit state is checked too.
+  ipcMain.handle("get-running-downloads", () =>
+    [...downloadProcesses]
+      .filter(([, child]) => child && child.exitCode == null && child.signalCode == null)
+      .map(([folder]) => folder)
+  );
+
   // Get current downloads
   ipcMain.handle("get-downloads", async () => {
     try {
@@ -561,17 +569,28 @@ function registerDownloadHandlers() {
               `${sanitizedGame}.json`
             );
             const cached = await fs.readJson(cachePath).catch(() => null);
-            const tracked = fs.existsSync(
-              path.join(gameDirectory, `${sanitizedGame}.ascendara.json`)
+            const trackedPath = path.join(
+              gameDirectory,
+              `${sanitizedGame}.ascendara.json`
             );
-            if (
-              cached?.transferId === fileList.transferId &&
-              (tracked || downloadProcesses.has(sanitizedGame))
-            )
+            const sameTransfer = cached?.transferId === fileList.transferId;
+            const running = downloadProcesses.has(sanitizedGame);
+            const tracked = await fs.readJson(trackedPath).catch(() => null);
+            // Running, or listed in Downloads where the user can resume it.
+            if (sameTransfer && (running || tracked?.downloadingData))
               return { success: true, alreadyStarted: true };
-            throw new Error(
-              "The game folder already exists. Resolve the existing download before starting this torrent."
-            );
+            // Leftovers start again in their folder, like Redownload: this transfer's own,
+            // an unfinished download with nothing running, or files with no game record.
+            // A running download or an installed game is never overwritten.
+            if (
+              !running &&
+              (sameTransfer || !fs.existsSync(trackedPath) || tracked?.downloadingData)
+            )
+              console.log(`Starting over the leftover folder of ${sanitizedGame}`);
+            else
+              throw new Error(
+                "The game folder already exists. Resolve the existing download before starting this torrent."
+              );
           }
 
           // If the destination folder already exists and wasn't created by a

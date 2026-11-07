@@ -30,13 +30,9 @@ test("cloud file lists reject traversal, duplicate paths and metadata collisions
   );
 });
 
-test("download IPC launches a grouped torrent using edited helper source and prevents duplicate starts", async t => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-handoff-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const settings = { downloadDirectory: path.join(root, "games") };
-  fs.mkdirSync(settings.downloadDirectory);
+// Loads downloads.js in a fresh context, as after an app start.
+function loadDownloadHandlers(root, settings, spawns) {
   const handlers = new Map();
-  const spawns = [];
   const control = require("../electron/modules/downloads/downloadControl");
   const mocked = {
     electron: {
@@ -96,29 +92,39 @@ test("download IPC launches a grouped torrent using edited helper source and pre
     context
   );
   context.module.exports.registerDownloadHandlers();
-  const payload = {
-    transferId: "realdebrid:torrent:ready",
-    files: [
-      { filename: "setup.exe", url: "https://cdn.example/setup", size: 10 },
-      { filename: "data.bin", url: "https://cdn.example/data", size: 20 },
-    ],
-  };
-  const args = [
-    { sender: { send() {} } },
-    payload,
-    "Example",
-    false,
-    false,
-    false,
-    false,
-    "1",
-    undefined,
-    "30 B",
-    0,
-    "",
-    true,
-  ];
-  const start = handlers.get("download-file");
+  return handlers;
+}
+
+const payload = {
+  transferId: "realdebrid:torrent:ready",
+  files: [
+    { filename: "setup.exe", url: "https://cdn.example/setup", size: 10 },
+    { filename: "data.bin", url: "https://cdn.example/data", size: 20 },
+  ],
+};
+const args = [
+  { sender: { send() {} } },
+  payload,
+  "Example",
+  false,
+  false,
+  false,
+  false,
+  "1",
+  undefined,
+  "30 B",
+  0,
+  "",
+  true,
+];
+
+test("download IPC launches a grouped torrent using edited helper source and prevents duplicate starts", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-handoff-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const settings = { downloadDirectory: path.join(root, "games") };
+  fs.mkdirSync(settings.downloadDirectory);
+  const spawns = [];
+  const start = loadDownloadHandlers(root, settings, spawns).get("download-file");
   assert.equal((await start(...args)).success, true);
   assert.equal(spawns.length, 1);
   assert.equal(spawns[0].command, "python");
@@ -140,4 +146,68 @@ test("download IPC launches a grouped torrent using edited helper source and pre
     ),
     /folder already exists/
   );
+});
+
+test("a leftover of the same torrent with nothing running starts downloading again", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-handoff-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const settings = { downloadDirectory: path.join(root, "games") };
+  fs.mkdirSync(settings.downloadDirectory);
+  const spawns = [];
+  const startFresh = () =>
+    loadDownloadHandlers(root, settings, spawns).get("download-file");
+  assert.equal((await startFresh()(...args)).success, true);
+  // The earlier attempt was stopped and the app restarted: folder and game file stay.
+  const gameFile = path.join(
+    settings.downloadDirectory,
+    "Example/Example.ascendara.json"
+  );
+  fs.writeFileSync(gameFile, JSON.stringify({ game: "Example" }));
+  const again = await startFresh()(...args);
+  assert.equal(again.success, true);
+  assert.equal(again.alreadyStarted, undefined, "nothing was running");
+  assert.equal(spawns.length, 2, "the download really starts again");
+  // A tracked download (running or stopped where Downloads can resume it) is left alone.
+  fs.writeFileSync(
+    gameFile,
+    JSON.stringify({ game: "Example", downloadingData: { stopped: true } })
+  );
+  assert.equal((await startFresh()(...args)).alreadyStarted, true);
+  assert.equal(spawns.length, 2);
+});
+
+test("a game folder left by an earlier attempt starts unless it holds an installed game", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-handoff-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const settings = { downloadDirectory: path.join(root, "games") };
+  const folder = path.join(settings.downloadDirectory, "Example");
+  const gameFile = path.join(folder, "Example.ascendara.json");
+  fs.mkdirSync(folder, { recursive: true });
+  const spawns = [];
+  // A fresh data folder: no download cache knows this transfer.
+  const startFresh = transferId => {
+    fs.rmSync(path.join(root, "downloadCache"), { recursive: true, force: true });
+    return loadDownloadHandlers(root, settings, spawns).get("download-file")(
+      args[0],
+      { ...payload, transferId },
+      ...args.slice(2)
+    );
+  };
+  // Only part files, no game record.
+  fs.writeFileSync(path.join(folder, "part.bin"), "x");
+  assert.equal((await startFresh("torbox:torrent:old")).success, true);
+  assert.equal(spawns.length, 1);
+  // An unfinished download whose downloader is gone.
+  fs.writeFileSync(
+    gameFile,
+    JSON.stringify({ game: "Example", downloadingData: { downloading: true } })
+  );
+  const unfinished = await startFresh("torbox:torrent:older");
+  assert.equal(unfinished.success, true);
+  assert.equal(unfinished.alreadyStarted, undefined);
+  assert.equal(spawns.length, 2);
+  // An installed game is never overwritten.
+  fs.writeFileSync(gameFile, JSON.stringify({ game: "Example" }));
+  await assert.rejects(startFresh("torbox:torrent:new"), /folder already exists/);
+  assert.equal(spawns.length, 2);
 });

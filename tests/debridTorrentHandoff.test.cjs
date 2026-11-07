@@ -168,7 +168,10 @@ test("handoff waits for readiness and active local jobs, respects disabling, and
     global.window = {
       electron: {
         getGames: async () =>
-          scenario === "busy" ? [{ downloadingData: { downloading: true } }] : [],
+          scenario === "busy"
+            ? [{ game: "Other", downloadingData: { downloading: true } }]
+            : [],
+        getRunningDownloads: async () => ["Other"],
         getSettings: async () => ({
           debridEnabled: scenario !== "disabled",
           key: "token",
@@ -206,6 +209,151 @@ test("handoff waits for readiness and active local jobs, respects disabling, and
       assert.equal(calls.length, 0, scenario);
     }
   }
+});
+
+test("a hand-off that stops early says why in the log, without links past the host", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => {
+    Object.assign(global, saved);
+    t.mock.restoreAll();
+  });
+  const warnings = [];
+  t.mock.method(console, "warn", message => warnings.push(message));
+  for (const scenario of ["busy", "disabled", "start", "links", "status"]) {
+    let stored = JSON.stringify({ "torrent:a": { game: "Example", autoHandoff: true } });
+    global.localStorage = {
+      getItem: () => stored,
+      setItem: (_k, value) => {
+        stored = value;
+      },
+    };
+    global.window = {
+      electron: {
+        getGames: async () =>
+          scenario === "busy"
+            ? [{ game: "Other", downloadingData: { downloading: true } }]
+            : [],
+        getRunningDownloads: async () => ["Other"],
+        getSettings: async () => ({
+          debridEnabled: scenario !== "disabled",
+          key: "token",
+        }),
+        downloadFile: async () => ({
+          success: false,
+          error: "refused https://cdn.example.com/dl/secret-token/file.bin",
+        }),
+      },
+    };
+    const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+      fresh: true,
+    });
+    const provider = {
+      id: "test",
+      apiKeySetting: "key",
+      metadataStorageKey: "metadata",
+      getTorrentGame: entry => entry,
+      getTorrentDownload: async () => {
+        if (scenario === "links")
+          throw new Error("busy at file:///C:/Users/me/x.torrent");
+        return scenario === "status"
+          ? null
+          : [{ url: "https://example.com/file", filename: "data.bin", size: 10 }];
+      },
+      getTorrentStatus: async () => {
+        throw new Error("timed out");
+      },
+    };
+    await worker.handoffTorrents(provider, "token").catch(() => {});
+  }
+  assert.deepEqual(warnings, [
+    "[debrid-handoff] Example: waiting for Other to finish",
+    "[debrid-handoff] Example: not started, debrid is off or the key changed",
+    "[debrid-handoff] Example: could not start: refused cdn.example.com",
+    "[debrid-handoff] Example: could not get the links: busy at [file]",
+    "[debrid-handoff] Example: could not read the cloud progress: timed out",
+  ]);
+});
+
+test("a hand-off whose game never shows up on this PC is started again, once confirmed games are left alone", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => {
+    Object.assign(global, saved);
+    t.mock.restoreAll();
+  });
+  let stored = JSON.stringify({
+    "torrent:lost": { game: "Lost", autoHandoff: true },
+    "torrent:listed": { game: "Listed", autoHandoff: true },
+    // Started before the confirm step existed, then deleted locally on purpose.
+    "torrent:deleted": {
+      game: "Deleted",
+      autoHandoff: true,
+      localDownloadStarted: true,
+      localDownloadStartedAt: 1,
+    },
+  });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_k, value) => {
+      stored = value;
+    },
+  };
+  const started = [];
+  let listed = [];
+  global.window = {
+    electron: {
+      getGames: async () => listed,
+      downloadFile: async (_data, game) => {
+        started.push(game);
+        return { success: true };
+      },
+    },
+  };
+  const warnings = [];
+  t.mock.method(console, "warn", message => warnings.push(message));
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  const provider = {
+    id: "test",
+    metadataStorageKey: "metadata",
+    getTorrentGame: entry => entry,
+    getTorrentDownload: async () => [
+      { url: "https://example.com/file", filename: "data.bin", size: 10 },
+    ],
+  };
+  let now = realNow();
+  t.mock.method(Date, "now", () => now);
+  const record = id => JSON.parse(stored)[`torrent:${id}`];
+
+  await worker.handoffTorrents(provider, "token");
+  now += 20000;
+  await worker.handoffTorrents(provider, "token");
+  assert.deepEqual(started, ["Lost", "Listed"]);
+  assert.equal(record("lost").localDownloadSeen, false);
+  // Only one of the two reaches the game list.
+  listed = [{ game: "Listed" }];
+  now += 20000;
+  await worker.handoffTorrents(provider, "token");
+  assert.equal(record("listed").localDownloadSeen, true);
+  assert.deepEqual(started, ["Lost", "Listed"], "no restart inside the confirm window");
+  now += 2 * 60 * 1000;
+  await worker.handoffTorrents(provider, "token");
+  assert.deepEqual(
+    started,
+    ["Lost", "Listed", "Lost"],
+    "the unconfirmed start is handed off again without a click"
+  );
+  assert.deepEqual(warnings, [
+    "[debrid-handoff] Lost: did not appear on this PC, starting again",
+  ]);
+  // A confirmed game that later leaves the list (deleted on purpose) stays deleted.
+  listed = [];
+  now += 10 * 60 * 1000;
+  await worker.handoffTorrents(provider, "token");
+  now += 20000;
+  await worker.handoffTorrents(provider, "token");
+  assert.equal(started.filter(game => game === "Listed").length, 1);
+  assert.equal(started.includes("Deleted"), false);
 });
 
 test("handoff skips legacy records and stops polling torrents removed from the cloud", async t => {
@@ -248,9 +396,76 @@ test("handoff skips legacy records and stops polling torrents removed from the c
   };
   await worker.handoffTorrents(provider, "token");
   await worker.handoffTorrents(provider, "token");
-  assert.deepEqual(lookups, ["gone"], "legacy and removed skipped, missing checked once");
+  assert.deepEqual(
+    lookups,
+    ["gone", "gone"],
+    "legacy and removed skipped, missing torrent retried"
+  );
+  assert.equal(JSON.parse(stored)["torrent:gone"].cloudTorrentMissing, undefined);
+  t.mock.method(Date, "now", () => realNow() + 10 * 60 * 1000);
+  await worker.handoffTorrents(provider, "token");
+  await worker.handoffTorrents(provider, "token");
+  assert.deepEqual(lookups, ["gone", "gone", "gone"], "missing torrent stops polling");
   assert.equal(calls.length, 0);
   assert.equal(JSON.parse(stored)["torrent:gone"].cloudTorrentMissing, true);
+});
+
+test("a TorBox torrent not listed on the first check is handed off once it shows up", async t => {
+  const saved = {
+    fetch: global.fetch,
+    window: global.window,
+    localStorage: global.localStorage,
+  };
+  t.after(() => Object.assign(global, saved));
+  let stored = JSON.stringify({
+    "torrent:7": { autoHandoff: true, gameData: { game: "Example" } },
+  });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_k, value) => {
+      stored = value;
+    },
+  };
+  const calls = [];
+  global.window = {
+    location: { origin: "http://localhost:5173" },
+    electron: {
+      getGames: async () => [],
+      downloadFile: async (...args) => {
+        calls.push(args);
+        return { success: true };
+      },
+    },
+  };
+  let listed = false;
+  const requests = [];
+  global.fetch = async raw => {
+    const url = new URL(raw);
+    requests.push(url.pathname);
+    if (url.pathname.endsWith("/torrents/mylist"))
+      return Response.json({
+        success: true,
+        data: listed ? { id: 7, download_finished: true, download_present: true } : [],
+      });
+    assert.ok(url.pathname.endsWith("/torrents/requestdl"));
+    return Response.json({ success: true, data: "https://cdn.example/torrent.zip" });
+  };
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  const { default: provider } = await loadModule(
+    "src/services/downloads/debrid/torboxProvider.js"
+  );
+  await worker.handoffTorrents(provider, "key");
+  assert.equal(JSON.parse(stored)["torrent:7"].cloudTorrentMissing, undefined);
+  listed = true;
+  assert.deepEqual(await worker.handoffTorrents(provider, "key"), {
+    game: "Example",
+    providerId: "torbox",
+  });
+  assert.ok(requests.some(path => path.endsWith("/torrents/requestdl")));
+  assert.equal(calls.length, 1);
+  assert.equal(JSON.parse(stored)["torrent:7"].localDownloadStarted, true);
 });
 
 test("a refused torrent asks Real-Debrid for its links once per retry, not on every poll", async t => {
@@ -352,6 +567,119 @@ test("a torrent that can not start does not hold back the ones behind it", async
     await assert.rejects(worker.handoffTorrents(provider, "key"), new RegExp(failure));
     t.mock.restoreAll();
   }
+});
+
+test("paused, queued or stuck downloads do not hold back a torrent hand-off", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => Object.assign(global, saved));
+  for (const state of [
+    { paused: true },
+    { waiting: true },
+    { awaitingRecoveryAction: true },
+    { pendingManualInstall: true },
+    { verifyError: [{ file: "data.bin" }] },
+  ]) {
+    let stored = JSON.stringify({
+      "torrent:ready": { game: "Example", autoHandoff: true },
+    });
+    global.localStorage = {
+      getItem: () => stored,
+      setItem: (_k, value) => {
+        stored = value;
+      },
+    };
+    const calls = [];
+    global.window = {
+      electron: {
+        getGames: async () => [
+          { game: "Other", downloadingData: { downloading: true, ...state } },
+        ],
+        downloadFile: async (...args) => {
+          calls.push(args);
+          return { success: true };
+        },
+      },
+    };
+    const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+      fresh: true,
+    });
+    await worker.handoffTorrents(
+      {
+        id: "test",
+        metadataStorageKey: "metadata",
+        getTorrentGame: entry => entry,
+        getTorrentDownload: async () => [
+          { url: "https://example.com/file", filename: "data.bin", size: 10 },
+        ],
+      },
+      "token"
+    );
+    assert.equal(calls.length, 1, JSON.stringify(state));
+  }
+});
+
+test("only a download with a live process holds back a hand-off, and the log names it", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => {
+    Object.assign(global, saved);
+    t.mock.restoreAll();
+  });
+  const warnings = [];
+  t.mock.method(console, "warn", message => warnings.push(message));
+  for (const scenario of ["leftover", "own", "live"]) {
+    let stored = JSON.stringify({
+      "torrent:ready": { game: "Enshrouded", autoHandoff: true },
+    });
+    global.localStorage = {
+      getItem: () => stored,
+      setItem: (_k, value) => {
+        stored = value;
+      },
+    };
+    const calls = [];
+    global.window = {
+      electron: {
+        // A killed earlier run left both folders saying "downloading".
+        getGames: async () => [
+          {
+            game: "Victoria 3",
+            _folderName: "Victoria 3",
+            downloadingData: { downloading: true },
+          },
+          {
+            game: "Enshrouded",
+            _folderName: "Enshrouded",
+            downloadingData: { downloading: true },
+          },
+        ],
+        // "own": this game is already downloading, so no second copy and no blocker.
+        getRunningDownloads: async () =>
+          ({ live: ["Victoria 3"], own: ["Enshrouded"] })[scenario] || [],
+        downloadFile: async (...args) => {
+          calls.push(args);
+          return { success: true };
+        },
+      },
+    };
+    const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+      fresh: true,
+    });
+    await worker.handoffTorrents(
+      {
+        id: "test",
+        metadataStorageKey: "metadata",
+        getTorrentGame: entry => entry,
+        getTorrentDownload: async () => [
+          { url: "https://example.com/file", filename: "data.bin", size: 10 },
+        ],
+      },
+      "token"
+    );
+    assert.equal(calls.length, scenario === "leftover" ? 1 : 0, scenario);
+  }
+  assert.deepEqual(warnings, [
+    "[debrid-handoff] Enshrouded: waiting for Victoria 3 to finish",
+  ]);
 });
 
 test("finished torrents leave the service only once their game is fully on this PC", async t => {

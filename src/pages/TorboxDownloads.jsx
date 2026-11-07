@@ -18,6 +18,11 @@ import { toast } from "sonner";
 import { AlertCircle, Download, StopCircle, Trash } from "lucide-react";
 import torboxProvider from "@/services/downloads/debrid/torboxProvider";
 import {
+  getDownloadKey,
+  getStoredDownloadData,
+  isSentToPc,
+} from "@/services/downloads/torboxRecords";
+import {
   DebridAccountBar,
   DebridAction,
   DebridEmpty,
@@ -89,17 +94,6 @@ const manageStoredGameNames = () => {
     return {};
   }
 };
-
-const getDownloadKey = download =>
-  download?._storageKey ||
-  `${download?._torboxType === "torrent" ? "torrent" : "webdl"}:${download?.id}`;
-
-const getStoredDownloadData = (storedDownloads, download) =>
-  storedDownloads[getDownloadKey(download)] ||
-  storedDownloads[download?.id] ||
-  storedDownloads[download?.url] ||
-  storedDownloads[download?.original_url] ||
-  null;
 
 const TorboxDownloads = () => {
   const { t } = useLanguage();
@@ -493,11 +487,7 @@ const TorboxDownloads = () => {
     const expired =
       state === "expired" || (finished && download.download_present === false);
     if (expired) return null;
-    const stored = getStoredDownloadData(storedDownloads, download);
-    const sent =
-      downloadedToPc[getDownloadKey(download)] ||
-      downloadedToPc[download.id] ||
-      stored?.localDownloadStarted;
+    const sent = isSentToPc(downloadedToPc, storedDownloads, download);
     const ready = finished;
     if (sent && ready)
       return { group: "sent", tone: "done", status: t("debrid.statusSent"), ready };
