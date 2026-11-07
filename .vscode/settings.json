@@ -2,5 +2,6 @@
   "i18n-ally.localesPaths": ["src/translations"],
   "i18n-ally.pathMatcher": "{locale}.json",
   "i18n-ally.keystyle": "nested",
-  "i18n-ally.keepFulfilled": true
+  "i18n-ally.keepFulfilled": true,
+  "python.terminal.useEnvFile": true
 }
