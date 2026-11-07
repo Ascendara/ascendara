@@ -191,7 +191,47 @@ export function playControllerActionSound(action) {
   playBigPictureSound(name, ...args);
 }
 
+// The same keys Big Picture navigates with (see useBigPicturePage)
+const KEY_ACTIONS = {
+  ArrowUp: "UP",
+  ArrowDown: "DOWN",
+  ArrowLeft: "LEFT",
+  ArrowRight: "RIGHT",
+  Enter: "CONFIRM",
+  Escape: "BACK",
+  Backspace: "BACK",
+  Tab: "MENU",
+  m: "MENU",
+  M: "MENU",
+  ContextMenu: "MENU",
+  " ": "SEARCH",
+  PageUp: "PREVIOUS_PAGE",
+  PageDown: "NEXT_PAGE",
+};
+
+const isTyping = target =>
+  target instanceof Element &&
+  (target.isContentEditable ||
+    !!target.closest("input, textarea, select, [contenteditable]"));
+
+function playKeyboardActionSound(event) {
+  // Screens that fake key presses for the controller already played a sound
+  if (!event.isTrusted || event.ctrlKey || event.altKey || event.metaKey) return;
+  const action = KEY_ACTIONS[event.key];
+  if (!action) return;
+  if (event.repeat && !event.key.startsWith("Arrow")) return;
+  // In a text field only Enter and Escape act on the page, everything else is typing
+  if (isTyping(event.target) && event.key !== "Enter" && event.key !== "Escape") return;
+  playControllerActionSound(action);
+}
+
 export function setBigPictureSoundsEnabled(value) {
   enabled = !!value;
   if (!enabled && ctx?.state === "running") ctx.suspend();
 }
+
+// Registered once when this module loads, before any Big Picture screen
+// mounts, so it runs ahead of every dialog's capture-phase key handler (some
+// stop propagation). It stays silent outside Big Picture since sounds are
+// only enabled while it is open.
+window.addEventListener("keydown", playKeyboardActionSound, { capture: true });

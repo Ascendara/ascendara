@@ -86,7 +86,7 @@ const categories = [
       [
         "bigPictureSounds",
         "Interface sounds",
-        "Play soft sounds as you move, select and switch pages.",
+        "Play soft sounds as you move, select and switch pages with a controller or keyboard.",
       ],
       [
         "controller",
