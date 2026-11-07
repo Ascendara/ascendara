@@ -1801,15 +1801,6 @@
     "view": "View",
     "workshopDownloader": "Workshop Downloader"
   },
-  "debrid": {
-    "handoff": {
-      "folderHasInstall": "Folder already has an install: remove it or pick another download folder",
-      "retryingIn": "Retrying in {{seconds}} s",
-      "startingIn": "Starting on your PC in {{seconds}} s",
-      "startingNow": "Starting on your PC now",
-      "waitingFor": "Waiting for {{game}} to finish"
-    }
-  },
   "download": {
     "aboutGame": "About This Game",
     "allDlc": "ALL-DLCs",
