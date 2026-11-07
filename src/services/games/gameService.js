@@ -19,6 +19,7 @@ const UPDATE_CHECK_FAILED = Symbol("update-check-failed");
 const updateCheckCache = new Map(); // "gameID|version" -> { result, expires }
 
 // Memory cache to avoid localStorage reads
+let inFlightLoad = null;
 let memoryCache = {
   games: null,
   metadata: null,
@@ -297,7 +298,18 @@ const gameService = {
     return new Date(dateStr).getTime();
   },
 
-  async getCachedData() {
+  // Callers on the same page ask at once; share one read of the multi-MB index
+  getCachedData() {
+    if (!inFlightLoad) {
+      const load = this._loadCachedData().finally(() => {
+        if (inFlightLoad === load) inFlightLoad = null;
+      });
+      inFlightLoad = load;
+    }
+    return inFlightLoad;
+  },
+
+  async _loadCachedData() {
     console.log("[GameService] getCachedData called");
 
     // Get settings first so we can branch on Custom Sources Mode before touching cache
@@ -838,6 +850,8 @@ const gameService = {
 
   clearMemoryCache() {
     console.log("[GameService] Clearing memory cache");
+    // A load already under way may be reading the index being swapped out
+    inFlightLoad = null;
     // Index-based update answers depend on the index that is being swapped out
     updateCheckCache.clear();
     memoryCache = {

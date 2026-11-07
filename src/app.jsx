@@ -1597,7 +1597,12 @@ const AppRoutes = () => {
         }
 
         const hasLaunched = await checkAndSetWelcomeStatus();
-        if (hasLaunched) {
+        // hasLaunched is false on every cold start, so gate on the welcome
+        // flow instead (it sets the index up itself)
+        const welcomeShowing =
+          !(await window.electron.isV7()) ||
+          (!hasLaunched && (await window.electron.isNew()));
+        if (!welcomeShowing) {
           // Pick up a newer game index while the splash is still up, so Home
           // doesn't load the old one and then refresh in front of the user.
           const bootSync = await syncIndexDuringBoot(await window.electron.getSettings());
