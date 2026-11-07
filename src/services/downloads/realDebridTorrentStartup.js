@@ -34,7 +34,8 @@ export function resumePendingTorrents(apiKey) {
           // The list endpoint can still report conversion after metadata is ready.
           torrent = await getTorrentInfo(apiKey, id);
         } catch (error) {
-          if (error.status === 404) finished.push(id);
+          // Deleted from the account: the handoff reports it.
+          if (error.status === 404 || error.code === 7) finished.push(id);
           else failure ||= error;
           continue;
         }

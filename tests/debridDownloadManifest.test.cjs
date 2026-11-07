@@ -157,16 +157,20 @@ test("a leftover of the same torrent with nothing running starts downloading aga
   const startFresh = () =>
     loadDownloadHandlers(root, settings, spawns).get("download-file");
   assert.equal((await startFresh()(...args)).success, true);
-  // The earlier attempt was stopped and the app restarted: folder and game file stay.
+  // The earlier attempt was killed before its game file was written: the folder stays.
   const gameFile = path.join(
     settings.downloadDirectory,
     "Example/Example.ascendara.json"
   );
-  fs.writeFileSync(gameFile, JSON.stringify({ game: "Example" }));
+  fs.rmSync(gameFile, { force: true });
   const again = await startFresh()(...args);
   assert.equal(again.success, true);
   assert.equal(again.alreadyStarted, undefined, "nothing was running");
   assert.equal(spawns.length, 2, "the download really starts again");
+  // The same torrent, finished and installed, is never downloaded over again.
+  fs.writeFileSync(gameFile, JSON.stringify({ game: "Example" }));
+  await assert.rejects(startFresh()(...args), /folder already exists/);
+  assert.equal(spawns.length, 2);
   // A tracked download (running or stopped where Downloads can resume it) is left alone.
   fs.writeFileSync(
     gameFile,

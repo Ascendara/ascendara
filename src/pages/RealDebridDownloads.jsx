@@ -16,6 +16,7 @@ import {
   DebridTabs,
   formatBytes,
 } from "@/components/debrid/DebridDownloadParts";
+import HandoffCountdown from "@/components/debrid/HandoffCountdown";
 import { toast } from "sonner";
 
 const itemKey = item => `${item.type}:${item.id}`;
@@ -311,6 +312,14 @@ export default function RealDebridDownloads() {
                 tone={tone}
                 progress={isTorrent && tone !== "ready" ? item.progress || 0 : undefined}
                 meta={meta}
+                note={
+                  isTorrent && tone !== "done" ? (
+                    <HandoffCountdown
+                      storageKey={realDebridProvider.metadataStorageKey}
+                      recordKey={`torrent:${item.id}`}
+                    />
+                  ) : null
+                }
                 action={action}
                 menu={[
                   ...(!isTorrent && item.download

@@ -52,6 +52,13 @@ export const getApiKey = settings => {
   return settings?.torboxApiKey || null;
 };
 
+// TorBox expects an integer id, or all=true, never both.
+const controlTarget = (idField, options) =>
+  options.all === true ? { all: true } : { [idField]: Number(options[idField]) };
+
+const controlError = (data, fallback) =>
+  new Error([data?.error, data?.detail].filter(Boolean).join(": ") || fallback);
+
 /**
  * Control web downloads (delete, etc.)
  * @param {string} apiKey - The Torbox API key for authorization
@@ -83,16 +90,15 @@ export const controlWebDownload = async (apiKey, options) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        webdl_id: options.webdl_id,
+        ...controlTarget("webdl_id", options),
         operation: options.operation,
-        all: options.all || false,
       }),
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
 
-    if (!data.success) {
-      throw new Error(data.detail || `Failed to ${options.operation} download`);
+    if (!response.ok || !data.success) {
+      throw controlError(data, `Failed to ${options.operation} download`);
     }
 
     return data;
@@ -127,31 +133,32 @@ export const controlTorrent = async (apiKey, options) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      torrent_id: options.torrent_id,
+      ...controlTarget("torrent_id", options),
       operation: options.operation,
-      all: options.all || false,
     }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.success) {
-    throw new Error(data.detail || `Failed to ${options.operation} torrent`);
+    throw controlError(data, `Failed to ${options.operation} torrent`);
   }
   return data;
 };
 
 /**
  * Control either a web download or torrent using its normalized TorBox type.
+ * TorBox has no stop operation for torrents or web downloads, so stop is a delete.
  */
 export const controlDownload = async (apiKey, download, operation) => {
+  const apiOperation = operation === "stop" ? "delete" : operation;
   if (download?._torboxType === "torrent") {
     return controlTorrent(apiKey, {
       torrent_id: download.id,
-      operation: operation === "stop" ? "delete" : operation,
+      operation: apiOperation,
     });
   }
   return controlWebDownload(apiKey, {
     webdl_id: download?.id,
-    operation,
+    operation: apiOperation,
   });
 };
 
@@ -411,8 +418,15 @@ const getDownloadList = async (apiKey, type, params) => {
   }));
 };
 
+// null when the torrent is not on the account (TorBox answers a deleted one with an error).
 export const getTorrentInfo = async (apiKey, id) => {
-  const items = await getDownloadList(apiKey, "torrent", { id, bypass_cache: "true" });
+  let items;
+  try {
+    items = await getDownloadList(apiKey, "torrent", { id, bypass_cache: "true" });
+  } catch (error) {
+    if (/no torrents found/i.test(error.message)) return null;
+    throw error;
+  }
   return items.find(item => String(item.id) === String(id)) || null;
 };
 

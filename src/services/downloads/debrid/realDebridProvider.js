@@ -49,7 +49,8 @@ export default {
     try {
       info = await api.getTorrentInfo(apiKey, id);
     } catch (error) {
-      if (error.status === 404) return "missing";
+      // 404 or error_code 7 (unknown_ressource): deleted from the account.
+      if (error.status === 404 || error.code === 7) return "missing";
       throw error;
     }
     if (info.status !== "downloaded") return null;

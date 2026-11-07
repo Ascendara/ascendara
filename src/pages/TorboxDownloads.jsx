@@ -32,6 +32,7 @@ import {
   DebridTabs,
   formatBytes as formatSize,
 } from "@/components/debrid/DebridDownloadParts";
+import HandoffCountdown from "@/components/debrid/HandoffCountdown";
 import "@/lib/utils";
 import {
   getUserInfo,
@@ -316,7 +317,7 @@ const TorboxDownloads = () => {
       );
     } catch (error) {
       console.error("[TorboxDownloads] Error deleting download:", error);
-      toast.error(t("torbox.error_deleting_download"));
+      toast.error(t("torbox.error_deleting_download"), { description: error?.message });
     }
   };
 
@@ -636,6 +637,14 @@ const TorboxDownloads = () => {
                   tone={tone}
                   progress={ready ? undefined : progressOf(download)}
                   meta={meta}
+                  note={
+                    download._torboxType === "torrent" && tone !== "done" ? (
+                      <HandoffCountdown
+                        storageKey={torboxProvider.metadataStorageKey}
+                        recordKey={getDownloadKey(download)}
+                      />
+                    ) : null
+                  }
                   action={
                     tone === "ready" ? (
                       <DebridAction
@@ -745,7 +754,9 @@ const TorboxDownloads = () => {
                   fetchTorboxDownloads();
                 } catch (error) {
                   console.error("Error stopping download:", error);
-                  toast.error(t("torbox.error_stopping_download"));
+                  toast.error(t("torbox.error_stopping_download"), {
+                    description: error?.message,
+                  });
                 }
                 setConfirmStop(null);
               }}

@@ -79,6 +79,8 @@ test("a finished torrent nobody sent is handed off and only then shows as sent",
   assert.deepEqual(await handoffTorrents(provider, "key"), {
     game: "Torrent Game",
     providerId: "torbox",
+    storageKey: "torboxGameNames",
+    recordKey: "torrent:5",
   });
   assert.deepEqual(requested, ["5"]);
   assert.equal(started[0][1], "Torrent Game");

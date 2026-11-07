@@ -198,9 +198,10 @@ test("handoff waits for readiness and active local jobs, respects disabling, and
     if (scenario === "failed") {
       await assert.rejects(worker.handoffTorrents(provider, "token"), /start failed/);
       assert.equal(JSON.parse(stored)["torrent:ready"].localDownloadStarted, undefined);
-      await assert.rejects(worker.handoffTorrents(provider, "token"), /start failed/);
+      // The waiting poll does not report the same error again.
+      await worker.handoffTorrents(provider, "token");
       assert.equal(calls.length, 1, "the next poll waits");
-      t.mock.method(Date, "now", () => realNow() + 5 * 60 * 1000);
+      t.mock.method(Date, "now", () => realNow() + 15 * 1000);
       await worker.handoffTorrents(provider, "token");
       assert.equal(JSON.parse(stored)["torrent:ready"].localDownloadStarted, true);
       t.mock.restoreAll();
@@ -299,10 +300,14 @@ test("a hand-off whose game never shows up on this PC is started again, once con
   };
   const started = [];
   let listed = [];
+  // Lost's downloader is alive but slow to publish its game.
+  let running = [];
   global.window = {
     electron: {
       getGames: async () => listed,
+      getRunningDownloads: async () => running,
       downloadFile: async (_data, game) => {
+        if (game === "Lost") running = ["Lost"];
         started.push(game);
         return { success: true };
       },
@@ -335,8 +340,10 @@ test("a hand-off whose game never shows up on this PC is started again, once con
   now += 20000;
   await worker.handoffTorrents(provider, "token");
   assert.equal(record("listed").localDownloadSeen, true);
-  assert.deepEqual(started, ["Lost", "Listed"], "no restart inside the confirm window");
-  now += 2 * 60 * 1000;
+  assert.deepEqual(started, ["Lost", "Listed"], "no second copy while it still runs");
+  // Its process ended without the game ever showing up: restarted 15 s later.
+  running = [];
+  now += 15000;
   await worker.handoffTorrents(provider, "token");
   assert.deepEqual(
     started,
@@ -386,6 +393,7 @@ test("handoff skips legacy records and stops polling torrents removed from the c
   const lookups = [];
   const provider = {
     id: "test",
+    name: "TestDebrid",
     apiKeySetting: "key",
     metadataStorageKey: "metadata",
     getTorrentGame: entry => entry,
@@ -403,7 +411,9 @@ test("handoff skips legacy records and stops polling torrents removed from the c
   );
   assert.equal(JSON.parse(stored)["torrent:gone"].cloudTorrentMissing, undefined);
   t.mock.method(Date, "now", () => realNow() + 10 * 60 * 1000);
-  await worker.handoffTorrents(provider, "token");
+  await assert.rejects(worker.handoffTorrents(provider, "token"), {
+    message: "Gone: This torrent was removed from your TestDebrid account.",
+  });
   await worker.handoffTorrents(provider, "token");
   assert.deepEqual(lookups, ["gone", "gone", "gone"], "missing torrent stops polling");
   assert.equal(calls.length, 0);
@@ -462,6 +472,8 @@ test("a TorBox torrent not listed on the first check is handed off once it shows
   assert.deepEqual(await worker.handoffTorrents(provider, "key"), {
     game: "Example",
     providerId: "torbox",
+    storageKey: "torboxGameNames",
+    recordKey: "torrent:7",
   });
   assert.ok(requests.some(path => path.endsWith("/torrents/requestdl")));
   assert.equal(calls.length, 1);
@@ -492,7 +504,7 @@ test("a refused torrent asks Real-Debrid for its links once per retry, not on ev
   global.window = {
     electron: {
       getGames: async () => [],
-      downloadFile: async () => ({ success: false, error: "Folder already exists" }),
+      downloadFile: async () => ({ success: false, error: "disk busy" }),
     },
   };
   const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
@@ -504,19 +516,93 @@ test("a refused torrent asks Real-Debrid for its links once per retry, not on ev
 
   let now = realNow();
   t.mock.method(Date, "now", () => now);
-  // One minute of the 5 second background poll.
-  for (let poll = 0; poll < 12; poll++) {
-    await assert.rejects(
-      worker.handoffTorrents(provider, "key"),
-      /Folder already exists/
-    );
+  await assert.rejects(worker.handoffTorrents(provider, "key"), /disk busy/);
+  // A minute of the 5 second background poll: retries at 15 s and 45 s only.
+  for (let poll = 1; poll < 12; poll++) {
     now += 5000;
+    await worker.handoffTorrents(provider, "key");
   }
-  assert.equal(requests, 31);
+  assert.equal(requests, 3 * 31);
+});
 
-  now += 5 * 60 * 1000;
-  await assert.rejects(worker.handoffTorrents(provider, "key"), /Folder already exists/);
-  assert.equal(requests, 62);
+test("a refused start retries in 15 s, backs off to 5 min, says each error once, and a start resets it", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => {
+    Object.assign(global, saved);
+    t.mock.restoreAll();
+  });
+  t.mock.method(console, "warn", () => {});
+  let stored = JSON.stringify({ "torrent:a": { game: "Example", autoHandoff: true } });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_k, value) => {
+      stored = value;
+    },
+  };
+  let result = { success: false, error: "disk busy" };
+  global.window = {
+    electron: {
+      getGames: async () => [],
+      getRunningDownloads: async () => [],
+      downloadFile: async () => result,
+    },
+  };
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  const provider = {
+    id: "test",
+    metadataStorageKey: "metadata",
+    getTorrentGame: entry => entry,
+    getTorrentDownload: async () => [
+      { url: "https://example.com/file", filename: "data.bin", size: 10 },
+    ],
+  };
+  let now = realNow();
+  t.mock.method(Date, "now", () => now);
+  const record = () => JSON.parse(stored)["torrent:a"];
+  const delays = [];
+  const reported = [];
+  const pass = async () => {
+    await worker.handoffTorrents(provider, "token").then(
+      () => reported.push(null),
+      error => reported.push(error.message)
+    );
+    delays.push(record().nextHandoffAt - now);
+    now = record().nextHandoffAt;
+  };
+
+  for (let retry = 0; retry < 6; retry++) await pass();
+  assert.deepEqual(delays, [15000, 30000, 60000, 120000, 300000, 300000]);
+  assert.deepEqual(reported, ["disk busy", null, null, null, null, null]);
+  assert.equal(record().handoffWaitReason, "retrying");
+
+  // A new error is said once, and keeps the backoff.
+  result = { success: false, error: "disk full" };
+  await pass();
+  await pass();
+  assert.deepEqual(reported.slice(6), ["disk full", null]);
+  assert.deepEqual(delays.slice(6), [300000, 300000]);
+
+  // A start resets the backoff and the errors already said.
+  result = { success: true };
+  await worker.handoffTorrents(provider, "token");
+  assert.equal(record().localDownloadStarted, true);
+  stored = JSON.stringify({ "torrent:a": { game: "Example", autoHandoff: true } });
+  now += 20000;
+  result = { success: false, error: "disk busy" };
+  reported.length = delays.length = 0;
+  await pass();
+  assert.deepEqual(reported, ["disk busy"]);
+  assert.deepEqual(delays, [15000]);
+
+  // A folder holding an installed game needs the user, not fast retries.
+  stored = JSON.stringify({ "torrent:b": { game: "Installed", autoHandoff: true } });
+  result = { success: false, error: "The game folder already exists." };
+  await worker.handoffTorrents(provider, "token").catch(() => {});
+  const installed = JSON.parse(stored)["torrent:b"];
+  assert.equal(installed.handoffWaitReason, "folder-has-install");
+  assert.equal(installed.nextHandoffAt - now, 300000);
 });
 
 test("a torrent that can not start does not hold back the ones behind it", async t => {
@@ -537,6 +623,8 @@ test("a torrent that can not start does not hold back the ones behind it", async
     global.window = {
       electron: {
         getGames: async () => [],
+        // Second's downloader keeps running past the confirm window.
+        getRunningDownloads: async () => started,
         downloadFile: async (_data, game) => {
           if (game === "First") return { success: false, error: "refused" };
           started.push(game);
@@ -559,6 +647,8 @@ test("a torrent that can not start does not hold back the ones behind it", async
     assert.deepEqual(await worker.handoffTorrents(provider, "key"), {
       game: "Second",
       providerId: "test",
+      storageKey: "metadata",
+      recordKey: "torrent:second",
     });
     assert.deepEqual(started, ["Second"]);
     assert.equal(JSON.parse(stored)["torrent:first"].localDownloadStarted, undefined);
@@ -682,6 +772,76 @@ test("only a download with a live process holds back a hand-off, and the log nam
   ]);
 });
 
+test("a hand-off says on its record why and until when it waits, and starts as soon as parts are picked", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => {
+    Object.assign(global, saved);
+    t.mock.restoreAll();
+  });
+  t.mock.method(console, "warn", () => {});
+  let stored = JSON.stringify({
+    "torrent:a": { game: "ContractVille", autoHandoff: true },
+  });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_k, value) => {
+      stored = value;
+    },
+  };
+  let running = ["Victoria 3"];
+  let result = { success: false, error: "The game folder already exists. Resolve it." };
+  const events = [];
+  global.window = {
+    dispatchEvent: event => events.push(event.type),
+    electron: {
+      getGames: async () => [
+        { game: "Victoria 3", downloadingData: { downloading: true } },
+      ],
+      getRunningDownloads: async () => running,
+      downloadFile: async () => result,
+    },
+  };
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  let polls = 0;
+  const provider = {
+    id: "test",
+    metadataStorageKey: "metadata",
+    pollIntervalMs: 30000,
+    getTorrentGame: entry => entry,
+    getTorrentDownload: async () => {
+      polls++;
+      return [{ url: "https://example.com/file", filename: "data.bin", size: 10 }];
+    },
+  };
+  let now = realNow();
+  t.mock.method(Date, "now", () => now);
+  const record = () => JSON.parse(stored)["torrent:a"];
+
+  await worker.handoffTorrents(provider, "token");
+  assert.equal(record().handoffWaitReason, "waiting-for:Victoria 3");
+  assert.equal(record().nextHandoffAt, now + 5000);
+  running = [];
+  await worker.handoffTorrents(provider, "token").catch(() => {});
+  assert.equal(record().handoffWaitReason, "folder-has-install");
+  assert.ok(record().nextHandoffAt > now);
+  result = { success: false, error: "disk busy" };
+  now = record().nextHandoffAt;
+  await worker.handoffTorrents(provider, "token").catch(() => {});
+  assert.equal(record().handoffWaitReason, "retrying");
+  // Picking parts asks the background poller for a pass right away.
+  worker.requestHandoffNow();
+  assert.deepEqual(events, ["debrid-handoff-now"]);
+  result = { success: true };
+  now = record().nextHandoffAt;
+  await worker.handoffTorrents(provider, "token");
+  assert.ok(polls > 0);
+  assert.equal(record().localDownloadStarted, true);
+  assert.equal(record().handoffWaitReason, undefined);
+  assert.equal(record().nextHandoffAt, undefined);
+});
+
 test("finished torrents leave the service only once their game is fully on this PC", async t => {
   const saved = { window: global.window, localStorage: global.localStorage };
   t.after(() => Object.assign(global, saved));
@@ -776,4 +936,69 @@ test("a cloud torrent with no progress for 3 days is reported once and no longer
   now += 10 * 60 * 1000;
   await worker.handoffTorrents(provider, "token");
   assert.equal(statusCalls.length, 3, "a stalled torrent is not polled again");
+});
+
+test("an installed game whose name the folder drops characters from is never sent again", async t => {
+  const saved = { window: global.window, localStorage: global.localStorage };
+  t.after(() => Object.assign(global, saved));
+  const name = "Enshrouded Deluxe Edition – Bonuses";
+  let stored = JSON.stringify({
+    "torrent:enshrouded": { game: name, autoHandoff: true },
+  });
+  global.localStorage = {
+    getItem: () => stored,
+    setItem: (_k, value) => {
+      stored = value;
+    },
+  };
+  const folder = "Enshrouded Deluxe Edition  Bonuses";
+  const started = [];
+  let listed = [];
+  let running = [];
+  global.window = {
+    electron: {
+      getGames: async () => listed,
+      getRunningDownloads: async () => running,
+      downloadFile: async (_data, game) => {
+        started.push(game);
+        running = [folder];
+        return { success: true };
+      },
+    },
+  };
+  t.mock.method(console, "warn", () => {});
+  const worker = await loadModule("src/services/downloads/debridTorrentHandoff.js", {
+    fresh: true,
+  });
+  assert.equal(worker.localGameName(name), folder, "same name as the main process");
+  const provider = {
+    id: "torbox",
+    metadataStorageKey: "metadata",
+    getTorrentGame: entry => entry,
+    // The finished torrent stays in the cloud account.
+    getTorrentDownload: async () => [
+      { url: "https://example.com/pack.zip", filename: "pack.zip", size: 10 },
+    ],
+  };
+  let now = realNow();
+  t.mock.method(Date, "now", () => now);
+  await worker.handoffTorrents(provider, "token");
+  assert.deepEqual(started, [name]);
+  // Downloading: the game list holds the stored (sanitized) name.
+  listed = [
+    { game: folder, _folderName: folder, downloadingData: { downloading: true } },
+  ];
+  now += 20000;
+  await worker.handoffTorrents(provider, "token");
+  // Finished, installed, download files deleted.
+  listed = [{ game: folder, _folderName: folder }];
+  running = [];
+  for (let pass = 0; pass < 5; pass++) {
+    now += 20 * 60 * 1000;
+    await worker.handoffTorrents(provider, "token");
+  }
+  assert.deepEqual(started, [name], "the installed game is not downloaded again");
+  const record = JSON.parse(stored)["torrent:enshrouded"];
+  assert.equal(record.localDownloadStarted, true);
+  assert.equal(record.localDownloadSeen, true);
 });

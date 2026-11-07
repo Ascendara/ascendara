@@ -156,6 +156,14 @@ const featureCenterResources = {
       pickUnsupported:
         "{{provider}} can't take this download. Pick another service or Default.",
       torrentFallback: "Cloud torrent submission failed. Falling back to qBittorrent.",
+      handoff: {
+        folderHasInstall:
+          "Folder already has an install: remove it or pick another download folder",
+        retryingIn: "Retrying in {{seconds}} s",
+        startingIn: "Starting on your PC in {{seconds}} s",
+        startingNow: "Starting on your PC now",
+        waitingFor: "Waiting for {{game}} to finish",
+      },
     },
     localRefresh: {
       torrentHandlerRequired:

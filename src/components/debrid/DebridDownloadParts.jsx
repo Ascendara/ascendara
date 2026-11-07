@@ -260,7 +260,18 @@ export function DebridAction({
 
 // One cloud item: status icon, name, kind, status, progress, then a primary action and a menu
 export const DebridItem = forwardRef(function DebridItem(
-  { name, kind, status, tone = "waiting", progress, meta, action, menu = [], children },
+  {
+    name,
+    kind,
+    status,
+    tone = "waiting",
+    progress,
+    meta,
+    note,
+    action,
+    menu = [],
+    children,
+  },
   ref
 ) {
   const colors = TONES[tone] || TONES.waiting;
@@ -306,6 +317,7 @@ export const DebridItem = forwardRef(function DebridItem(
             {kind && <span>{kind}</span>}
             {meta && <span className="tabular-nums">{meta}</span>}
           </div>
+          {note}
         </div>
         {action}
         {menu.length > 0 && (
