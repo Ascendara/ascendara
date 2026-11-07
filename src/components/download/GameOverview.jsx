@@ -39,6 +39,15 @@ export default function GameOverview({
     );
   }
 
+  // Not on Steam (no lookup error): one plain line, no empty card
+  if (!steamData && !steamError) {
+    return (
+      <p className="px-1 text-sm text-muted-foreground">
+        {t("download.noGameInfoAvailable")}
+      </p>
+    );
+  }
+
   if (!steamData) {
     return (
       <section className="rounded-xl bg-card p-6 text-center shadow">
@@ -52,15 +61,13 @@ export default function GameOverview({
               </Button>
             )}
           </>
-        ) : steamError ? (
+        ) : (
           <>
             <p className="font-medium text-foreground">
               {t("download.gameInfoError", "Error fetching game information")}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">{steamError}</p>
           </>
-        ) : (
-          <p className="text-muted-foreground">{t("download.noGameInfoAvailable")}</p>
         )}
       </section>
     );
