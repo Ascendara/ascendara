@@ -866,13 +866,20 @@ function Settings() {
     }
   });
 
-  const selectCategory = id => {
+  const activeCategoryRef = useRef(activeCategory);
+  activeCategoryRef.current = activeCategory;
+
+  const openCategory = id => {
     setActiveCategory(id);
     try {
       sessionStorage.setItem("settings-category", id);
     } catch {
       // Remembering the category is only a convenience
     }
+  };
+
+  const selectCategory = id => {
+    openCategory(id);
     window.scrollTo({ top: 0 });
   };
 
@@ -893,46 +900,143 @@ function Settings() {
     };
   };
 
-  // Handle scrollTo from navigation state (from global search)
+  // Links from elsewhere in the app (global search, index prompts, ...) land
+  // here with a setting id in the navigation state. The state is cleared right
+  // away so a re-render doesn't jump again, and the jump itself runs from its
+  // own state so clearing the location doesn't cancel it.
+  const [jumpTarget, setJumpTarget] = useState(null);
+  const settingsRootRef = useRef(null);
+
   useEffect(() => {
-    if ((location.state?.scrollTo || location.state?.scrollToBottom) && !isLoading) {
-      const scrollToId = location.state.scrollTo;
-      const scrollToBottom = !!location.state.scrollToBottom;
-
-      // Open the category that holds the setting before scrolling to it
-      const target = scrollToId && document.getElementById(scrollToId);
-      const targetCategory = target?.closest("[data-category]")?.dataset.category;
-      if (targetCategory) setActiveCategory(targetCategory);
-
-      // Small delay to ensure DOM is ready
-      setTimeout(() => {
-        if (scrollToBottom) {
-          // Scroll to the very bottom of the settings page (torrenting +
-          // experimental sections live there).
-          const scroller = document.scrollingElement || document.documentElement;
-          window.scrollTo({
-            top: scroller.scrollHeight,
-            behavior: "smooth",
-          });
-        }
-        if (scrollToId) {
-          const element = document.getElementById(scrollToId);
-          if (element) {
-            if (!scrollToBottom) {
-              element.scrollIntoView({ behavior: "smooth", block: "center" });
-            }
-            element.classList.add("highlight-setting");
-            setTimeout(() => {
-              element.classList.remove("highlight-setting");
-            }, 4000);
-          }
-        }
-      }, 100);
-
-      // Clear the state to prevent re-scrolling on re-renders
-      navigate(location.pathname, { replace: true, state: {} });
-    }
+    const targetId = location.state?.scrollTo;
+    if (!targetId || isLoading) return;
+    setJumpTarget({
+      id: targetId,
+      // Opened instead when the setting isn't available on this platform
+      category: location.state?.category,
+      requestedAt: Date.now(),
+    });
+    navigate(location.pathname, { replace: true, state: {} });
   }, [location.state, isLoading, navigate, location.pathname]);
+
+  useEffect(() => {
+    if (!jumpTarget) return;
+    let cancelled = false;
+    let frame = 0;
+    let lastTop = null;
+    let highlighted = null;
+    const timers = [];
+    const cleanups = [];
+    const startedAt = performance.now();
+
+    const highlight = element => {
+      element.classList.remove("highlight-setting");
+      // Restart the animation if the same setting is linked twice in a row
+      void element.offsetWidth;
+      element.classList.add("highlight-setting");
+      highlighted = element;
+      timers.push(setTimeout(() => element.classList.remove("highlight-setting"), 2800));
+    };
+
+    const scrollToElement = element => {
+      const isCategory = element.hasAttribute("data-category");
+      const behavior =
+        document.documentElement.dataset.motion === "reduced" ? "auto" : "smooth";
+
+      // A whole category only needs opening, from the top
+      if (isCategory) {
+        window.scrollTo({ top: 0, behavior });
+        return;
+      }
+
+      // Keep clear of the menu bar on top and the dock at the bottom: center
+      // the setting in what is left, or line up its top if it is taller
+      const topInset = 72;
+      const bottomInset = 120;
+      const usable = window.innerHeight - topInset - bottomInset;
+      const rect = element.getBoundingClientRect();
+      const offset =
+        rect.height < usable ? topInset + (usable - rect.height) / 2 : topInset + 16;
+      const maxTop = document.documentElement.scrollHeight - window.innerHeight;
+      const top = Math.max(0, Math.min(maxTop, window.scrollY + rect.top - offset));
+
+      if (Math.abs(top - window.scrollY) < 2) {
+        highlight(element);
+        return;
+      }
+
+      // Highlight once the scroll lands so the pulse is actually seen
+      let done = false;
+      const onArrive = () => {
+        if (done || cancelled) return;
+        done = true;
+        window.removeEventListener("scrollend", onArrive);
+        highlight(element);
+      };
+      window.addEventListener("scrollend", onArrive);
+      cleanups.push(() => window.removeEventListener("scrollend", onArrive));
+      timers.push(setTimeout(onArrive, behavior === "smooth" ? 900 : 50));
+      window.scrollTo({ top, behavior });
+    };
+
+    const step = () => {
+      if (cancelled) return;
+      const root = settingsRootRef.current;
+      if (!root) {
+        if (performance.now() - startedAt < 2000) frame = requestAnimationFrame(step);
+        return;
+      }
+      // Look only inside Settings: the page being navigated away from can
+      // still be fading out with ids of its own
+      let element = root.querySelector(`#${CSS.escape(jumpTarget.id)}`);
+      // Some settings only render once platform checks finish, so keep
+      // looking for a moment before falling back to the setting's category
+      if (!element) {
+        const elapsed = performance.now() - startedAt;
+        if (jumpTarget.category && elapsed > 800) {
+          element = root.querySelector(
+            `[data-category="${CSS.escape(jumpTarget.category)}"]`
+          );
+        }
+        if (!element) {
+          if (elapsed < 2000) frame = requestAnimationFrame(step);
+          return;
+        }
+      }
+
+      const category = element.closest("[data-category]")?.dataset.category;
+      if (category && category !== activeCategoryRef.current) {
+        openCategory(category);
+        frame = requestAnimationFrame(step);
+        return;
+      }
+
+      // Wait for the page's enter transition to settle so the measured
+      // position is where the setting will actually end up
+      const top = element.getBoundingClientRect().top + window.scrollY;
+      const visible = element.getClientRects().length > 0;
+      if (
+        (!visible || lastTop === null || Math.abs(top - lastTop) > 0.5) &&
+        performance.now() - startedAt < 1500
+      ) {
+        lastTop = top;
+        frame = requestAnimationFrame(step);
+        return;
+      }
+
+      scrollToElement(element);
+    };
+
+    frame = requestAnimationFrame(step);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+      timers.forEach(clearTimeout);
+      cleanups.forEach(cleanup => cleanup());
+      highlighted?.classList.remove("highlight-setting");
+    };
+  }, [jumpTarget]);
 
   // On Unix, verify that ludusavi is installed
   useEffect(() => {
@@ -994,7 +1098,7 @@ function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div ref={settingsRootRef} className="min-h-screen bg-background">
       <div className="container mx-auto max-w-7xl p-4 md:p-8">
         <div className="mb-6 flex items-center gap-4">
           <h1 className="text-3xl font-bold tracking-tight">{t("settings.title")}</h1>
@@ -1875,7 +1979,10 @@ function Settings() {
                   </div>
 
                   {/* Additional Download Paths Section */}
-                  <div className="border-t border-border/50 pt-6">
+                  <div
+                    id="additional-locations"
+                    className="border-t border-border/50 pt-6"
+                  >
                     <div className="mb-2 flex items-center justify-between">
                       <Label className={isDownloaderRunning ? "opacity-50" : ""}>
                         {t("settings.additionalLocations")}
@@ -2409,7 +2516,10 @@ function Settings() {
                   </Button>
                 </div>
 
-                <div className="flex items-center justify-between gap-4">
+                <div
+                  id="controller-type"
+                  className="flex items-center justify-between gap-4"
+                >
                   <div className="min-w-0 space-y-0.5">
                     <Label>{t("settings.controllerType")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -2432,7 +2542,10 @@ function Settings() {
                   </Select>
                 </div>
 
-                <div className="flex items-center justify-between gap-4">
+                <div
+                  id="keyboard-layout"
+                  className="flex items-center justify-between gap-4"
+                >
                   <div className="min-w-0 space-y-0.5">
                     <Label>{t("settings.keyboardLayout")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -2791,7 +2904,7 @@ function Settings() {
 
             {isOnMac && (
               <SettingsCategory {...categoryProps("compatibility")}>
-                <SettingsSection>
+                <SettingsSection id="compatibility-layer">
                   <HighballSettings />
                 </SettingsSection>
               </SettingsCategory>
@@ -2803,6 +2916,7 @@ function Settings() {
                 {isOnLinux && (
                   <>
                     <SettingsSection
+                      id="compatibility-layer"
                       title={t("welcome.compatibilityLayer")}
                       description={t("settings.linuxCompat.description")}
                     >

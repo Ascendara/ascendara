@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useSearch } from "@/context/SearchContext";
-import { settingsSearchData } from "@/lib/settingsSearchData";
+import { settingsSearchData, settingsSectionCategories } from "@/lib/settingsSearchData";
 
 export const useSettingsSearch = () => {
   const { registerSearchable, unregisterSearchable } = useSearch();
@@ -20,7 +20,10 @@ export const useSettingsSearch = () => {
           // Settings opens the right category and scrolls, even if it is
           // already the current page
           navigate("/settings", {
-            state: { scrollTo: setting.scrollTo },
+            state: {
+              scrollTo: setting.scrollTo,
+              category: settingsSectionCategories[setting.section],
+            },
           });
         }
       },

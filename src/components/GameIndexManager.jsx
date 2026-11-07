@@ -2083,7 +2083,7 @@ const GameIndexManager = ({
             {/* Overview, external sources and settings sit flat on the page */}
             <div className="divide-y divide-border/60">
               <div className="divide-y divide-border/60">
-                <section className="relative overflow-hidden py-8">
+                <section id="ascendara-index" className="relative overflow-hidden py-8">
                   <AnimatePresence>
                     {justRefreshed && (
                       <motion.div
@@ -2207,7 +2207,7 @@ const GameIndexManager = ({
                 </section>
 
                 {/* Everything that isn't the Ascendara index lives on its own page */}
-                <section className="py-8">
+                <section id="external-sources" className="py-8">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="mb-0 text-lg font-semibold tracking-tight text-foreground">
@@ -2250,7 +2250,10 @@ const GameIndexManager = ({
                   {t("localRefresh.settings") || "Settings"}
                 </h3>
 
-                <div className="flex items-center justify-between gap-4 py-4">
+                <div
+                  id="index-background-sync-setting"
+                  className="flex items-center justify-between gap-4 py-4"
+                >
                   <div className="space-y-0.5">
                     <Label htmlFor="index-background-sync">
                       {t("localRefresh.backgroundSync")}
@@ -2268,7 +2271,7 @@ const GameIndexManager = ({
                   />
                 </div>
 
-                <div className="space-y-2 py-4">
+                <div id="index-storage-location" className="space-y-2 py-4">
                   <div className="space-y-0.5">
                     <Label>{t("localRefresh.storageLocation")}</Label>
                     <p className="text-sm text-muted-foreground">
@@ -2293,7 +2296,7 @@ const GameIndexManager = ({
                   </div>
                 </div>
 
-                <div className="space-y-2 pb-8 pt-4">
+                <div id="index-blacklist-setting" className="space-y-2 pb-8 pt-4">
                   <div className="space-y-0.5">
                     <Label htmlFor="index-blacklist">{t("localRefresh.blacklist")}</Label>
                     <p className="text-sm text-muted-foreground">

@@ -13,7 +13,7 @@ export const settingsSearchData = [
       "library",
       "rescan",
     ],
-    section: "General",
+    section: "Game Index",
     scrollTo: "game-index",
   },
   {
@@ -30,7 +30,7 @@ export const settingsSearchData = [
       "style",
       "look",
     ],
-    section: "Appearance",
+    section: "General",
     scrollTo: "theme",
   },
   {
@@ -46,7 +46,7 @@ export const settingsSearchData = [
       "customize",
       "color scheme",
     ],
-    section: "Appearance",
+    section: "General",
     scrollTo: "custom-colors",
   },
   {
@@ -61,7 +61,7 @@ export const settingsSearchData = [
       "motion",
       "page transitions",
     ],
-    section: "Motion & Effects",
+    section: "General",
     scrollTo: "smooth-transitions",
   },
   {
@@ -69,7 +69,7 @@ export const settingsSearchData = [
     title: "Compact Navigation on Scroll",
     description: "Shrink the navigation bar to colored dots while scrolling",
     keywords: ["navigation", "dock", "navbar", "compact", "scroll", "minimal", "dots"],
-    section: "Appearance",
+    section: "General",
     scrollTo: "compact-dock-on-scroll",
   },
   {
@@ -88,7 +88,7 @@ export const settingsSearchData = [
       "low end",
       "battery",
     ],
-    section: "Motion & Effects",
+    section: "General",
     scrollTo: "reduce-effects",
   },
   {
@@ -96,7 +96,7 @@ export const settingsSearchData = [
     title: "Side Scrollbar",
     description: "Show scrollbar on the side of pages",
     keywords: ["side", "scrollbar", "scroll", "bar", "sidebar", "show scrollbar"],
-    section: "Appearance",
+    section: "General",
     scrollTo: "side-scrollbar",
   },
   {
@@ -114,7 +114,7 @@ export const settingsSearchData = [
       "menu bar",
       "titlebar",
     ],
-    section: "Appearance",
+    section: "General",
     scrollTo: "window-controls",
   },
   {
@@ -132,7 +132,7 @@ export const settingsSearchData = [
       "logo",
       "titlebar",
     ],
-    section: "Appearance",
+    section: "General",
     scrollTo: "menu-bar-side",
   },
   {
@@ -140,7 +140,7 @@ export const settingsSearchData = [
     title: "Home Search",
     description: "Show search bar on home page",
     keywords: ["home", "search", "bar", "homepage", "search bar", "home page"],
-    section: "Appearance",
+    section: "General",
     scrollTo: "home-search",
   },
   {
@@ -157,7 +157,7 @@ export const settingsSearchData = [
       "initial page",
       "open on start",
     ],
-    section: "Application",
+    section: "General",
     scrollTo: "default-landing-page",
   },
   {
@@ -173,7 +173,7 @@ export const settingsSearchData = [
       "upgrade",
       "version",
     ],
-    section: "Application",
+    section: "General",
     scrollTo: "auto-update",
   },
   {
@@ -188,7 +188,7 @@ export const settingsSearchData = [
       "desktop notifications",
       "popups",
     ],
-    section: "Application",
+    section: "General",
     scrollTo: "notifications",
   },
   {
@@ -206,7 +206,7 @@ export const settingsSearchData = [
       "lingua",
       "change language",
     ],
-    section: "Application",
+    section: "General",
     scrollTo: "language",
   },
   {
@@ -292,7 +292,7 @@ export const settingsSearchData = [
       "show playing",
       "game status",
     ],
-    section: "Integrations",
+    section: "Gaming",
     scrollTo: "discord-rpc",
   },
   {
@@ -309,7 +309,7 @@ export const settingsSearchData = [
       "game saves",
       "backup saves",
     ],
-    section: "Integrations",
+    section: "Saves & Backups",
     scrollTo: "ludusavi",
   },
   {
@@ -326,7 +326,7 @@ export const settingsSearchData = [
       "backup location",
       "save location",
     ],
-    section: "Integrations",
+    section: "Saves & Backups",
     scrollTo: "backup-directory",
   },
   {
@@ -351,7 +351,7 @@ export const settingsSearchData = [
       "profile",
       "game index",
     ],
-    section: "Integrations",
+    section: "Saves & Backups",
     scrollTo: "library-transfer",
   },
   {
@@ -371,7 +371,7 @@ export const settingsSearchData = [
       "antivirus",
       "protection",
     ],
-    section: "Advanced",
+    section: "Downloads",
     scrollTo: "exclude-folders",
   },
   {
@@ -389,7 +389,7 @@ export const settingsSearchData = [
       "keep running",
       "stay open",
     ],
-    section: "Application",
+    section: "General",
     scrollTo: "quick-launch",
   },
   {
@@ -460,19 +460,7 @@ export const settingsSearchData = [
       "console mode",
     ],
     section: "Gaming",
-    navigate: navigate => {
-      navigate("/settings");
-      setTimeout(() => {
-        const element = document.getElementById("big-picture-settings");
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth", block: "center" });
-          element.classList.add("highlight-setting");
-          setTimeout(() => {
-            element.classList.remove("highlight-setting");
-          }, 4000);
-        }
-      }, 100);
-    },
+    scrollTo: "big-picture-settings",
   },
   {
     id: "controller-type",
@@ -491,19 +479,7 @@ export const settingsSearchData = [
       "controller layout",
     ],
     section: "Gaming",
-    navigate: navigate => {
-      navigate("/settings");
-      setTimeout(() => {
-        const element = document.getElementById("big-picture-settings");
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth", block: "center" });
-          element.classList.add("highlight-setting");
-          setTimeout(() => {
-            element.classList.remove("highlight-setting");
-          }, 4000);
-        }
-      }, 100);
-    },
+    scrollTo: "controller-type",
   },
   {
     id: "keyboard-layout",
@@ -521,19 +497,7 @@ export const settingsSearchData = [
       "keyboard type",
     ],
     section: "Gaming",
-    navigate: navigate => {
-      navigate("/settings");
-      setTimeout(() => {
-        const element = document.getElementById("big-picture-settings");
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth", block: "center" });
-          element.classList.add("highlight-setting");
-          setTimeout(() => {
-            element.classList.remove("highlight-setting");
-          }, 4000);
-        }
-      }, 100);
-    },
+    scrollTo: "keyboard-layout",
   },
   {
     id: "debrid-services",
@@ -572,7 +536,7 @@ export const settingsSearchData = [
       "premium",
     ],
     section: "Debrid",
-    scrollTo: "debrid-services",
+    scrollTo: "debrid-accounts",
   },
   {
     id: "torbox-api-key",
@@ -589,7 +553,7 @@ export const settingsSearchData = [
       "token",
     ],
     section: "Debrid",
-    scrollTo: "debrid-services",
+    scrollTo: "debrid-accounts",
   },
   {
     id: "prioritize-torbox",
@@ -605,7 +569,7 @@ export const settingsSearchData = [
       "torbox first",
     ],
     section: "Debrid",
-    scrollTo: "debrid-services",
+    scrollTo: "debrid-order",
   },
   {
     id: "single-stream",
@@ -657,7 +621,7 @@ export const settingsSearchData = [
       "previous versions",
       "old versions",
     ],
-    section: "Advanced",
+    section: "Tools",
     scrollTo: "timemachine",
   },
   {
@@ -673,7 +637,7 @@ export const settingsSearchData = [
       "steam workshop",
       "download mods",
     ],
-    section: "Advanced",
+    section: "Tools",
     scrollTo: "workshop-downloader",
   },
   {
@@ -689,7 +653,7 @@ export const settingsSearchData = [
       "manage",
       "system components",
     ],
-    section: "Advanced",
+    section: "Tools",
     scrollTo: "components",
   },
   {
@@ -698,6 +662,251 @@ export const settingsSearchData = [
     description: "Enable experimental and beta features",
     keywords: ["experimental", "beta", "features", "testing"],
     section: "Advanced",
-    scrollTo: "experimental-features",
+    scrollTo: "app-branch",
+  },
+  {
+    id: "open-on-startup",
+    title: "Open on Startup",
+    description: "Launch Ascendara automatically when the computer starts",
+    keywords: ["startup", "boot", "launch", "autostart", "login", "start with windows"],
+    section: "General",
+    scrollTo: "open-on-startup",
+  },
+  {
+    id: "start-minimized",
+    title: "Start Minimized",
+    description: "Start Ascendara in the background instead of opening the window",
+    keywords: ["start", "minimized", "background", "tray", "hidden", "silent", "startup"],
+    section: "General",
+    scrollTo: "start-minimized",
+  },
+  {
+    id: "download-locations",
+    title: "Additional Download Locations",
+    description: "Add more folders and drives for game downloads",
+    keywords: [
+      "additional",
+      "locations",
+      "drives",
+      "folders",
+      "paths",
+      "multiple",
+      "storage",
+      "second drive",
+    ],
+    section: "Downloads",
+    scrollTo: "additional-locations",
+  },
+  {
+    id: "qbittorrent-connection",
+    title: "qBittorrent Connection",
+    description: "Set the qBittorrent Web UI host, port, username and password",
+    keywords: [
+      "qbittorrent",
+      "qbit",
+      "web ui",
+      "host",
+      "port",
+      "username",
+      "password",
+      "connection",
+      "torrent client",
+    ],
+    section: "Downloads",
+    scrollTo: "torrent-downloads",
+  },
+  {
+    id: "prompt-game-support",
+    title: "Developer Support Reminder",
+    description: "Show a reminder to support developers after playing a game for a while",
+    keywords: ["support", "developers", "reminder", "prompt", "buy", "donate"],
+    section: "Gaming",
+    scrollTo: "prompt-game-support",
+  },
+  {
+    id: "extra-game-options",
+    title: "Extra Game Options",
+    description: "Show additional options on the game screen, like editing game data",
+    keywords: ["extra", "game", "options", "edit", "advanced", "game screen", "entry"],
+    section: "Gaming",
+    scrollTo: "extra-game-options",
+  },
+  {
+    id: "achievement-watcher",
+    title: "Achievement Watcher",
+    description: "Choose the folders watched for game achievements",
+    keywords: [
+      "achievements",
+      "watcher",
+      "trophies",
+      "directories",
+      "folders",
+      "tracking",
+      "steam app id",
+    ],
+    section: "Gaming",
+    scrollTo: "achievement-watcher",
+  },
+  {
+    id: "ascendara-index",
+    title: "Ascendara Index",
+    description: "Check the game index version and refresh it",
+    keywords: ["index", "refresh", "update", "sync", "games list", "catalog", "version"],
+    section: "Game Index",
+    scrollTo: "ascendara-index",
+  },
+  {
+    id: "external-sources",
+    title: "External Sources / Custom Sources",
+    description: "Use and manage game sources other than the Ascendara index",
+    keywords: ["external", "custom", "sources", "source", "json", "provider"],
+    section: "Game Index",
+    scrollTo: "external-sources",
+  },
+  {
+    id: "index-background-sync",
+    title: "Background Index Sync",
+    description: "Keep the game index up to date in the background",
+    keywords: ["background", "sync", "index", "automatic", "auto refresh", "update"],
+    section: "Game Index",
+    scrollTo: "index-background-sync-setting",
+  },
+  {
+    id: "index-storage-location",
+    title: "Index Storage Location",
+    description: "Change where the game index is stored",
+    keywords: ["index", "storage", "location", "folder", "path", "directory"],
+    section: "Game Index",
+    scrollTo: "index-storage-location",
+  },
+  {
+    id: "index-blacklist",
+    title: "Index Blacklist",
+    description: "Hide games from the index by their ID",
+    keywords: ["blacklist", "block", "hide", "exclude", "remove", "game id", "filter"],
+    section: "Game Index",
+    scrollTo: "index-blacklist-setting",
+  },
+  {
+    id: "debrid-enable",
+    title: "Enable Debrid",
+    description: "Turn debrid services on or off",
+    keywords: ["debrid", "enable", "disable", "turn on", "premium", "hosts"],
+    section: "Debrid",
+    scrollTo: "debrid-services",
+  },
+  {
+    id: "debrid-accounts",
+    title: "Debrid Accounts",
+    description: "Connect debrid accounts and manage their API keys",
+    keywords: [
+      "debrid",
+      "accounts",
+      "api key",
+      "connect",
+      "login",
+      "alldebrid",
+      "premiumize",
+      "debrid-link",
+    ],
+    section: "Debrid",
+    scrollTo: "debrid-accounts",
+  },
+  {
+    id: "debrid-order",
+    title: "Debrid Priority Order",
+    description: "Choose which debrid service is tried first",
+    keywords: ["debrid", "priority", "order", "first", "preferred", "fallback", "sort"],
+    section: "Debrid",
+    scrollTo: "debrid-order",
+  },
+  {
+    id: "backup-options",
+    title: "Backup Format & Retention",
+    description: "Set the backup format, compression level and how many backups to keep",
+    keywords: [
+      "backup",
+      "format",
+      "zip",
+      "compression",
+      "zstd",
+      "deflate",
+      "keep",
+      "retention",
+      "manifest",
+    ],
+    section: "Saves & Backups",
+    scrollTo: "ludusavi",
+  },
+  {
+    id: "compatibility-layer",
+    title: "Compatibility Layer / Wine & Proton",
+    description: "Configure how Windows games run on Linux and macOS",
+    keywords: [
+      "compatibility",
+      "wine",
+      "proton",
+      "proton-ge",
+      "cachyos",
+      "umu",
+      "runner",
+      "linux",
+      "mac",
+      "macos",
+      "highball",
+      "d3dmetal",
+      "bottle",
+    ],
+    section: "Compatibility",
+    scrollTo: "compatibility-layer",
+  },
+  {
+    id: "app-branch",
+    title: "App Branch / Release Channel",
+    description: "Switch between the live, public testing and experimental builds",
+    keywords: [
+      "branch",
+      "release",
+      "channel",
+      "live",
+      "public testing",
+      "beta",
+      "experimental",
+      "version",
+    ],
+    section: "Advanced",
+    scrollTo: "app-branch",
+  },
+  {
+    id: "quick-support",
+    title: "Quick Support",
+    description: "Get help using a support code and upload logs",
+    keywords: [
+      "support",
+      "help",
+      "quick support",
+      "support code",
+      "logs",
+      "troubleshoot",
+      "contact",
+      "bug",
+      "issue",
+    ],
+    section: "Advanced",
+    scrollTo: "quick-support",
   },
 ];
+
+// Search badges are the Settings category names. Each maps to the category
+// opened instead when a setting isn't available on this platform
+export const settingsSectionCategories = {
+  General: "general",
+  "Game Index": "game-index",
+  Debrid: "debrid",
+  Downloads: "downloads",
+  Gaming: "gaming",
+  "Saves & Backups": "backups",
+  Compatibility: "compatibility",
+  Tools: "tools",
+  Advanced: "advanced",
+};

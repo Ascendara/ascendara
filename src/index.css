@@ -132,19 +132,40 @@
 }
 
 /* Highlight animation for search navigation */
+/* The tint sits on a pseudo-element padded out past the setting, so rows that
+   run edge to edge still get breathing room and nothing in the layout moves */
 .highlight-setting {
-  animation: highlightPulse 4s ease-in-out;
-  border-radius: 0.5rem;
+  position: relative;
+  isolation: isolate;
 }
 
-@keyframes highlightPulse {
-  0%,
-  100% {
-    background-color: transparent;
-    box-shadow: none;
+.highlight-setting::before {
+  content: "";
+  position: absolute;
+  inset: -0.75rem -1rem;
+  z-index: -1;
+  border-radius: 0.875rem;
+  background-color: rgb(var(--color-primary) / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(var(--color-primary) / 0.35);
+  pointer-events: none;
+  opacity: 0;
+  animation: highlightSetting 2.8s ease-in-out forwards;
+}
+
+/* Settings sections carry their own vertical padding already */
+section.highlight-setting::before {
+  inset: 1rem -1.25rem;
+}
+
+@keyframes highlightSetting {
+  0% {
+    opacity: 0;
   }
-  50% {
-    background-color: rgb(var(--color-primary) / 0.1);
-    box-shadow: 0 0 0 4px rgb(var(--color-primary) / 0.1);
+  12%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }
