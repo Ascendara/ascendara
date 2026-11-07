@@ -27,6 +27,13 @@ from PyQt6.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QSizePolicy,
 )
 
+# Sound is optional, a missing multimedia backend should never stop a notification
+try:
+    from PyQt6.QtCore import QUrl
+    from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+except Exception:
+    QMediaPlayer = None
+
 
 def get_ascendara_log_path():
     if sys.platform == "win32":
@@ -148,18 +155,23 @@ def find_settings_path():
     return None
 
 
-def load_custom_theme():
+def load_settings():
     path = find_settings_path()
     if not path:
-        return None
+        return {}
     try:
         with open(path, "r", encoding="utf-8") as f:
             settings = json.load(f)
-        custom = settings.get("customTheme")
-        if isinstance(custom, list) and custom and isinstance(custom[0], dict):
-            return custom[0]
+        return settings if isinstance(settings, dict) else {}
     except Exception as e:
-        logger.warning(f"Failed to read custom theme from {path}: {e}")
+        logger.warning(f"Failed to read settings from {path}: {e}")
+    return {}
+
+
+def load_custom_theme():
+    custom = load_settings().get("customTheme")
+    if isinstance(custom, list) and custom and isinstance(custom[0], dict):
+        return custom[0]
     return None
 
 
@@ -274,6 +286,74 @@ def launch_crash_reporter(error_code, error_message):
     if not hasattr(launch_crash_reporter, "_registered"):
         atexit.register(_launch_crash_reporter_on_exit, error_code, error_message)
         launch_crash_reporter._registered = True
+
+
+# ------------------------------------------------------------------------------
+# Sound
+# ------------------------------------------------------------------------------
+SOUND_EXTENSIONS = (".wav", ".mp3", ".ogg", ".flac", ".m4a")
+SOUND_PROFILES = ("classic", "crystal", "arcade", "simple")
+# Loudest output at 100%. Notifications should never startle, so full volume
+# stays well under the system level.
+SOUND_MAX_GAIN = 0.4
+
+
+def sound_gain(volume):
+    """Map the 0-100 slider to output gain. Hearing is logarithmic, so squaring
+    spreads the range out; a straight line makes everything above ~20% sound
+    about the same. Keep in sync with notificationSoundService.js."""
+    return SOUND_MAX_GAIN * (max(0, min(100, volume)) / 100.0) ** 2
+
+
+def resolve_sound(is_achievement):
+    """Pick the sound file and volume for this notification from settings, or
+    (None, 0) when sounds are off. A custom upload wins over the chosen sound
+    profile, and a missing custom file falls back to the profile."""
+    settings = load_settings()
+    if settings.get("notificationSounds") is False:
+        return None, 0
+    try:
+        volume = max(0, min(100, int(settings.get("notificationSoundVolume", 70))))
+    except (TypeError, ValueError):
+        volume = 70
+    if volume == 0:
+        return None, 0
+
+    kind = "achievement" if is_achievement else "notification"
+    custom = settings.get(f"{kind}SoundPath")
+    if isinstance(custom, str) and custom.lower().endswith(SOUND_EXTENSIONS) and os.path.isfile(custom):
+        return custom, volume
+    if custom:
+        logger.warning(f"Custom {kind} sound not found, using the default: {custom}")
+    profile = settings.get("notificationSoundProfile")
+    if profile not in SOUND_PROFILES:
+        profile = SOUND_PROFILES[0]
+    return resource_path(os.path.join("sounds", profile, f"{kind}.wav")), volume
+
+
+def play_sound(owner, is_achievement):
+    """Start the notification sound. The player is parented to owner so it lives
+    as long as the notification window."""
+    if QMediaPlayer is None:
+        logger.info("QtMultimedia unavailable, skipping sound")
+        return None
+    path, volume = resolve_sound(is_achievement)
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        player = QMediaPlayer(owner)
+        output = QAudioOutput(owner)
+        output.setVolume(sound_gain(volume))
+        player.setAudioOutput(output)
+        player.errorOccurred.connect(lambda _e, msg: logger.warning(f"Sound playback failed: {msg}"))
+        player.setSource(QUrl.fromLocalFile(path))
+        player.play()
+        owner._sound = (player, output)
+        logger.info(f"Playing sound {path} at volume {volume}")
+        return player
+    except Exception as e:
+        logger.warning(f"Could not play sound {path}: {e}")
+        return None
 
 
 # ------------------------------------------------------------------------------
@@ -749,6 +829,7 @@ class NotificationWindow(QWidget):
         self.fade.start()
         self.clock.start()
         self.tick.start()
+        play_sound(self, self.is_achievement)
 
     def _on_tick(self):
         elapsed = self.clock.restart()
