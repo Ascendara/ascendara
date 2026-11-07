@@ -338,6 +338,14 @@ const Navigation = memo(({ items }) => {
       const isPage = target === document || target === document.documentElement;
       // Ignore small scrollers like dropdowns and carousels
       if (!isPage && target.clientHeight < window.innerHeight * 0.5) return;
+      // Dialogs and popovers scroll over the page, not as it
+      if (
+        !isPage &&
+        target.closest?.(
+          '[role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper]'
+        )
+      )
+        return;
       const y = isPage ? window.scrollY : target.scrollTop;
       setScrolled(y >= COMPACT_MIN_SCROLL);
     };

@@ -5057,6 +5057,104 @@
     "languageSettings": "Language Settings",
     "languageSettingsDescription": "Choose your preferred language for the UI",
     "lastIndexRefresh": "Last refresh",
+    "libraryTransfer": {
+      "categories": {
+        "appearance": {
+          "description": "Theme, custom colors, app icon and layout preferences.",
+          "title": "Appearance"
+        },
+        "caches": {
+          "description": "Install size and library value caches and recent searches. Ascendara rebuilds these on its own.",
+          "title": "Caches"
+        },
+        "gameIndex": {
+          "description": "The downloaded game index, so a new PC can skip the first index download. Large, and only restored when this PC has no index yet.",
+          "title": "Game Index"
+        },
+        "library": {
+          "description": "Games added manually or imported from other launchers, with their covers and artwork.",
+          "title": "Custom Games"
+        },
+        "organization": {
+          "description": "Folders, favorites, Play Later, ratings, statuses, recent games and library view preferences.",
+          "title": "Library Organization"
+        },
+        "paths": {
+          "description": "Download, game index and backup folders. Only folders that exist on this PC are applied.",
+          "title": "Folder Locations"
+        },
+        "profile": {
+          "description": "Local username, avatar and profile picture.",
+          "title": "Profile"
+        },
+        "retro": {
+          "description": "Emulator setups and the retro game library.",
+          "title": "Retro Setup"
+        },
+        "settings": {
+          "description": "App, download, game and integration preferences. API keys, passwords and sign-ins are never included.",
+          "title": "Ascendara Settings"
+        },
+        "stats": {
+          "description": "Playtime, launch count, last played and favorites for installed games.",
+          "title": "Playtime & Stats"
+        }
+      },
+      "description": "Save your library, settings and setup to one export file. Keep it somewhere safe, or use it to move Ascendara to a new PC.",
+      "explain": {
+        "excluded": "Game files, save files, API keys, passwords and account sign-ins. Save files are covered by Game Backups above.",
+        "excludedTitle": "What is never included",
+        "included": "Custom games, playtime, folders, favorites, settings, theme, profile, retro setup and optionally caches and the game index. You choose each part.",
+        "includedTitle": "What an export holds",
+        "restore": "Library parts are merged, so nothing already in Ascendara is removed and games you already have are skipped. Settings, appearance and profile take the export's values.",
+        "restoreTitle": "How restoring works"
+      },
+      "export": "Create Export",
+      "exportDescription": "Choose what goes into the export. You can pick again when restoring, so including more now keeps your options open.",
+      "exportFailed": "Could not create export",
+      "exportSelected": "Create Export",
+      "exportSuccess": "Export created",
+      "exportSuccessDescription": "Export file saved ({{size}}).",
+      "exportTitle": "Create an Export",
+      "import": "Restore from Export",
+      "importDescription": "{{file}}, created {{date}}. Choose what to restore.",
+      "importFailed": "Could not restore export",
+      "importSelected": "Restore",
+      "importSuccess": "Export restored",
+      "importTitle": "Restore from an Export",
+      "later": "Later",
+      "meta": {
+        "files_one": "{{count}} file",
+        "files_other": "{{count}} files",
+        "games_one": "{{count}} game",
+        "games_other": "{{count}} games",
+        "items_one": "{{count}} item",
+        "items_other": "{{count}} items"
+      },
+      "replaceWarning": "Replaces what is set on this PC now.",
+      "restart": "Restart Now",
+      "restartHint": "Restart Ascendara to load everything that was restored.",
+      "result": {
+        "gameIndex": "Game index restored.",
+        "gameIndexSkipped": "Game index skipped because this PC already has one.",
+        "library_one": "{{count}} custom game added.",
+        "library_other": "{{count}} custom games added.",
+        "pathsMissing_one": "{{count}} folder does not exist on this PC and was skipped.",
+        "pathsMissing_other": "{{count}} folders do not exist on this PC and were skipped.",
+        "paths_one": "{{count}} folder location applied.",
+        "paths_other": "{{count}} folder locations applied.",
+        "restored": "{{name}} restored.",
+        "retro_one": "{{count}} retro game added.",
+        "retro_other": "{{count}} retro games added.",
+        "settings_one": "{{count}} setting applied.",
+        "settings_other": "{{count}} settings applied.",
+        "statsMissing_one": "{{count}} game in the backup is not installed.",
+        "statsMissing_other": "{{count}} games in the backup are not installed.",
+        "stats_one": "Stats restored for {{count}} installed game.",
+        "stats_other": "Stats restored for {{count}} installed games."
+      },
+      "title": "Ascendara Exports"
+    },
     "lightThemes": "Light Themes",
     "linuxCompat": {
       "advancedOptions": "Advanced Options",
