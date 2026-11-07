@@ -3803,6 +3803,24 @@ function InstalledGameScreen() {
                   }
                 };
 
+                // MegaDB resolves without a window; the window is only a fallback
+                if (downloadProvider === "megadb") {
+                  setIsStartingUpdate(true);
+                  let resolved;
+                  try {
+                    resolved = await window.electron.resolveMegaDbLink(downloadUrl);
+                  } catch (error) {
+                    resolved = { error: error.message };
+                  } finally {
+                    setIsStartingUpdate(false);
+                  }
+                  if (resolved?.url) {
+                    await startUpdate(resolved.url);
+                    return;
+                  }
+                  console.warn("[GameScreen] MegaDB link not resolved:", resolved?.error);
+                }
+
                 if (browserProviders.includes(downloadProvider)) {
                   pendingBrowserUpdate.current = startUpdate;
                   try {

@@ -3,7 +3,6 @@ import PrivateGameDetails from "@/components/download/PrivateGameDetails";
 import AscendPerks from "@/components/download/AscendPerks";
 import {
   ExistingInstallDialog,
-  NewUserGuideDialog,
   NoDownloadPathDialog,
   ProviderBlockedDialog,
   QueueDialog,
@@ -281,8 +280,6 @@ function PublicDownloadPage() {
         setIsValidLink(true);
         setShowCopySuccess(false);
         setShowShareCopySuccess(false);
-        setShowNewUserGuide(false);
-        pendingBrowserLinkRef.current = null;
 
         // Remove the state from history
         window.history.replaceState({}, document.title, location.pathname);
@@ -316,8 +313,10 @@ function PublicDownloadPage() {
   const [selectedProvider, setSelectedProvider] = useState("");
   const [inputLink, setInputLink] = useState("");
   const [isStartingDownload, setIsStartingDownload] = useState(false);
-  // Where a hidden-window download is: "opening", "resolving" or "starting"
+  // Where a hosted link is: "opening", "countdown", "resolving" or "starting"
   const [linkStage, setLinkStage] = useState(null);
+  // When the provider's countdown (MegaDB) finishes, for the button label
+  const [countdownEndsAt, setCountdownEndsAt] = useState(null);
 
   // When provider changes, re-validate the input link
   useEffect(() => {
@@ -363,8 +362,6 @@ function PublicDownloadPage() {
   const [timemachineSetting, setTimemachineSetting] = useState(false);
   const [showSelectPath, setShowSelectPath] = useState(false);
   const [showTimemachineSelection, setShowTimemachineSelection] = useState(false);
-  const [showNewUserGuide, setShowNewUserGuide] = useState(false);
-  const pendingBrowserLinkRef = useRef(null);
   const [lastProcessedUrl, setLastProcessedUrl] = useState(null);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [showQueuePrompt, setShowQueuePrompt] = useState(false);
@@ -1579,10 +1576,13 @@ function PublicDownloadPage() {
   }, []);
 
   useEffect(() => {
-    const removeListener = window.electron.onExternalWindowProgress(({ stage }) => {
-      // Only while a hidden-window download is still being worked on
-      setLinkStage(current => (current ? stage : current));
-    });
+    const removeListener = window.electron.onExternalWindowProgress(
+      ({ stage, endsAt }) => {
+        // Only while a hidden-window download is still being worked on
+        setLinkStage(current => (current ? stage : current));
+        if (stage === "countdown") setCountdownEndsAt(endsAt);
+      }
+    );
     return () => removeListener && removeListener();
   }, []);
 
@@ -1774,23 +1774,6 @@ function PublicDownloadPage() {
     return window.electron.openURL(link);
   };
 
-  const handleCloseGuide = () => {
-    setShowNewUserGuide(false);
-    if (pendingBrowserLinkRef.current) {
-      const pendingLink = pendingBrowserLinkRef.current;
-      pendingBrowserLinkRef.current = null;
-      openBrowserLink(pendingLink);
-    }
-  };
-
-  const checkIfNewUser = async () => {
-    if (!settings.downloadDirectory) {
-      return true;
-    }
-    const games = await window.electron.getGames();
-    return games.length === 0;
-  };
-
   const handleCopyLink = async () => {
     let link = downloadLinks[selectedProvider][0].startsWith("//")
       ? `https:${downloadLinks[selectedProvider][0]}`
@@ -1798,11 +1781,6 @@ function PublicDownloadPage() {
     await navigator.clipboard.writeText(link);
     setShowCopySuccess(true);
     setTimeout(() => setShowCopySuccess(false), 1000);
-
-    const isNewUser = await checkIfNewUser();
-    if (isNewUser) {
-      setShowNewUserGuide(true);
-    }
   };
 
   const handleOpenInBrowser = async () => {
@@ -1811,21 +1789,38 @@ function PublicDownloadPage() {
       : downloadLinks[selectedProvider][0];
 
     const autoDownload =
-      selectedProvider.toLowerCase() === "buzzheavier" ||
-      /bzzhr\.(?:to|co)|buzzheavier|fafda\.to|fuckingfast\.(?:net|co)/i.test(link);
-    const needsReferrerSpoofing =
-      autoDownload ||
-      selectedProvider.toLowerCase() === "megadb" ||
-      /megadb\.net/i.test(link);
+      ["buzzheavier", "megadb"].includes(selectedProvider.toLowerCase()) ||
+      /bzzhr\.(?:to|co)|buzzheavier|fafda\.to|fuckingfast\.(?:net|co)|megadb\.net/i.test(
+        link
+      );
+    const needsReferrerSpoofing = autoDownload;
 
     const browserLink = { link, needsReferrerSpoofing, autoDownload };
-    // The guide walks through downloading in a browser, which auto downloads skip
-    if (!autoDownload && (await checkIfNewUser())) {
-      pendingBrowserLinkRef.current = browserLink;
-      setShowNewUserGuide(true);
-    } else {
+
+    // MegaDB resolves without any window; the window is only a fallback
+    if (/megadb\.(?:net|xyz)/i.test(link)) {
+      setLinkStage("opening");
+      let result;
+      try {
+        result = await window.electron.resolveMegaDbLink(link);
+      } catch (error) {
+        result = { error: error.message };
+      }
+      if (result?.url) {
+        setLinkStage("starting");
+        try {
+          await whereToDownloadRef.current(result.url);
+        } finally {
+          setLinkStage(null);
+        }
+        return;
+      }
+      console.warn("MegaDB link not resolved, opening its page:", result?.error);
       await openBrowserLink(browserLink);
+      return;
     }
+
+    await openBrowserLink(browserLink);
   };
 
   const handleShareLink = async () => {
@@ -2125,6 +2120,7 @@ function PublicDownloadPage() {
               torrentRunning={torrentRunning}
               isStartingDownload={isStartingDownload}
               linkStage={linkStage}
+              countdownEndsAt={countdownEndsAt}
               isDev={isDev}
               providerLink={providerLink}
               showCopySuccess={showCopySuccess}
@@ -2249,20 +2245,6 @@ function PublicDownloadPage() {
       />
 
       <VerifiedDialog open={showVerifiedDialog} onOpenChange={setShowVerifiedDialog} />
-
-      <NewUserGuideDialog
-        open={showNewUserGuide}
-        onClose={handleCloseGuide}
-        onFinish={() => {
-          setSettings({ downloadHandler: true })
-            .then(() => {
-              handleCloseGuide();
-            })
-            .catch(error => {
-              console.error("Failed to save settings:", error);
-            });
-        }}
-      />
 
       <ProviderBlockedDialog
         open={showProviderBlockedDialog}

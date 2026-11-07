@@ -206,7 +206,9 @@ export function ExistingInstallDialog({
           )}
           <Button
             variant={hasFolder && action !== "rename" ? "destructive" : "default"}
-            className={hasFolder && action !== "rename" ? "text-foreground" : "text-secondary"}
+            className={
+              hasFolder && action !== "rename" ? "text-foreground" : "text-secondary"
+            }
             disabled={busy}
             onClick={() =>
               onConfirm(hasFolder ? action : null, {
@@ -401,45 +403,6 @@ export function SelectPathDialog({
             onClick={() => onOpenChange(false)}
           >
             {t("common.cancel")}
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-export function NewUserGuideDialog({ open, onClose, onFinish }) {
-  const { t } = useLanguage();
-  return (
-    <AlertDialog open={open} onOpenChange={onClose}>
-      <AlertDialogContent className="sm:max-w-[600px]">
-        <AlertDialogHeader>
-          <AlertDialogTitle className="text-2xl font-bold text-foreground">
-            {t("download.newUserGuide.title")}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("download.newUserGuide.description")}
-          </AlertDialogDescription>
-          <div className="mt-4">
-            <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
-              <iframe
-                className="absolute left-0 top-0 h-full w-full rounded-lg"
-                src="https://www.youtube.com/embed/1SwhCFKbhFU?si=BZ3qSKaCwSjkQfBb"
-                title="YouTube video player"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-              />
-            </div>
-          </div>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel className="text-primary" onClick={onClose}>
-            {t("download.newUserGuide.noThanks")}
-          </AlertDialogCancel>
-          <Button className="text-secondary" onClick={onFinish}>
-            {t("download.newUserGuide.finish")}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

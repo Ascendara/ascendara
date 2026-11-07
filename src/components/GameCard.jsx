@@ -11,7 +11,6 @@ import {
   Gift,
   Gamepad2,
   BookOpen,
-  Zap,
   Loader,
   ArrowUpFromLine,
   Calendar,
@@ -58,7 +57,6 @@ import { useImageLoader } from "@/hooks/useImageLoader";
 import usePrivateArtwork from "@/hooks/usePrivateArtwork";
 import verifiedGamesService from "@/services/games/verifiedGamesService";
 import gamePagePreparer from "@/services/games/gamePagePreparer";
-import { SEAMLESS_PROVIDERS } from "@/config/providers";
 
 const MAX_VISIBLE_TAGS = 3;
 const RECENT_UPDATE_DAYS = 14;
@@ -405,8 +403,7 @@ function GameCardContent({ game, compact, viewCount }) {
     debridHosts
   );
   const debridAvailable = Boolean(debridProvider);
-  const seamless = !debridAvailable && SEAMLESS_PROVIDERS.includes(host);
-  const showProviderBadge = !isLoading && !isInstalled && (debridAvailable || seamless);
+  const showProviderBadge = !isLoading && !isInstalled && debridAvailable;
 
   const specs = [
     // The measured install size once players have reported it, else the download
@@ -743,7 +740,6 @@ function GameCardContent({ game, compact, viewCount }) {
                   {debridAvailable && (
                     <DebridIcon provider={debridProvider} className="h-4 w-4" />
                   )}
-                  {seamless && <Zap fill="currentColor" className="h-3 w-3" />}
                 </div>
               )}
             </Button>

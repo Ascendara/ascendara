@@ -389,6 +389,7 @@ function registerCriticalHandlers() {
   downloads.registerDownloadHandlers();
   require("./modules/downloads/privateSources").registerPrivateSourceHandlers();
   games.registerGameHandlers();
+  require("./modules/library/libraryTransfer").registerLibraryTransferHandlers();
   require("./modules/store-accounts").registerStoreAccountHandlers();
   require("./modules/retro").registerRetroHandlers();
   system.registerSystemHandlers();

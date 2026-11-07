@@ -314,6 +314,11 @@ contextBridge.exposeInMainWorld("electron", {
   //===========================================================================
   getGames: () => ipcRenderer.invoke("get-games"),
   getCustomGames: () => ipcRenderer.invoke("get-custom-games"),
+  getLibraryExportInfo: () => ipcRenderer.invoke("get-library-export-info"),
+  exportLibrary: options => ipcRenderer.invoke("export-library", options),
+  inspectLibraryBackup: () => ipcRenderer.invoke("inspect-library-backup"),
+  importLibrary: (token, categories) =>
+    ipcRenderer.invoke("import-library", token, categories),
   getInstalledGames: () => ipcRenderer.invoke("get-installed-games"),
   getInstalledGamesSize: () => ipcRenderer.invoke("get-installed-games-size"),
   addGame: (game, online, dlc, version, executable, imageUrl) =>
@@ -740,6 +745,7 @@ contextBridge.exposeInMainWorld("electron", {
   getAnalyticsKey: () => ipcRenderer.invoke("get-analytics-key"),
   getImageKey: () => ipcRenderer.invoke("get-image-key"),
   openURL: (url, options) => ipcRenderer.invoke("open-url", url, options),
+  resolveMegaDbLink: url => ipcRenderer.invoke("resolve-megadb-link", url),
   onExternalWindowBlocked: callback =>
     preloadIpc.subscribe("external-window-blocked", callback, {
       selectArgs: args => [args[0]],
