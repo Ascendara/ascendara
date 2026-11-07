@@ -68,6 +68,8 @@ import { checkInstallSpace } from "@/lib/installSpace";
 import { formatBytes } from "@/services/app/systemHealthService";
 import TimemachineDialog from "@/components/TimemachineDialog";
 import steamService from "@/services/games/gameInfoService";
+import { findGameDetails } from "@/lib/steamMatch";
+import { STEAM_LOOKUP_FAILED } from "@/components/download/GameOverview";
 import hltbService from "@/services/integrations/hltbService";
 import useDebridHosts from "@/hooks/useDebridHosts";
 import * as debrid from "@/services/downloads/debridService";
@@ -244,7 +246,7 @@ function PublicDownloadPage() {
       setSteamError(null);
 
       try {
-        const data = await steamService.getGameDetails(gameName);
+        const data = await findGameDetails(gameName, steamService.getGameDetails);
 
         if (data) {
           setSteamData(data);
@@ -254,8 +256,9 @@ function PublicDownloadPage() {
           setSteamError(null);
         }
       } catch (error) {
+        // Steam not reached (busy or offline): the overview offers a retry
         console.error("Error fetching game data:", error);
-        setSteamError(error.message || "Error fetching game data");
+        setSteamError(STEAM_LOOKUP_FAILED);
       } finally {
         setSteamLoading(false);
       }
@@ -1602,7 +1605,7 @@ function PublicDownloadPage() {
       setCachedImage(prepared.cachedImage);
       setArtworkReady(true);
       setSteamData(prepared.steamData);
-      setSteamError(null);
+      setSteamError(prepared.steamFailed ? STEAM_LOOKUP_FAILED : null);
       setSteamLoading(false);
     };
 
@@ -2168,6 +2171,7 @@ function PublicDownloadPage() {
               steamData={steamData}
               steamLoading={steamLoading}
               steamError={steamError}
+              onSteamRetry={() => fetchSteamData(gameData.game)}
             />
             <GameReviews
               key={gameData.gameID}

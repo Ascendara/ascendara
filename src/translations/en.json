@@ -2118,7 +2118,9 @@
       "ram": "RAM"
     },
     "steamLoading": "Loading game information...",
+    "steamLookupFailed": "Couldn't reach Steam right now. This game may still be on Steam.",
     "steamRating": "This game is rated {{rating}} apples. Apple ratings are different than Star ratings on Ascendara, and are more of a general rating of the game.",
+    "steamRetry": "Try again",
     "storyOnly": "STORY ONLY",
     "storyOnlyTooltip": "Only the single-player story mode is available. Online and multiplayer modes will not work.",
     "submitReport": "Submit Report",

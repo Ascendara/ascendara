@@ -17,6 +17,51 @@ const STEAM_STORE_SEARCH_URL = `${STEAM_PROXY_BASE}/search`;
 // A Steam request that never answers would keep the game page loading forever
 const STEAM_FETCH_TIMEOUT_MS = 15000;
 const STEAM_APP_DETAILS_URL = `${STEAM_PROXY_BASE}/appdetails`;
+// A busy proxy (429, 5xx, network) gets one more try after a short wait
+const STEAM_FETCH_TRIES = 2;
+const STEAM_RETRY_DELAY_MS = 800;
+const STEAM_RETRY_MAX_DELAY_MS = 3000;
+
+// Thrown when Steam could not be reached, so callers can tell "no answer"
+// apart from "not on Steam" and never cache it
+export class SteamLookupError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = "SteamLookupError";
+    this.status = status;
+  }
+}
+
+const retryDelay = response => {
+  const seconds = Number(response?.headers?.get?.("retry-after"));
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.min(seconds * 1000, STEAM_RETRY_MAX_DELAY_MS);
+  }
+  return STEAM_RETRY_DELAY_MS;
+};
+
+const fetchSteam = async url => {
+  let failure;
+  for (let attempt = 1; attempt <= STEAM_FETCH_TRIES; attempt++) {
+    let response = null;
+    try {
+      response = await fetch(url, {
+        signal: AbortSignal.timeout(STEAM_FETCH_TIMEOUT_MS),
+      });
+      if (response.status !== 429 && response.status < 500) return response;
+      failure = new SteamLookupError(
+        `Steam proxy error: ${response.status}`,
+        response.status
+      );
+    } catch (error) {
+      failure = new SteamLookupError(error?.message || "Steam proxy unreachable");
+    }
+    if (attempt < STEAM_FETCH_TRIES) {
+      await new Promise(resolve => setTimeout(resolve, retryDelay(response)));
+    }
+  }
+  throw failure;
+};
 
 // UI language, sent so Steam returns descriptions, genres etc. in that language
 const getDetailsLanguage = () => i18n.language || "en";
@@ -88,6 +133,7 @@ const generateSearchVariations = title => {
  * @returns {Promise<Object>} Game data with appid
  */
 const searchGameSteam = async (gameName, apiKey) => {
+  let lookupError = null;
   try {
     // Generate search variations
     const searchVariations = generateSearchVariations(gameName);
@@ -109,9 +155,15 @@ const searchGameSteam = async (gameName, apiKey) => {
       );
 
       const storeSearchUrl = `${STEAM_STORE_SEARCH_URL}?term=${encodedSearch}`;
-      const response = await fetch(storeSearchUrl, {
-        signal: AbortSignal.timeout(STEAM_FETCH_TIMEOUT_MS),
-      });
+      let response;
+      try {
+        response = await fetchSteam(storeSearchUrl);
+      } catch (error) {
+        // Steam is busy or down: more variations would only add to the load
+        lookupError = error;
+        console.log(`Store search failed for: "${searchTerm}"`, error.message);
+        break;
+      }
       const storeResult = {
         success: response.ok,
         data: response.ok ? await response.json() : null,
@@ -171,10 +223,12 @@ const searchGameSteam = async (gameName, apiKey) => {
       }
     }
 
+    if (lookupError) throw lookupError;
     console.log(`No Steam app found for: ${gameName}`);
     return null;
   } catch (error) {
     console.error("Error searching for game on Steam:", error);
+    if (error instanceof SteamLookupError) throw error;
     return null;
   }
 };
@@ -233,9 +287,7 @@ const getGameDetailByIdSteam = async (appId, apiKey) => {
     // Get game details from Steam Store API via proxy
     const url = `${STEAM_APP_DETAILS_URL}?appids=${appId}&lang=${encodeURIComponent(getDetailsLanguage())}`;
 
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(STEAM_FETCH_TIMEOUT_MS),
-    });
+    const response = await fetchSteam(url);
     if (!response.ok) {
       throw new Error(`Steam API error: ${response.status}`);
     }
@@ -256,6 +308,7 @@ const getGameDetailByIdSteam = async (appId, apiKey) => {
     return null;
   } catch (error) {
     console.error("Error getting game details from Steam:", error);
+    if (error instanceof SteamLookupError) throw error;
     return null;
   }
 };
@@ -302,6 +355,7 @@ const getGameDetailsSteam = async (gameName, config) => {
     return formattedDetails;
   } catch (error) {
     console.error("Error getting game details from Steam:", error);
+    if (error instanceof SteamLookupError) throw error;
     return null;
   }
 };
@@ -626,6 +680,7 @@ const formatSteamData = steamData => {
     id: steamData.steam_appid,
     appid: steamData.steam_appid,
     name: steamData.name,
+    type: steamData.type,
     summary: shortDescription,
     description: aboutTheGame || shortDescription,
     storyline: null,
