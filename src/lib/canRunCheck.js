@@ -212,6 +212,33 @@ export function parseGenericCpu(text) {
   return cores || ghz ? { cores, ghz } : null;
 }
 
+// A family named with no model ("Intel Core i3", "Ryzen 5", "AMD FX") is read
+// as its oldest part, and only a PC this far above that reads Meets it
+const FAMILY_CLEAR_MARGIN = 1.5;
+
+/**
+ * Floor score for a CPU family named without a model, or null. A named model,
+ * a generation ("4th gen") or a placeholder ("i5-4xxx") isn't the oldest part,
+ * so those lines get no floor and stay with the model lookup.
+ */
+export function cpuFamilyFloor(text) {
+  const value = normalizeHardware(text).replace(/\d+(?:[.,]\d+)?\s*ghz/g, " ");
+  if (/\bgen(?:eration)?\b|\d(?:st|nd|rd|th)\b|\dx{2,}\b/.test(value)) return null;
+  const floors = TIERS.cpuFamilyFloor;
+  let m = value.match(/\bi([3579])\b(?![\s-]*\d)/);
+  if (m) return floors[`core i${m[1]}`];
+  m = value.match(/\bryzen(?:\s*([3579]))?\b(?![\s-]*(?:pro\s*)?\d)/);
+  if (m) return floors[joinKey("ryzen", m[1])];
+  if (/\bfx\b(?![\s-]*\d)/.test(value)) return floors.fx;
+  if (/\bpentium\b(?!\s*(?:gold|silver|[a-z]{1,2}\s*-?\d{3,}|\d{3,}))/.test(value)) {
+    return floors.pentium;
+  }
+  if (/\bathlon\b(?!\s*(?:gold|silver|ii|x\d|[a-z]?\d{3,}))/.test(value)) {
+    return floors.athlon;
+  }
+  return null;
+}
+
 function checkGenericCpu(required, specs, pcScore) {
   if (required.cores) {
     // os.cpus() counts threads: with two per core at most, half is a floor
@@ -279,7 +306,13 @@ export function checkCpu(requirement, specs = {}) {
   const pcScore = have ? cpuScore(have) : null;
   const generic = part => {
     const required = parseGenericCpu(part);
-    return required ? checkGenericCpu(required, specs, pcScore) : null;
+    const clock = required ? checkGenericCpu(required, specs, pcScore) : null;
+    const floor = cpuFamilyFloor(part);
+    if (!floor) return clock;
+    // Below the margin is never a fail: the line may mean a newer part
+    const family = pcScore >= floor * FAMILY_CLEAR_MARGIN ? "pass" : "unknown";
+    if (!clock) return family;
+    return family === "pass" && clock === "unknown" ? "pass" : clock;
   };
   return withHave(judgeAlternatives(requirement, pcScore, cpuScore, generic), have);
 }

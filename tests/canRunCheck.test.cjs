@@ -190,6 +190,48 @@ test("unknown models and requirements stay Can't tell and never fail", async () 
   assert.deepEqual(checkCpu("Intel Core i5-8400", {}), { status: "unknown" });
 });
 
+test("CPU families named without a model are read as their oldest part", async () => {
+  const { checkCpu } = await load();
+  const i5Old = { cpu: "Intel(R) Core(TM) i5-2400 CPU @ 3.10GHz", cpuCores: 4 };
+  const i3Old = { cpu: "Intel Core i3-2100", cpuCores: 4, cpuSpeedMhz: 3100 };
+  const odd = { cpu: "Mystery Chip 9000", cpuCores: 8 };
+  const cases = [
+    // A current PC clearly above the oldest part of each family
+    ["Intel Core i3 or equivalent", ryzen, "pass"],
+    ["Core i5", ryzen, "pass"],
+    ["i7", ryzen, "pass"],
+    ["Intel Core i9 or AMD equivalent", ryzen, "pass"],
+    ["Ryzen 3", ryzen, "pass"],
+    ["AMD Ryzen 9", ryzen, "pass"],
+    ["AMD FX", ryzen, "pass"],
+    ["Pentium", ryzen, "pass"],
+    ["Athlon", ryzen, "pass"],
+    ["Pentium 4 3.0 GHz", ryzen, "pass"],
+    ["dual core 2.0 GHz", ryzen, "pass"],
+    ["quad core", ryzen, "pass"],
+    ["2.0 GHz", ryzen, "pass"],
+    ["Intel Core i3 2.0 GHz", ryzen, "pass"],
+    ["Intel Core i5 / AMD Ryzen 5", ryzen, "pass"],
+    // Two families: judged against the weaker one
+    ["Intel Core i5 / AMD Athlon", i3Old, "pass"],
+    // Not clearly above, a generation or model the family floor can't stand
+    // for, or no score for this PC: Can't tell, never Doesn't meet
+    ["Intel Core i5", i5Old, "unknown"],
+    ["Intel Core i7 or equivalent", i3Old, "unknown"],
+    ["Core i7 / Ryzen 7", i3Old, "unknown"],
+    ["Intel Core i5 4th gen", ryzen, "unknown"],
+    ["Intel Core i5-4xxx", ryzen, "unknown"],
+    ["Intel Pentium G4560", ryzen, "unknown"],
+    ["Athlon 200GE", ryzen, "unknown"],
+    ["Intel Core i3", odd, "unknown"],
+    ["Intel Core i3", {}, "unknown"],
+    ["2.0 GHz", { ...odd, cpuSpeedMhz: 1500 }, "unknown"],
+  ];
+  for (const [requirement, specs, expected] of cases) {
+    assert.equal(checkCpu(requirement, specs).status, expected, requirement);
+  }
+});
+
 test("checkCanRun gives a verdict for every line it can judge", async () => {
   const { checkCanRun } = await load();
   const minReqs = {

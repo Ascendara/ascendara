@@ -224,5 +224,20 @@
     "hs": 0.85,
     "hx": 1
   },
-  "fx": { "4": 40, "6": 50, "8": 60, "9": 67 }
+  "fx": { "4": 40, "6": 50, "8": 60, "9": 67 },
+  "cpuFamilyFloor": {
+    "note": "Oldest or weakest desktop part a family name alone could mean, for lines like \"Intel Core i3\" with no model: i3-530, i5-750, i7-920, i9-8950HK, Ryzen 1000 / 4000 APUs, FX-4100, Pentium 4, Athlon 64.",
+    "core i3": 30,
+    "core i5": 45,
+    "core i7": 55,
+    "core i9": 135,
+    "ryzen": 60,
+    "ryzen 3": 60,
+    "ryzen 5": 80,
+    "ryzen 7": 95,
+    "ryzen 9": 150,
+    "fx": 40,
+    "pentium": 5,
+    "athlon": 5
+  }
 }
