@@ -1943,47 +1943,6 @@
     "mainStory": "Main Story",
     "medianScore": "Median Score",
     "modManaging": "Nexus Mods",
-    "newUserGuide": {
-      "close": "Close",
-      "description": "You haven't installed a game before, so Ascendara will guide you through the setup process.",
-      "finish": "Finish",
-      "handlerEnabled": "Handler is Enabled →",
-      "installed": "I installed it →",
-      "nextStep": "Next Step →",
-      "noThanks": "No Thanks",
-      "startGuide": "Start Guide",
-      "steps": [
-        {
-          "description": "The Ascendara Download Handler sends file links from your browser to Ascendara. Review the game name before continuing. If you don't have it, close the guide and click the \"Don't have the extension? Get it for Chrome or Firefox\" button to download it.",
-          "title": "The Ascendara Download Handler"
-        },
-        {
-          "description": "After installing the extension, click the extension icon to enable the handler.",
-          "title": "Step 1: Enable the Handler"
-        },
-        {
-          "description": "Choose My sites and providers, Any website, or Capture next download in the extension. Any website forwards all HTTP(S) downloads while enabled.",
-          "title": "The Download Handler"
-        },
-        {
-          "description": "Complete the CAPTCHA, and start the download.",
-          "title": "Step 2: Start the download"
-        },
-        {
-          "description": "Once the download tries to start, you will see a popup asking to open Ascendara. Allow the browser to open Ascendara, then review the game name. Games outside your index are supported too.",
-          "title": "Step 3: Using the Extension"
-        },
-        {
-          "description": "Open Ascendara, confirm the game name, and choose where to download.",
-          "title": "Step 4: Downloading"
-        },
-        {
-          "description": "Your download will automatically start in Ascendara. If you're not brought to the download page, navigate to it.",
-          "title": "That's it!"
-        }
-      ],
-      "title": "Downloading with Ascendara"
-    },
     "noDownloadPath": {
       "desc": "You haven't set a download directory yet. Please go to Settings to choose where your games will be saved.",
       "goToSettings": "Go to Settings",
