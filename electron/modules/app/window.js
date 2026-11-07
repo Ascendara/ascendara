@@ -19,6 +19,73 @@ let mainWindowHidden = false;
 let isHandlingProtocolUrl = false;
 let bigPictureWindowBounds = null;
 
+// Settled once app.js knows whether this process holds the local server's port. A
+// window opened before that (a second launch or a deep link at startup) waits for it,
+// and nothing is trusted until the answer is yes.
+let settleAppServerOwned;
+const appServerOwned = new Promise(resolve => {
+  settleAppServerOwned = resolve;
+});
+
+const LOAD_FAILURE_CAUSES = [
+  'Missing Visual C++ Redistributables - <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" style="color: #3b82f6;">Download here</a>',
+  "Antivirus blocking the app",
+  "Port 46859 being used by another application",
+];
+const PORT_IN_USE_CAUSES = [
+  "Another program is serving port 46859, so Ascendara will not load that page as itself",
+  "To see which one: on Windows run <code>netstat -ano | findstr :46859</code>, on macOS or Linux run <code>lsof -i :46859</code>",
+];
+
+/** Show a helpful error page instead of a white screen. */
+function showLoadFailure(
+  mainWindow,
+  errorDescription,
+  errorCode,
+  causes = LOAD_FAILURE_CAUSES
+) {
+  const safeDescription = String(errorDescription).replace(
+    /[&<>"']/g,
+    char =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]
+  );
+  const page = `
+  <html>
+    <head>
+      <style>
+        body { background: #09090b; color: #fff; font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; flex-direction: column; }
+        h1 { color: #ef4444; margin-bottom: 16px; }
+        p { color: #a1a1aa; max-width: 500px; text-align: center; line-height: 1.6; }
+        code { background: #27272a; padding: 2px 6px; border-radius: 4px; }
+      </style>
+    </head>
+    <body>
+      <h1>Failed to Load Ascendara</h1>
+      <p>Error: ${safeDescription} (${errorCode})</p>
+      <p>This may be caused by:</p>
+      ${causes.map(cause => `<p>• ${cause}</p>`).join("\n      ")}
+      <p>Try restarting Ascendara or your computer.</p>
+    </body>
+  </html>
+    `;
+  // Encoded, because a raw "#" (the colours) would start a URL fragment and cut the page.
+  mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`);
+}
+
+/** Whether this process holds the local server's port. */
+function setAppServerOwned(owned) {
+  settleAppServerOwned(owned === true);
+}
+
+/**
+ * Run callback when a window createWindow() just returned has loaded its first page.
+ * The load starts only after the port answer, so isLoading() is still false right
+ * after createWindow(), and a message sent then reaches no page.
+ */
+function whenFirstPageLoads(mainWindow, callback) {
+  mainWindow.webContents.once("did-finish-load", callback);
+}
+
 /**
  * Create the main application window
  * @returns {BrowserWindow} - The created window
@@ -124,8 +191,27 @@ function createWindow() {
     : "http://localhost:46859" + urlSuffix;
 
   console.log(`Loading window from: ${targetUrl}`);
-  registerTrustedWebContents(mainWindow.webContents, new URL(targetUrl).origin);
-  mainWindow.loadURL(targetUrl);
+  const loadApp = () => {
+    registerTrustedWebContents(mainWindow.webContents, new URL(targetUrl).origin);
+    mainWindow.loadURL(targetUrl);
+  };
+  // This page is trusted as the app. When another program holds the port, that page
+  // is not ours.
+  if (isDev) {
+    loadApp();
+  } else {
+    appServerOwned.then(owned => {
+      if (mainWindow.isDestroyed()) return;
+      if (owned) loadApp();
+      else
+        showLoadFailure(
+          mainWindow,
+          "Another program is using port 46859",
+          "port in use",
+          PORT_IN_USE_CAUSES
+        );
+    });
+  }
 
   // Add load event listeners for debugging
   mainWindow.webContents.on("did-start-loading", () => {
@@ -145,34 +231,8 @@ function createWindow() {
     "did-fail-load",
     (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
       if (!isMainFrame || errorCode === -3 || validatedURL?.startsWith("data:")) return;
-      const safeDescription = String(errorDescription).replace(
-        /[&<>"']/g,
-        char =>
-          ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]
-      );
       console.error(`Failed to load: ${errorCode} - ${errorDescription}`);
-      // Show a helpful error page instead of white screen
-      mainWindow.loadURL(`data:text/html,
-      <html>
-        <head>
-          <style>
-            body { background: #09090b; color: #fff; font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; flex-direction: column; }
-            h1 { color: #ef4444; margin-bottom: 16px; }
-            p { color: #a1a1aa; max-width: 500px; text-align: center; line-height: 1.6; }
-            code { background: #27272a; padding: 2px 6px; border-radius: 4px; }
-          </style>
-        </head>
-        <body>
-          <h1>Failed to Load Ascendara</h1>
-          <p>Error: ${safeDescription} (${errorCode})</p>
-          <p>This may be caused by:</p>
-          <p>• Missing Visual C++ Redistributables - <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" style="color: #3b82f6;">Download here</a></p>
-          <p>• Antivirus blocking the app</p>
-          <p>• Port 46859 being used by another application</p>
-          <p>Try restarting Ascendara or your computer.</p>
-        </body>
-      </html>
-    `);
+      showLoadFailure(mainWindow, errorDescription, errorCode);
     }
   );
 
@@ -558,6 +618,8 @@ function registerWindowHandlers() {
 
 module.exports = {
   createWindow,
+  setAppServerOwned,
+  whenFirstPageLoads,
   hideWindow,
   showWindow,
   getMainWindow,

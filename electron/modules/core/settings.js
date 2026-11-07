@@ -33,6 +33,8 @@ class SettingsManager {
       "premiumizeApiKey",
       "debridLinkApiKey",
     ];
+    // Logins from features that are gone. Nothing reads them, but files can still hold them.
+    this.retiredSensitiveKeys = ["twitchSecret", "twitchClientId"];
     this.secrets = createSecretStore({
       safeStorage,
       isAppReady: () => app.isReady?.(),
@@ -305,7 +307,8 @@ class SettingsManager {
   /** A copy without saved logins, for files that outlive a removed key. */
   withoutSecrets(settings) {
     const copy = { ...settings };
-    for (const key of this.sensitiveKeys) delete copy[key];
+    for (const key of [...this.sensitiveKeys, ...this.retiredSensitiveKeys])
+      delete copy[key];
     return copy;
   }
 

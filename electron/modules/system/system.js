@@ -13,6 +13,7 @@ const { exec, execFile, spawn } = require("child_process");
 const { ipcMain, app, BrowserWindow } = require("electron");
 const unzipper = require("unzipper");
 const { runDependencyInstaller } = require("./dependency-installer");
+const { pickGpuName } = require("./gpu-name");
 const {
   isDev,
   isWindows,
@@ -514,11 +515,30 @@ function registerSystemHandlers() {
     }
   });
 
-  // Fetch system specs
-  ipcMain.handle("fetch-system-specs", async () => {
+  // The hardware doesn't change while the app runs and reading it starts
+  // helper processes on Windows, so every page shares one read per run
+  let systemSpecsRequest = null;
+  ipcMain.handle("fetch-system-specs", () => {
+    systemSpecsRequest ??= readSystemSpecs().catch(error => {
+      systemSpecsRequest = null;
+      throw error;
+    });
+    return systemSpecsRequest;
+  });
+
+  async function readSystemSpecs() {
+    const cpus = os.cpus();
     const specs = {
       os: `${os.type()} ${os.release()}`,
-      cpu: os.cpus()[0]?.model || "Unknown",
+      // Raw values for comparing against a game's minimum requirements
+      platform: process.platform,
+      osRelease: os.release(),
+      arch: os.arch(),
+      totalMemory: os.totalmem(),
+      cpu: cpus[0]?.model || "Unknown",
+      // Logical threads and the highest clock reported, in MHz
+      cpuCores: cpus.length,
+      cpuSpeedMhz: Math.max(0, ...cpus.map(cpu => cpu.speed || 0)),
       ram: `${Math.round(os.totalmem() / (1024 * 1024 * 1024))} GB`,
       gpu: "Unknown",
       directx: "Unknown",
@@ -527,29 +547,20 @@ function registerSystemHandlers() {
     if (process.platform === "win32") {
       try {
         const gpuResult = await new Promise(resolve => {
-          exec("wmic path win32_VideoController get name", (error, stdout) => {
-            if (!error && stdout) {
-              const lines = stdout
-                .split("\n")
-                .map(line => line.trim())
-                .filter(line => line && line !== "Name");
-              const virtualKeywords = [
-                "virtual",
-                "basic",
-                "microsoft",
-                "remote",
-                "vnc",
-                "rdp",
-              ];
-              const realGpu = lines.find(
-                line =>
-                  !virtualKeywords.some(keyword => line.toLowerCase().includes(keyword))
-              );
-              resolve(realGpu || lines[0] || "Unknown");
-            } else {
-              resolve("Unknown");
+          // wmic is gone from current Windows 11 builds, so ask CIM through PowerShell.
+          execFile(
+            "powershell.exe",
+            [
+              "-NoProfile",
+              "-NonInteractive",
+              "-Command",
+              "(Get-CimInstance Win32_VideoController).Name",
+            ],
+            { timeout: 10000, windowsHide: true },
+            (error, stdout) => {
+              resolve(!error && stdout ? pickGpuName(stdout) : "Unknown");
             }
-          });
+          );
         });
         specs.gpu = gpuResult;
 
@@ -577,7 +588,7 @@ function registerSystemHandlers() {
     }
 
     return specs;
-  });
+  }
 
   // Check game dependencies
   ipcMain.handle("check-game-dependencies", async () => {

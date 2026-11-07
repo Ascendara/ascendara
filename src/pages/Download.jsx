@@ -64,10 +64,11 @@ import HighballCompatibility, {
   useHighballCompat,
 } from "@/components/HighballCompatibility";
 import { toast } from "sonner";
-import { checkInstallSpace } from "@/lib/installSpace";
+import { checkInstallSpace, parseSize } from "@/lib/installSpace";
 import { formatBytes } from "@/services/app/systemHealthService";
 import TimemachineDialog from "@/components/TimemachineDialog";
 import steamService from "@/services/games/gameInfoService";
+import { findGameDetails } from "@/lib/requirementsMatch";
 import hltbService from "@/services/integrations/hltbService";
 import useDebridHosts from "@/hooks/useDebridHosts";
 import * as debrid from "@/services/downloads/debridService";
@@ -244,7 +245,7 @@ function PublicDownloadPage() {
       setSteamError(null);
 
       try {
-        const data = await steamService.getGameDetails(gameName);
+        const data = await findGameDetails(gameName, steamService.getGameDetails);
 
         if (data) {
           setSteamData(data);
@@ -2147,7 +2148,13 @@ function PublicDownloadPage() {
                 }
               }}
             />
-            <SystemRequirements minReqs={gameData.minReqs} />
+            <SystemRequirements
+              minReqs={gameData.minReqs}
+              gameName={gameData.game}
+              steamData={steamData}
+              downloadSize={parseSize(gameData.size)}
+              downloadDirectory={settings.downloadDirectory}
+            />
             <AscendPerks
               gameName={gameData.game}
               isAuthenticated={isAuthenticated}
