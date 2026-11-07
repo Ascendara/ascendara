@@ -21,8 +21,13 @@ let connecting = false;
 let connectionGeneration = 0;
 let activityQueue = Promise.resolve();
 let desiredState = "default";
+let pendingPublish = null;
+let pendingForce = false;
+let lastSentKey = null;
+let lastSentAt = 0;
 
 const PLAYING_REFRESH_MS = 20000;
+const MIN_PUBLISH_INTERVAL_MS = 4000;
 
 function scheduleRetry(delay) {
   if (retryTimeout) clearTimeout(retryTimeout);
@@ -43,33 +48,66 @@ function syncPlayingRefresh() {
   }
 }
 
-function publishActivity() {
+function resetPublishState() {
+  if (pendingPublish) clearTimeout(pendingPublish);
+  pendingPublish = null;
+  lastSentKey = null;
+  lastSentAt = 0;
+}
+
+// Discord drops presence updates past ~5 per 20s, so fast navigation could
+// lose the final state. Space sends out and always publish the latest state
+// at the end of the window; identical updates are skipped unless forced.
+function publishActivity(force = false) {
   if (!rpc || !rpcIsConnected) return;
+  if (force) pendingForce = true;
+  if (pendingPublish) return;
+  const wait = lastSentAt + MIN_PUBLISH_INTERVAL_MS - Date.now();
+  if (wait > 0) {
+    pendingPublish = setTimeout(() => {
+      pendingPublish = null;
+      publishActivity();
+    }, wait);
+    pendingPublish.unref?.();
+    return;
+  }
+  const forced = pendingForce;
+  pendingForce = false;
   const client = rpc;
   // Serialize writes: a pending browsing update must never land after a game starts.
-  activityQueue = activityQueue.catch(() => {}).then(() => {
-    if (client !== rpc || !rpcIsConnected) return;
-    const session = [...playingSessions.values()].at(-1);
-    const activity = session
-      ? {
-          details: "Playing a Game",
-          state: session.name,
-          startTimestamp: session.startedAt,
-          largeImageKey: "ascendara",
-          largeImageText: "Ascendara",
-          buttons: [{ label: "Play on Ascendara", url: "https://ascendara.app/" }],
-        }
-      : {
-          state: desiredState === "downloading"
-            ? "Watching download progress..."
-            : desiredState === "idle" ? "Idling..." : "Searching for games...",
-          largeImageKey: "ascendara",
-          largeImageText: "Ascendara",
-        };
-    return client.setActivity(activity);
-  }).catch(error => {
-    console.warn("Failed to update Discord RPC activity:", error);
-  });
+  activityQueue = activityQueue
+    .catch(() => {})
+    .then(() => {
+      if (client !== rpc || !rpcIsConnected) return;
+      const session = [...playingSessions.values()].at(-1);
+      const activity = session
+        ? {
+            details: "Playing a Game",
+            state: session.name,
+            startTimestamp: session.startedAt,
+            largeImageKey: "ascendara",
+            largeImageText: "Ascendara",
+            buttons: [{ label: "Play on Ascendara", url: "https://ascendara.app/" }],
+          }
+        : {
+            state:
+              desiredState === "downloading"
+                ? "Watching download progress..."
+                : desiredState === "idle"
+                  ? "Idling..."
+                  : "Searching for games...",
+            largeImageKey: "ascendara",
+            largeImageText: "Ascendara",
+          };
+      const key = JSON.stringify(activity);
+      if (!forced && key === lastSentKey) return;
+      lastSentKey = key;
+      lastSentAt = Date.now();
+      return client.setActivity(activity);
+    })
+    .catch(error => {
+      console.warn("Failed to update Discord RPC activity:", error);
+    });
 }
 
 /**
@@ -78,13 +116,17 @@ function publishActivity() {
 async function isDiscordRunning() {
   try {
     if (process.platform === "win32") {
-      const { stdout } = await execAsync('tasklist /FO CSV /NH');
+      const { stdout } = await execAsync("tasklist /FO CSV /NH");
       return /"discord(?:canary|ptb|development)?\.exe"/i.test(stdout);
     } else if (process.platform === "darwin") {
-      const { stdout } = await execAsync('pgrep -x Discord || pgrep -x "Discord Canary" || pgrep -x "Discord PTB"');
+      const { stdout } = await execAsync(
+        'pgrep -x Discord || pgrep -x "Discord Canary" || pgrep -x "Discord PTB"'
+      );
       return stdout.trim().length > 0;
     } else {
-      const { stdout } = await execAsync('pgrep -x discord || pgrep -x "discordcanary" || pgrep -x "discordptb"');
+      const { stdout } = await execAsync(
+        'pgrep -x discord || pgrep -x "discordcanary" || pgrep -x "discordptb"'
+      );
       return stdout.trim().length > 0;
     }
   } catch {
@@ -111,6 +153,7 @@ function destroyDiscordRPC() {
   rpc = null;
   rpcIsConnected = false;
   activityQueue = Promise.resolve();
+  resetPublishState();
   if (!client) return;
   client.removeAllListeners();
   Promise.resolve(client.destroy()).catch(() => {});
@@ -174,6 +217,7 @@ async function initializeDiscordRPC() {
     rpcIsConnected = false;
     connecting = false;
     activityQueue = Promise.resolve();
+    resetPublishState();
     Promise.resolve(client.destroy()).catch(() => {});
     const delay = Math.min(2000 * 2 ** rpcConnectionAttempts++, 30000);
     scheduleRetry(delay);
@@ -185,6 +229,7 @@ async function initializeDiscordRPC() {
     rpcIsConnected = true;
     connecting = false;
     activityQueue = Promise.resolve();
+    resetPublishState();
     console.log("Discord RPC is ready");
     syncPlayingRefresh();
     publishActivity();
@@ -216,7 +261,8 @@ function setPlayingActivity(gameName, sessionId = "pc") {
 }
 
 function publishPlayingActivity() {
-  if (playingSessions.size) publishActivity();
+  // Forced so the periodic refresh re-asserts presence even when unchanged
+  if (playingSessions.size) publishActivity(true);
 }
 
 /**

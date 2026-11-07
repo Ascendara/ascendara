@@ -644,9 +644,9 @@ const DiscordRPCTracker = () => {
   const idleTimerRef = useRef(null);
   const isGamePlayingRef = useRef(false);
 
+  // "/download" is a game's store page (reached from search), not progress
   const isDownloadPath = path =>
     [
-      "/download",
       "/downloads",
       "/debriddownloads",
       "/torboxdownloads",
@@ -682,19 +682,15 @@ const DiscordRPCTracker = () => {
     if (lastPathRef.current === pathname) return;
     lastPathRef.current = pathname;
 
-    // While a game is playing, the "Playing a Game" activity is owned by the
-    // main process and should not be replaced by navigation-driven states.
-    if (isGamePlayingRef.current) {
-      clearIdleTimer();
-      return;
-    }
-
+    // Always report the page state: the main process keeps "Playing a Game"
+    // on top while a game runs and falls back to this state when it closes.
     if (isDownloadPath(pathname)) {
       clearIdleTimer();
       window.electron.switchRPC("downloading");
     } else {
       window.electron.switchRPC("default");
-      scheduleIdle();
+      if (isGamePlayingRef.current) clearIdleTimer();
+      else scheduleIdle();
     }
   }, [pathname, settings?.rpcEnabled]);
 

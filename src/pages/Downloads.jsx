@@ -388,12 +388,6 @@ const Downloads = () => {
     };
   }, [stopCommandChecking]);
 
-  useEffect(() => {
-    window.electron.switchRPC("downloading");
-    return () => {
-      window.electron.switchRPC("default");
-    };
-  }, []);
   const [downloadingGames, setDownloadingGames] = useState([]);
   const [completedGames, setCompletedGames] = useState(new Set()); // Track games that just completed
   const [fadingGames, setFadingGames] = useState(new Set()); // Track games that are fading out
