@@ -19,12 +19,12 @@ import "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import GameCard from "@/components/GameCard";
 import CategoryFilter from "@/components/CategoryFilter";
+import IndexInfoDialog from "@/components/IndexInfoDialog";
 import {
   Search as SearchIcon,
   SlidersHorizontal,
   Gamepad2,
   Gift,
-  InfoIcon,
   ExternalLink,
   RefreshCw,
   AlertTriangle,
@@ -49,7 +49,6 @@ import {
   AlertDialogHeader,
   AlertDialogCancel,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import useStableNavigate from "@/hooks/useStableNavigate";
 import imageCacheService from "@/services/images/imageCacheService";
@@ -969,160 +968,14 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                 <span>
                   {apiMetadata.games.toLocaleString()} {t("search.gamesIndexed")}
                 </span>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <InfoIcon className="h-4 w-4 cursor-pointer transition-colors hover:text-foreground" />
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="border-border">
-                    <AlertDialogCancel className="absolute right-2 top-2 cursor-pointer text-foreground transition-colors">
-                      <X className="h-4 w-4" />
-                    </AlertDialogCancel>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="text-2xl font-bold text-foreground">
-                        {apiMetadata.local
-                          ? t("search.localIndexedInformation")
-                          : t("search.indexedInformation")}
-                      </AlertDialogTitle>
-                      <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                        {apiMetadata.local ? (
-                          <>
-                            <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-green-600 dark:text-green-400">
-                              <Database className="h-4 w-4 shrink-0" />
-                              <span>{t("search.usingLocalIndex")}</span>
-                            </div>
-                            <p>{t("search.localIndexedDescription")}</p>
-                            <Separator className="bg-border/50" />
-                            <p>
-                              {t("search.totalGames")}:{" "}
-                              {apiMetadata.games.toLocaleString()}
-                            </p>
-                            <p>
-                              {t("search.source")}: {apiMetadata.source}
-                            </p>
-                            <p>
-                              {t("search.lastUpdated")}: {apiMetadata.getDate}
-                            </p>
-                            <Separator className="bg-border/50" />
-                            <div className="pt-2">
-                              <Button
-                                className="flex w-full items-center justify-center gap-2 text-secondary"
-                                onClick={() =>
-                                  navigate("/settings", {
-                                    state: { scrollTo: "game-index" },
-                                  })
-                                }
-                              >
-                                <RefreshCw className="h-4 w-4" />
-                                {t("search.refreshLocalIndex")}
-                              </Button>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <p>
-                              {t("search.indexedInformationDescription")}{" "}
-                              <a
-                                onClick={() =>
-                                  window.electron.openURL("https://ascendara.app/dmca")
-                                }
-                                className="cursor-pointer text-primary hover:underline"
-                              >
-                                {t("common.learnMore")}{" "}
-                                <ExternalLink className="mb-1 inline-block h-3 w-3" />
-                              </a>
-                            </p>
-                            <Separator className="bg-border/50" />
-                            <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-yellow-600 dark:text-yellow-400">
-                              <AlertTriangle className="h-4 w-4 shrink-0" />
-                              <span>{t("search.usinganApiWarning")}</span>
-                            </div>
-                            <Separator className="bg-border/50" />
-                            <p>
-                              {t("search.totalGames")}:{" "}
-                              {apiMetadata.games.toLocaleString()}
-                            </p>
-                            <p>
-                              {t("search.source")}:{" "}
-                              {apiMetadata.sourceName || apiMetadata.source}
-                            </p>
-                            {apiMetadata.customSource &&
-                              apiMetadata.sourceUrl &&
-                              (() => {
-                                const isCustomList = String(
-                                  apiMetadata.sourceUrl
-                                ).startsWith("custom_list_");
-                                const listId = isCustomList
-                                  ? apiMetadata.sourceUrl
-                                  : null;
-                                if (isCustomList) {
-                                  return (
-                                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                                      <span className="rounded border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 font-medium text-blue-600 dark:text-blue-300">
-                                        {t("search.customList") || "Custom list"}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          window.electron?.showCustomListInFolder?.(
-                                            listId
-                                          )
-                                        }
-                                        className="cursor-pointer text-primary hover:underline"
-                                      >
-                                        {t("search.showInFolder") || "Show in folder"}
-                                      </button>
-                                      <span className="text-muted-foreground/60">/</span>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          window.electron?.openCustomListFile?.(listId)
-                                        }
-                                        className="cursor-pointer text-primary hover:underline"
-                                      >
-                                        {t("search.openFile") || "Open file"}
-                                      </button>
-                                    </div>
-                                  );
-                                }
-                                return (
-                                  <p className="break-all text-xs text-muted-foreground/80">
-                                    <a
-                                      onClick={() =>
-                                        window.electron?.openURL?.(apiMetadata.sourceUrl)
-                                      }
-                                      className="cursor-pointer hover:underline"
-                                    >
-                                      {apiMetadata.sourceUrl}
-                                    </a>
-                                  </p>
-                                );
-                              })()}
-                            <p>
-                              {apiMetadata.customSource
-                                ? t("search.lastSynced") || "Last synced"
-                                : t("search.lastUpdated")}
-                              : {apiMetadata.getDate}
-                            </p>
-                            <Separator className="bg-border/50" />
-                            <div className="pt-2">
-                              <Button
-                                className="flex w-full items-center justify-center gap-2 text-secondary"
-                                onClick={() =>
-                                  navigate("/settings", {
-                                    state: { scrollTo: "game-index" },
-                                  })
-                                }
-                              >
-                                <RefreshCw className="h-4 w-4" />
-                                {t("search.switchToLocalIndex")}
-                              </Button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </AlertDialogHeader>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <IndexInfoDialog
+                  metadata={apiMetadata}
+                  games={games}
+                  lastRefreshTime={lastRefreshTime}
+                  onOpenSettings={() =>
+                    navigate("/settings", { state: { scrollTo: "game-index" } })
+                  }
+                />
               </div>
             </div>
           )}

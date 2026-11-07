@@ -4730,6 +4730,22 @@
     "filterOptions": "Filter Options",
     "filters": "Filters",
     "gamesIndexed": "Games Indexed",
+    "indexInfo": {
+      "empty": "The local index has no games yet. Refresh it from Settings to load the catalog.",
+      "freshness": {
+        "aging": "Getting old",
+        "fresh": "Up to date",
+        "outdated": "Out of date",
+        "unknown": "Unknown age"
+      },
+      "location": "Location",
+      "notAvailable": "Not available",
+      "onlinePlay": "Online Play",
+      "open": "Index information",
+      "openFolder": "Open Folder",
+      "version": "v{{version}}",
+      "withDlc": "Include DLC"
+    },
     "indexedInformation": "Indexed Information",
     "indexedInformationDescription": "Ascendara uses a custom developed database to store game links and information. Indexed information is refreshed every couple days or if a request is made. No game files are ever stored on Ascendara servers.",
     "lastSynced": "Last Synced",
