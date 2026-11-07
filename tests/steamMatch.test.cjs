@@ -213,6 +213,17 @@ test("only the same name after cleaning counts as a match", async () => {
   assert.ok(!isConfidentMatch("", ""));
 });
 
+test("a subtitle Steam adds counts only when Steam calls it a game", async () => {
+  const { isConfidentMatch } = await load();
+  assert.ok(isConfidentMatch("The Witcher 3", "The Witcher 3: Wild Hunt", "game"));
+  assert.ok(isConfidentMatch("Batman Arkham Knight", "Batman™: Arkham Knight", "game"));
+  assert.ok(isConfidentMatch("Dying Light 2", "Dying Light 2 - Stay Human", "game"));
+  assert.ok(!isConfidentMatch("The Witcher 3", "The Witcher 3: Wild Hunt"));
+  assert.ok(!isConfidentMatch("Split Fiction", "Split Fiction: Friend's Pass", "dlc"));
+  assert.ok(!isConfidentMatch("Hades", "Hades II: Early Access", "game"));
+  assert.ok(!isConfidentMatch("Game", "Game: Soundtrack", "music"));
+});
+
 const steamGame = name => ({
   name,
   system_requirements: { minimum: "", recommended: "" },

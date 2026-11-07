@@ -680,6 +680,7 @@ const formatSteamData = steamData => {
     id: steamData.steam_appid,
     appid: steamData.steam_appid,
     name: steamData.name,
+    type: steamData.type,
     summary: shortDescription,
     description: aboutTheGame || shortDescription,
     storyline: null,

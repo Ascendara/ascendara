@@ -98,9 +98,16 @@ export function titleKey(title) {
 const EXTRA_CONTENT = /\b(?:demo|soundtrack|ost|playtest|dlc)\b/i;
 const ASKS_FOR_DLC = /\b(?:dlcs?|pack)\b/i;
 
-export function isConfidentMatch(indexTitle, foundTitle) {
+export function isConfidentMatch(indexTitle, foundTitle, foundType) {
   const key = titleKey(indexTitle);
-  if (key === "" || key !== titleKey(foundTitle)) return false;
+  if (key === "") return false;
+  if (key !== titleKey(foundTitle)) {
+    // Steam often adds a subtitle the index leaves out ("The Witcher 3" vs
+    // "The Witcher 3: Wild Hunt"). Only trusted when Steam says it is a game,
+    // so a DLC like "Game: Friend's Pass" still does not count
+    const head = String(foundTitle).split(/\s*:\s+|\s+[-–]\s+/)[0];
+    if (foundType !== "game" || key !== titleKey(head)) return false;
+  }
   const extra = String(foundTitle).match(EXTRA_CONTENT)?.[0];
   if (!extra || EXTRA_CONTENT.test(cleanGameTitle(indexTitle))) return true;
   return /^dlc$/i.test(extra) && ASKS_FOR_DLC.test(String(indexTitle));
@@ -118,7 +125,9 @@ export function matchSteamDetails(title, lookup) {
     const pending = Promise.resolve()
       .then(() => lookup(cleanGameTitle(title)))
       .then(details =>
-        details?.name && isConfidentMatch(title, details.name) ? details : null
+        details?.name && isConfidentMatch(title, details.name, details.type)
+          ? details
+          : null
       )
       .catch(error => {
         steamMatches.delete(key);
@@ -143,7 +152,8 @@ export async function findGameDetails(title, lookup) {
   } catch (error) {
     failure = error;
   }
-  const matched = details?.name && isConfidentMatch(title, details.name) ? details : null;
+  const matched =
+    details?.name && isConfidentMatch(title, details.name, details.type) ? details : null;
   if (matched || cleanGameTitle(title) === String(title).trim()) {
     if (failure) throw failure;
     return matched;
