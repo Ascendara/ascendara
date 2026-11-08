@@ -60,36 +60,65 @@ function matchingHelpers(processes, name, directory, knownPids = []) {
   );
 }
 
-async function stopHelpers(
-  name,
-  directory,
-  knownPids,
-  { cooperative = true, windows = process.platform === "win32" } = {}
-) {
-  const find = async () =>
-    matchingHelpers(await listHelpers(windows), name, directory, knownPids);
-  let remaining = await find();
-  if (cooperative) {
-    const deadline = Date.now() + 3000;
-    while (remaining.length && Date.now() < deadline) {
-      await delay(150);
-      remaining = await find();
-    }
-  }
-  for (const p of remaining) {
+async function stopHelpers(name, directory, knownPids, options = {}) {
+  const {
+    cooperative = true,
+    windows = process.platform === "win32",
+    list = () => listHelpers(windows),
+    kill = pid =>
+      windows
+        ? run("taskkill", ["/F", "/T", "/PID", String(pid)])
+        : process.kill(pid, "SIGKILL"),
+    graceMs = 3000,
+    exitMs = 10000,
+  } = options;
+  let listError = null;
+  // One slow or failed PowerShell/WMI listing means "unknown", not "running":
+  // poll again instead of failing the whole pause or cancel on it.
+  const find = async () => {
     try {
-      if (windows) await run("taskkill", ["/F", "/T", "/PID", String(p.pid)]);
-      else process.kill(p.pid, "SIGKILL");
+      const found = matchingHelpers(await list(), name, directory, knownPids);
+      listError = null;
+      return found;
     } catch (error) {
-      // A cooperative exit can race the kill. The final process listing decides.
-      if ((await find()).some(live => live.pid === p.pid)) throw error;
+      listError = error;
+      return null;
     }
-  }
-  for (let attempt = 0; attempt < 20; attempt++) {
-    if (!(await find()).length) return;
-    await delay(100);
-  }
-  throw new Error("The downloader is still running. Please try pausing again.");
+  };
+  const waitUntilGone = async (deadline, onRunning) => {
+    for (;;) {
+      const remaining = await find();
+      if (remaining && !remaining.length) return true;
+      if (Date.now() >= deadline) return false;
+      if (remaining?.length && onRunning) await onRunning(remaining);
+      await delay(150);
+    }
+  };
+
+  if (cooperative && (await waitUntilGone(Date.now() + graceMs))) return;
+
+  // The Windows helpers are PyInstaller onefile builds: a bootloader and its
+  // child share one command line, and "taskkill /T" on the bootloader ends
+  // both. The child can stay listed for a moment while it terminates, so a
+  // second taskkill on it fails even though it is already on its way out.
+  // Kill errors are therefore not fatal; only the process listing decides.
+  const killedAt = new Map();
+  const terminate = async remaining => {
+    for (const { pid } of remaining) {
+      const last = killedAt.get(pid);
+      if (last && Date.now() - last < 2000) continue;
+      killedAt.set(pid, Date.now());
+      try {
+        await kill(pid);
+      } catch (error) {
+        console.warn(`[downloads] Kill of helper ${pid} reported: ${error.message}`);
+      }
+    }
+  };
+  if (await waitUntilGone(Date.now() + exitMs, terminate)) return;
+  throw (
+    listError || new Error("The downloader is still running. Please try pausing again.")
+  );
 }
 
 function createOperationLock() {
