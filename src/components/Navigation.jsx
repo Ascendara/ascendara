@@ -40,11 +40,24 @@ const dockItemCompact = active => ({
 });
 // How far from the top a page has to be scrolled before the dock goes compact
 const COMPACT_MIN_SCROLL = 80;
-const DOCK_ITEM_TRANSITION = {
-  type: "spring",
-  stiffness: 380,
-  damping: 30,
-  opacity: { duration: 0.2 },
+const DOCK_SPRING = { type: "spring", stiffness: 380, damping: 30 };
+const DOCK_ITEM_TRANSITION = { ...DOCK_SPRING, opacity: { duration: 0.2 } };
+// The shell rides the same spring as the items so the two never drift apart. Its corner
+// radius stays put: the compact dock is short enough that 18px already rounds it into a
+// pill, and a fixed radius can't snap the way a jump to rounded-full does
+const DOCK_SHELL_EXPANDED = {
+  paddingTop: 12,
+  paddingBottom: 12,
+  paddingLeft: 12,
+  paddingRight: 12,
+  gap: 8,
+};
+const DOCK_SHELL_COMPACT = {
+  paddingTop: 10,
+  paddingBottom: 10,
+  paddingLeft: 14,
+  paddingRight: 14,
+  gap: 6,
 };
 
 const Navigation = memo(({ items }) => {
@@ -385,10 +398,11 @@ const Navigation = memo(({ items }) => {
           data-tour="navigation"
         >
           {/* data-boot-dock: slides up from the window edge as the boot logo lands (app.css) */}
-          <div
-            className={`pointer-events-auto relative mx-auto flex w-fit items-center justify-center border border-border shadow-lg backdrop-blur-lg transition-[padding,gap,border-radius] duration-300 ease-out ${
-              compact ? "gap-1.5 rounded-full px-3.5 py-2.5" : "gap-2 rounded-2xl p-3"
-            }`}
+          <motion.div
+            className="pointer-events-auto relative mx-auto flex w-fit items-center justify-center rounded-[18px] border border-border shadow-lg backdrop-blur-lg"
+            initial={false}
+            animate={compact ? DOCK_SHELL_COMPACT : DOCK_SHELL_EXPANDED}
+            transition={DOCK_SPRING}
             onPointerEnter={() => setDockEngaged(true)}
             onPointerLeave={() => setDockEngaged(false)}
             onFocus={() => setDockEngaged(true)}
@@ -416,11 +430,16 @@ const Navigation = memo(({ items }) => {
             <AnimatePresence initial={false}>
               {navItems.map(item =>
                 item.hidden ? null : item.separator ? (
-                  <div
+                  <motion.div
                     key={item.path}
-                    className={`w-px shrink-0 bg-border/50 transition-all duration-300 ${
-                      compact ? "mx-0.5 h-3" : "h-8"
-                    }`}
+                    className="w-px shrink-0 rounded-full bg-border/50"
+                    initial={false}
+                    animate={
+                      compact
+                        ? { height: 12, marginLeft: 2, marginRight: 2 }
+                        : { height: 32, marginLeft: 0, marginRight: 0 }
+                    }
+                    transition={DOCK_SPRING}
                   />
                 ) : (
                   <motion.div
@@ -446,13 +465,13 @@ const Navigation = memo(({ items }) => {
                       }}
                       // The dots and icons overlap as they swap, so the dock never
                       // looks empty halfway through
-                      transition={{ duration: compact ? 0.2 : 0.35 }}
+                      transition={{ duration: compact ? 0.3 : 0.4, ease: "easeInOut" }}
                     />
                     <motion.div
                       className={`flex shrink-0 ${compact ? "pointer-events-none" : ""}`}
                       initial={false}
                       animate={{ opacity: compact ? 0 : 1, scale: compact ? 0.6 : 1 }}
-                      transition={{ duration: compact ? 0.15 : 0.2 }}
+                      transition={{ duration: compact ? 0.2 : 0.3, ease: "easeOut" }}
                     >
                       <Link
                         to={item.path}
@@ -472,11 +491,11 @@ const Navigation = memo(({ items }) => {
                         <div
                           className={`absolute inset-0 rounded-xl bg-gradient-to-br ${item.color} transition-opacity duration-300 ${isActive(item.path) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                         />
+                        {/* The gradient layer above fades the active colour in; a gradient set
+                            here would swap instantly, since background images can't transition */}
                         <div
-                          className={`relative flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-200 ${
-                            isActive(item.path)
-                              ? "bg-gradient-to-br " + item.color
-                              : "group-hover:bg-white/10"
+                          className={`relative flex h-12 w-12 items-center justify-center rounded-lg transition-colors duration-300 ${
+                            isActive(item.path) ? "" : "group-hover:bg-white/10"
                           }`}
                         >
                           <item.icon className="h-5 w-5" />
@@ -503,7 +522,7 @@ const Navigation = memo(({ items }) => {
                 )
               )}
             </AnimatePresence>
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>
