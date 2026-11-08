@@ -3,7 +3,6 @@ const ENDPOINTS = {
   monitor: "https://monitor.ascendara.app/",
   api: `${API_URL}/`,
   storage: "https://cdn.ascendara.app/",
-  lfs: "https://lfs.ascendara.app/",
   r2: "https://r2.ascendara.app/",
 };
 
@@ -103,7 +102,6 @@ let currentStatus = {
   monitor: { ok: true },
   api: { ok: true },
   storage: { ok: true },
-  lfs: { ok: true },
   r2: { ok: true },
 };
 let lastCheck = null;
@@ -145,12 +143,11 @@ const performStatusCheck = async (force = false) => {
   try {
     // These checks double as the connectivity probe, so there is no separate
     // ping: if none of them got any response at all, we have no internet.
-    const [monitor, api, lfs] = await Promise.all([
+    const [monitor, api] = await Promise.all([
       checkEndpoint(ENDPOINTS.monitor),
       checkEndpoint(ENDPOINTS.api),
-      checkEndpoint(ENDPOINTS.lfs),
     ]);
-    const isOnline = ![monitor, api, lfs].every(r => r.unreachable);
+    const isOnline = ![monitor, api].every(r => r.unreachable);
 
     // If no internet, update and return that status
     if (!isOnline) {
@@ -160,7 +157,6 @@ const performStatusCheck = async (force = false) => {
         monitor: { ok: false, error: "No internet connection" },
         api: { ok: false, error: "No internet connection" },
         storage: { ok: false, error: "No internet connection" },
-        lfs: { ok: false, error: "No internet connection" },
         r2: { ok: false, error: "No internet connection" },
       };
       lastBucketCheck = null; // re-check buckets as soon as we're back online
@@ -171,7 +167,7 @@ const performStatusCheck = async (force = false) => {
 
     // We have internet, so the bucket checks are worth spending
     const [storage, r2] = await checkBuckets();
-    const results = [monitor, api, storage, lfs, r2];
+    const results = [monitor, api, storage, r2];
 
     currentStatus = {
       ok: results.every(r => r.ok),
@@ -179,8 +175,7 @@ const performStatusCheck = async (force = false) => {
       monitor: results[0],
       api: results[1],
       storage: results[2],
-      lfs: results[3],
-      r2: results[4],
+      r2: results[3],
     };
 
     lastCheck = Date.now();

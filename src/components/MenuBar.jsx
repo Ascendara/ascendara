@@ -58,7 +58,6 @@ const MenuBar = () => {
       noInternet: false,
       api: { ok: true },
       storage: { ok: true },
-      lfs: { ok: true },
     };
   });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -330,7 +329,6 @@ const MenuBar = () => {
                 serverStatus.monitor?.ok &&
                 serverStatus.api?.ok &&
                 serverStatus.storage?.ok &&
-                serverStatus.lfs?.ok &&
                 serverStatus.r2?.ok
                   ? "bg-green-500 hover:bg-green-600"
                   : "animate-pulse bg-red-500 hover:bg-red-600"
@@ -579,7 +577,6 @@ const MenuBar = () => {
                       serverStatus.monitor?.ok &&
                       serverStatus.api?.ok &&
                       serverStatus.storage?.ok &&
-                      serverStatus.lfs?.ok &&
                       serverStatus.r2?.ok
                         ? "border-green-500/30 bg-gradient-to-br from-green-500/10 to-green-500/5"
                         : "border-red-500/30 bg-gradient-to-br from-red-500/10 to-red-500/5"
@@ -591,7 +588,6 @@ const MenuBar = () => {
                           {serverStatus.monitor?.ok &&
                           serverStatus.api?.ok &&
                           serverStatus.storage?.ok &&
-                          serverStatus.lfs?.ok &&
                           serverStatus.r2?.ok
                             ? t("server-status.healthy")
                             : t("server-status.unhealthy")}
@@ -600,7 +596,6 @@ const MenuBar = () => {
                           {serverStatus.monitor?.ok &&
                           serverStatus.api?.ok &&
                           serverStatus.storage?.ok &&
-                          serverStatus.lfs?.ok &&
                           serverStatus.r2?.ok
                             ? t("server-status.healthy-description")
                             : t("server-status.unhealthy-description")}
@@ -611,7 +606,6 @@ const MenuBar = () => {
                           serverStatus.monitor?.ok &&
                           serverStatus.api?.ok &&
                           serverStatus.storage?.ok &&
-                          serverStatus.lfs?.ok &&
                           serverStatus.r2?.ok
                             ? "bg-green-500 shadow-green-500/50"
                             : "animate-pulse bg-red-500 shadow-red-500/50"
@@ -624,7 +618,7 @@ const MenuBar = () => {
                     <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                       {t("server-status.service-status")}
                     </h4>
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                       {/* API Status - Main Endpoint - Takes 2 columns */}
                       <div
                         className={`group col-span-2 rounded-xl border-2 p-4 transition-all hover:scale-[1.02] ${
@@ -656,35 +650,6 @@ const MenuBar = () => {
                           {serverStatus.api?.ok
                             ? t("server-status.operational")
                             : serverStatus.api?.error || t("server-status.down")}
-                        </p>
-                      </div>
-
-                      {/* LFS Status */}
-                      <div
-                        className={`group rounded-xl border-2 p-4 transition-all hover:scale-[1.02] ${
-                          serverStatus.lfs?.ok
-                            ? "border-green-500/30 bg-green-500/5 hover:border-green-500/50"
-                            : "border-red-500/30 bg-red-500/5 hover:border-red-500/50"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`h-3 w-3 rounded-full shadow-lg ${
-                                serverStatus.lfs?.ok
-                                  ? "bg-green-500 shadow-green-500/50"
-                                  : "bg-red-500 shadow-red-500/50"
-                              }`}
-                            />
-                            <span className="font-semibold text-foreground">
-                              {t("server-status.lfs-name")}
-                            </span>
-                          </div>
-                        </div>
-                        <p className="mt-2 text-xs font-medium text-muted-foreground">
-                          {serverStatus.lfs?.ok
-                            ? t("server-status.operational")
-                            : serverStatus.lfs?.error || t("server-status.down")}
                         </p>
                       </div>
 

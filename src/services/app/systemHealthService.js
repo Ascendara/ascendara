@@ -204,7 +204,7 @@ export async function inspectSystemHealth(t) {
       });
     }
 
-    const serviceNames = ["monitor", "api", "storage", "lfs", "r2"];
+    const serviceNames = ["monitor", "api", "storage", "r2"];
     const failedServices = serviceNames.filter(name => !serverStatus?.[name]?.ok);
     items.push({
       id: "services",

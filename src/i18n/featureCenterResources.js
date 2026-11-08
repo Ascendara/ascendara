@@ -364,7 +364,7 @@ const featureCenterResources = {
           servicesOffline: "No connection to Ascendara services was detected.",
           servicesPartial:
             "Unavailable: {{services}}. Local features can continue to work.",
-          servicesOk: "Monitor, API, CDN, LFS and R2 endpoints are reachable.",
+          servicesOk: "Monitor, API, CDN and R2 endpoints are reachable.",
           tools: "Optional tools",
           toolsCount: "{{count}} optional Ascendara tool(s) are registered as installed.",
           toolsError: "Ascendara could not inspect optional tools.",
@@ -702,7 +702,7 @@ const featureCenterResources = {
           servicesOffline: "Não foi detectada conexão com os serviços do Ascendara.",
           servicesPartial:
             "Indisponíveis: {{services}}. Os recursos locais podem continuar funcionando.",
-          servicesOk: "Os endpoints Monitor, API, CDN, LFS e R2 estão acessíveis.",
+          servicesOk: "Os endpoints Monitor, API, CDN e R2 estão acessíveis.",
           tools: "Ferramentas opcionais",
           toolsCount:
             "{{count}} ferramenta(s) opcional(is) do Ascendara está(ão) registrada(s) como instalada(s).",

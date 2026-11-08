@@ -5,7 +5,6 @@ const ALLOWED_SERVICE_HOSTS = new Set([
   "monitor.ascendara.app",
   new URL(API_URL).hostname,
   "cdn.ascendara.app",
-  "lfs.ascendara.app",
   "r2.ascendara.app",
 ]);
 const ALLOWED_SERVICE_METHODS = new Set(["GET", "HEAD"]);
@@ -22,7 +21,9 @@ function normalizeServiceRequest(rawUrl, options = {}) {
   }
 
   if (parsedUrl.protocol !== "https:" || !ALLOWED_SERVICE_HOSTS.has(parsedUrl.hostname)) {
-    throw new Error(`Service request host is not allowed: ${parsedUrl.hostname || "unknown"}`);
+    throw new Error(
+      `Service request host is not allowed: ${parsedUrl.hostname || "unknown"}`
+    );
   }
 
   // This path is only for the root service status checks.
@@ -59,7 +60,10 @@ function normalizeServiceRequest(rawUrl, options = {}) {
 }
 
 function requestAscendaraService(rawUrl, options = {}) {
-  const { parsedUrl, method, timeout, headers } = normalizeServiceRequest(rawUrl, options);
+  const { parsedUrl, method, timeout, headers } = normalizeServiceRequest(
+    rawUrl,
+    options
+  );
 
   return new Promise((resolve, reject) => {
     const request = https.request(
@@ -115,18 +119,26 @@ function normalizeExternalRequest(rawUrl, options = {}) {
     throw new Error("External requests must use HTTPS");
   }
 
-  const method = typeof options.method === "string" ? options.method.toUpperCase() : "GET";
+  const method =
+    typeof options.method === "string" ? options.method.toUpperCase() : "GET";
   const headers =
-    options.headers && typeof options.headers === "object" && !Array.isArray(options.headers)
+    options.headers &&
+    typeof options.headers === "object" &&
+    !Array.isArray(options.headers)
       ? { ...options.headers }
       : {};
-  const timeout = Number.isFinite(Number(options.timeout)) ? Number(options.timeout) : undefined;
+  const timeout = Number.isFinite(Number(options.timeout))
+    ? Number(options.timeout)
+    : undefined;
 
   return { parsedUrl, method, headers, timeout };
 }
 
 function requestExternalResource(rawUrl, options = {}) {
-  const { parsedUrl, method, headers, timeout } = normalizeExternalRequest(rawUrl, options);
+  const { parsedUrl, method, headers, timeout } = normalizeExternalRequest(
+    rawUrl,
+    options
+  );
 
   return new Promise((resolve, reject) => {
     const request = https.request(
@@ -170,13 +182,13 @@ function isAscendaraHealthRequest(rawUrl) {
     const parsedUrl = new URL(rawUrl);
     return Boolean(
       parsedUrl.protocol === "https:" &&
-        ALLOWED_SERVICE_HOSTS.has(parsedUrl.hostname) &&
-        !parsedUrl.username &&
-        !parsedUrl.password &&
-        (!parsedUrl.port || parsedUrl.port === "443") &&
-        parsedUrl.pathname === "/" &&
-        !parsedUrl.search &&
-        !parsedUrl.hash
+      ALLOWED_SERVICE_HOSTS.has(parsedUrl.hostname) &&
+      !parsedUrl.username &&
+      !parsedUrl.password &&
+      (!parsedUrl.port || parsedUrl.port === "443") &&
+      parsedUrl.pathname === "/" &&
+      !parsedUrl.search &&
+      !parsedUrl.hash
     );
   } catch {
     return false;

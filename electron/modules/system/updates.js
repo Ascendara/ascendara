@@ -49,6 +49,20 @@ let availableVersion = null;
 // Portable copies update by downloading the new portable build from the release.
 const PORTABLE_RELEASES_URL = "https://github.com/Ascendara/ascendara/releases/latest";
 
+// Live installers come straight from the GitHub release for that version; with
+// no version given, the latest live version is looked up first
+async function liveInstallerUrl(version) {
+  if (!version)
+    version = (await axios.get(`${API_URL}/`, { timeout: 15000 })).data?.appVer;
+  if (!/^\d+(?:\.\d+)*(?:-\d+)?$/.test(String(version || ""))) {
+    throw new Error("Could not determine the latest Ascendara version.");
+  }
+  const file = isWindows
+    ? `Ascendara.Setup.${version}.exe`
+    : `Ascendara-${version}.AppImage`;
+  return `https://github.com/Ascendara/ascendara/releases/download/${version}/${file}`;
+}
+
 // Each testing branch installs from its own prerelease (see testingReleaseTag)
 const testingReleaseUrl = branch =>
   `https://api.github.com/repos/Ascendara/ascendara/releases/tags/${testingReleaseTag(branch)}`;
@@ -462,7 +476,7 @@ async function downloadUpdateInBackground() {
     if (!isMac) {
       updateUrl =
         currentBranch === "live"
-          ? `https://lfs.ascendara.app/download?update`
+          ? await liveInstallerUrl(availableVersion)
           : await testingInstallerUrl(currentBranch, availableVersion);
     }
     const tempDir = path.join(os.tmpdir(), "ascendarainstaller");
@@ -717,9 +731,7 @@ async function reinstallBranch(branch, progressChannel) {
     }
 
     const url =
-      branch === "live"
-        ? "https://lfs.ascendara.app/download?update"
-        : await testingInstallerUrl(branch);
+      branch === "live" ? await liveInstallerUrl() : await testingInstallerUrl(branch);
     // Use testingVersion for testing branches, appVersion for live
     const versionToSend =
       branch === "public-testing" || branch === "experimental"

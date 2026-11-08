@@ -35,7 +35,9 @@ const BrokenVersionDialog = ({ onClose }) => {
           <div className="mt-6 flex justify-end gap-2">
             <button
               onClick={() =>
-                window.electron.openURL("https://lfs.ascendara.app/download?update")
+                window.electron.openURL(
+                  "https://github.com/Ascendara/ascendara/releases/latest"
+                )
               }
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-secondary hover:bg-primary/90"
             >
