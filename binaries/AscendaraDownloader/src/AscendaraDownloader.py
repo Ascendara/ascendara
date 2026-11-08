@@ -37,7 +37,7 @@ from AscendaraRarRecovery import _extended_path, _check_path, _member_path
 from AscendaraExtraction import (
     IncompleteArchiveOutput, ExtractionRecoveryCancelled, detect_file_type,
     verify_manifest, supervise_extraction, _wanted, inplace_consumed, inplace_paths,
-    inplace_retained, trust_inplace_output,
+    inplace_retained, trust_inplace_output, _check_room,
 )
 
 _caffeinate_proc = None
@@ -1686,8 +1686,7 @@ class AscendaraDownloader:
                 target = _member_path(payload, item['filename'])
                 os.makedirs(os.path.dirname(target), exist_ok=True)
                 expected = item['size']
-                if expected > shutil.disk_usage(payload).free:
-                    raise OSError('Insufficient disk space for downloaded game files')
+                _check_room(expected, payload, 'Insufficient disk space for downloaded game files')
                 copied = 0
                 with open(item['source'], 'rb') as incoming, open(target, 'wb') as output:
                     while True:

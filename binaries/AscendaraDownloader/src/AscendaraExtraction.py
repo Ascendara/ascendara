@@ -245,6 +245,58 @@ def _find_hatchzip():
                  if path and os.path.isfile(path) and os.access(path, os.X_OK)), None)
 
 
+def compresses_writes(path):
+    """True when files written under `path` are compressed by the filesystem.
+
+    Btrfs with compression, or a folder marked compressed, often stores a
+    game in a fraction of its size, so free space checks against the
+    uncompressed size would refuse installs that fit.
+    """
+    path = os.path.abspath(path)
+    while not os.path.exists(path) and os.path.dirname(path) != path:
+        path = os.path.dirname(path)
+    try:
+        if os.name == 'nt':
+            return bool(getattr(os.stat(path), 'st_file_attributes', 0) & stat.FILE_ATTRIBUTE_COMPRESSED)
+        if not sys.platform.startswith('linux'):
+            return False
+        real, mount = os.path.realpath(path), None
+        with open('/proc/self/mounts', encoding='utf-8') as stream:
+            for line in stream:
+                fields = line.split()
+                if len(fields) < 4:
+                    continue
+                point = re.sub(r'\\([0-7]{3})', lambda m: chr(int(m.group(1), 8)), fields[1])
+                inside = real == point or real.startswith(point.rstrip('/') + '/')
+                if inside and (mount is None or len(point) >= len(mount[0])):
+                    mount = point, fields[2], fields[3].split(',')
+        if mount and mount[1] == 'btrfs' and any(
+                option.split('=')[0] in ('compress', 'compress-force') and not option.endswith('=no')
+                for option in mount[2]):
+            return True
+        # chattr +c or `btrfs property set compression`, inherited by new files
+        import fcntl
+        import struct
+        fd = os.open(path, os.O_RDONLY)
+        try:
+            flags = struct.unpack('i', fcntl.ioctl(fd, 0x80086601, struct.pack('i', 0)))[0]
+        finally:
+            os.close(fd)
+        return bool(flags & 0x4)
+    except (OSError, ValueError):
+        return False
+
+
+def _check_room(needed, destination, message='Insufficient disk space for extraction'):
+    free = shutil.disk_usage(destination).free
+    if needed <= free:
+        return
+    if not compresses_writes(destination):
+        raise OSError(message)
+    # Compressed data may still fit; running out stops the write itself.
+    logging.info('Proceeding on a compressing filesystem: %d bytes uncompressed, %d free', needed, free)
+
+
 def inplace_paths(archive):
     """Output folder and state file of an in-place extraction, beside the archive.
 
@@ -964,7 +1016,9 @@ def _fits_beside(kind, archive, destination, listing_path, cancelled, report):
             wanted=lambda name: True).values())
     else:
         return False
-    return needed + KEEP_FREE <= shutil.disk_usage(destination).free
+    # In-place extractors refuse to start unless the uncompressed output fits,
+    # while extracting beside the archive only needs the space actually used.
+    return needed + KEEP_FREE <= shutil.disk_usage(destination).free or compresses_writes(destination)
 
 
 def rar_inplace_layout(archive):
@@ -1502,8 +1556,7 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
                 members = [i for i in members if not stat.S_ISLNK(i.external_attr >> 16)]
                 files = [i for i in members if not i.is_dir()]
                 total_bytes = sum(i.file_size for i in files)
-                if total_bytes > shutil.disk_usage(destination).free:
-                    raise OSError('Insufficient disk space for extraction')
+                _check_room(total_bytes, destination)
                 state['total'] = len(files)
                 report(True)
                 done_bytes = 0
@@ -1558,8 +1611,7 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
                     report()
             finally:
                 api.close(handle)
-            if total_bytes > shutil.disk_usage(destination).free:
-                raise OSError('Insufficient disk space for extraction')
+            _check_room(total_bytes, destination)
             finished_bytes = 0
             def rar_progress(name, written, expected):
                 state.update(name=name, bytes=finished_bytes + min(written, expected),
@@ -1579,8 +1631,7 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
             if not manifest:
                 raise RuntimeError('Archive contains no installable files')
             total_bytes = sum(item['size'] for item in manifest.values())
-            if total_bytes > shutil.disk_usage(destination).free:
-                raise OSError('Insufficient disk space for extraction')
+            _check_room(total_bytes, destination)
             state.update(total=len(manifest), name='Extracting...', bytes=0)
             report(True)
             progress = UnrarProgress(destination, manifest, state)
@@ -1598,8 +1649,7 @@ def extraction_worker(archive, destination, manifest_path, connection, stop, all
             manifest = _7z_files(tool, archive, destination, manifest_path + '.listing',
                                  cancelled, lambda text: report(), links=links)
             total_bytes = sum(v['size'] for v in manifest.values())
-            if total_bytes > shutil.disk_usage(destination).free:
-                raise OSError('Insufficient disk space for extraction')
+            _check_room(total_bytes, destination)
             state['total'] = len(manifest)
             _release_outputs(destination, manifest)
             def cli_activity(text):
