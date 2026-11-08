@@ -23,7 +23,7 @@ import re
 from tempfile import NamedTemporaryFile, gettempdir
 from datetime import datetime
 import logging
-import qbittorrentapi
+from AscendaraTorrentClients import CLIENTS, TorrentClient, create_client
 import argparse
 import subprocess
 import base64
@@ -267,91 +267,43 @@ def _launch_notification(theme, title, message):
         logging.error(f"Failed to launch notification helper: {e}")
 
 class TorrentManager:
-    def __init__(self, qbit_host='localhost', qbit_port=8080, qbit_username='admin', qbit_password='adminadmin'):
-        self.qbt_client = None
-        self.connect_thread = None
+    def __init__(self, client: TorrentClient):
+        self.client = client
+        self.connected = False
         self.current_torrent_hash = None
         self.notification_theme = None
-        self.qbit_host = qbit_host
-        self.qbit_port = qbit_port
-        self.qbit_username = qbit_username
-        self.qbit_password = qbit_password
-        
+
     def cleanup(self):
-        if self.qbt_client and self.current_torrent_hash:
+        if self.connected and self.current_torrent_hash:
             try:
-                # Get torrent info to check if it's complete
-                torrents = self.qbt_client.torrents_info(torrent_hashes=self.current_torrent_hash)
-                if torrents and not torrents[0].state_enum.is_complete:
-                    # Delete the torrent and its data if download is incomplete
-                    self.qbt_client.torrents_delete(delete_files=True, torrent_hashes=self.current_torrent_hash)
+                # Delete the torrent and its data if download is incomplete
+                status = self.client.get(self.current_torrent_hash)
+                if status and not status.complete:
+                    self.client.remove(self.current_torrent_hash, delete_files=True)
             except:
                 pass  # Ignore any errors during cleanup
-    
-    def _connect_qbittorrent(self):
-        # Connect to the user-configured qBittorrent Web UI
-        logging.info(
-            f"Connecting to qBittorrent WebUI at {self.qbit_host}:{self.qbit_port} "
-            f"as user '{self.qbit_username}'"
-        )
-        self.qbt_client = qbittorrentapi.Client(
-            host=self.qbit_host,
-            port=self.qbit_port,
-            username=self.qbit_username,
-            password=self.qbit_password
-        )
-        try:
-            self.qbt_client.auth_log_in()
-        except qbittorrentapi.LoginFailed as e:
-            raise Exception(
-                f"Failed to authenticate with qBittorrent at {self.qbit_host}:{self.qbit_port}. "
-                "Check your credentials in Ascendara settings."
-            ) from e
-        except Exception as e:
-            raise Exception(
-                f"Failed to connect to qBittorrent at {self.qbit_host}:{self.qbit_port}. "
-                "Make sure it's running with Web UI enabled and the host/port are correct."
-            ) from e
-    
+
     def ensure_connected(self):
         # Connect on the calling thread: an exception raised in a worker thread
         # was lost, so login and connection errors reached the user as a vague
         # failure from the first API call instead
-        if self.qbt_client is None:
-            self._connect_qbittorrent()
+        if not self.connected:
+            self.client.connect()
+            self.connected = True
 
     def release_torrent(self, torrent_hash: str):
-        """Remove the finished torrent from qBittorrent but keep its files, so
+        """Remove the finished torrent from the client but keep its files, so
         seeding doesn't lock archives that extraction deletes afterwards."""
         try:
-            self.qbt_client.torrents_delete(delete_files=False, torrent_hashes=torrent_hash)
+            self.client.remove(torrent_hash, delete_files=False)
             for _ in range(20):
-                if not self.qbt_client.torrents_info(torrent_hashes=torrent_hash):
+                if not self.client.get(torrent_hash):
                     break
                 time.sleep(0.5)
             self.current_torrent_hash = None
-            logging.info(f"[TorrentHandler] Removed finished torrent {torrent_hash} from qBittorrent")
+            logging.info(f"[TorrentHandler] Removed finished torrent {torrent_hash} from {self.client.name}")
         except Exception as e:
-            logging.warning(f"[TorrentHandler] Could not remove finished torrent from qBittorrent: {e}")
-
-    @staticmethod
-    def _torrent_add_succeeded(result) -> bool:
-        """qBittorrent < 5.1 answers torrents/add with "Ok."/"Fails."; 5.1+ returns
-        JSON metadata (success_count, pending_count, failure_count, added_torrent_ids)."""
-        if isinstance(result, str):
-            return result.strip() == "Ok."
-        try:
-            get = result.get if hasattr(result, "get") else lambda k, d=None: getattr(result, k, d)
-            success = int(get("success_count", 0) or 0)
-            pending = int(get("pending_count", 0) or 0)
-            added = get("added_torrent_ids", None) or []
-            if success or pending or added:
-                return True
-            if get("failure_count", None) is not None:
-                return False
-        except Exception:
-            pass
-        return str(result).strip() == "Ok."
+            logging.warning(f"[TorrentHandler] Could not remove finished torrent from {self.client.name}: {e}")
 
     def download_torrent(self, magnet_link, game, online, dlc, isVr, updateFlow, version, size, download_dir, theme=None):
         self.notification_theme = theme
@@ -428,47 +380,37 @@ class TorrentManager:
             if not torrent_hash:
                 raise Exception("Could not read the torrent hash. Only magnet links with a BitTorrent v1 hash are supported.")
 
-            # qBittorrent ignores an add for a torrent it already has and keeps the
+            # Clients ignore an add for a torrent they already have and keep the
             # old save path, so Ascendara would watch files somewhere else
-            existing = self.qbt_client.torrents_info(torrent_hashes=torrent_hash)
+            existing = self.client.get(torrent_hash)
             same_path = existing and (
-                os.path.normcase(os.path.normpath(existing[0].save_path or ""))
+                os.path.normcase(os.path.normpath(existing.save_path))
                 == os.path.normcase(os.path.normpath(game_dir))
             )
             if existing and not same_path:
                 raise Exception(
-                    f"This torrent is already in qBittorrent (saving to {existing[0].save_path}). "
-                    "Remove it from qBittorrent, then start the download again."
+                    f"This torrent is already in {self.client.name} (saving to {existing.save_path}). "
+                    f"Remove it from {self.client.name}, then start the download again."
                 )
 
             if existing:
-                logging.info(f"Torrent already in qBittorrent for {game}, resuming it")
-                try:
-                    self.qbt_client.torrents_start(torrent_hashes=torrent_hash)
-                except Exception:
-                    self.qbt_client.torrents_resume(torrent_hashes=torrent_hash)
+                logging.info(f"Torrent already in {self.client.name} for {game}, resuming it")
+                self.client.resume(torrent_hash)
             else:
-                result = self.qbt_client.torrents_add(
-                    urls=magnet_link,
-                    save_path=game_dir,  # Save to game-specific directory
-                    use_auto_torrent_management=False,
-                    sequential_download=True
-                )
-                if not self._torrent_add_succeeded(result):
-                    raise Exception(f"qBittorrent rejected the torrent ({result})")
-                logging.info(f"Added torrent to qBittorrent for game: {game}")
+                self.client.add(magnet_link, game_dir)  # Save to game-specific directory
+                logging.info(f"Added torrent to {self.client.name} for game: {game}")
             self.current_torrent_hash = torrent_hash
 
-            # Wait for qBittorrent to register the torrent before polling its info
-            # (torrents_info can briefly return an empty list right after torrents_add)
+            # Wait for the client to register the torrent before polling its info
+            # (it can briefly report nothing right after an add)
             registered = False
             for _ in range(30):
-                if self.qbt_client.torrents_info(torrent_hashes=torrent_hash):
+                if self.client.get(torrent_hash):
                     registered = True
                     break
                 time.sleep(0.5)
             if not registered:
-                raise Exception(f"Torrent {torrent_hash} did not register in qBittorrent after adding")
+                raise Exception(f"Torrent {torrent_hash} did not register in {self.client.name} after adding")
 
             # Apply download speed limit from settings if configured
             try:
@@ -476,10 +418,7 @@ class TorrentManager:
                 download_limit_kbps = int(settings.get('downloadLimit', 0))
                 if download_limit_kbps > 0:
                     limit_bytes = download_limit_kbps * 1024
-                    self.qbt_client.torrents_set_download_limit(
-                        limit=limit_bytes,
-                        torrent_hashes=torrent_hash
-                    )
+                    self.client.set_download_limit(torrent_hash, limit_bytes)
                     logging.info(f"[TorrentHandler] Speed limit set: {download_limit_kbps} KB/s for {game}")
                 else:
                     logging.info(f"[TorrentHandler] Speed limit: unlimited for {game}")
@@ -492,30 +431,29 @@ class TorrentManager:
             missing_polls = 0
             while True:
                 # Get torrent info
-                torrents = self.qbt_client.torrents_info(torrent_hashes=torrent_hash)
-                if not torrents:
-                    # Removed in qBittorrent: stop instead of sitting at 0% forever,
+                torrent = self.client.get(torrent_hash)
+                if not torrent:
+                    # Removed in the client: stop instead of sitting at 0% forever,
                     # which also held the queue for every other download
                     missing_polls += 1
                     if missing_polls >= 15:
                         self.current_torrent_hash = None
-                        raise Exception("The torrent was removed from qBittorrent")
+                        raise Exception(f"The torrent was removed from {self.client.name}")
                     time.sleep(1)
                     continue
                 missing_polls = 0
-                torrent = torrents[0]
 
-                if torrent.state_enum.is_complete:
+                if torrent.complete:
                     break
-                if torrent.state in ("error", "missingFiles"):
+                if torrent.error:
                     raise Exception(
-                        f"qBittorrent reported '{torrent.state}' for this torrent. "
+                        f"{self.client.name} reported '{torrent.state}' for this torrent. "
                         "Check that the download folder is writable and has free space."
                     )
                 
                 # Update progress
                 progress = torrent.progress * 100
-                speed = torrent.dlspeed  # bytes/s
+                speed = torrent.download_speed  # bytes/s
                 
                 # Update waiting status based on download speed
                 if speed > 0 and game_info["downloadingData"]["waiting"]:
@@ -563,10 +501,10 @@ class TorrentManager:
             if self.notification_theme:
                 _launch_notification(self.notification_theme, "Download Complete", f"Download complete for {game}, starting installation")
             
-            # qBittorrent may still be checking/moving files right after reporting
+            # The client may still be checking/moving files right after reporting
             # completion, which holds OS-level file locks. Wait for it to settle
             # before touching any files, otherwise we hit WinError 32.
-            self._wait_for_qbt_release(torrent_hash, game)
+            self._wait_for_client_release(torrent_hash, game)
             self.release_torrent(torrent_hash)
 
             # The torrent content lands inside a folder named after the torrent
@@ -677,19 +615,15 @@ class TorrentManager:
         }
         safe_write_json(game_info_path, game_info)
 
-    def _wait_for_qbt_release(self, torrent_hash: str, game: str, max_wait_seconds: int = 30):
-        """Wait until qBittorrent leaves transient checking/moving states that hold file locks."""
-        unstable_states = {'checkingup', 'checkingdl', 'movingfiles', 'checkingresumedata', 'allocating'}
+    def _wait_for_client_release(self, torrent_hash: str, game: str, max_wait_seconds: int = 30):
+        """Wait until the client leaves transient checking/moving states that hold file locks."""
         waited = 0
         while waited < max_wait_seconds:
             try:
-                torrents = self.qbt_client.torrents_info(torrent_hashes=torrent_hash)
-                if not torrents:
+                status = self.client.get(torrent_hash)
+                if not status or not status.busy:
                     break
-                state = (torrents[0].state or '').lower()
-                if state not in unstable_states:
-                    break
-                logging.info(f"[{game}] Waiting for qBittorrent to release files (state: {state})")
+                logging.info(f"[{game}] Waiting for {self.client.name} to release files (state: {status.state})")
             except Exception:
                 break
             time.sleep(1)
@@ -1172,6 +1106,7 @@ def main():
     parser.add_argument("size", help="Download size")
     parser.add_argument("dir", help="Download directory")
     parser.add_argument("--withNotification", help="Theme name for notifications (e.g. light, dark, blue)", default=None)
+    parser.add_argument("--torrentClient", help="Local torrent client to use", choices=sorted(CLIENTS), default="qbittorrent")
     parser.add_argument("--qbitHost", help="qBittorrent WebUI host", default="localhost")
     parser.add_argument("--qbitPort", help="qBittorrent WebUI port", type=int, default=8080)
     parser.add_argument("--qbitUsername", help="qBittorrent WebUI username", default="admin")
@@ -1191,12 +1126,13 @@ def main():
                      f"version={args.version}, size={args.size}, dir={args.dir}, "
                      f"withNotification={args.withNotification}")
         
-        torrent_manager = TorrentManager(
-            qbit_host=args.qbitHost,
-            qbit_port=args.qbitPort,
-            qbit_username=args.qbitUsername,
-            qbit_password=args.qbitPassword,
-        )
+        torrent_manager = TorrentManager(create_client(
+            args.torrentClient,
+            args.qbitHost,
+            args.qbitPort,
+            args.qbitUsername,
+            args.qbitPassword,
+        ))
         torrent_manager.download_torrent(
             args.magnet,
             args.game,
