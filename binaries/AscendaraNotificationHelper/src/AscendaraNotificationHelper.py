@@ -8,6 +8,7 @@
 import sys
 import os
 import json
+import re
 import atexit
 import logging
 import argparse
@@ -293,6 +294,7 @@ def launch_crash_reporter(error_code, error_message):
 # ------------------------------------------------------------------------------
 SOUND_EXTENSIONS = (".wav", ".mp3", ".ogg", ".flac", ".m4a")
 SOUND_PROFILES = ("classic", "crystal", "arcade", "simple")
+SOUND_PACK_ID = re.compile(r"^[a-z0-9-]{1,40}$")
 # Loudest output at 100%. Notifications should never startle, so full volume
 # stays well under the system level.
 SOUND_MAX_GAIN = 0.4
@@ -305,10 +307,28 @@ def sound_gain(volume):
     return SOUND_MAX_GAIN * (max(0, min(100, volume)) / 100.0) ** 2
 
 
+def find_pack_sound(profile, kind):
+    """The sound file for an imported pack profile ("pack:<id>"), or None.
+    Packs live next to the settings file; keep in sync with soundPacks.js."""
+    if not isinstance(profile, str) or not profile.startswith("pack:"):
+        return None
+    pack_id = profile[len("pack:"):]
+    settings_path = find_settings_path()
+    if not SOUND_PACK_ID.match(pack_id) or not settings_path:
+        return None
+    pack_dir = os.path.join(os.path.dirname(settings_path), "notification_sounds", "packs", pack_id)
+    for ext in SOUND_EXTENSIONS:
+        candidate = os.path.join(pack_dir, kind + ext)
+        if os.path.isfile(candidate):
+            return candidate
+    logger.warning(f"Sound pack {pack_id} has no {kind} sound, using the default")
+    return None
+
+
 def resolve_sound(is_achievement):
     """Pick the sound file and volume for this notification from settings, or
     (None, 0) when sounds are off. A custom upload wins over the chosen sound
-    profile, and a missing custom file falls back to the profile."""
+    profile, and a missing custom file or pack falls back to a built-in profile."""
     settings = load_settings()
     if settings.get("notificationSounds") is False:
         return None, 0
@@ -326,6 +346,9 @@ def resolve_sound(is_achievement):
     if custom:
         logger.warning(f"Custom {kind} sound not found, using the default: {custom}")
     profile = settings.get("notificationSoundProfile")
+    pack = find_pack_sound(profile, kind)
+    if pack:
+        return pack, volume
     if profile not in SOUND_PROFILES:
         profile = SOUND_PROFILES[0]
     return resource_path(os.path.join("sounds", profile, f"{kind}.wav")), volume

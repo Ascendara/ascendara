@@ -25,6 +25,7 @@ const { getSettingsManager } = require("../core/settings");
 const { sanitizeText, getExtensionFromMimeType } = require("../core/utils");
 const { initializeDiscordRPC, destroyDiscordRPC, setRPCState } = require("./discord-rpc");
 const steamgrid = require("../library/steamgrid");
+const soundPacks = require("./soundPacks");
 const { searchAchievementFolders } = require("../library/achievementFolderSearch");
 const { isSafeExternalUrl, isTrustedIpcSender } = require("../core/security");
 const {
@@ -1227,9 +1228,7 @@ function registerMiscHandlers() {
 
   // Notification sounds. A picked file is copied into userData so it keeps
   // working if the original is moved, and the helper reads the copy's path.
-  const SOUND_KINDS = ["achievement", "notification"];
   const SOUND_PROFILES = ["classic", "crystal", "arcade", "simple"];
-  const SOUND_EXTENSIONS = ["wav", "mp3", "ogg", "flac", "m4a"];
   const SOUND_MIME = {
     wav: "audio/wav",
     mp3: "audio/mpeg",
@@ -1237,17 +1236,19 @@ function registerMiscHandlers() {
     flac: "audio/flac",
     m4a: "audio/mp4",
   };
-  const MAX_SOUND_BYTES = 10 * 1024 * 1024;
-  const soundsDir = () => path.join(app.getPath("userData"), "notification_sounds");
+  const isCustomSound = async file =>
+    typeof file === "string" &&
+    path.dirname(path.resolve(file)) === soundPacks.soundsDir() &&
+    (await fs.pathExists(file));
 
   ipcMain.handle("pick-notification-sound", async (event, kind) => {
-    if (!SOUND_KINDS.includes(kind)) {
+    if (!soundPacks.SOUND_KINDS.includes(kind)) {
       return { success: false, error: "Invalid sound type" };
     }
     const window = BrowserWindow.fromWebContents(event.sender);
     const result = await dialog.showOpenDialog(window, {
       properties: ["openFile"],
-      filters: [{ name: "Audio", extensions: SOUND_EXTENSIONS }],
+      filters: [{ name: "Audio", extensions: soundPacks.SOUND_EXTENSIONS }],
     });
     if (result.canceled || !result.filePaths[0]) {
       return { success: false, canceled: true };
@@ -1255,14 +1256,14 @@ function registerMiscHandlers() {
     try {
       const source = result.filePaths[0];
       const ext = path.extname(source).slice(1).toLowerCase();
-      if (!SOUND_EXTENSIONS.includes(ext)) {
+      if (!soundPacks.SOUND_EXTENSIONS.includes(ext)) {
         return { success: false, error: "unsupported" };
       }
       const { size } = await fs.stat(source);
-      if (size > MAX_SOUND_BYTES) {
+      if (size > soundPacks.MAX_SOUND_BYTES) {
         return { success: false, error: "tooLarge" };
       }
-      const dir = soundsDir();
+      const dir = soundPacks.soundsDir();
       await fs.ensureDir(dir);
       // Drop the previous custom sound for this type, whatever its format
       for (const file of await fs.readdir(dir)) {
@@ -1279,30 +1280,28 @@ function registerMiscHandlers() {
 
   // The configured sound as a data URL, for previewing in the window and for
   // notifications that don't go through the helper. Passing a profile previews
-  // that profile's built-in sound and skips any custom upload.
+  // that profile's sound and skips any custom upload. A profile is a built-in
+  // name or "pack:<id>" for an imported pack, and a missing pack falls back
+  // to the first built-in profile.
   ipcMain.handle("get-notification-sound", async (_, kind, previewProfile) => {
-    if (!SOUND_KINDS.includes(kind)) return null;
+    if (!soundPacks.SOUND_KINDS.includes(kind)) return null;
     try {
       const settings = settingsManager.getSettings();
       const custom = settings[`${kind}SoundPath`];
-      const profile = SOUND_PROFILES.includes(previewProfile)
-        ? previewProfile
-        : SOUND_PROFILES.includes(settings.notificationSoundProfile)
-          ? settings.notificationSoundProfile
-          : SOUND_PROFILES[0];
+      const profile = previewProfile || settings.notificationSoundProfile;
       let file = null;
-      if (
-        !previewProfile &&
-        typeof custom === "string" &&
-        path.dirname(path.resolve(custom)) === soundsDir() &&
-        (await fs.pathExists(custom))
-      ) {
+      if (!previewProfile && (await isCustomSound(custom))) {
         file = custom;
       } else {
+        const packId = soundPacks.packIdFromProfile(profile);
+        if (packId) file = await soundPacks.findPackSound(packId, kind);
+      }
+      if (!file) {
         const base = app.isPackaged
           ? path.join(process.resourcesPath, "public", "sounds")
           : path.join(__dirname, "../../../src/public/sounds");
-        file = path.join(base, "profiles", profile, `${kind}.wav`);
+        const builtIn = SOUND_PROFILES.includes(profile) ? profile : SOUND_PROFILES[0];
+        file = path.join(base, "profiles", builtIn, `${kind}.wav`);
       }
       const ext = path.extname(file).slice(1).toLowerCase();
       const data = await fs.readFile(file);
@@ -1310,6 +1309,71 @@ function registerMiscHandlers() {
     } catch (error) {
       console.error("Error reading notification sound:", error);
       return null;
+    }
+  });
+
+  ipcMain.handle("list-sound-packs", async () => {
+    try {
+      return await soundPacks.listSoundPacks();
+    } catch (error) {
+      console.error("Error listing sound packs:", error);
+      return [];
+    }
+  });
+
+  ipcMain.handle("import-sound-pack", async event => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(window, {
+      properties: ["openFile"],
+      filters: [{ name: "Sound pack", extensions: ["zip"] }],
+    });
+    if (result.canceled || !result.filePaths[0]) {
+      return { success: false, canceled: true };
+    }
+    try {
+      const pack = await soundPacks.importSoundPack(result.filePaths[0]);
+      return { success: true, pack };
+    } catch (error) {
+      console.error("Error importing sound pack:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle("delete-sound-pack", async (_, id) => {
+    try {
+      await soundPacks.deleteSoundPack(id);
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting sound pack:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Packs up the user's two custom sounds so they can share them
+  ipcMain.handle("export-sound-pack", async event => {
+    const settings = settingsManager.getSettings();
+    const sources = {};
+    for (const kind of soundPacks.SOUND_KINDS) {
+      const custom = settings[`${kind}SoundPath`];
+      if (!(await isCustomSound(custom))) {
+        return { success: false, error: "missingSounds" };
+      }
+      sources[kind] = custom;
+    }
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showSaveDialog(window, {
+      defaultPath: "My sound pack.zip",
+      filters: [{ name: "Sound pack", extensions: ["zip"] }],
+    });
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true };
+    }
+    try {
+      await soundPacks.exportSoundPack(sources, result.filePath);
+      return { success: true, path: result.filePath };
+    } catch (error) {
+      console.error("Error exporting sound pack:", error);
+      return { success: false, error: error.message };
     }
   });
 

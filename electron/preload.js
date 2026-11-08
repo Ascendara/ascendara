@@ -740,6 +740,10 @@ contextBridge.exposeInMainWorld("electron", {
   pickNotificationSound: kind => ipcRenderer.invoke("pick-notification-sound", kind),
   getNotificationSound: (kind, profile) =>
     ipcRenderer.invoke("get-notification-sound", kind, profile),
+  listSoundPacks: () => ipcRenderer.invoke("list-sound-packs"),
+  importSoundPack: () => ipcRenderer.invoke("import-sound-pack"),
+  deleteSoundPack: id => ipcRenderer.invoke("delete-sound-pack", id),
+  exportSoundPack: () => ipcRenderer.invoke("export-sound-pack"),
   onPlayNotificationSound: callback =>
     preloadIpc.subscribe("play-notification-sound", callback),
 
