@@ -3,8 +3,8 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const Checkbox = forwardRef(
-  ({ className, checked, onCheckedChange, disabled, ...props }, ref) => {
-    const handleClick = () => {
+  ({ className, checked, onCheckedChange, disabled, onClick, ...props }, ref) => {
+    const toggle = () => {
       if (!disabled && onCheckedChange) {
         onCheckedChange(!checked);
       }
@@ -16,11 +16,14 @@ const Checkbox = forwardRef(
         role="checkbox"
         aria-checked={checked}
         tabIndex={disabled ? -1 : 0}
-        onClick={handleClick}
+        onClick={event => {
+          onClick?.(event);
+          toggle();
+        }}
         onKeyDown={e => {
           if (e.key === " " || e.key === "Enter") {
             e.preventDefault();
-            handleClick();
+            toggle();
           }
         }}
         className={cn(
