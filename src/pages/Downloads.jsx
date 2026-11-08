@@ -77,7 +77,7 @@ import { privateSourceMessage } from "@/lib/privateSourceMessages";
 import SpeedGraph, { formatSpeed, markDownloadStart } from "@/components/SpeedGraph";
 import { API_URL } from "@/config/api";
 import { getReporterHeaders } from "@/services/firebase/firebaseService";
-import { isDownloadHalted } from "@/services/downloads/downloadState";
+import { freedByPause, isDownloadHalted } from "@/services/downloads/downloadState";
 import { useDownloadStall } from "@/hooks/useDownloadStall";
 import CloudTorrentList, { useCloudTorrents } from "@/components/debrid/CloudTorrentList";
 
@@ -707,7 +707,7 @@ const Downloads = () => {
 
           // Process next queued download when transitioning from active to no active downloads
           // This handles stopped downloads and other cases where games don't go through "completed" state
-          if (prevActiveCountRef.current > 0) {
+          if (prevActiveCountRef.current > 0 && !freedByPause(prevGames, downloading)) {
             processNextInQueue().then(nextItem => {
               if (nextItem) {
                 toast.success(

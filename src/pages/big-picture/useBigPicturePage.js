@@ -11,6 +11,7 @@ import {
 } from "@/services/downloads/downloadQueueService";
 import { toast } from "sonner";
 import * as debrid from "@/services/downloads/debridService";
+import { freedByPause } from "@/services/downloads/downloadState";
 import * as torboxService from "@/services/downloads/torboxService";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { sanitizeText } from "@/lib/utils";
@@ -270,7 +271,13 @@ function useBigPicturePage() {
     ).length;
 
     // When transitioning from active to no active downloads
-    if (prevActiveCountRef.current > 0 && activeCount === 0) {
+    // prevDownloadingGamesRef still holds the previous list here: the effect
+    // below that updates it runs after this one.
+    if (
+      prevActiveCountRef.current > 0 &&
+      activeCount === 0 &&
+      !freedByPause(prevDownloadingGamesRef.current, downloadingGames)
+    ) {
       processNextInQueue().then(nextItem => {
         if (nextItem) {
           toast.success(
