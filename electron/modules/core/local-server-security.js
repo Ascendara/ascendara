@@ -4,9 +4,11 @@ const ALLOWED_HOSTS = new Set(["localhost:46859", "127.0.0.1:46859"]);
 const ALLOWED_ORIGINS = new Set([...ALLOWED_HOSTS].map(host => `http://${host}`));
 
 function isAllowedLocalRequest(req) {
-  return ALLOWED_HOSTS.has(req.headers.host) &&
+  return (
+    ALLOWED_HOSTS.has(req.headers.host) &&
     (!req.headers.origin || ALLOWED_ORIGINS.has(req.headers.origin)) &&
-    req.headers["sec-fetch-site"] !== "cross-site";
+    req.headers["sec-fetch-site"] !== "cross-site"
+  );
 }
 
 function resolvePublicFile(root, rawUrl) {
@@ -18,12 +20,20 @@ function resolvePublicFile(root, rawUrl) {
   }
   if (!pathname.startsWith("/") || /[\\\0]/.test(pathname)) return null;
   const parts = pathname.split("/");
-  if (parts.some(part => part === "." || part === ".." || part.includes(":"))) return null;
+  if (parts.some(part => part === "." || part === ".." || part.includes(":")))
+    return null;
   // The build scripts copy assets next to privileged main-process source files.
   // Only public build output may be served from that directory.
   if (pathname === "/") pathname = "/index.html";
-  if (!(pathname === "/index.html" || pathname === "/no-image.png" || /^\/icon\.(png|ico)$/.test(pathname) ||
-    pathname.startsWith("/assets/") || pathname.startsWith("/sounds/") || pathname.startsWith("/guide/"))) return null;
+  if (!(
+    pathname === "/index.html" ||
+    pathname === "/no-image.png" ||
+    /^\/icon\.(png|ico)$/.test(pathname) ||
+    pathname.startsWith("/assets/") ||
+    pathname.startsWith("/sounds/") ||
+    pathname.startsWith("/guide/")
+  ))
+    return null;
   const fullPath = path.resolve(root, `.${pathname}`);
   const relative = path.relative(root, fullPath);
   if (relative.startsWith("..") || path.isAbsolute(relative)) return null;
@@ -46,9 +56,10 @@ const listenOnce = (server, port, host) =>
  * the browser may try either one, so another program could be serving the one left
  * free.
  * @param {Function} createServer - Makes one server each time it is called
- * @returns {Promise<{owned: boolean, servers: Object[]}>} When not owned, nothing is
- *   left listening and that port's page must not be loaded as the app. An earlier
- *   instance that is still closing gets a moment to let go.
+ * @returns {Promise<{owned: boolean, servers: Object[], errorCode?: string}>} When not
+ *   owned, nothing is left listening, that port's page must not be loaded as the app,
+ *   and errorCode says why. An earlier instance that is still closing gets a moment to
+ *   let go.
  */
 async function holdAppPort(createServer, { port = 46859, tries = 3, waitMs = 500 } = {}) {
   const servers = [];
@@ -66,7 +77,7 @@ async function holdAppPort(createServer, { port = 46859, tries = 3, waitMs = 500
     else {
       console.error("Local server error:", error.message);
       await Promise.all(servers.map(held => new Promise(done => held.close(done))));
-      return { owned: false, servers: [] };
+      return { owned: false, servers: [], errorCode: error.code };
     }
   }
   return { owned: true, servers };

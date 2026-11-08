@@ -26,6 +26,7 @@ let settleAppServerOwned;
 const appServerOwned = new Promise(resolve => {
   settleAppServerOwned = resolve;
 });
+let appServerErrorCode;
 
 const LOAD_FAILURE_CAUSES = [
   'Missing Visual C++ Redistributables - <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" style="color: #3b82f6;">Download here</a>',
@@ -35,6 +36,13 @@ const LOAD_FAILURE_CAUSES = [
 const PORT_IN_USE_CAUSES = [
   "Another program is serving port 46859, so Ascendara will not load that page as itself",
   "To see which one: on Windows run <code>netstat -ano | findstr :46859</code>, on macOS or Linux run <code>lsof -i :46859</code>",
+];
+// EACCES on Windows is almost always a range Hyper-V, WSL or Docker reserved, which
+// netstat does not show.
+const PORT_RESERVED_CAUSES = [
+  "Windows has reserved port 46859 for Hyper-V, WSL or Docker, so Ascendara cannot use it",
+  "To check: run <code>netsh interface ipv4 show excludedportrange protocol=tcp</code> and look for a range that includes 46859",
+  "To free it: in a terminal opened as administrator, run <code>net stop winnat</code> then <code>net start winnat</code>, then open Ascendara again",
 ];
 
 /** Show a helpful error page instead of a white screen. */
@@ -72,8 +80,13 @@ function showLoadFailure(
   mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`);
 }
 
-/** Whether this process holds the local server's port. */
-function setAppServerOwned(owned) {
+/**
+ * Whether this process holds the local server's port.
+ * @param {boolean} owned
+ * @param {string} [errorCode] - Why the port could not be held, when it was not
+ */
+function setAppServerOwned(owned, errorCode) {
+  appServerErrorCode = errorCode;
   settleAppServerOwned(owned === true);
 }
 
@@ -203,6 +216,13 @@ function createWindow() {
     appServerOwned.then(owned => {
       if (mainWindow.isDestroyed()) return;
       if (owned) loadApp();
+      else if (appServerErrorCode === "EACCES")
+        showLoadFailure(
+          mainWindow,
+          "Ascendara is not allowed to use port 46859",
+          "port reserved",
+          PORT_RESERVED_CAUSES
+        );
       else
         showLoadFailure(
           mainWindow,

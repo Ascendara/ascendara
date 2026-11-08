@@ -516,12 +516,12 @@ async function initializeApp() {
           });
       };
 
-      const { owned, servers } = await holdAppPort(() =>
+      const { owned, servers, errorCode } = await holdAppPort(() =>
         http.createServer(serveLocalRequest)
       );
       localServers = servers;
       if (owned) console.log("Local server running at http://localhost:46859");
-      windowModule.setAppServerOwned(owned);
+      windowModule.setAppServerOwned(owned, errorCode);
     } else {
       await ensureDevServerRunning();
     }

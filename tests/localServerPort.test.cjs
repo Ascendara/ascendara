@@ -62,7 +62,7 @@ for (const host of ["127.0.0.1", "::1"]) {
     console.error = () => {};
     try {
       const result = await holdAppPort(() => http.createServer(), { port, ...quick });
-      assert.deepEqual(result, { owned: false, servers: [] });
+      assert.deepEqual(result, { owned: false, servers: [], errorCode: "EADDRINUSE" });
     } finally {
       console.error = realError;
     }
@@ -162,6 +162,22 @@ test("no window trusts the port before the answer, and only a yes grants it", as
       errorHtml,
       /Try restarting Ascendara or your computer\.<\/p>\s*<\/body>\s*<\/html>/
     );
+
+    // A reserved port (EACCES) gets its own page: netstat would show nothing there.
+    const reserved = fresh();
+    reserved.createWindow();
+    reserved.setAppServerOwned(false, "EACCES");
+    await new Promise(setImmediate);
+    assert.equal(trusted.length, 0);
+    const reservedPage = new URL(windows[1].urls[0]);
+    const reservedHtml = decodeURIComponent(
+      reservedPage.pathname.slice(reservedPage.pathname.indexOf(",") + 1)
+    );
+    assert.match(reservedHtml, /\(port reserved\)/);
+    assert.match(reservedHtml, /excludedportrange/);
+    assert.match(reservedHtml, /net stop winnat/);
+    assert.doesNotMatch(reservedHtml, /netstat -ano/);
+    windows.splice(1, 1);
 
     const owned = fresh();
     owned.createWindow();
