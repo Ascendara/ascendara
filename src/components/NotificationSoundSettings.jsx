@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Bell,
   Check,
+  ExternalLink,
   FolderDown,
   Play,
   Share2,
@@ -259,6 +260,17 @@ const NotificationSoundSettings = ({ settings, onSettingChange }) => {
                 );
               })}
             </div>
+            <p className="text-xs text-muted-foreground">
+              {t("settings.sounds.findPacks")}{" "}
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                onClick={() => window.electron.openURL("https://ascendara.app/discord")}
+              >
+                {t("settings.sounds.joinDiscord")}
+                <ExternalLink className="h-3 w-3" />
+              </button>
+            </p>
           </div>
 
           <div className="space-y-3">
