@@ -139,7 +139,15 @@ const joinKey = (...parts) =>
 /** GPU text to its hardwareTiers key, or null when no known family is named */
 export function gpuKey(text) {
   const value = normalizeHardware(text);
-  let m = value.match(/\b(gtx|rtx|gt)\s*(\d{3,4})\s*(ti\s*super|ti\s*boost|ti|super)?\b/);
+  // GeForce 8 and 9 series name the model first: "GeForce 8800", "9800 GT"
+  let m = value.match(
+    /\b(?:geforce\s*([89][1-9]00)|([89][1-9]00)\s*(?:gtx|gts|gt|gs|ultra))\b/
+  );
+  if (m) return `geforce ${m[1] || m[2]}`;
+  // "(?!\s*mb)" keeps "GT 512 MB" from reading as a model
+  m = value.match(
+    /\b(gtx|rtx|gts|gt)\s*(\d{3,4})(?!\s*mb)\s*(ti\s*super|ti\s*boost|ti|super)?\b/
+  );
   if (m) return joinKey(m[1], m[2], m[3]);
   m = value.match(/\brx\s*(\d{3,4})\s*(xtx|xt|gre)?\b/);
   if (m) return joinKey("rx", m[1], m[2]);
@@ -153,13 +161,15 @@ export function gpuKey(text) {
   m = value.match(/\barc\s*([ab]\d{3})\b/);
   if (m) return `arc ${m[1]}`;
   // Intel and AMD both used "HD" with four digits, so Intel is told by name
-  if (/\bintel\b|\bhd graphics\b|\buhd\b|\biris\b/.test(value)) {
+  if (/\bintel\b|\bhd graphics\b|\buhd\b|\biris\b|\bgma\b/.test(value)) {
+    m = value.match(/\bgma\s*(x?\d{3,4})\b/);
+    if (m) return `intel gma ${m[1]}`;
     m = value.match(/\b(u?hd)\s*(?:graphics\s*)?(\d{3,4})\b/);
     if (m) return `intel ${m[1]} ${m[2]}`;
     m = value.match(/\biris\s*(xe|plus|pro)\b/);
     return m ? `intel iris ${m[1]}` : null;
   }
-  m = value.match(/\bhd\s*(7\d{3})\b/);
+  m = value.match(/\bhd\s*([2-7]\d{3})\b/);
   return m ? `hd ${m[1]}` : null;
 }
 

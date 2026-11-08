@@ -267,3 +267,38 @@ test("checkCanRun gives a verdict for every line it can judge", async () => {
   assert.deepEqual(checkCanRun({ ram: "8 GB RAM" }, null), {});
   assert.deepEqual(checkCanRun(null, win11), {});
 });
+
+test("old GPU families read Meets it on a current card", async () => {
+  const { checkGpu, gpuKey } = await load();
+  const rtx5070 = { gpu: "NVIDIA GeForce RTX 5070" };
+  const keys = {
+    "GeForce 8800 (512 MB)": "geforce 8800",
+    "NVIDIA GeForce 9800 GT 512MB": "geforce 9800",
+    "8600 GT": "geforce 8600",
+    "GeForce GTS 250": "gts 250",
+    "NVIDIA GeForce GTX 260": "gtx 260",
+    "GeForce GT 430": "gt 430",
+    "GeForce GTX 560 Ti": "gtx 560 ti",
+    "Radeon HD3850 (512 MB)": "hd 3850",
+    "ATI Radeon HD 4870": "hd 4870",
+    "AMD Radeon HD 6850": "hd 6850",
+    "Intel GMA X4500": "intel gma x4500",
+    "Intel HD Graphics 3000": "intel hd 3000",
+  };
+  for (const [text, key] of Object.entries(keys)) {
+    assert.equal(gpuKey(text), key, text);
+    assert.equal(checkGpu(text, rtx5070).status, "pass", text);
+  }
+  assert.equal(
+    checkGpu("GeForce 8800 (512 MB) or Radeon HD3850 (512 MB)", rtx5070).status,
+    "pass"
+  );
+  // A memory size is not a model number
+  assert.equal(gpuKey("GeForce GT 512 MB"), null);
+  // Unknown old models still never read Below it
+  assert.equal(checkGpu("GeForce 7900 GTX", rtx5070).status, "unknown");
+  assert.equal(checkGpu("Radeon HD 1950", rtx5070).status, "unknown");
+  assert.equal(checkGpu("GeForce 8800", { gpu: "Mystery Graphics" }).status, "unknown");
+  // An old card in the PC still compares
+  assert.equal(checkGpu("GTX 1060", { gpu: "NVIDIA GeForce GTX 560 Ti" }).status, "fail");
+});
