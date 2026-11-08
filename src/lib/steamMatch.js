@@ -6,6 +6,8 @@ const BUNDLE_WORDS =
   "soundtracks?|ost|bundle|bonus(?:es)?|dlcs?|artbooks?|art book|season pass|expansions?";
 const PACKAGING_WORDS =
   "super deluxe|deluxe|gold|game of the year|goty|complete|ultimate|ultra|premium|standard|collector'?s|founder'?s|special|limited|anniversary|digital|day one|launch|starter|elite|year one|absolute";
+// Edition words that are part of a game's own name ("Enhanced Edition")
+const EDITION_WORDS = "definitive|enhanced";
 const RELEASE_GROUPS =
   "codex|plaza|skidrow|reloaded|cpy|empress|tenoke|rune|flt|doge|darksiders|elamigos|fitgirl|dodi|gog|p2p|razor1911|hoodlum|prophet|tinyiso|simplex|kaos";
 
@@ -19,6 +21,12 @@ const BUNDLE_TAIL = new RegExp(
 // ("2.0 Starter Edition") or "Complete" after it
 const PACKAGING_EDITION = new RegExp(
   `(?:\\b\\d+(?:\\.\\d+)+\\s+)?\\b(?:(?:${PACKAGING_WORDS})\\s+){1,4}edition(?:\\s+complete)?\\b`,
+  "gi"
+);
+// "Ultimate Bundle", "Grand Edition Bundle", "Gold Edition Pack": a store
+// bundle of the game, not the game's own name
+const EDITION_BUNDLE = new RegExp(
+  `\\b(?:(?:${PACKAGING_WORDS}|grand|${EDITION_WORDS})\\s+){1,4}(?:edition\\s+bundle|edition\\s+pack|bundle)\\b`,
   "gi"
 );
 const TRAILING_TAG = new RegExp(
@@ -63,6 +71,7 @@ export function cleanGameTitle(title) {
   for (const tag of VERSION_TAGS) text = text.replace(tag, " ");
   text = text.replace(EXTRAS_TAIL, "");
   text = text.replace(FIX_TAIL, "");
+  text = text.replace(EDITION_BUNDLE, " ");
   text = text.replace(BUNDLE_TAIL, "");
   text = text.replace(PACKAGING_EDITION, " ");
   // An edition taken out of "Name – Deluxe Edition, ..." leaves "Name – ,"
@@ -113,6 +122,51 @@ export function isConfidentMatch(indexTitle, foundTitle, foundType) {
   return /^dlc$/i.test(extra) && ASKS_FOR_DLC.test(String(indexTitle));
 }
 
+// "Enhanced Edition", "Director's Cut", "Remastered" at the end, for one
+// fallback lookup when Steam's name differs ("The Witcher Enhanced Edition"
+// vs "The Witcher: Enhanced Edition Director's Cut"). cleanGameTitle already
+// drops "Deluxe Edition", "GOTY" and the other packaging editions.
+const TRAILING_EDITION = new RegExp(
+  `(?:[\\s\\-–—:,]*\\b(?:(?:${EDITION_WORDS})\\s+edition|director'?s cut|remastered))+$`,
+  "i"
+);
+
+export function stripEditionWords(title) {
+  return tidy(cleanGameTitle(title).replace(TRAILING_EDITION, ""));
+}
+
+// The name without edition words, or null when it has none to drop
+function editionlessName(title) {
+  const bare = stripEditionWords(title);
+  return bare && bare !== cleanGameTitle(title) ? bare : null;
+}
+
+// The fallback answer must be a game whose name, or its name without edition
+// words, or its head before a subtitle, is the edition-less name
+function isEditionlessMatch(bare, details) {
+  if (!details?.name || details.type !== "game") return false;
+  return (
+    isConfidentMatch(bare, details.name, details.type) ||
+    // cleaning drops "Soundtrack" or "Demo", so those are checked first
+    (!EXTRA_CONTENT.test(details.name) &&
+      isConfidentMatch(bare, stripEditionWords(details.name), details.type))
+  );
+}
+
+export function isSameGame(title, details) {
+  if (!details?.name) return false;
+  if (isConfidentMatch(title, details.name, details.type)) return true;
+  const bare = editionlessName(title);
+  return !!bare && isEditionlessMatch(bare, details);
+}
+
+async function lookupEditionless(title, lookup) {
+  const bare = editionlessName(title);
+  if (!bare) return null;
+  const details = await lookup(bare);
+  return isEditionlessMatch(bare, details) ? details : null;
+}
+
 // One cleaned-name Steam lookup per title for the session, shared by the game
 // page and the page preparer; only an exact name match is kept, and a failed
 // lookup may be retried
@@ -127,7 +181,7 @@ export function matchSteamDetails(title, lookup) {
       .then(details =>
         details?.name && isConfidentMatch(title, details.name, details.type)
           ? details
-          : null
+          : lookupEditionless(title, lookup)
       )
       .catch(error => {
         steamMatches.delete(key);
@@ -141,7 +195,8 @@ export function matchSteamDetails(title, lookup) {
 // Game page details: the index name first, as before. Torrent index names
 // ("Name Deluxe Edition, v1.0 + Bonus") also try the cleaned name when the
 // first answer is missing or a different game. An answer whose name is not the
-// cleaned name (a Demo, the base game for a DLC pack) is never shown
+// cleaned name (a Demo, the base game for a DLC pack) is never shown. A miss
+// tries the name without edition words once ("The Witcher Enhanced Edition")
 // A lookup that throws means Steam was not reached: that is passed on so the
 // page can offer a retry, never turned into "not on Steam"
 export async function findGameDetails(title, lookup) {
@@ -154,11 +209,12 @@ export async function findGameDetails(title, lookup) {
   }
   const matched =
     details?.name && isConfidentMatch(title, details.name, details.type) ? details : null;
-  if (matched || cleanGameTitle(title) === String(title).trim()) {
-    if (failure) throw failure;
-    return matched;
+  if (matched) return matched;
+  if (cleanGameTitle(title) !== String(title).trim()) {
+    return matchSteamDetails(title, lookup);
   }
-  return matchSteamDetails(title, lookup);
+  if (failure) throw failure;
+  return lookupEditionless(title, lookup);
 }
 
 const STEAM_LABELS = {
@@ -191,8 +247,7 @@ export function parseSteamMinimum(text) {
 }
 
 function toRequirements(details, indexTitle) {
-  if (!details?.name || !isConfidentMatch(indexTitle, details.name, details.type))
-    return null;
+  if (!isSameGame(indexTitle, details)) return null;
   const minReqs = parseSteamMinimum(details.system_requirements?.minimum);
   return minReqs ? { name: details.name, minReqs } : null;
 }
