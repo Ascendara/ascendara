@@ -464,3 +464,88 @@ test("a failed lookup shows nothing and is tried again later", async () => {
   });
   assert.equal(retried.name, "Flaky Game");
 });
+
+// Edition names from Victor's Windows test (2026-11-08): [index name,
+// Steam answer per looked-up name, name shown or null]
+const editionRows = [
+  [
+    "Victoria 3 Ultimate Bundle, -Bonuses + Windows 7 Fix",
+    { "Victoria 3": "Victoria 3" },
+    "Victoria 3",
+  ],
+  [
+    "Crusader Kings III Grand Edition Bundle",
+    { "Crusader Kings III": "Crusader Kings III" },
+    "Crusader Kings III",
+  ],
+  [
+    "The Witcher Enhanced Edition",
+    { "The Witcher": "The Witcher: Enhanced Edition Director's Cut" },
+    "The Witcher: Enhanced Edition Director's Cut",
+  ],
+  [
+    "The Witcher 2 Assassins of Kings Enhanced Edition",
+    {
+      "The Witcher 2 Assassins of Kings Enhanced Edition":
+        "The Witcher 2: Assassins of Kings Enhanced Edition",
+    },
+    "The Witcher 2: Assassins of Kings Enhanced Edition",
+  ],
+  [
+    "The Witcher 2 Assassins of Kings Enhanced Edition",
+    {
+      "The Witcher 2 Assassins of Kings":
+        "The Witcher 2: Assassins of Kings Enhanced Edition",
+    },
+    "The Witcher 2: Assassins of Kings Enhanced Edition",
+  ],
+  [
+    "The Elder Scrolls V: Skyrim Special Edition",
+    {
+      "The Elder Scrolls V: Skyrim Special Edition":
+        "The Elder Scrolls V: Skyrim Special Edition",
+      "The Elder Scrolls V: Skyrim": "The Elder Scrolls V: Skyrim",
+    },
+    "The Elder Scrolls V: Skyrim Special Edition",
+  ],
+  [
+    "The Witcher 3",
+    { "The Witcher 3": "The Witcher 3: Wild Hunt" },
+    "The Witcher 3: Wild Hunt",
+  ],
+  // The fallback never takes a demo, soundtrack, another game or a non-game
+  ["The Witcher Enhanced Edition", { "The Witcher": "The Witcher 3: Wild Hunt" }, null],
+  ["Hades Enhanced Edition", { Hades: "Hades Soundtrack" }, null],
+  ["Hades Enhanced Edition", { Hades: "Hades Demo" }, null],
+  ["Hades Enhanced Edition", { Hades: ["Hades: Extra Story", "dlc"] }, null],
+];
+
+test("edition bundles clean off and edition names get one edition-less lookup", async () => {
+  for (const [index, answers, shown] of editionRows) {
+    const { findGameDetails } = await load();
+    const asked = [];
+    const details = await findGameDetails(index, async name => {
+      asked.push(name);
+      const answer = answers[name];
+      if (!answer) return null;
+      const [found, type] = Array.isArray(answer) ? answer : [answer, "game"];
+      return { ...steamGame(found), type };
+    });
+    assert.equal(details?.name ?? null, shown, index);
+    assert.ok(asked.length <= 3, `${index}: ${asked.join(" | ")}`);
+  }
+});
+
+test("requirements accept the page's edition-less Steam match", async () => {
+  const { matchRequirements, stripEditionWords } = await load();
+  assert.equal(
+    stripEditionWords("The Witcher: Enhanced Edition Director's Cut"),
+    "The Witcher"
+  );
+  assert.equal(stripEditionWords("Hades"), "Hades");
+  const match = await matchRequirements("The Witcher Enhanced Edition", {
+    known: { ...steamGame("The Witcher: Enhanced Edition Director's Cut"), type: "game" },
+    lookup: async () => null,
+  });
+  assert.equal(match.name, "The Witcher: Enhanced Edition Director's Cut");
+});
