@@ -50,12 +50,42 @@ function findSteamInstallPath() {
   return path.join(os.homedir(), ".steam/steam"); // fallback
 }
 
+function isExecutableFile(filePath) {
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve the umu-run binary: Ascendara's own copy first, then a system install
+ * (PATH plus common locations, since desktop launchers often get a minimal PATH)
+ */
+function getUmuBin() {
+  const { linuxUmuBin } = require("../core/config");
+  if (!isLinux) return null;
+  if (isExecutableFile(linuxUmuBin)) return linuxUmuBin;
+
+  const dirs = [
+    ...(process.env.PATH || "").split(path.delimiter).filter(Boolean),
+    path.join(os.homedir(), ".local/bin"),
+    "/usr/local/bin",
+    "/usr/bin",
+  ];
+  for (const dir of dirs) {
+    const candidate = path.join(dir, "umu-run");
+    if (isExecutableFile(candidate)) return candidate;
+  }
+  return null;
+}
+
 /**
  * Detects if umu-run is installed
  */
 function isUmuInstalled() {
-  const { linuxUmuBin } = require("../core/config");
-  return fs.existsSync(linuxUmuBin);
+  return !!getUmuBin();
 }
 
 // Directory Setup
@@ -1386,7 +1416,6 @@ async function buildLaunchConfig(
   store,
   onlineFix = null
 ) {
-  const { linuxUmuBin } = require("../core/config");
   const compatDataPath = getCompatDataPath(gameName);
   const winePrefix = path.join(compatDataPath, "pfx");
   fs.ensureDirSync(winePrefix);
@@ -1396,7 +1425,8 @@ async function buildLaunchConfig(
   // useProtonDirect to true. This works even when detection failed, so the
   // user can manually force Proton Direct for a game the parser missed.
   const forceProtonDirect = !!onlineFix?.useProtonDirect;
-  if (isUmuInstalled() && !forceProtonDirect) {
+  const umuBin = getUmuBin();
+  if (umuBin && !forceProtonDirect) {
     const runner = await resolveRunner(gameRunnerOverride);
 
     const env = {
@@ -1429,7 +1459,7 @@ async function buildLaunchConfig(
     }
 
     return {
-      cmd: [linuxUmuBin, exePath],
+      cmd: [umuBin, exePath],
       env,
       runner: runner || { name: "UMU-Proton (auto)", type: "proton" },
       compatDataPath,

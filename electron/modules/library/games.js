@@ -9,13 +9,7 @@ const os = require("os");
 const axios = require("axios");
 const { spawn, execSync } = require("child_process");
 const { ipcMain, shell, dialog, BrowserWindow } = require("electron");
-const {
-  isDev,
-  isWindows,
-  isLinux,
-  appDirectory,
-  linuxUmuBin,
-} = require("../core/config");
+const { isDev, isWindows, isLinux, appDirectory } = require("../core/config");
 const {
   sanitizeGameName,
   sanitizeText,
@@ -975,7 +969,7 @@ function registerGameHandlers() {
             "--linux-runner-type",
             launchConfig.mode === "umu" ? "umu" : launchConfig.runner.type,
             "--linux-runner-path",
-            launchConfig.mode === "umu" ? linuxUmuBin : launchConfig.runner.path,
+            launchConfig.mode === "umu" ? launchConfig.cmd[0] : launchConfig.runner.path,
             "--linux-compat-data",
             launchConfig.compatDataPath,
             "--linux-steam-path",
