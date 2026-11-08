@@ -620,6 +620,14 @@ fn run_session(opts: &Options, game: &Game, rpc: Option<discord_rich_presence::D
     }
 
     let runner = runners::parse_runner_args(&opts.argv);
+    // Native Linux games are followed through every process they start. Wine
+    // launches are not, since wineserver can outlive the game, and neither are
+    // sessions with a trainer, which runs under Wine
+    let adopt_orphans = cfg!(target_os = "linux") && !exe_path.to_lowercase().ends_with(".exe") && !opts.launch_trainer;
+    #[cfg(target_os = "linux")]
+    if adopt_orphans {
+        crate::procs::become_subreaper();
+    }
     let Some(mut process) = launch(opts, game, runner.as_ref())? else { return Ok(()) };
 
     let start = Instant::now();
@@ -674,22 +682,28 @@ fn run_session(opts: &Options, game: &Game, rpc: Option<discord_rich_presence::D
     let mut last_alive_time = 0.0;
     let mut launched_exit_time: Option<f64> = None;
     // Processes spawned by what we launched (e.g. a .bat starting the game).
-    // Only tracked on Windows: under Wine/Proton the tree includes wineserver,
-    // which can outlive the game.
-    let track_tree = cfg!(windows);
+    // Tracked on Windows and for native Linux games: under Wine/Proton the tree
+    // includes wineserver, which can outlive the game.
+    let track_tree = cfg!(windows) || adopt_orphans;
+    // Orphans are adopted by the handler rather than kept under the launched process
+    let tree_root = if adopt_orphans { handler_pid } else { process.pid() };
     let mut tree_seen = HashMap::new();
     let mut procs = Processes::new();
 
     loop {
         // The process table is only read when something needs it, so a running
         // game costs one non-blocking wait per second on macOS and Linux
+        #[cfg(target_os = "linux")]
+        if adopt_orphans {
+            crate::procs::reap_adopted(process.pid());
+        }
         let launched_exited = process.poll().is_some();
         let mut fresh = false;
         if track_tree || stop_pending || launched_exited {
             fresh = stop_pending || launched_exited;
             procs.refresh(fresh);
         }
-        let tree_alive = if track_tree { procs.refresh_tree(&mut tree_seen, process.pid()) } else { Vec::new() };
+        let tree_alive = if track_tree { procs.refresh_tree(&mut tree_seen, tree_root) } else { Vec::new() };
 
         if stop_pending {
             stop_pending = false;

@@ -195,6 +195,32 @@ impl Processes {
     }
 }
 
+/// Adopt every process the game orphans, so a launcher that starts the real
+/// binary in the background and exits still leaves it in our process tree.
+#[cfg(target_os = "linux")]
+pub fn become_subreaper() {
+    if unsafe { libc::prctl(libc::PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) } != 0 {
+        error!("Could not adopt orphaned game processes: {}", std::io::Error::last_os_error());
+    }
+}
+
+/// Reap adopted processes that exited, leaving `keep` for its own Child to wait on.
+#[cfg(target_os = "linux")]
+pub fn reap_adopted(keep: u32) {
+    loop {
+        let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+        let flags = libc::WEXITED | libc::WNOHANG | libc::WNOWAIT;
+        if unsafe { libc::waitid(libc::P_ALL, 0, &mut info, flags) } != 0 {
+            return;
+        }
+        let pid = unsafe { info.si_pid() };
+        if pid == 0 || pid as u32 == keep {
+            return;
+        }
+        unsafe { libc::waitpid(pid, std::ptr::null_mut(), libc::WNOHANG) };
+    }
+}
+
 /// Force-kill a process. False only when it exists but may not be killed.
 #[cfg(unix)]
 fn kill_pid(pid: u32) -> bool {
@@ -278,7 +304,7 @@ mod backend {
 #[cfg(not(target_os = "macos"))]
 mod backend {
     use super::{normalize_exe, ProcInfo};
-    use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+    use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System, UpdateKind};
 
     pub struct Backend {
         sys: System,
@@ -290,7 +316,9 @@ mod backend {
         }
 
         pub fn snapshot(&mut self, with_exe: bool) -> Vec<ProcInfo> {
-            let mut kind = ProcessRefreshKind::nothing();
+            // Linux lists every thread as a process parented to its owner,
+            // which would make a process look like it has live children
+            let mut kind = ProcessRefreshKind::nothing().without_tasks();
             if with_exe {
                 kind = kind.with_exe(UpdateKind::OnlyIfNotSet);
             }
@@ -298,6 +326,7 @@ mod backend {
             self.sys
                 .processes()
                 .values()
+                .filter(|p| p.status() != ProcessStatus::Zombie)
                 .map(|p| ProcInfo {
                     pid: p.pid().as_u32(),
                     ppid: p.parent().map(Pid::as_u32),
