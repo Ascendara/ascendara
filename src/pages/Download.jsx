@@ -68,7 +68,7 @@ import { checkInstallSpace, parseSize } from "@/lib/installSpace";
 import { formatBytes } from "@/services/app/systemHealthService";
 import TimemachineDialog from "@/components/TimemachineDialog";
 import steamService from "@/services/games/gameInfoService";
-import { cleanGameTitle, findGameDetails } from "@/lib/steamMatch";
+import { cleanGameTitle, findGameDetails, stripEditionWords } from "@/lib/steamMatch";
 import { STEAM_LOOKUP_FAILED } from "@/components/download/GameOverview";
 import hltbService from "@/services/integrations/hltbService";
 import useDebridHosts from "@/hooks/useDebridHosts";
@@ -306,18 +306,19 @@ function PublicDownloadPage() {
     if (!name) return;
     let cancelled = false;
     // HowLongToBeat only takes a close name, so a miss tries the cleaned index
-    // name ("Name: Deluxe Edition, v1.0 + 5 DLCs" -> "Name")
-    const cleaned = cleanGameTitle(name);
-    hltbService
-      .getGameTimes(name)
-      .then(
-        times =>
-          times ||
-          (cleaned && cleaned !== name.trim() ? hltbService.getGameTimes(cleaned) : null)
-      )
-      .then(times => {
-        if (!cancelled) setHltbData(times);
-      });
+    // name ("Name: Deluxe Edition, v1.0 + 5 DLCs" -> "Name"), then that name
+    // without edition words ("Name Enhanced Edition" -> "Name")
+    const names = [
+      ...new Set([name.trim(), cleanGameTitle(name), stripEditionWords(name)]),
+    ].filter(Boolean);
+    (async () => {
+      let times = null;
+      for (const query of names) {
+        times = await hltbService.getGameTimes(query);
+        if (times || cancelled) break;
+      }
+      if (!cancelled) setHltbData(times);
+    })();
     return () => {
       cancelled = true;
     };
