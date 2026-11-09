@@ -19,6 +19,17 @@ const {
 // stays as long as it is useful for recovering from a failed move.
 const PRE_MIGRATION_BACKUP_KEEP_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * Downloader settings whose old defaults were saved into every settings file.
+ * They only count once the person changes them; the downloader applies the
+ * same rule when it reads the file.
+ */
+function applyDownloaderDefaults(settings) {
+  if (!settings.singleStreamChosen) settings.singleStream = false;
+  if (!settings.threadCountChosen && settings.threadCount === 12)
+    settings.threadCount = 16;
+}
+
 class SettingsManager {
   constructor() {
     this.filePath = path.join(app.getPath("userData"), "ascendarasettings.json");
@@ -80,7 +91,9 @@ class SettingsManager {
       language: "en",
       theme: "purple",
       customTheme: [],
-      threadCount: 12,
+      threadCount: 16,
+      // 12 was the default before; a 12 nobody chose moves to the new default.
+      threadCountChosen: false,
       singleStream: false,
       // Single Stream used to be on by default, which held every download to one
       // connection. It only applies once the person turns it on themselves.
@@ -351,7 +364,7 @@ class SettingsManager {
       if (!("debridEnabled" in settings) && settings.torboxApiKey) {
         mergedSettings.debridEnabled = true;
       }
-      if (!mergedSettings.singleStreamChosen) mergedSettings.singleStream = false;
+      applyDownloaderDefaults(mergedSettings);
       // Only return the merged settings without writing to disk
       return mergedSettings;
     } catch (error) {
@@ -466,6 +479,7 @@ class SettingsManager {
         [key]: processedValue,
       };
       if (key === "singleStream") updatedSettings.singleStreamChosen = true;
+      if (key === "threadCount") updatedSettings.threadCountChosen = true;
 
       // Clean up any flat ludusavi properties if we're updating the ludusavi object
       if (key === "ludusavi") {
@@ -493,7 +507,7 @@ class SettingsManager {
   getSettings() {
     // Create a copy of settings with decrypted sensitive values
     const decryptedSettings = { ...this.settings };
-    if (!decryptedSettings.singleStreamChosen) decryptedSettings.singleStream = false;
+    applyDownloaderDefaults(decryptedSettings);
 
     for (const key of this.sensitiveKeysIn(decryptedSettings)) {
       if (decryptedSettings[key])
@@ -600,8 +614,13 @@ function registerSettingsHandlers() {
       ...currentSettings,
       ...options,
     };
-    if ("singleStream" in options && options.singleStream !== currentSettings.singleStream)
+    if (
+      "singleStream" in options &&
+      options.singleStream !== currentSettings.singleStream
+    )
       sanitizedOptions.singleStreamChosen = true;
+    if ("threadCount" in options && options.threadCount !== currentSettings.threadCount)
+      sanitizedOptions.threadCountChosen = true;
 
     // Bulk saves may contain an uninitialized renderer default. Clearing the
     // index path must be explicit via update-setting, not a stale snapshot.

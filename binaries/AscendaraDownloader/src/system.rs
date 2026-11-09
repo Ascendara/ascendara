@@ -10,6 +10,9 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
+/// Past this, most hosts refuse the extra connections or gain nothing from them.
+const DEFAULT_CONNECTIONS: u64 = 16;
+
 #[derive(Debug, Clone)]
 pub struct Settings {
     raw: Value,
@@ -44,7 +47,13 @@ impl Settings {
         if single && chosen {
             return 1;
         }
-        let threads = self.raw.get("threadCount").and_then(Value::as_u64).unwrap_or(8);
+        let chosen = self.raw.get("threadCountChosen").and_then(Value::as_bool).unwrap_or(false);
+        let threads = match self.raw.get("threadCount").and_then(Value::as_u64) {
+            // 12 was saved into every settings file as the old default.
+            Some(12) if !chosen => DEFAULT_CONNECTIONS,
+            Some(threads) => threads,
+            None => DEFAULT_CONNECTIONS,
+        };
         threads.clamp(1, 32) as usize
     }
 
@@ -242,3 +251,25 @@ pub fn run_post_download_behavior(settings: &Settings) {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn connections(raw: Value) -> usize {
+        Settings { raw }.connections()
+    }
+
+    #[test]
+    fn connection_counts() {
+        assert_eq!(connections(json!({})), 16);
+        // The old default nobody chose moves to the new one; real choices stay.
+        assert_eq!(connections(json!({"threadCount": 12})), 16);
+        assert_eq!(connections(json!({"threadCount": 12, "threadCountChosen": true})), 12);
+        assert_eq!(connections(json!({"threadCount": 20})), 20);
+        assert_eq!(connections(json!({"threadCount": 48})), 32);
+        // Single Stream only once someone turned it on themselves.
+        assert_eq!(connections(json!({"singleStream": true, "threadCount": 20})), 20);
+        assert_eq!(connections(json!({"singleStream": true, "singleStreamChosen": true})), 1);
+    }
+}
