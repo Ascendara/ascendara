@@ -2389,7 +2389,10 @@
     "kill": "Kill Download",
     "killSuccess": "Download cancelled",
     "killSuccessKeepFiles": "Download killed, files kept on disk",
+    "decompressingNotice": "Still unpacking: decompressing data before it is written to disk...",
     "largeFileNotice": "Writing a large file to disk... this may take a moment.",
+    "largeFileDecompressing": "Unpacking a large file: {{done}} of {{total}}. Decompressing the next part, still working...",
+    "largeFileProgress": "Unpacking a large file: {{done}} of {{total}}",
     "lastExtracted": "Last extracted",
     "limitedTo": "Limited to",
     "logViewerTitle": "Download Manager Log",
@@ -2453,7 +2456,24 @@
     "waiting": "Waiting for Peers",
     "waitingDescription": "qBittorrent is looking for peers to connect to download pieces of the torrent file from other users and upload to them in turn. Others may be able to see what you're downloading and/or determine your public IP address.",
     "waitingInQueue": "Waiting in queue",
-    "windowsDefenderError": "Windows detected a false positive and prevented the download from completing. Please enable Protect Directories in Ascendara preferences."
+    "windowsDefenderError": "Windows detected a false positive and prevented the download from completing. Please enable Protect Directories in Ascendara preferences.",
+    "card": {
+      "phaseDownload": "Download",
+      "phaseUnpack": "Unpack",
+      "phaseVerify": "Verify",
+      "speed": "Speed",
+      "timeLeft": "Time left",
+      "files": "Files",
+      "read": "Read",
+      "write": "Write",
+      "reconnecting": "Reconnecting",
+      "attempt": "Attempt {{count}}",
+      "decompressing": "Decompressing",
+      "waitingOnDrive": "Waiting on drive",
+      "writing": "Writing",
+      "starting": "Connecting to the download..."
+    },
+    "waitingOnDriveNotice": "Waiting for the drive to catch up. Hard drives slow down during long writes; unpacking carries on by itself."
   },
   "externalSources": {
     "activeDesc": "Search and downloads are using {{name}} instead of the Ascendara index.",

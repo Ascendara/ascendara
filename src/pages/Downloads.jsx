@@ -59,6 +59,11 @@ import {
   Copy,
   GripVertical,
   Info,
+  Check,
+  Cpu,
+  HardDrive,
+  FileDown,
+  Gamepad2,
 } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
 import {
@@ -171,6 +176,20 @@ const ProgressBar = memo(({ value, tone = "primary", indeterminate, active = tru
   </div>
 ));
 
+const formatFileBytes = bytes => {
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes || 0;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${value.toFixed(unit < 2 ? 0 : 1)} ${units[unit]}`;
+};
+
+// Files this big take long enough on their own that progress inside them is shown.
+const LARGE_FILE_BYTES = 256 * 1024 * 1024;
+
 const IconAction = ({ label, icon: Icon, onClick, disabled, spinning, className }) => (
   <Tooltip>
     <TooltipTrigger asChild>
@@ -192,6 +211,219 @@ const IconAction = ({ label, icon: Icon, onClick, disabled, spinning, className 
     <TooltipContent className="text-secondary">{label}</TooltipContent>
   </Tooltip>
 );
+
+const CALLOUT_TONES = {
+  amber: {
+    box: "border-amber-500/25 bg-amber-500/[0.06]",
+    icon: "bg-amber-500/15 text-amber-600",
+    title: "text-amber-600",
+  },
+  red: {
+    box: "border-red-500/25 bg-red-500/[0.06]",
+    icon: "bg-red-500/15 text-red-500",
+    title: "text-red-500",
+  },
+  blue: {
+    box: "border-blue-500/25 bg-blue-500/[0.06]",
+    icon: "bg-blue-500/15 text-blue-600",
+    title: "text-blue-600",
+  },
+  green: {
+    box: "border-green-500/25 bg-green-500/[0.06]",
+    icon: "bg-green-500/15 text-green-600",
+    title: "text-green-600",
+  },
+};
+
+// Every notice on a card: one shape, a tone, an optional title and actions.
+const Callout = ({ tone = "amber", icon: Icon, spinning, title, children, actions }) => {
+  const style = CALLOUT_TONES[tone];
+  return (
+    <div className={cn("rounded-xl border p-3.5", style.box)}>
+      <div className="flex items-start gap-3">
+        <span
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+            style.icon
+          )}
+        >
+          {spinning ? (
+            <Loader className="h-4 w-4 animate-spin" />
+          ) : (
+            <Icon className="h-4 w-4" />
+          )}
+        </span>
+        <div className="min-w-0 flex-1 space-y-1 pt-0.5">
+          {title && <p className={cn("text-sm font-semibold", style.title)}>{title}</p>}
+          {children && (
+            <div className="space-y-1.5 text-sm text-muted-foreground">{children}</div>
+          )}
+          {actions && <div className="flex flex-wrap gap-2 pt-2">{actions}</div>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const STEP_TONES = {
+  primary: "border-primary bg-primary/15 text-primary",
+  amber: "border-amber-500 bg-amber-500/15 text-amber-600",
+  blue: "border-blue-500 bg-blue-500/15 text-blue-600",
+};
+
+// Download, unpack, verify: where the game is on its way to the library.
+const PhaseSteps = memo(({ steps }) => (
+  <ol className="flex items-center gap-2">
+    {steps.map((step, index) => (
+      <li
+        key={step.key}
+        className={cn("flex items-center gap-2", index < steps.length - 1 && "flex-1")}
+      >
+        <span
+          className={cn(
+            "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold transition-colors",
+            step.state === "done" && "border-primary bg-primary text-secondary",
+            step.state === "active" && STEP_TONES[step.tone],
+            step.state === "failed" && "border-red-500 bg-red-500/15 text-red-500",
+            step.state === "paused" && "border-muted-foreground/50 text-muted-foreground",
+            step.state === "pending" && "border-border text-muted-foreground/60"
+          )}
+        >
+          {step.state === "active" && (
+            <span
+              className={cn(
+                "absolute inset-0 animate-ping rounded-full border opacity-40",
+                STEP_TONES[step.tone]
+              )}
+            />
+          )}
+          {step.state === "done" ? (
+            <Check className="h-3 w-3" strokeWidth={3} />
+          ) : step.state === "failed" ? (
+            <X className="h-3 w-3" strokeWidth={3} />
+          ) : (
+            index + 1
+          )}
+        </span>
+        <span
+          className={cn(
+            "whitespace-nowrap text-xs font-medium",
+            step.state === "pending" ? "text-muted-foreground/60" : "text-foreground"
+          )}
+        >
+          {step.label}
+        </span>
+        {index < steps.length - 1 && (
+          <span
+            className={cn(
+              "h-px min-w-3 flex-1 rounded-full",
+              step.state === "done" ? "bg-primary/60" : "bg-border"
+            )}
+          />
+        )}
+      </li>
+    ))}
+  </ol>
+));
+
+const Metric = ({ label, children }) => (
+  <div className="min-w-0 rounded-lg bg-muted/40 px-3 py-2">
+    <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      {label}
+    </p>
+    <div className="truncate text-sm font-semibold tabular-nums text-foreground">
+      {children}
+    </div>
+  </div>
+);
+
+const BigPercent = ({ value, muted }) => (
+  <span
+    className={cn(
+      "text-3xl font-bold tabular-nums leading-none tracking-tight",
+      muted ? "text-muted-foreground" : "text-foreground"
+    )}
+  >
+    {value.toFixed(1)}
+    <span className="ml-0.5 text-base font-medium text-muted-foreground">%</span>
+  </span>
+);
+
+const ACTIVITY_CHIPS = {
+  decompressing: { icon: Cpu, className: "bg-blue-500/15 text-blue-600" },
+  waitingOnDrive: { icon: HardDrive, className: "bg-amber-500/15 text-amber-600" },
+  writing: { icon: FileDown, className: "bg-green-500/15 text-green-600" },
+};
+
+// The file being unpacked right now, with its own progress when it is large,
+// and why the numbers may be standing still.
+const ActivityPanel = ({ extraction, clockIcon: ClockIcon, showLargeFileNotice, t }) => {
+  const large = extraction?.currentFileSize >= LARGE_FILE_BYTES;
+  const activity = extraction?.waitingOnDrive
+    ? "waitingOnDrive"
+    : extraction?.decompressing
+      ? "decompressing"
+      : "writing";
+  const chip = ACTIVITY_CHIPS[activity];
+  const ChipIcon = chip.icon;
+  const hint = extraction?.waitingOnDrive
+    ? t("downloads.waitingOnDriveNotice")
+    : large
+      ? t(
+          extraction.decompressing
+            ? "downloads.largeFileDecompressing"
+            : "downloads.largeFileProgress",
+          {
+            done: formatFileBytes(extraction.currentFileDone),
+            total: formatFileBytes(extraction.currentFileSize),
+          }
+        )
+      : extraction?.decompressing
+        ? t("downloads.decompressingNotice")
+        : showLargeFileNotice
+          ? t("downloads.largeFileNotice")
+          : null;
+  return (
+    <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <p
+          className="min-w-0 truncate text-xs font-medium text-foreground"
+          title={extraction?.currentFile || undefined}
+        >
+          {extraction?.currentFile || t("downloads.extractingDescription")}
+        </p>
+        <span
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+            chip.className
+          )}
+        >
+          <ChipIcon className="h-3 w-3" />
+          {t(`downloads.card.${activity}`)}
+        </span>
+      </div>
+      {large ? (
+        <ProgressBar
+          value={(extraction.currentFileDone / extraction.currentFileSize) * 100}
+          tone={extraction.waitingOnDrive ? "muted" : "amber"}
+        />
+      ) : (
+        (extraction?.decompressing || extraction?.waitingOnDrive) && (
+          <ProgressBar
+            indeterminate
+            tone={extraction.waitingOnDrive ? "muted" : "amber"}
+          />
+        )
+      )}
+      {hint && (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <ClockIcon className="h-3.5 w-3.5 shrink-0" />
+          <span className="tabular-nums">{hint}</span>
+        </p>
+      )}
+    </div>
+  );
+};
 
 // How often to check for webapp commands when nothing is actively downloading.
 const IDLE_COMMAND_CHECK_INTERVAL = 15000;
@@ -1851,7 +2083,7 @@ const DownloadCard = ({
       type="button"
       onClick={handleViewLog}
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium transition-colors hover:bg-muted hover:text-foreground",
+        "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-muted hover:text-foreground",
         logDialogOpen ? "bg-muted text-foreground" : "text-muted-foreground"
       )}
     >
@@ -1862,12 +2094,44 @@ const DownloadCard = ({
     </button>
   );
   const extractionPercent = parseFloat(extraction?.percentComplete || 0);
+  const isDownloadPhase =
+    isDownloading && !isWaiting && !isExtracting && !hasError && !isStopped;
+
+  // Where the game is: downloading, unpacking or verifying. A failure or pause
+  // marks the phase it happened in.
+  const reachedUnpack =
+    isExtracting ||
+    isVerifyingState ||
+    isAwaitingRecovery ||
+    hasVerifyError ||
+    isPendingManualInstall ||
+    isCompleted ||
+    canRetryExtraction(game);
+  const reachedVerify = isVerifyingState || hasVerifyError || isCompleted;
+  const current = reachedVerify ? 2 : reachedUnpack ? 1 : 0;
+  const finished = isCompleted || isPendingManualInstall;
+  const stepState = index => {
+    if (finished || index < current) return "done";
+    if (index > current) return "pending";
+    if (hasError || (index === 2 && hasVerifyError)) return "failed";
+    if (isStopped || isWaiting) return "paused";
+    return "active";
+  };
+  const steps = [
+    { key: "download", label: t("downloads.card.phaseDownload"), tone: "primary" },
+    { key: "unpack", label: t("downloads.card.phaseUnpack"), tone: "amber" },
+    { key: "verify", label: t("downloads.card.phaseVerify"), tone: "blue" },
+  ].map((step, index) => ({ ...step, state: stepState(index) }));
+  const showSteps = !downloadingData?.privatePackage && !isResumingState;
+  const rate = bytes => `${formatFileBytes(bytes)}/s`;
 
   return (
     <div
       data-tour="downloads-card"
       className={cn(
-        "group relative overflow-hidden rounded-xl bg-card shadow transition-all duration-500",
+        "group relative overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-500",
+        needsAction && "border-amber-500/40",
+        hasError && "border-red-500/40",
         isFading && "scale-95 opacity-0"
       )}
     >
@@ -1879,56 +2143,64 @@ const DownloadCard = ({
             backgroundImage: `url(${heroImage})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
-            opacity: 0.22,
+            opacity: 0.14,
             maskImage: "linear-gradient(to left, black, transparent)",
             WebkitMaskImage: "linear-gradient(to left, black, transparent)",
           }}
         />
       )}
 
-      <div className="relative space-y-3 p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
+      <div className="relative space-y-4 p-5">
+        {/* Header: artwork, name, status and actions */}
+        <div className="flex items-center gap-4">
+          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-muted/60 ring-1 ring-border/60">
+            {heroImage ? (
+              <img src={heroImage} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <Gamepad2 className="absolute inset-0 m-auto h-6 w-6 text-muted-foreground" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
             <h3 className="truncate text-base font-semibold text-foreground">
               {game.game}
             </h3>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-              <span className="relative flex h-2 w-2">
-                {statusPulse && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2 py-0.5 font-medium text-foreground">
+                <span className="relative flex h-1.5 w-1.5">
+                  {statusPulse && (
+                    <span
+                      className={cn(
+                        "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+                        statusColor
+                      )}
+                    />
+                  )}
                   <span
                     className={cn(
-                      "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+                      "relative inline-flex h-1.5 w-1.5 rounded-full",
                       statusColor
                     )}
                   />
-                )}
-                <span
-                  className={cn("relative inline-flex h-2 w-2 rounded-full", statusColor)}
-                />
+                </span>
+                {statusLabel}
               </span>
-              <span>{statusLabel}</span>
               {game.size && (
-                <>
-                  <span>·</span>
-                  <span>{t("downloads.downloadSize", { size: game.size })}</span>
-                </>
+                <span>{t("downloads.downloadSize", { size: game.size })}</span>
               )}
+              {game.version && <span>v{game.version}</span>}
               {isDownloading && settings.downloadLimit > 0 && (
-                <>
-                  <span>·</span>
-                  <span>
-                    {t("downloads.limitedTo")}{" "}
-                    {settings.downloadLimit >= 1024
-                      ? `${Math.round(settings.downloadLimit / 1024)} MB/s`
-                      : `${settings.downloadLimit} KB/s`}
-                  </span>
-                </>
+                <span>
+                  {t("downloads.limitedTo")}{" "}
+                  {settings.downloadLimit >= 1024
+                    ? `${Math.round(settings.downloadLimit / 1024)} MB/s`
+                    : `${settings.downloadLimit} KB/s`}
+                </span>
               )}
             </div>
           </div>
 
           {!isCompleted && (
-            <div className="flex shrink-0 items-center gap-0.5">
+            <div className="flex shrink-0 items-center gap-0.5 rounded-xl bg-background/50 p-0.5 backdrop-blur-sm">
               {canRetryExtraction(game) && !hasError && (
                 <IconAction
                   label={t("downloads.retryExtraction")}
@@ -1953,7 +2225,9 @@ const DownloadCard = ({
                 </Button>
               ) : (
                 !hasError &&
-                !isInstalling && (
+                !isInstalling &&
+                !isAwaitingRecovery &&
+                !isPendingManualInstall && (
                   <IconAction
                     label={t("downloads.actions.pauseDownload")}
                     icon={Pause}
@@ -1986,79 +2260,293 @@ const DownloadCard = ({
 
         {/* Cancel confirmation, in place of a dialog */}
         {confirmingKill && !isCompleted && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3">
-            <p className="text-sm font-medium text-foreground">
-              {t("downloads.actions.killDownloadTitle", {
-                gameName: game.game,
-              })}
+          <Callout
+            tone="red"
+            icon={X}
+            title={t("downloads.actions.killDownloadTitle", { gameName: game.game })}
+            actions={
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isStopping}
+                  className="border-red-500/40 text-red-600 hover:bg-red-500/10 hover:text-red-600"
+                  onClick={() => {
+                    setConfirmingKill(false);
+                    onKill(true);
+                  }}
+                >
+                  {t("downloads.actions.deleteFilesOption")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isStopping}
+                  onClick={() => {
+                    setConfirmingKill(false);
+                    onKill(false);
+                  }}
+                >
+                  {t("downloads.actions.keepFilesOption")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConfirmingKill(false)}
+                >
+                  {t("common.cancel")}
+                </Button>
+              </>
+            }
+          />
+        )}
+
+        {showSteps && <PhaseSteps steps={steps} />}
+
+        {/* Starting: links resolving, peers being found, nothing received yet */}
+        {isDownloadPhase && progress === 0 && (
+          <div className="space-y-2">
+            <ProgressBar indeterminate />
+            <p className="text-sm text-muted-foreground">
+              {/\d/.test(downloadingData.timeUntilComplete || "")
+                ? t("downloads.card.starting")
+                : downloadingData.timeUntilComplete || t("downloads.card.starting")}
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={isStopping}
-                className="border-red-500/40 text-red-600 hover:bg-red-500/10 hover:text-red-600"
-                onClick={() => {
-                  setConfirmingKill(false);
-                  onKill(true);
-                }}
-              >
-                {t("downloads.actions.deleteFilesOption")}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={isStopping}
-                onClick={() => {
-                  setConfirmingKill(false);
-                  onKill(false);
-                }}
-              >
-                {t("downloads.actions.keepFilesOption")}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setConfirmingKill(false)}>
-                {t("common.cancel")}
-              </Button>
+          </div>
+        )}
+
+        {/* Downloading */}
+        {isDownloadPhase && progress > 0 && (
+          <div className="space-y-2.5">
+            <div className="flex items-end justify-between gap-3">
+              <BigPercent value={progress} />
+              <SpeedIndicator
+                speed={downloadingData.progressDownloadSpeeds}
+                isHigh={isHighSpeed(downloadingData.progressDownloadSpeeds)}
+              />
+            </div>
+            <ProgressBar value={progress} />
+            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <span className="tabular-nums">
+                {t("downloads.card.timeLeft")}:{" "}
+                <span className="font-semibold text-foreground">
+                  {downloadingData.timeUntilComplete || "--:--"}
+                </span>
+              </span>
+              {downloadingData.retryAttempt > 0 && (
+                <span className="inline-flex items-center gap-1 text-amber-600">
+                  <RefreshCcw className="h-3 w-3 animate-spin" />
+                  {t("downloads.card.reconnecting")} ·{" "}
+                  {t("downloads.card.attempt", { count: downloadingData.retryAttempt })}
+                </span>
+              )}
             </div>
           </div>
+        )}
+
+        {/* Extracting */}
+        {isExtracting && (
+          <div className="space-y-3">
+            {extraction?.totalFiles > 0 ? (
+              <>
+                <div className="flex items-end justify-between gap-3">
+                  <BigPercent value={extractionPercent} />
+                  <span className="text-sm font-semibold tabular-nums text-foreground">
+                    {extraction.extractionSpeed}
+                  </span>
+                </div>
+                <ProgressBar value={extractionPercent} tone="amber" />
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <Metric label={t("downloads.card.files")}>
+                    {extraction.filesExtracted} / {extraction.totalFiles}
+                  </Metric>
+                  <Metric label={t("downloads.card.read")}>
+                    <span className="text-blue-500">{rate(extraction.readSpeed)}</span>
+                  </Metric>
+                  <Metric label={t("downloads.card.write")}>
+                    <span className="text-amber-500">{rate(extraction.writeSpeed)}</span>
+                  </Metric>
+                  <Metric label={t("downloads.card.timeLeft")}>
+                    {downloadingData.timeUntilComplete || "--:--"}
+                  </Metric>
+                </div>
+                <ActivityPanel
+                  extraction={extraction}
+                  clockIcon={AnimatedClockIcon}
+                  showLargeFileNotice={showLargeFileNotice}
+                  t={t}
+                />
+              </>
+            ) : (
+              <div className="space-y-2">
+                <ProgressBar indeterminate tone="amber" />
+                <p className="text-sm text-muted-foreground">
+                  {t("downloads.preparingExtraction") || "Preparing extraction..."}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Verifying */}
+        {isVerifyingState && !isCompleted && (
+          <div className="space-y-2">
+            <ProgressBar indeterminate tone="blue" />
+            <p className="text-sm text-muted-foreground">
+              {t("downloads.verifyingDescription")}
+            </p>
+          </div>
+        )}
+
+        {/* Resuming */}
+        {isResumingState && (
+          <div className="space-y-2">
+            <ProgressBar indeterminate tone="blue" />
+            <p className="text-sm text-muted-foreground">
+              {t("downloads.resumingDescription")}
+            </p>
+          </div>
+        )}
+
+        {/* Waiting for peers */}
+        {isWaiting && (
+          <div className="space-y-2">
+            <ProgressBar indeterminate tone="muted" />
+            <p className="text-sm text-muted-foreground">
+              {t("downloads.waitingDescription")}
+            </p>
+          </div>
+        )}
+
+        {/* Paused */}
+        {isStopped && !isResumingState && (
+          <div className="space-y-3">
+            <BigPercent value={progress} muted />
+            <ProgressBar value={progress} tone="muted" active={false} />
+          </div>
+        )}
+
+        {/* Completed */}
+        {isCompleted && !isPendingManualInstall && (
+          <Callout
+            tone="green"
+            icon={CheckCircle2}
+            title={t("downloads.completedDescription") || "Your game is ready to play"}
+          />
+        )}
+
+        {/* Automatic recovery in progress */}
+        {autoRecovery &&
+          !isAwaitingRecovery &&
+          !hasError &&
+          !isStopped &&
+          (isDownloading || isExtracting) && (
+            <Callout tone="blue" icon={Info}>
+              <p>
+                {t(
+                  autoRecovery.kind === "redownload"
+                    ? "downloads.extractionRecovery.autoRetry.redownload"
+                    : "downloads.extractionRecovery.autoRetry.reextract",
+                  { archive: autoRecovery.archive }
+                )}
+              </p>
+            </Callout>
+          )}
+
+        {/* No progress for a while */}
+        {stall && !hasError && !isStopped && !isWaiting && (
+          <Callout
+            icon={AlertTriangle}
+            title={t("downloads.stalled.title", {
+              minutes: Math.max(1, Math.round((Date.now() - stall.since) / 60000)),
+            })}
+          >
+            <p>
+              {stall.phase === "extraction"
+                ? t("downloads.stalled.extraction")
+                : t("downloads.stalled.download")}
+            </p>
+          </Callout>
         )}
 
         {/* Extraction recovery */}
         {isAwaitingRecovery &&
           (recoverableError?.type === "missingExtractedFiles" || isArchiveRecovery) && (
-            <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-              <div className="flex items-start gap-2.5">
-                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-amber-600">
-                    {isArchiveRecovery
-                      ? t(`downloads.extractionRecovery.reasons.${recoveryReason}.title`)
-                      : t("downloads.extractionRecovery.title")}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {isArchiveRecovery
-                      ? t(`downloads.extractionRecovery.reasons.${recoveryReason}.body`)
-                      : t("downloads.extractionRecovery.description")}
-                  </p>
-                  {isArchiveRecovery &&
-                    (recoverableError.redownloaded || recoverableError.autoRetried) && (
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {t(
-                          recoverableError.redownloaded
-                            ? "downloads.extractionRecovery.alreadyRedownloaded"
-                            : "downloads.extractionRecovery.alreadyRetried"
+            <Callout
+              icon={ShieldAlert}
+              title={
+                isArchiveRecovery
+                  ? t(`downloads.extractionRecovery.reasons.${recoveryReason}.title`)
+                  : t("downloads.extractionRecovery.title")
+              }
+              actions={
+                <>
+                  {(!isArchiveRecovery || recoveryReason === "security") &&
+                    window.electron.getPlatform() === "win32" &&
+                    !settings.excludeFolders && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleExtractionRecovery(true)}
+                        disabled={isSubmittingRecovery}
+                        className="gap-2 text-secondary"
+                      >
+                        {isSubmittingRecovery ? (
+                          <Loader className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ShieldAlert className="h-4 w-4" />
                         )}
-                      </p>
+                        {t("downloads.extractionRecovery.enableProtectionAndRetry")}
+                      </Button>
                     )}
-                  {isArchiveRecovery && (
-                    <p className="mt-1 text-sm font-medium text-foreground">
-                      {t(`downloads.extractionRecovery.reasons.${recoveryReason}.next`)}
-                    </p>
-                  )}
-                </div>
-              </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleExtractionRecovery(false)}
+                    disabled={isSubmittingRecovery}
+                    className="gap-2"
+                  >
+                    <RefreshCcw className="h-4 w-4" />
+                    {t(
+                      isArchiveRecovery
+                        ? "downloads.retryExtraction"
+                        : "downloads.extractionRecovery.retryMissingFiles"
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleExtractionRecovery(false, "cancel")}
+                    disabled={isSubmittingRecovery}
+                  >
+                    {isArchiveRecovery
+                      ? t("downloads.extractionRecovery.stopKeepFiles")
+                      : t("common.cancel")}
+                  </Button>
+                </>
+              }
+            >
+              <p>
+                {isArchiveRecovery
+                  ? t(`downloads.extractionRecovery.reasons.${recoveryReason}.body`)
+                  : t("downloads.extractionRecovery.description")}
+              </p>
+              {isArchiveRecovery &&
+                (recoverableError.redownloaded || recoverableError.autoRetried) && (
+                  <p>
+                    {t(
+                      recoverableError.redownloaded
+                        ? "downloads.extractionRecovery.alreadyRedownloaded"
+                        : "downloads.extractionRecovery.alreadyRetried"
+                    )}
+                  </p>
+                )}
+              {isArchiveRecovery && (
+                <p className="font-medium text-foreground">
+                  {t(`downloads.extractionRecovery.reasons.${recoveryReason}.next`)}
+                </p>
+              )}
               {isArchiveRecovery ? (
-                <details className="text-xs text-muted-foreground">
+                <details className="text-xs">
                   <summary className="cursor-pointer select-none">
                     {t("downloads.extractionRecovery.technicalDetails")}
                   </summary>
@@ -2079,140 +2567,121 @@ const DownloadCard = ({
               ) : (
                 <div className="max-h-24 overflow-y-auto rounded-md bg-muted/50 p-2 text-xs">
                   {(recoverableError.files || []).map((error, index) => (
-                    <div
-                      key={`${error.file}-${index}`}
-                      className="py-0.5 text-muted-foreground"
-                    >
+                    <div key={`${error.file}-${index}`} className="py-0.5">
                       <span className="font-medium">{error.file}</span>
                       <span className="ml-2">{error.error}</span>
                     </div>
                   ))}
                 </div>
               )}
-              <div className="flex flex-wrap gap-2">
-                {(!isArchiveRecovery || recoveryReason === "security") &&
-                  window.electron.getPlatform() === "win32" &&
-                  !settings.excludeFolders && (
+            </Callout>
+          )}
+
+        {/* Private package */}
+        {isPendingManualInstall && downloadingData?.privatePackage && (
+          <Callout
+            icon={Info}
+            title={t("privateSources.package.title")}
+            actions={
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    window.electron.privateSources
+                      .openPackage(game.game)
+                      .catch(e => toast.error(privateSourceMessage(t, e)))
+                  }
+                >
+                  {t("privateSources.package.showInFolder")}
+                </Button>
+                {/\.(zip|7z|rar)$/i.test(game.privateSource?.package || "") &&
+                  !game.privateSource?.extracted && (
                     <Button
                       size="sm"
-                      onClick={() => handleExtractionRecovery(true)}
-                      disabled={isSubmittingRecovery}
-                      className="gap-2 text-secondary"
+                      onClick={async () => {
+                        const result = await window.electron.retryExtract(game.game);
+                        if (!result.success)
+                          toast.error(privateSourceMessage(t, result.error));
+                      }}
                     >
-                      {isSubmittingRecovery ? (
-                        <Loader className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <ShieldAlert className="h-4 w-4" />
-                      )}
-                      {t("downloads.extractionRecovery.enableProtectionAndRetry")}
+                      {t("privateSources.package.extract")}
                     </Button>
                   )}
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={() => handleExtractionRecovery(false)}
-                  disabled={isSubmittingRecovery}
-                  className="gap-2"
+                  variant="secondary"
+                  onClick={() =>
+                    window.electron.privateSources
+                      .importGame(game.game, {
+                        pickTitle: t("privateSources.package.pickTitle"),
+                        cancel: t("common.cancel"),
+                        confirm: t("privateSources.package.importConfirm"),
+                        message: t("privateSources.package.importMessage"),
+                        detail: t("privateSources.package.importDetail"),
+                      })
+                      .catch(e => toast.error(privateSourceMessage(t, e)))
+                  }
                 >
-                  <RefreshCcw className="h-4 w-4" />
-                  {t(
-                    isArchiveRecovery
-                      ? "downloads.retryExtraction"
-                      : "downloads.extractionRecovery.retryMissingFiles"
-                  )}
+                  {t("privateSources.package.selectExecutable")}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleExtractionRecovery(false, "cancel")}
-                  disabled={isSubmittingRecovery}
-                >
-                  {isArchiveRecovery
-                    ? t("downloads.extractionRecovery.stopKeepFiles")
-                    : t("common.cancel")}
-                </Button>
-              </div>
-            </div>
-          )}
+              </>
+            }
+          >
+            <p>{privateSourceMessage(t, downloadingData.message)}</p>
+            <p className="text-xs">{t("privateSources.package.note")}</p>
+          </Callout>
+        )}
 
         {/* Manual installer */}
-        {isPendingManualInstall && downloadingData?.privatePackage && (
-          <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-            <p className="font-medium">{t("privateSources.package.title")}</p>
-            <p className="text-sm text-muted-foreground">
-              {privateSourceMessage(t, downloadingData.message)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {t("privateSources.package.note")}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  window.electron.privateSources
-                    .openPackage(game.game)
-                    .catch(e => toast.error(privateSourceMessage(t, e)))
-                }
-              >
-                {t("privateSources.package.showInFolder")}
-              </Button>
-              {/\.(zip|7z|rar)$/i.test(game.privateSource?.package || "") &&
-                !game.privateSource?.extracted && (
-                  <Button
-                    size="sm"
-                    onClick={async () => {
-                      const result = await window.electron.retryExtract(game.game);
-                      if (!result.success)
-                        toast.error(privateSourceMessage(t, result.error));
-                    }}
-                  >
-                    {t("privateSources.package.extract")}
-                  </Button>
-                )}
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() =>
-                  window.electron.privateSources
-                    .importGame(game.game, {
-                      pickTitle: t("privateSources.package.pickTitle"),
-                      cancel: t("common.cancel"),
-                      confirm: t("privateSources.package.importConfirm"),
-                      message: t("privateSources.package.importMessage"),
-                      detail: t("privateSources.package.importDetail"),
-                    })
-                    .catch(e => toast.error(privateSourceMessage(t, e)))
-                }
-              >
-                {t("privateSources.package.selectExecutable")}
-              </Button>
-            </div>
-          </div>
-        )}
         {isPendingManualInstall && !downloadingData?.privatePackage && (
-          <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-            <div className="flex items-start gap-2.5">
-              {installerLaunched ? (
-                <Loader className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-amber-600" />
+          <Callout
+            icon={ShieldAlert}
+            spinning={installerLaunched}
+            title={
+              installerLaunched
+                ? t("downloads.installingTitle") || "Installing..."
+                : t("downloads.manualInstallTitle") || "One Last Step"
+            }
+            actions={
+              installerLaunched ? (
+                <Button
+                  size="sm"
+                  onClick={handleFinishInstall}
+                  disabled={isFinishingInstall}
+                  className="gap-2 text-secondary"
+                >
+                  {isFinishingInstall ? (
+                    <Loader className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  {t("downloads.finishedInstalling") || "I've Finished Installing"}
+                </Button>
               ) : (
-                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-              )}
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-amber-600">
-                  {installerLaunched
-                    ? t("downloads.installingTitle") || "Installing..."
-                    : t("downloads.manualInstallTitle") || "One Last Step"}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {installerLaunched
-                    ? t("downloads.setInstallLocationDescription") ||
-                      "In the installer, set the destination folder to the path below. This must match the game's existing folder so Ascendara can detect it."
-                    : t("downloads.manualInstallDescription") ||
-                      "Download complete. Run the installer as Administrator to finish installing the game."}
-                </p>
-              </div>
-            </div>
+                <Button
+                  size="sm"
+                  onClick={handleRunInstaller}
+                  disabled={isLaunchingInstaller}
+                  className="gap-2 text-secondary"
+                >
+                  {isLaunchingInstaller ? (
+                    <Loader className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ShieldAlert className="h-4 w-4" />
+                  )}
+                  {t("downloads.runAsAdmin") || "Run Installer as Admin"}
+                </Button>
+              )
+            }
+          >
+            <p>
+              {installerLaunched
+                ? t("downloads.setInstallLocationDescription") ||
+                  "In the installer, set the destination folder to the path below. This must match the game's existing folder so Ascendara can detect it."
+                : t("downloads.manualInstallDescription") ||
+                  "Download complete. Run the installer as Administrator to finish installing the game."}
+            </p>
             {installerLaunched && downloadingData?.manualInstallDir && (
               <div className="flex items-center gap-2 rounded-md bg-muted/50 py-1 pl-3 pr-1">
                 <code className="flex-1 break-all text-xs text-foreground">
@@ -2225,124 +2694,78 @@ const DownloadCard = ({
                 />
               </div>
             )}
-            {installerLaunched ? (
-              <Button
-                size="sm"
-                onClick={handleFinishInstall}
-                disabled={isFinishingInstall}
-                className="gap-2 text-secondary"
-              >
-                {isFinishingInstall ? (
-                  <Loader className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                {t("downloads.finishedInstalling") || "I've Finished Installing"}
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={handleRunInstaller}
-                disabled={isLaunchingInstaller}
-                className="gap-2 text-secondary"
-              >
-                {isLaunchingInstaller ? (
-                  <Loader className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ShieldAlert className="h-4 w-4" />
-                )}
-                {t("downloads.runAsAdmin") || "Run Installer as Admin"}
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Completed */}
-        {isCompleted && !isPendingManualInstall && (
-          <p className="flex items-center gap-2 text-sm text-green-600">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            {t("downloads.completedDescription") || "Your game is ready to play"}
-          </p>
-        )}
-
-        {/* Verifying */}
-        {isVerifyingState && !isCompleted && (
-          <div className="space-y-2">
-            <ProgressBar indeterminate tone="blue" />
-            <p className="text-sm text-muted-foreground">
-              {t("downloads.verifyingDescription")}
-            </p>
-          </div>
+          </Callout>
         )}
 
         {/* Verification failed */}
         {hasVerifyError && (
-          <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-            <div className="flex items-start gap-2.5">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-amber-600">
-                  {downloadingData.verifyError.length === 1
-                    ? t("downloads.verificationFailed1", {
-                        numFailed: downloadingData.verifyError.length,
-                      })
-                    : t("downloads.verificationFailed2", {
-                        numFailed: downloadingData.verifyError.length,
-                      })}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {t("downloads.verificationFailedDesc")}{" "}
-                  <a
-                    className="inline-flex cursor-pointer items-center text-primary hover:underline"
-                    onClick={() =>
-                      window.electron.openURL(
-                        "https://ascendara.app/docs/troubleshooting/common-issues#verification-issues"
-                      )
-                    }
-                  >
-                    {t("common.learnMore")} <ExternalLink className="ml-1 h-3 w-3" />
-                  </a>
-                </p>
-              </div>
-            </div>
-            <div className="max-h-24 overflow-y-auto rounded-md bg-muted/50 p-2 text-xs">
-              {downloadingData.verifyError.map((error, index) => (
-                <div key={index} className="py-0.5 font-medium text-muted-foreground">
-                  {error.file}
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleVerifyGame}
-                disabled={isVerifying || isRepairingDlls || isKeepingGame}
-              >
-                {isVerifying ? t("downloads.verifying") : t("downloads.verifyAgain")}
-              </Button>
-              {downloadingData.verifyError.some(error =>
-                /\.dll$/i.test(error.file || "")
-              ) && (
+          <Callout
+            icon={AlertTriangle}
+            title={
+              downloadingData.verifyError.length === 1
+                ? t("downloads.verificationFailed1", {
+                    numFailed: downloadingData.verifyError.length,
+                  })
+                : t("downloads.verificationFailed2", {
+                    numFailed: downloadingData.verifyError.length,
+                  })
+            }
+            actions={
+              <>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleRepairDlls}
+                  onClick={handleVerifyGame}
                   disabled={isVerifying || isRepairingDlls || isKeepingGame}
                 >
-                  {isRepairingDlls
-                    ? t("downloads.dllRepairing", { defaultValue: "Restoring DLLs…" })
-                    : t("downloads.dllRepair", { defaultValue: "Restore missing DLLs" })}
+                  {isVerifying ? t("downloads.verifying") : t("downloads.verifyAgain")}
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setConfirmKeepGame(true)}
-                disabled={isVerifying || isRepairingDlls || isKeepingGame}
+                {downloadingData.verifyError.some(error =>
+                  /\.dll$/i.test(error.file || "")
+                ) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRepairDlls}
+                    disabled={isVerifying || isRepairingDlls || isKeepingGame}
+                  >
+                    {isRepairingDlls
+                      ? t("downloads.dllRepairing", { defaultValue: "Restoring DLLs…" })
+                      : t("downloads.dllRepair", {
+                          defaultValue: "Restore missing DLLs",
+                        })}
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmKeepGame(true)}
+                  disabled={isVerifying || isRepairingDlls || isKeepingGame}
+                >
+                  {isKeepingGame ? t("downloads.keepingGame") : t("downloads.keepGame")}
+                </Button>
+              </>
+            }
+          >
+            <p>
+              {t("downloads.verificationFailedDesc")}{" "}
+              <a
+                className="inline-flex cursor-pointer items-center text-primary hover:underline"
+                onClick={() =>
+                  window.electron.openURL(
+                    "https://ascendara.app/docs/troubleshooting/common-issues#verification-issues"
+                  )
+                }
               >
-                {isKeepingGame ? t("downloads.keepingGame") : t("downloads.keepGame")}
-              </Button>
+                {t("common.learnMore")} <ExternalLink className="ml-1 h-3 w-3" />
+              </a>
+            </p>
+            <div className="max-h-24 overflow-y-auto rounded-md bg-muted/50 p-2 text-xs">
+              {downloadingData.verifyError.map((error, index) => (
+                <div key={index} className="py-0.5 font-medium">
+                  {error.file}
+                </div>
+              ))}
             </div>
             <AlertDialog
               open={confirmKeepGame}
@@ -2375,239 +2798,98 @@ const DownloadCard = ({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          </div>
-        )}
-
-        {/* Resuming */}
-        {isResumingState && (
-          <div className="space-y-2">
-            <ProgressBar indeterminate tone="blue" />
-            <p className="text-sm text-muted-foreground">
-              {t("downloads.resumingDescription")}
-            </p>
-          </div>
-        )}
-
-        {/* Paused */}
-        {isStopped && !isResumingState && (
-          <div className="space-y-2">
-            <span className="text-2xl font-bold tabular-nums leading-none text-muted-foreground">
-              {progress.toFixed(1)}
-              <span className="ml-0.5 text-sm font-medium">%</span>
-            </span>
-            <ProgressBar value={progress} tone="muted" active={false} />
-          </div>
+          </Callout>
         )}
 
         {/* Error */}
         {hasError && (
-          <div className="space-y-3 rounded-lg border border-red-500/30 bg-red-500/5 p-4">
-            <div className="flex items-start gap-2.5">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
-              <div className="min-w-0 flex-1">
-                <p className="line-clamp-4 break-words text-sm text-foreground">
-                  {errorMessage}
-                </p>
-                {downloadingData.message && errorMessage !== downloadingData.message && (
-                  <details className="mt-1 text-xs text-muted-foreground">
-                    <summary className="cursor-pointer select-none">
-                      {t("downloads.extractionRecovery.technicalDetails")}
-                    </summary>
-                    <p className="mt-1 max-h-24 overflow-y-auto break-words rounded-md bg-muted/50 p-2">
-                      {downloadingData.message}
-                    </p>
-                  </details>
-                )}
-                {isPredefinedError(downloadingData.message) && (
-                  <a
-                    onClick={() =>
-                      window.electron.openURL(
-                        "https://ascendara.app/docs/troubleshooting/common-issues#download-issues"
-                      )
-                    }
-                    className="mt-1 inline-flex cursor-pointer items-center gap-1 text-sm text-primary hover:underline"
+          <Callout
+            tone="red"
+            icon={AlertCircle}
+            actions={
+              <>
+                {offerProtection && (
+                  <Button
+                    size="sm"
+                    onClick={handleEnableProtectionAndRetry}
+                    disabled={isSubmittingRecovery}
+                    className="gap-2 text-secondary"
                   >
-                    {t("common.learnMore")} <ExternalLink className="h-3 w-3" />
-                  </a>
+                    {isSubmittingRecovery ? (
+                      <Loader className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ShieldAlert className="h-4 w-4" />
+                    )}
+                    {t("downloads.extractionRecovery.enableProtectionAndRetry")}
+                  </Button>
                 )}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {offerProtection && (
                 <Button
                   size="sm"
-                  onClick={handleEnableProtectionAndRetry}
+                  variant={offerProtection ? "outline" : "default"}
+                  onClick={canRetryExtraction(game) ? handleRetryExtraction : onRetry}
                   disabled={isSubmittingRecovery}
                   className="gap-2 text-secondary"
                 >
-                  {isSubmittingRecovery ? (
-                    <Loader className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ShieldAlert className="h-4 w-4" />
+                  <RefreshCcw className="h-4 w-4" />
+                  {t(
+                    canRetryExtraction(game)
+                      ? "downloads.retryExtraction"
+                      : "common.retry"
                   )}
-                  {t("downloads.extractionRecovery.enableProtectionAndRetry")}
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant={offerProtection ? "outline" : "default"}
-                onClick={canRetryExtraction(game) ? handleRetryExtraction : onRetry}
-                disabled={isSubmittingRecovery}
-                className="gap-2 text-secondary"
-              >
-                <RefreshCcw className="h-4 w-4" />
-                {t(
-                  canRetryExtraction(game) ? "downloads.retryExtraction" : "common.retry"
-                )}
-              </Button>
-              {!isPredefinedError(downloadingData.message) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleReport}
-                  disabled={isReporting || wasReported}
-                  className="gap-2"
-                >
-                  {isReporting ? (
-                    <Loader className="h-4 w-4 animate-spin" />
-                  ) : wasReported ? (
-                    <CircleCheck className="h-4 w-4" />
-                  ) : (
-                    <AlertTriangle className="h-4 w-4" />
-                  )}
-                  {isReporting
-                    ? t("common.reporting")
-                    : wasReported
-                      ? t("downloads.alreadyReported")
-                      : t("common.reportToAscendara")}
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* No progress for a while */}
-        {stall && !hasError && !isStopped && !isWaiting && (
-          <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-amber-600">
-                {t("downloads.stalled.title", {
-                  minutes: Math.max(1, Math.round((Date.now() - stall.since) / 60000)),
-                })}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {stall.phase === "extraction"
-                  ? t("downloads.stalled.extraction")
-                  : t("downloads.stalled.download")}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Automatic recovery in progress */}
-        {autoRecovery &&
-          !isAwaitingRecovery &&
-          !hasError &&
-          !isStopped &&
-          (isDownloading || isExtracting) && (
-            <div className="flex items-start gap-2.5 rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-              <p className="text-sm text-muted-foreground">
-                {t(
-                  autoRecovery.kind === "redownload"
-                    ? "downloads.extractionRecovery.autoRetry.redownload"
-                    : "downloads.extractionRecovery.autoRetry.reextract",
-                  { archive: autoRecovery.archive }
-                )}
-              </p>
-            </div>
-          )}
-
-        {/* Downloading */}
-        {isDownloading && !isWaiting && !isExtracting && !hasError && !isStopped && (
-          <div className="space-y-2">
-            <div className="flex items-end justify-between gap-3">
-              <span className="text-2xl font-bold tabular-nums leading-none text-foreground">
-                {progress.toFixed(1)}
-                <span className="ml-0.5 text-sm font-medium text-muted-foreground">
-                  %
-                </span>
-              </span>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <SpeedIndicator
-                  speed={downloadingData.progressDownloadSpeeds}
-                  isHigh={isHighSpeed(downloadingData.progressDownloadSpeeds)}
-                />
-                <span className="tabular-nums">
-                  ETA {downloadingData.timeUntilComplete || "--:--"}
-                </span>
-              </div>
-            </div>
-            <ProgressBar value={progress} />
-          </div>
-        )}
-
-        {/* Extracting */}
-        {isExtracting && (
-          <div className="space-y-2">
-            {extraction?.totalFiles > 0 ? (
-              <>
-                <div className="flex items-end justify-between gap-3">
-                  <span className="text-2xl font-bold tabular-nums leading-none text-foreground">
-                    {extractionPercent.toFixed(1)}
-                    <span className="ml-0.5 text-sm font-medium text-muted-foreground">
-                      %
-                    </span>
-                  </span>
-                  <span className="text-sm tabular-nums text-muted-foreground">
-                    {extraction.filesExtracted} / {extraction.totalFiles}{" "}
-                    {t("downloads.files", "files")}
-                    {extraction.extractionSpeed && ` · ${extraction.extractionSpeed}`}
-                  </span>
-                </div>
-                <ProgressBar value={extractionPercent} tone="amber" />
-                <div className="flex items-center justify-between gap-3">
-                  <p
-                    className="min-w-0 truncate text-xs text-muted-foreground"
-                    title={extraction.currentFile || undefined}
+                {!isPredefinedError(downloadingData.message) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleReport}
+                    disabled={isReporting || wasReported}
+                    className="gap-2"
                   >
-                    {extraction.currentFile || t("downloads.extractingDescription")}
-                  </p>
-                  {logToggle}
-                </div>
+                    {isReporting ? (
+                      <Loader className="h-4 w-4 animate-spin" />
+                    ) : wasReported ? (
+                      <CircleCheck className="h-4 w-4" />
+                    ) : (
+                      <AlertTriangle className="h-4 w-4" />
+                    )}
+                    {isReporting
+                      ? t("common.reporting")
+                      : wasReported
+                        ? t("downloads.alreadyReported")
+                        : t("common.reportToAscendara")}
+                  </Button>
+                )}
               </>
-            ) : (
-              <>
-                <ProgressBar indeterminate tone="amber" />
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm text-muted-foreground">
-                    {t("downloads.preparingExtraction") || "Preparing extraction..."}
-                  </p>
-                  {logToggle}
-                </div>
-              </>
+            }
+          >
+            <p className="line-clamp-4 break-words text-foreground">{errorMessage}</p>
+            {downloadingData.message && errorMessage !== downloadingData.message && (
+              <details className="text-xs">
+                <summary className="cursor-pointer select-none">
+                  {t("downloads.extractionRecovery.technicalDetails")}
+                </summary>
+                <p className="mt-1 max-h-24 overflow-y-auto break-words rounded-md bg-muted/50 p-2">
+                  {downloadingData.message}
+                </p>
+              </details>
             )}
-            {showLargeFileNotice && (
-              <p className="flex items-center gap-2 text-xs text-blue-600">
-                <AnimatedClockIcon className="h-3.5 w-3.5 shrink-0" />
-                {t("downloads.largeFileNotice")}
-              </p>
+            {isPredefinedError(downloadingData.message) && (
+              <a
+                onClick={() =>
+                  window.electron.openURL(
+                    "https://ascendara.app/docs/troubleshooting/common-issues#download-issues"
+                  )
+                }
+                className="inline-flex cursor-pointer items-center gap-1 text-primary hover:underline"
+              >
+                {t("common.learnMore")} <ExternalLink className="h-3 w-3" />
+              </a>
             )}
-          </div>
-        )}
-
-        {/* Waiting for peers */}
-        {isWaiting && (
-          <div className="space-y-2">
-            <ProgressBar indeterminate tone="muted" />
-            <p className="text-sm text-muted-foreground">
-              {t("downloads.waitingDescription")}
-            </p>
-          </div>
+          </Callout>
         )}
 
         {/* Live log, inline */}
+        {isExtracting && <div className="flex justify-end">{logToggle}</div>}
         {logDialogOpen && (
           <div
             ref={logScrollRef}
@@ -2630,3 +2912,4 @@ const DownloadCard = ({
 };
 
 export default Downloads;
+
