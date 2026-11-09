@@ -1,0 +1,45 @@
+[package]
+name = "AscendaraDownloader"
+version = "5.0.0"
+edition = "2021"
+rust-version = "1.90"
+description = "Ascendara download engine: HTTP, GoFile, file hosts, torrents and archive installation"
+
+[[bin]]
+name = "AscendaraDownloader"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+log = { version = "0.4", features = ["std"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "fs", "sync", "io-util"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "cookies", "json", "http2"] }
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+regex = "1"
+url = "2"
+percent-encoding = "2"
+sha2 = "0.10"
+md-5 = "0.10"
+hex = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+zip = { version = "2", default-features = false, features = ["aes-crypto", "bzip2", "deflate", "deflate64", "lzma", "zstd", "xz"] }
+sevenz-rust2 = { version = "0.20", features = ["aes256", "bzip2", "zstd", "brotli", "lz4"] }
+unrar = "0.5"
+librqbit = { version = "9", default-features = false, features = ["rust-tls"] }
+
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Power", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_Threading"] }
+
+[target."cfg(unix)".dependencies]
+libc = "0.2"
+
+[build-dependencies]
+winres = "0.1.12"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "unwind"
