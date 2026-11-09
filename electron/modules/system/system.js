@@ -1132,7 +1132,7 @@ function registerSystemHandlers() {
       // already live at resourcesPath (there is no nested resources directory).
       const helpers = [
         ["AscendaraCrashReporter", "target/release/AscendaraCrashReporter"],
-        ["AscendaraDownloader", "src/AscendaraDownloader.py"],
+        ["AscendaraDownloader", "target/release/AscendaraDownloader"],
         ["AscendaraGameHandler", "target/release/AscendaraGameHandler"],
         ["AscendaraLanguageTranslation", "src/AscendaraLanguageTranslation.py"],
         ["AscendaraTorrentHandler", "src/AscendaraTorrentHandler.py"],

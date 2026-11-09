@@ -53,8 +53,7 @@ function loadDownloadHandlers(root, settings, spawns) {
       isDev: true,
       isWindows: true,
       TIMESTAMP_FILE: path.join(root, "timestamp.json"),
-      getHelperPath: () => "unused.exe",
-      getPythonPath: () => "python",
+      getHelperPath: () => "AscendaraDownloader.exe",
     },
     "../core/settings": { getSettingsManager: () => ({ getSettings: () => settings }) },
     "../core/log-safe": { linkForLog: link => link },
@@ -118,7 +117,7 @@ const args = [
   true,
 ];
 
-test("download IPC launches a grouped torrent using edited helper source and prevents duplicate starts", async t => {
+test("download IPC launches a grouped torrent with the downloader and prevents duplicate starts", async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-handoff-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const settings = { downloadDirectory: path.join(root, "games") };
@@ -127,9 +126,9 @@ test("download IPC launches a grouped torrent using edited helper source and pre
   const start = loadDownloadHandlers(root, settings, spawns).get("download-file");
   assert.equal((await start(...args)).success, true);
   assert.equal(spawns.length, 1);
-  assert.equal(spawns[0].command, "python");
+  assert.equal(spawns[0].command, "AscendaraDownloader.exe");
   assert.ok(spawns[0].args.includes("--file-list"));
-  const manifest = JSON.parse(fs.readFileSync(spawns[0].args[1], "utf8"));
+  const manifest = JSON.parse(fs.readFileSync(spawns[0].args[0], "utf8"));
   assert.deepEqual(manifest.files, payload.files);
   assert.equal((await start(...args)).alreadyStarted, true);
   assert.equal(spawns.length, 1);

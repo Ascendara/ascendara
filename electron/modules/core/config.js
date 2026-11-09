@@ -127,11 +127,14 @@ function getPythonPath() {
   return fs.existsSync(venvPython) ? venvPython : "python3";
 }
 
+// Helpers written in Rust are built with cargo instead of PyInstaller.
+const CARGO_HELPERS = new Set(["AscendaraDownloader"]);
+
 function getHelperPath(name) {
   const filename = name + (isWindows ? ".exe" : "");
-  return isDev
-    ? path.resolve(__dirname, "../../../binaries", name, "dist", filename)
-    : path.join(process.resourcesPath, filename);
+  if (!isDev) return path.join(process.resourcesPath, filename);
+  const output = CARGO_HELPERS.has(name) ? ["target", "release"] : ["dist"];
+  return path.resolve(__dirname, "../../../binaries", name, ...output, filename);
 }
 
 function getLudusaviPath() {

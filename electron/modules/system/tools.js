@@ -129,9 +129,10 @@ async function installTool(tool) {
  * @returns {string[]} - Array of installed tool names
  */
 function getInstalledTools() {
-  // The torrent handler ships with the app, so it is never downloaded as a tool
+  // The downloader ships with the app and handles torrents itself, so torrent
+  // support is never downloaded as a tool
   const tools = listInstalledTools();
-  if (isDev || fs.existsSync(getHelperPath("AscendaraTorrentHandler"))) {
+  if (isDev || fs.existsSync(getHelperPath("AscendaraDownloader"))) {
     tools.push("torrent");
   }
   return tools;
