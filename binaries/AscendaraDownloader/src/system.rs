@@ -20,7 +20,10 @@ impl Settings {
         for path in settings_candidates() {
             if let Ok(text) = std::fs::read_to_string(&path) {
                 match serde_json::from_str::<Value>(&text) {
-                    Ok(raw) => return Settings { raw },
+                    Ok(raw) => {
+                    log::info!("Using settings from {}", path.display());
+                    return Settings { raw };
+                }
                     Err(error) => log::warn!("Could not read settings {}: {error}", path.display()),
                 }
             }
@@ -56,6 +59,10 @@ impl Settings {
 
 fn settings_candidates() -> Vec<PathBuf> {
     let mut found = Vec::new();
+    // The app passes the file it uses; development builds keep theirs elsewhere.
+    if let Some(path) = std::env::var_os("ASCENDARA_SETTINGS") {
+        found.push(PathBuf::from(path));
+    }
     if cfg!(windows) {
         if let Some(appdata) = std::env::var_os("APPDATA") {
             let appdata = PathBuf::from(appdata);
@@ -234,3 +241,4 @@ pub fn run_post_download_behavior(settings: &Settings) {
         spawn_hidden(Command::new(program).args(args));
     }
 }
+

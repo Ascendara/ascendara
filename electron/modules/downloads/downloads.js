@@ -110,6 +110,12 @@ const { validateFileList } = require("./downloadManifest");
  */
 function registerDownloadHandlers() {
   const settingsManager = getSettingsManager();
+  // The downloader reads the same settings file as this app instance, so a
+  // development build never picks up the installed app's thread count or limit.
+  const downloaderEnv = () => ({
+    ...process.env,
+    ASCENDARA_SETTINGS: settingsManager.filePath,
+  });
 
   ipcMain.handle("extraction-recovery-action", async (_, game, requestId, action) => {
     if (!["retry", "cancel"].includes(action)) {
@@ -796,6 +802,7 @@ function registerDownloadHandlers() {
             detached: true,
             stdio: "ignore",
             windowsHide: Boolean(fileList),
+            env: downloaderEnv(),
           });
 
           downloadProcess.on("error", err => {
@@ -1543,6 +1550,7 @@ function registerDownloadHandlers() {
         const child = spawn(executable, args, {
           stdio: "ignore",
           windowsHide: true,
+          env: downloaderEnv(),
         });
         downloadProcesses.set(game, child);
         child.once("close", async code => {
@@ -1610,7 +1618,9 @@ function registerDownloadHandlers() {
         gamesDirectory,
       ];
 
-      const downloadProcess = spawn(executablePath, spawnCommand);
+      const downloadProcess = spawn(executablePath, spawnCommand, {
+        env: downloaderEnv(),
+      });
       retryDownloadProcesses.set(game, downloadProcess);
 
       downloadProcess.stdout.on("data", data => {
@@ -1790,6 +1800,7 @@ function registerDownloadHandlers() {
               detached: true,
               stdio: "ignore",
               windowsHide: true,
+              env: downloaderEnv(),
             });
             await waitForSpawn(downloadProcess);
           } catch (error) {
