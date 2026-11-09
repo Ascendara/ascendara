@@ -1455,6 +1455,8 @@ function InstalledGameScreen() {
   // Hero image state for header background
   const [heroImageData, setHeroImageData] = useState(null);
   const [hasGridImage, setHasGridImage] = useState(true);
+  // Portrait grid used for the cover when the image on disk is a wide header
+  const [tallCover, setTallCover] = useState(null);
 
   // 3-hour purchase prompt state
   const [showPurchasePrompt, setShowPurchasePrompt] = useState(false);
@@ -2036,6 +2038,26 @@ function InstalledGameScreen() {
       window.removeEventListener("game-cover-updated", handleCoverUpdate);
     };
   }, [game?.game, game?.name, steamData?.cover?.url]); // Add steamData.cover.url as dependency
+
+  // Older installs only have a wide header, which the portrait cover crops to its
+  // middle. Fetch the tall grid for the cover instead.
+  useEffect(() => {
+    setTallCover(null);
+    if (!imageData || !game) return;
+    let cancelled = false;
+    const probe = new Image();
+    probe.onload = async () => {
+      if (cancelled || probe.naturalWidth <= probe.naturalHeight) return;
+      try {
+        const result = await window.electron.getSteamGridGrid(game.game || game.name);
+        if (result?.url && !cancelled) setTallCover(result.url);
+      } catch (e) {}
+    };
+    probe.src = imageData;
+    return () => {
+      cancelled = true;
+    };
+  }, [imageData, game?.game, game?.name]);
 
   // Load hero image when grid image fails
   useEffect(() => {
@@ -2683,7 +2705,7 @@ function InstalledGameScreen() {
   // Prepare screenshots data from Steam API if available
   const screenshots = steamData?.formatted_screenshots || [];
   const bannerImage = heroImageData || screenshots[0]?.formatted_url || imageData;
-  const coverImage = !hasGridImage && heroImageData ? null : imageData;
+  const coverImage = tallCover || (!hasGridImage && heroImageData ? null : imageData);
 
   const achievementList = achievements?.achievements || [];
   const sections = [
