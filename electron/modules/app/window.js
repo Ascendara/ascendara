@@ -44,6 +44,21 @@ const PORT_RESERVED_CAUSES = [
   "To check: run <code>netsh interface ipv4 show excludedportrange protocol=tcp</code> and look for a range that includes 46859",
   "To free it: in a terminal opened as administrator, run <code>net stop winnat</code> then <code>net start winnat</code>, then open Ascendara again",
 ];
+// The local server is already listening by the time the page loads, so a timeout means
+// something dropped the connection on the way, almost always security software filtering
+// traffic for this exe's path.
+const CONNECTION_TIMEOUT_CAUSES = [
+  "An antivirus or firewall blocking Ascendara from connecting to itself. Add the Ascendara install folder as an exception, or pause the firewall and open Ascendara again",
+  "A firewall rule set to Block for Ascendara. Check the Inbound and Outbound Rules in Windows Defender Firewall's advanced settings and remove it",
+  "A VPN or network filtering tool intercepting local connections",
+  ...(process.platform === "win32"
+    ? [
+        "If none of these help, try the portable version of Ascendara from <code>github.com/Ascendara/ascendara/releases/latest</code>. It runs from a different location, so firewall rules on the installed copy do not affect it",
+      ]
+    : []),
+];
+// ERR_CONNECTION_TIMED_OUT and ERR_TIMED_OUT
+const CONNECTION_TIMEOUT_CODES = new Set([-118, -7]);
 
 /** Show a helpful error page instead of a white screen. */
 function showLoadFailure(
@@ -252,7 +267,14 @@ function createWindow() {
     (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
       if (!isMainFrame || errorCode === -3 || validatedURL?.startsWith("data:")) return;
       console.error(`Failed to load: ${errorCode} - ${errorDescription}`);
-      showLoadFailure(mainWindow, errorDescription, errorCode);
+      showLoadFailure(
+        mainWindow,
+        errorDescription,
+        errorCode,
+        CONNECTION_TIMEOUT_CODES.has(errorCode)
+          ? CONNECTION_TIMEOUT_CAUSES
+          : LOAD_FAILURE_CAUSES
+      );
     }
   );
 
