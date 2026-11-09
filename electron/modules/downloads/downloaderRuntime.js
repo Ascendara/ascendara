@@ -9,9 +9,8 @@ async function prepareDownloaderRuntime(source, cacheRoot) {
   const key = JSON.stringify([source, cacheRoot]);
   if (!prepared.has(key)) {
     const preparation = (async () => {
-      // The packaged Linux downloader is a self-contained PyInstaller onefile
-      // executable. Start it here so sys.executable and future extraction workers
-      // never refer back to /tmp/.mount_.../resources.
+      // Run a copy of the packaged downloader from here so it never refers back to
+      // /tmp/.mount_.../resources, which disappears when the AppImage exits.
       const binary = await fs.readFile(source);
       const digest = crypto.createHash("sha256").update(binary).digest("hex");
       const directory = path.join(cacheRoot, digest);

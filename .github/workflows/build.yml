@@ -28,3 +28,36 @@ jobs:
         env:
           HUSKY: '0'
       - run: yarn build
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [windows-latest, ubuntu-22.04, macos-15]
+        crate: [AscendaraDownloader, AscendaraGameHandler, AscendaraCrashReporter]
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: binaries/${{ matrix.crate }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal --component clippy
+          rustup default 1.90.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            binaries/${{ matrix.crate }}/target
+          key: cargo-check-${{ matrix.runner }}-${{ matrix.crate }}-1.90.0-${{ hashFiles(format('binaries/{0}/Cargo.lock', matrix.crate)) }}
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libpango1.0-dev libgl1-mesa-dev libglu1-mesa-dev pkg-config
+      - run: cargo clippy --locked --all-targets
+      - run: cargo test --locked
