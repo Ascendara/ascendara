@@ -1,4 +1,5 @@
 import React, { memo, useEffect, useRef } from "react";
+import { Pause } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const WINDOW_SECONDS = 60;
@@ -84,9 +85,18 @@ const highest = (from, to) => {
  * animation. A series is only drawn while it has something to show, so the
  * download curve scrolls out as the curves of an extraction scroll in.
  * diskRef's extract value counts files per second when its `files` flag is set.
+ * While paused the curves hold still and gray out.
  */
 const SpeedGraph = memo(
-  ({ speedRef, diskRef, labels = {}, peak = 0, high = false, className }) => {
+  ({
+    speedRef,
+    diskRef,
+    labels = {},
+    peak = 0,
+    high = false,
+    paused = false,
+    className,
+  }) => {
     const containerRef = useRef(null);
     const lineRefs = useRef({});
     const areaRefs = useRef({});
@@ -102,7 +112,7 @@ const SpeedGraph = memo(
     const tooltipRef = useRef(null);
     const hoverX = useRef(null);
     const latest = useRef({});
-    latest.current = { peak, labels };
+    latest.current = { peak, labels, paused };
 
     useEffect(() => {
       const container = containerRef.current;
@@ -123,6 +133,7 @@ const SpeedGraph = memo(
         const elapsed = Math.min(100, now - previous);
         previous = now;
 
+        const paused = latest.current.paused;
         // Ease toward the reported values so one-second updates read as a curve.
         const targets = {
           download: speedRef?.current,
@@ -131,11 +142,14 @@ const SpeedGraph = memo(
           write: diskRef?.current?.write,
         };
         for (const { key } of SERIES) {
+          if (paused) break;
           const target = Math.max(0, targets[key] || 0);
           live[key] += (target - live[key]) * (1 - Math.exp(-elapsed / 350));
           if (Math.abs(target - live[key]) < 0.001) live[key] = target;
         }
 
+        // Paused, the curves stop scrolling and pick up from here on resume.
+        if (paused) lastSampleAt = now;
         // After a gap (page closed, window hidden) keep the old curves as they were.
         if (now - lastSampleAt > 1000) lastSampleAt = now - SAMPLE_MS;
         while (now - lastSampleAt >= SAMPLE_MS) {
@@ -188,7 +202,8 @@ const SpeedGraph = memo(
           lineRefs.current[key].style.display = display;
           areaRefs.current[key].style.display = display;
           // A finished series keeps its curve while it scrolls out, but not its live dot.
-          headRefs.current[key].style.display = live[key] > 0.0005 ? "" : "none";
+          headRefs.current[key].style.display =
+            live[key] > 0.0005 && !paused ? "" : "none";
           dotRefs.current[key].style.opacity = shown && hovering ? 1 : 0;
           if (!shown) continue;
           if (key !== "extract") onlyExtract = false;
@@ -302,7 +317,10 @@ const SpeedGraph = memo(
         }}
       >
         <svg
-          className="absolute inset-0 h-full w-full overflow-hidden"
+          className={cn(
+            "absolute inset-0 h-full w-full overflow-hidden transition-[filter,opacity] duration-500",
+            paused && "opacity-50 grayscale"
+          )}
           style={{
             maskImage: "linear-gradient(to right, transparent, black 14%)",
             WebkitMaskImage: "linear-gradient(to right, transparent, black 14%)",
@@ -449,6 +467,14 @@ const SpeedGraph = memo(
             style={{ opacity: 0 }}
           />
         ))}
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-500",
+            paused ? "opacity-100" : "opacity-0"
+          )}
+        >
+          <Pause className="h-7 w-7 fill-muted-foreground/30 text-muted-foreground/30" />
+        </div>
         <div
           ref={tooltipRef}
           className="pointer-events-none absolute left-0 top-0 whitespace-nowrap rounded-md border border-border bg-card/95 px-2 py-1 text-xs font-semibold tabular-nums text-foreground shadow-lg backdrop-blur-sm"

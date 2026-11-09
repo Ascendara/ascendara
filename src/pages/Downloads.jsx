@@ -1199,6 +1199,11 @@ const Downloads = () => {
   });
   // With nothing left to download, the panel follows the extraction instead.
   const extractMode = activeDownloads === 0 && disk.extracting > 0;
+  // Every download paused: the graph holds still until one resumes.
+  const graphPaused =
+    !extractMode &&
+    downloadingGames.length > 0 &&
+    downloadingGames.every(game => game.downloadingData?.stopped);
   const filesPerSecond = `${t("downloads.files", "files")}/s`;
   const graphLabels = {
     extract: t("downloads.extractionSpeed", "Extraction"),
@@ -1390,6 +1395,7 @@ const Downloads = () => {
                 labels={graphLabels}
                 peak={peakSpeed}
                 high={highSpeed}
+                paused={graphPaused}
                 className="mt-2 h-40"
               />
             </section>
