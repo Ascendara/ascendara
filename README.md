@@ -256,7 +256,7 @@ The installer is also open source and available [here](https://github.com/Ascend
 
 ### Windows
 
-[**Download Ascendara for Windows**](https://cdn.ascendara.app/files/AscendaraInstaller.exe)
+[**Download Ascendara for Windows**](https://github.com/Ascendara/installer/releases/latest/download/AscendaraInstaller.exe)
 
 ### Linux
 
