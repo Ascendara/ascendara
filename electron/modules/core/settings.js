@@ -81,7 +81,10 @@ class SettingsManager {
       theme: "purple",
       customTheme: [],
       threadCount: 12,
-      singleStream: true,
+      singleStream: false,
+      // Single Stream used to be on by default, which held every download to one
+      // connection. It only applies once the person turns it on themselves.
+      singleStreamChosen: false,
       downloadLimit: 0,
       sideScrollBar: false,
       excludeFolders: false,
@@ -348,6 +351,7 @@ class SettingsManager {
       if (!("debridEnabled" in settings) && settings.torboxApiKey) {
         mergedSettings.debridEnabled = true;
       }
+      if (!mergedSettings.singleStreamChosen) mergedSettings.singleStream = false;
       // Only return the merged settings without writing to disk
       return mergedSettings;
     } catch (error) {
@@ -461,6 +465,7 @@ class SettingsManager {
         ...currentSettings,
         [key]: processedValue,
       };
+      if (key === "singleStream") updatedSettings.singleStreamChosen = true;
 
       // Clean up any flat ludusavi properties if we're updating the ludusavi object
       if (key === "ludusavi") {
@@ -488,6 +493,7 @@ class SettingsManager {
   getSettings() {
     // Create a copy of settings with decrypted sensitive values
     const decryptedSettings = { ...this.settings };
+    if (!decryptedSettings.singleStreamChosen) decryptedSettings.singleStream = false;
 
     for (const key of this.sensitiveKeysIn(decryptedSettings)) {
       if (decryptedSettings[key])
@@ -594,6 +600,8 @@ function registerSettingsHandlers() {
       ...currentSettings,
       ...options,
     };
+    if ("singleStream" in options && options.singleStream !== currentSettings.singleStream)
+      sanitizedOptions.singleStreamChosen = true;
 
     // Bulk saves may contain an uninitialized renderer default. Clearing the
     // index path must be explicit via update-setting, not a stale snapshot.
