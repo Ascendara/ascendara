@@ -299,11 +299,22 @@ pub struct DownloadMeter {
     updated: Option<Instant>,
     last_total: Option<u64>,
     last_done: u64,
+    /// (time, total time blocked writing) for telling a slow drive from a slow connection.
+    writes: VecDeque<(Instant, u64)>,
+    waiting_on_drive: bool,
 }
 
 impl DownloadMeter {
     pub fn new() -> Self {
-        DownloadMeter { samples: VecDeque::new(), rate: None, updated: None, last_total: None, last_done: 0 }
+        DownloadMeter {
+            samples: VecDeque::new(),
+            rate: None,
+            updated: None,
+            last_total: None,
+            last_done: 0,
+            writes: VecDeque::new(),
+            waiting_on_drive: false,
+        }
     }
 
     /// Update the game state's download fields. `total` is None while unknown.
@@ -352,8 +363,25 @@ impl DownloadMeter {
             Some(total) if total > 0 => (done as f64 / total as f64 * 100.0).min(100.0),
             _ => 0.0,
         };
+        // Writes to a drive with room to spare return at once. When they spend over
+        // half the time blocked, the drive cannot take data as fast as it arrives
+        // (common on hard drives once Windows' write cache fills).
+        let blocked = crate::http::WRITE_BLOCKED_NANOS.load(std::sync::atomic::Ordering::Relaxed);
+        self.writes.push_back((now, blocked));
+        while self.writes.len() > 2 && now.duration_since(self.writes[1].0) >= Duration::from_secs(4) {
+            self.writes.pop_front();
+        }
+        if let (Some((t0, b0)), Some((t1, b1))) = (self.writes.front(), self.writes.back()) {
+            let span = t1.duration_since(*t0).as_secs_f64();
+            if span >= 2.0 {
+                let share = b1.saturating_sub(*b0) as f64 / 1e9 / span;
+                // Separate on and off levels so the notice does not flicker.
+                self.waiting_on_drive = if self.waiting_on_drive { share >= 0.2 } else { share >= 0.5 };
+            }
+        }
         state.set(json!({
             "downloading": true,
+            "waitingOnDrive": self.waiting_on_drive,
             "extracting": false,
             "verifying": false,
             "progressCompleted": format!("{percent:.2}"),
@@ -464,6 +492,7 @@ impl ExtractMeter {
         state.set(json!({
             "downloading": false,
             "extracting": true,
+            "waitingOnDrive": false,
             "verifying": false,
             "progressCompleted": "100.00",
             "progressDownloadSpeeds": "0.00 KB/s",

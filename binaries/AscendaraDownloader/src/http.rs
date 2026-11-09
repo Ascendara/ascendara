@@ -226,8 +226,19 @@ fn page_excerpt(bytes: &[u8]) -> String {
     title.unwrap_or_else(|| text.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(160).collect())
 }
 
+/// Time spent blocked in disk writes, summed over every connection, in nanoseconds.
+/// When this grows about as fast as the clock, the drive is what holds the download back.
+pub static WRITE_BLOCKED_NANOS: AtomicU64 = AtomicU64::new(0);
+
+fn write_all_at(file: &File, bytes: &[u8], offset: u64) -> std::io::Result<()> {
+    let started = Instant::now();
+    let result = write_all_at_raw(file, bytes, offset);
+    WRITE_BLOCKED_NANOS.fetch_add(started.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    result
+}
+
 #[cfg(windows)]
-fn write_all_at(file: &File, mut bytes: &[u8], mut offset: u64) -> std::io::Result<()> {
+fn write_all_at_raw(file: &File, mut bytes: &[u8], mut offset: u64) -> std::io::Result<()> {
     use std::os::windows::fs::FileExt;
     while !bytes.is_empty() {
         let written = file.seek_write(bytes, offset)?;
@@ -241,7 +252,7 @@ fn write_all_at(file: &File, mut bytes: &[u8], mut offset: u64) -> std::io::Resu
 }
 
 #[cfg(unix)]
-fn write_all_at(file: &File, bytes: &[u8], offset: u64) -> std::io::Result<()> {
+fn write_all_at_raw(file: &File, bytes: &[u8], offset: u64) -> std::io::Result<()> {
     use std::os::unix::fs::FileExt;
     file.write_all_at(bytes, offset)
 }

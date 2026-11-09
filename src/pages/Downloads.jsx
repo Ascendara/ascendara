@@ -2459,6 +2459,13 @@ const DownloadCard = ({
             </Callout>
           )}
 
+        {/* The drive, not the connection, is limiting the speed */}
+        {isDownloadPhase && downloadingData?.waitingOnDrive && !stall && (
+          <Callout icon={HardDrive} title={t("downloads.driveBottleneck.title")}>
+            <p>{t("downloads.driveBottleneck.description")}</p>
+          </Callout>
+        )}
+
         {/* No progress for a while */}
         {stall && !hasError && !isStopped && !isWaiting && (
           <Callout

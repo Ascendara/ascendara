@@ -2473,7 +2473,11 @@
       "writing": "Writing",
       "starting": "Connecting to the download..."
     },
-    "waitingOnDriveNotice": "Waiting for the drive to catch up. Hard drives slow down during long writes; unpacking carries on by itself."
+    "waitingOnDriveNotice": "Waiting for the drive to catch up. Hard drives slow down during long writes; unpacking carries on by itself.",
+    "driveBottleneck": {
+      "title": "Your drive can't keep up",
+      "description": "Data is arriving faster than this drive can write it, so the speed rises and drops as the drive catches up. This is the drive, not your connection. Downloading to an SSD avoids it."
+    }
   },
   "externalSources": {
     "activeDesc": "Search and downloads are using {{name}} instead of the Ascendara index.",
