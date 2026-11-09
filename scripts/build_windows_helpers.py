@@ -10,7 +10,6 @@ import shutil
 import subprocess
 import sys
 from build_support import ROOT, validate_resources
-import setup_hatchzip
 
 
 def run(args, cwd=ROOT):
@@ -27,8 +26,7 @@ def main():
     for name in ('7z.exe', '7z.dll', 'License.txt'):
         if not (seven / name).is_file():
             raise RuntimeError(f'Install 7-Zip x64: missing {seven / name}')
-    hatchzip = setup_hatchzip.build()
-    names = ('AscendaraDownloader', 'AscendaraNotificationHelper', 'AscendaraTorrentHandler')
+    names = ('AscendaraNotificationHelper', 'AscendaraTorrentHandler')
     venv = ROOT / '.build_venv' / 'Scripts/python.exe'
     run([sys.executable, '-m', 'venv', venv.parent.parent])
     run([venv, '-m', 'pip', 'install', 'pyinstaller==6.16.0'])
@@ -44,20 +42,15 @@ def main():
         # The app starts these in the background; as console programs Windows
         # would open a terminal window for each one
         command += ['--windowed']
-        if name in ('AscendaraDownloader', 'AscendaraTorrentHandler'):
+        if name == 'AscendaraTorrentHandler':
             for file in ('7z.exe', '7z.dll'):
                 command += ['--add-binary', f'{seven / file};.']
             command += ['--add-data', f'{seven / "License.txt"};licenses/7zip']
         if name == 'AscendaraNotificationHelper':
             command += ['--add-data', f'{folder / "src/sounds"};sounds',
                         '--hidden-import', 'PyQt6.QtMultimedia']
-        if name == 'AscendaraDownloader':
-            command += ['--add-binary', f'{folder / "src/UnRAR.dll"};.', '--hidden-import', 'unrar.unrarlib']
-            command += ['--add-binary', f'{hatchzip};.']
-            for file in setup_hatchzip.LICENSES:
-                command += ['--add-data', f'{hatchzip.parent / file};licenses/hatchzip']
         run([*command, folder / 'src' / f'{name}.py'])
-    for name in ('AscendaraCrashReporter', 'AscendaraGameHandler'):
+    for name in ('AscendaraCrashReporter', 'AscendaraGameHandler', 'AscendaraDownloader'):
         run(['cargo', 'build', '--release', '--locked'], ROOT / 'binaries' / name)
     watcher = ROOT / 'binaries/AscendaraAchievementWatcher'
     run(['yarn.cmd', 'install', '--frozen-lockfile'], watcher)

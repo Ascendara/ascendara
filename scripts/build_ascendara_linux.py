@@ -110,12 +110,12 @@ def build_achievement_watcher():
     return True
 
 def build_rust_binaries():
-    """Build the Rust helpers (CrashReporter, GameHandler) for Linux"""
+    """Build the Rust helpers (CrashReporter, GameHandler, Downloader) for Linux"""
     if not shutil.which('cargo'):
         print("Error: cargo is not installed. Please install Rust toolchain.")
         return False
 
-    for name in ('AscendaraCrashReporter', 'AscendaraGameHandler'):
+    for name in ('AscendaraCrashReporter', 'AscendaraGameHandler', 'AscendaraDownloader'):
         print(f"Building {name} (Rust)...")
         crate_dir = os.path.join('binaries', name)
         if not run_command(['cargo', 'build', '--release', '--locked'], cwd=crate_dir):
@@ -186,20 +186,9 @@ def build_python_binaries_linux():
                        '--add-binary', f'{unrar}:.',
                        '--add-data', f'{unrar_license}:licenses/unrar']
 
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    import setup_hatchzip
-    try:
-        hatchzip = str(setup_hatchzip.build())
-    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
-        print(f'Failed to build HatchZip: {error}')
-        return False
-    downloader_args = extraction_args + ['--add-binary', f'{hatchzip}:.']
-    for file in setup_hatchzip.LICENSES:
-        downloader_args += ['--add-data', f'{os.path.join(os.path.dirname(hatchzip), file)}:licenses/hatchzip']
 
     # Map: (output name, script path relative to binaries_dir, extra PyInstaller args)
     binaries = [
-        ('AscendaraDownloader',         'AscendaraDownloader/src/AscendaraDownloader.py',         downloader_args),
         ('AscendaraLanguageTranslation', 'AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py', []),
         ('AscendaraTorrentHandler',      'AscendaraTorrentHandler/src/AscendaraTorrentHandler.py',  extraction_args),
         ('AscendaraNotificationHelper',  'AscendaraNotificationHelper/src/AscendaraNotificationHelper.py',

@@ -174,7 +174,7 @@
           "to": "icon.ico"
         },
         {
-          "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader.exe",
+          "from": "binaries/AscendaraDownloader/target/release/AscendaraDownloader.exe",
           "to": "."
         },
         {
@@ -213,7 +213,7 @@
           "to": "icon.png"
         },
         {
-          "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader",
+          "from": "binaries/AscendaraDownloader/target/release/AscendaraDownloader",
           "to": "."
         },
         {
@@ -294,7 +294,7 @@
           "to": "icon.png"
         },
         {
-          "from": "binaries/AscendaraDownloader/dist/AscendaraDownloader",
+          "from": "binaries/AscendaraDownloader/target/release/AscendaraDownloader",
           "to": "."
         },
         {

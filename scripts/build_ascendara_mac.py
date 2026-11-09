@@ -10,15 +10,13 @@ import subprocess
 import sys
 from build_support import register_after_build, validate_resources
 from setup_macos_tools import TOOL_DIR, validate_tool
-import setup_hatchzip
 import build_highball
 
 ROOT = Path(__file__).resolve().parents[1]
 HELPERS = (
-    'AscendaraDownloader', 'AscendaraLanguageTranslation',
-    'AscendaraTorrentHandler', 'AscendaraNotificationHelper',
+    'AscendaraLanguageTranslation', 'AscendaraTorrentHandler', 'AscendaraNotificationHelper',
 )
-RUST_HELPERS = ('AscendaraCrashReporter', 'AscendaraGameHandler')
+RUST_HELPERS = ('AscendaraCrashReporter', 'AscendaraGameHandler', 'AscendaraDownloader')
 
 
 MACH_ARCH = {'arm64': 'arm64', 'x64': 'x86_64'}
@@ -161,7 +159,6 @@ def build_arch(arch, args, identity):
     # Separate caches prevent mixing native libraries between CPU targets.
     env['PYINSTALLER_CONFIG_DIR'] = str(staging / 'pyinstaller-cache')
     run([*python, '-m', 'pip', 'install', 'pyinstaller==6.16.0'], env=env)
-    hatchzip = setup_hatchzip.build(RUST_TARGET[arch])
     for name in HELPERS:
         run([*python, '-m', 'pip', 'install', '-r', ROOT / 'binaries' / name / 'requirements.txt'], env=env)
     for name in HELPERS:
@@ -171,17 +168,13 @@ def build_arch(arch, args, identity):
         if identity:
             # Onefile payloads must be signed before they are embedded.
             command += ['--codesign-identity', identity]
-        if name in ('AscendaraDownloader', 'AscendaraTorrentHandler'):
+        if name == 'AscendaraTorrentHandler':
             command += ['--add-binary', f'{TOOL_DIR / "7zz"}:.',
                         '--add-data', f'{TOOL_DIR / "License.txt"}:licenses/7zip',
                         '--add-data', f'{TOOL_DIR / "readme.txt"}:licenses/7zip']
         if name == 'AscendaraNotificationHelper':
             command += ['--add-data', f'{ROOT / "binaries" / name / "src/sounds"}:sounds',
                         '--hidden-import', 'PyQt6.QtMultimedia']
-        if name == 'AscendaraDownloader':
-            command += ['--add-binary', f'{hatchzip}:.']
-            for file in setup_hatchzip.LICENSES:
-                command += ['--add-data', f'{hatchzip.parent / file}:licenses/hatchzip']
         command += [ROOT / 'binaries' / name / 'src' / f'{name}.py']
         run(command, env=env)
     for name in RUST_HELPERS:
