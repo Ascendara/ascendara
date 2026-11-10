@@ -1837,6 +1837,7 @@
       "matchedAs": "Matched as: {{name}}",
       "needsSpace": "{{free}} free, needs {{needed}}",
       "note": "Checked on this PC. CPU and GPU use rough performance tiers, so treat those as a guide.",
+      "notRequired": "These are the developer's recommended minimums, not a hard requirement. Many games still run fine below them.",
       "pass": "Meets it",
       "summary": "Meets {{passed}} of {{total}}",
       "unknown": "Can't tell",

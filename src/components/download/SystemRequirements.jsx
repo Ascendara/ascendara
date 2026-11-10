@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Cpu,
   HelpCircle,
+  Info,
   Loader,
   XCircle,
 } from "lucide-react";
@@ -195,12 +196,14 @@ export default function SystemRequirements({
           </div>
         ))}
       </dl>
-      {(matched || hasVerdicts) && (
-        <div className="mt-4 space-y-1 border-t border-border/40 pt-3 text-xs leading-relaxed text-muted-foreground">
-          {matched && <p>{t("download.canRun.matchedAs", { name: matched.name })}</p>}
-          {hasVerdicts && <p>{t("download.canRun.note")}</p>}
-        </div>
-      )}
+      <div className="mt-4 space-y-1 border-t border-border/40 pt-3 text-xs leading-relaxed text-muted-foreground">
+        <p className="flex items-start gap-1.5">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+          <span>{t("download.canRun.notRequired")}</span>
+        </p>
+        {matched && <p>{t("download.canRun.matchedAs", { name: matched.name })}</p>}
+        {hasVerdicts && <p>{t("download.canRun.note")}</p>}
+      </div>
 
       <AlertDialog open={showCompareDialog} onOpenChange={setShowCompareDialog}>
         <AlertDialogContent className="max-w-2xl gap-0 border-border bg-background/95 p-6 backdrop-blur-sm">
@@ -286,7 +289,8 @@ export default function SystemRequirements({
 
           <AlertDialogFooter className="mt-5 items-center gap-3 sm:justify-between">
             <p className="text-xs leading-relaxed text-muted-foreground sm:max-w-md">
-              {hasVerdicts ? t("download.canRun.note") : null}
+              {t("download.canRun.notRequired")}
+              {hasVerdicts && <> {t("download.canRun.note")}</>}
             </p>
             <AlertDialogCancel className="mt-0">{t("common.close")}</AlertDialogCancel>
           </AlertDialogFooter>
