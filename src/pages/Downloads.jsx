@@ -381,7 +381,12 @@ const ActivityPanel = ({ extraction, clockIcon: ClockIcon, showLargeFileNotice, 
       : extraction?.decompressing
         ? t("downloads.decompressingNotice")
         : showLargeFileNotice
-          ? t("downloads.largeFileNotice")
+          ? // A slow small file means the drive is behind, not that the file is big
+            t(
+              extraction?.currentFileSize > 0
+                ? "downloads.slowWriteNotice"
+                : "downloads.largeFileNotice"
+            )
           : null;
   return (
     <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
@@ -2925,4 +2930,3 @@ const DownloadCard = ({
 };
 
 export default Downloads;
-

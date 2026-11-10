@@ -2391,6 +2391,7 @@
     "killSuccessKeepFiles": "Download killed, files kept on disk",
     "decompressingNotice": "Still unpacking: decompressing data before it is written to disk...",
     "largeFileNotice": "Writing a large file to disk... this may take a moment.",
+    "slowWriteNotice": "Still writing to disk... the drive is catching up, this may take a moment.",
     "largeFileDecompressing": "Unpacking a large file: {{done}} of {{total}}. Decompressing the next part, still working...",
     "largeFileProgress": "Unpacking a large file: {{done}} of {{total}}",
     "lastExtracted": "Last extracted",
@@ -2816,8 +2817,8 @@
     "updateFailed": "Failed to start update download",
     "updateManualHint": "You can also update your local index manually and then reinstall the game to get the latest version.",
     "updateStarted": "Update download started!",
-    "viewAll": "View All",
     "updateViaMagicLink": "This update downloads through a Magic Link. Ascendara opens the host's page in the background and grabs the file for you, so there's nothing to click.",
+    "viewAll": "View All",
     "viewOnFling": "View on FLiNG",
     "viewOnNexus": "View on Nexus Mods"
   },
