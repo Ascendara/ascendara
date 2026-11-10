@@ -106,24 +106,52 @@ pub fn shell_split(s: &str) -> Result<Vec<String>> {
     }
 }
 
-/// Tokens matching VAR=VALUE become env vars, '%command%' is dropped and the
-/// remaining tokens are passed as arguments to the game executable.
-pub fn split_env_and_args(launch_cmd: Option<&str>) -> Result<(BTreeMap<String, String>, Vec<String>)> {
-    let mut env = BTreeMap::new();
-    let mut args = Vec::new();
-    let Some(cmd) = launch_cmd.filter(|c| !c.is_empty()) else { return Ok((env, args)) };
-    for token in shell_split(cmd)? {
-        if token == "%command%" {
-            continue;
-        }
-        match is_env_assignment(&token) {
-            Some((k, v)) => {
-                env.insert(k, v);
+/// A launch command split Steam-style into env vars, a wrapper and game args.
+#[derive(Debug, Default)]
+pub struct LaunchCmd {
+    pub env: BTreeMap<String, String>,
+    pub wrapper: Vec<String>,
+    pub args: Vec<String>,
+}
+
+impl LaunchCmd {
+    /// The wrapper followed by the runner command it should run.
+    pub fn wrap(&self, cmd: Vec<String>) -> Vec<String> {
+        self.wrapper.iter().cloned().chain(cmd).collect()
+    }
+}
+
+/// Parses launch options like Steam does. With '%command%', leading VAR=VALUE
+/// tokens become env vars, the rest before it is a wrapper (lsfg, gamemoderun,
+/// mangohud...) and tokens after it are game arguments. Without '%command%',
+/// VAR=VALUE tokens become env vars and the rest are game arguments.
+pub fn split_env_and_args(launch_cmd: Option<&str>) -> Result<LaunchCmd> {
+    let mut parsed = LaunchCmd::default();
+    let Some(cmd) = launch_cmd.filter(|c| !c.is_empty()) else { return Ok(parsed) };
+    let tokens = shell_split(cmd)?;
+    let Some(marker) = tokens.iter().position(|t| t == "%command%") else {
+        for token in tokens {
+            match is_env_assignment(&token) {
+                Some((k, v)) => {
+                    parsed.env.insert(k, v);
+                }
+                None => parsed.args.push(token),
             }
-            None => args.push(token),
+        }
+        return Ok(parsed);
+    };
+    let mut tokens = tokens.into_iter();
+    for token in tokens.by_ref().take(marker) {
+        match is_env_assignment(&token).filter(|_| parsed.wrapper.is_empty()) {
+            Some((k, v)) => {
+                parsed.env.insert(k, v);
+            }
+            None if parsed.wrapper.is_empty() => parsed.wrapper.push(pypath::expand_home(&token)),
+            None => parsed.wrapper.push(token),
         }
     }
-    Ok((env, args))
+    parsed.args.extend(tokens.skip(1).filter(|t| t != "%command%"));
+    Ok(parsed)
 }
 
 /// The environment handed to runners. Variables a PyInstaller parent saved as
@@ -333,8 +361,8 @@ pub fn launch_with_proton(exe_path: &str, config: &RunnerConfig, launch_cmd: Opt
     env.entry("SteamGameId".into()).or_insert_with(|| "0".into());
     sdl_video_driver(&mut env, "Proton");
 
-    let (extra_env, extra_args) = split_env_and_args(launch_cmd)?;
-    env.extend(extra_env);
+    let launch = split_env_and_args(launch_cmd)?;
+    env.extend(launch.env.clone());
 
     apply_online_fix(&mut env, config);
     if set(&config.winedlloverrides).is_some() || set(&config.steamappid).is_some() {
@@ -376,7 +404,8 @@ pub fn launch_with_proton(exe_path: &str, config: &RunnerConfig, launch_cmd: Opt
     }
 
     let mut cmd = vec![proton_script, "run".into(), exe_path.into()];
-    cmd.extend(extra_args);
+    cmd.extend(launch.args.iter().cloned());
+    let cmd = launch.wrap(cmd);
     let game_dir = pypath::dirname(exe_path);
 
     info!("[Proton] Command: {}", cmd.join(" "));
@@ -404,11 +433,12 @@ pub fn launch_with_wine_isolated(exe_path: &str, config: &RunnerConfig, launch_c
     }
     sdl_video_driver(&mut env, "Wine");
 
-    let (extra_env, extra_args) = split_env_and_args(launch_cmd)?;
-    env.extend(extra_env);
+    let launch = split_env_and_args(launch_cmd)?;
+    env.extend(launch.env.clone());
 
     let mut cmd = vec![wine_path.to_string(), exe_path.to_string()];
-    cmd.extend(extra_args);
+    cmd.extend(launch.args.iter().cloned());
+    let cmd = launch.wrap(cmd);
     let game_dir = pypath::dirname(exe_path);
 
     info!("[Wine] Command: {}", cmd.join(" "));
@@ -435,8 +465,8 @@ pub fn launch_with_highball(exe_path: &str, config: &RunnerConfig, launch_cmd: O
     }
 
     let mut env = highball_env(config);
-    let (extra_env, extra_args) = split_env_and_args(launch_cmd)?;
-    env.extend(extra_env);
+    let launch = split_env_and_args(launch_cmd)?;
+    env.extend(launch.env.clone());
 
     let mut cmd = vec![highball_bin.to_string(), "run".into()];
     if let Some(renderer) = set(&config.highball_renderer) {
@@ -444,10 +474,11 @@ pub fn launch_with_highball(exe_path: &str, config: &RunnerConfig, launch_cmd: O
     }
     cmd.push(config.highball_bottle.clone().unwrap_or_default());
     cmd.push(exe_path.into());
-    if !extra_args.is_empty() {
+    if !launch.args.is_empty() {
         cmd.push("--".into());
-        cmd.extend(extra_args);
+        cmd.extend(launch.args.iter().cloned());
     }
+    let cmd = launch.wrap(cmd);
 
     info!("[Highball] Command: {}", cmd.join(" "));
     info!("[Highball] HIGHBALL_HOME={}", env_or_none(&env, "HIGHBALL_HOME"));
@@ -490,8 +521,8 @@ pub fn launch_with_umu(exe_path: &str, config: &RunnerConfig, launch_cmd: Option
         env.insert("STEAM_COMPAT_CLIENT_INSTALL_PATH".into(), steam.into());
     }
 
-    let (extra_env, extra_args) = split_env_and_args(launch_cmd)?;
-    env.extend(extra_env.clone());
+    let launch = split_env_and_args(launch_cmd)?;
+    env.extend(launch.env.clone());
 
     if config.umu_use_steam {
         env.insert("UMU_USE_STEAM".into(), "1".into());
@@ -507,7 +538,8 @@ pub fn launch_with_umu(exe_path: &str, config: &RunnerConfig, launch_cmd: Option
     }
 
     let mut cmd = vec![umu_bin.to_string(), exe_path.to_string()];
-    cmd.extend(extra_args);
+    cmd.extend(launch.args.iter().cloned());
+    let cmd = launch.wrap(cmd);
 
     install_vcredist(&prefix_path, &env, Some(umu_bin), None)?;
 
@@ -515,7 +547,7 @@ pub fn launch_with_umu(exe_path: &str, config: &RunnerConfig, launch_cmd: Option
     info!("[UMU] Command: {}", cmd.join(" "));
     info!("[UMU] GAMEID={}, WINEPREFIX={prefix_path}", env["GAMEID"]);
     info!("[UMU] PROTONPATH={}", env.get("PROTONPATH").map_or("(auto)", |p| p.as_str()));
-    info!("[UMU] Extra env applied: {extra_env:?}");
+    info!("[UMU] Extra env applied: {:?}", launch.env);
     Ok(spawn_logged(&cmd, &env, &game_dir, "UMU", "UMU"))
 }
 
@@ -623,12 +655,32 @@ mod tests {
 
     #[test]
     fn env_and_args_split() {
-        let (env, rest) = split_env_and_args(Some("DXVK_HUD=1 PROTON_LOG=1 %command% -windowed 'two words' lower=1")).unwrap();
-        assert_eq!(env.get("DXVK_HUD").map(String::as_str), Some("1"));
-        assert_eq!(env.get("PROTON_LOG").map(String::as_str), Some("1"));
-        assert_eq!(rest, vec!["-windowed", "two words", "lower=1"]);
+        let parsed = split_env_and_args(Some("DXVK_HUD=1 PROTON_LOG=1 %command% -windowed 'two words' lower=1")).unwrap();
+        assert_eq!(parsed.env.get("DXVK_HUD").map(String::as_str), Some("1"));
+        assert_eq!(parsed.env.get("PROTON_LOG").map(String::as_str), Some("1"));
+        assert!(parsed.wrapper.is_empty());
+        assert_eq!(parsed.args, vec!["-windowed", "two words", "lower=1"]);
         assert!(split_env_and_args(Some("'unterminated")).is_err());
-        assert_eq!(split_env_and_args(None).unwrap().1.len(), 0);
+        assert_eq!(split_env_and_args(None).unwrap().args.len(), 0);
+
+        let parsed = split_env_and_args(Some("-dx11 MANGOHUD=1")).unwrap();
+        assert!(parsed.wrapper.is_empty());
+        assert_eq!(parsed.env.get("MANGOHUD").map(String::as_str), Some("1"));
+        assert_eq!(parsed.args, vec!["-dx11"]);
+    }
+
+    #[test]
+    fn wrapper_before_command() {
+        let parsed = split_env_and_args(Some("LSFG_PROCESS=game gamemoderun mangohud FOO=1 %command% -windowed")).unwrap();
+        assert_eq!(parsed.env.len(), 1);
+        assert_eq!(parsed.env.get("LSFG_PROCESS").map(String::as_str), Some("game"));
+        assert_eq!(parsed.wrapper, vec!["gamemoderun", "mangohud", "FOO=1"]);
+        assert_eq!(parsed.args, vec!["-windowed"]);
+        assert_eq!(parsed.wrap(args(&["umu-run", "g.exe"])), vec!["gamemoderun", "mangohud", "FOO=1", "umu-run", "g.exe"]);
+
+        let parsed = split_env_and_args(Some("~/lsfg %command%")).unwrap();
+        assert_eq!(parsed.wrapper, vec![pypath::expand_home("~/lsfg")]);
+        assert!(!parsed.wrapper[0].starts_with('~'));
     }
 
     #[test]
