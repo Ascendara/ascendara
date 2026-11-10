@@ -98,6 +98,7 @@ import {
 import { useSettings } from "@/context/SettingsContext";
 import { verifyAscendAccess } from "@/services/firebase/firebaseService";
 import ProtonOptionsDialog from "@/components/ProtonOptionsDialog";
+import TimemachineIntroDialog from "@/components/TimemachineIntroDialog";
 import HighballSettings from "@/components/HighballSettings";
 import GameIndexManager from "@/components/GameIndexManager";
 import AchievementFolderSearch from "@/components/AchievementFolderSearch";
@@ -307,6 +308,7 @@ function Settings() {
   const [latestDevCommit, setLatestDevCommit] = useState(null);
   const [protonOptionsOpen, setProtonOptionsOpen] = useState(false);
   const [showSupportDialog, setShowSupportDialog] = useState(false);
+  const [showTimemachineIntro, setShowTimemachineIntro] = useState(false);
   const [showSupportConfirmDialog, setShowSupportConfirmDialog] = useState(false);
   const [supportCode, setSupportCode] = useState(["", "", "", "", "", ""]);
   const [supportLoading, setSupportLoading] = useState(false);
@@ -3856,7 +3858,12 @@ function Settings() {
                         checked={settings.showOldDownloadLinks}
                         onCheckedChange={value => {
                           handleSettingChange("showOldDownloadLinks", value);
+                          if (value) setShowTimemachineIntro(true);
                         }}
+                      />
+                      <TimemachineIntroDialog
+                        open={showTimemachineIntro}
+                        onOpenChange={setShowTimemachineIntro}
                       />
                     </div>
                   </div>

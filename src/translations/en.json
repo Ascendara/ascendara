@@ -2149,6 +2149,10 @@
       "current": "Current",
       "currentlyShowing": "Currently showing",
       "description": "Select a previous version of {game}",
+      "intro": {
+        "description": "On any game's download page, click the clock next to its version to browse and download older releases.",
+        "title": "Timemachine is on"
+      },
       "latest": "Latest",
       "loadError": "Failed to load version history",
       "loading": "Loading previous versions...",
