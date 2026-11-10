@@ -214,7 +214,7 @@ export default function SystemRequirements({
                   <Cpu className="h-5 w-5 text-primary" />
                 </div>
                 <div className="min-w-0 text-left">
-                  <AlertDialogTitle className="text-lg">
+                  <AlertDialogTitle className="mb-0 text-lg leading-tight">
                     {t("download.compareYourPC")}
                   </AlertDialogTitle>
                   {gameName && (
