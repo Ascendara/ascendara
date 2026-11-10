@@ -47,6 +47,30 @@ function usePacedStage(stage, steps) {
   return shown;
 }
 
+/**
+ * Seconds left until `endsAt` and how far along the wait is (0-1), ticking a
+ * few times a second; both null without a countdown.
+ */
+export function useCountdown(endsAt) {
+  const startedAt = useRef(null);
+  const read = () => {
+    if (!endsAt) return { seconds: null, progress: null };
+    const total = Math.max(1, endsAt - (startedAt.current ?? Date.now()));
+    const left = Math.max(0, endsAt - Date.now());
+    return { seconds: Math.ceil(left / 1000), progress: 1 - left / total };
+  };
+  const [state, setState] = useState(read);
+  useEffect(() => {
+    startedAt.current = endsAt ? Date.now() : null;
+    setState(read());
+    if (!endsAt) return;
+    const timer = setInterval(() => setState(read()), 200);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endsAt]);
+  return state;
+}
+
 /** Ring that fills as a countdown runs, in place of the spinner. */
 function CountdownRing({ progress }) {
   const radius = 7;

@@ -33,10 +33,30 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle2,
+  ArrowUpFromLine,
+  WandSparkles,
 } from "lucide-react";
+
+// Hosts whose page is opened in a hidden window to grab the file (Magic Link)
+const BROWSER_UPDATE_PROVIDERS = ["buzzheavier", "megadb"];
+
+/** The first usable update link, seamless hosts first; null if there is none. */
+const pickUpdateSource = downloadLinks => {
+  for (const provider of [...SEAMLESS_PROVIDERS, ...BROWSER_UPDATE_PROVIDERS]) {
+    const links = downloadLinks?.[provider];
+    const link = Array.isArray(links)
+      ? links.find(item => item && typeof item === "string")
+      : null;
+    if (link) {
+      return { provider, url: link.replace(/^(?:https?:)?\/\//, "https://") };
+    }
+  }
+  return null;
+};
 import { Switch } from "@/components/ui/switch";
 import gameUpdateService from "@/services/library/gameUpdateService";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
+import DownloadButton, { useCountdown } from "@/components/download/DownloadButton";
 import { loadFolders, saveFolders } from "@/lib/folderManager";
 import { cn, sanitizeText } from "@/lib/utils";
 import { useSettings } from "@/context/SettingsContext";
@@ -1410,6 +1430,12 @@ function InstalledGameScreen() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [isStartingUpdate, setIsStartingUpdate] = useState(false);
   const pendingBrowserUpdate = useRef(null);
+  // Magic Link stage of an update being prepared in a hidden window
+  const [updateLinkStage, setUpdateLinkStage] = useState(null);
+  const [updateCountdownEndsAt, setUpdateCountdownEndsAt] = useState(null);
+  const updateCountdown = useCountdown(
+    updateLinkStage === "countdown" ? updateCountdownEndsAt : null
+  );
   const [importCatalogMatch, setImportCatalogMatch] = useState(null);
 
   useEffect(() => {
@@ -1420,6 +1446,7 @@ function InstalledGameScreen() {
 
       const startUpdate = pendingBrowserUpdate.current;
       pendingBrowserUpdate.current = null;
+      setUpdateLinkStage(stage => (stage ? "starting" : stage));
       try {
         const downloadUrl = decodeURIComponent(url.slice("ascendara://".length));
         if (!["https:", "http:"].includes(new URL(downloadUrl).protocol)) {
@@ -1429,15 +1456,143 @@ function InstalledGameScreen() {
       } catch (error) {
         console.error("[GameScreen] Error handling intercepted update:", error);
         toast.error(t("gameScreen.updateFailed"));
+      } finally {
+        setUpdateLinkStage(null);
       }
     };
 
     const unsubscribe = window.electron.onInterceptedDownloadUrl(handleInterceptedUpdate);
+    const removeProgress = window.electron.onExternalWindowProgress(
+      ({ stage, endsAt }) => {
+        // Only while a hidden-window update is still being worked on
+        setUpdateLinkStage(current => (current ? stage : current));
+        if (stage === "countdown") setUpdateCountdownEndsAt(endsAt);
+      }
+    );
     return () => {
       pendingBrowserUpdate.current = null;
+      setUpdateLinkStage(null);
       unsubscribe();
+      removeProgress && removeProgress();
     };
   }, [showUpdateDialog, game?.game, game?.name, t]);
+
+  const updateSource = pickUpdateSource(updateInfo?.downloadLinks);
+  const updateViaMagicLink = BROWSER_UPDATE_PROVIDERS.includes(updateSource?.provider);
+
+  const openUpdateOnDownloadPage = () => {
+    setShowUpdateDialog(false);
+    navigate("/download", {
+      state: {
+        gameData: {
+          game: updateInfo?.gameName || game?.game,
+          gameID: updateInfo?.gameID || game?.gameID,
+          version: updateInfo?.latestVersion,
+          download_links: updateInfo?.downloadLinks,
+          imgID: game?.imgID,
+          isUpdate: true,
+        },
+      },
+    });
+  };
+
+  const handleStartUpdate = async () => {
+    // Check if user has Ascend access - if not, promote Ascend
+    if (!isAuthenticated || !ascendAccess.hasAccess) {
+      setShowUpdateDialog(false);
+      navigate("/ascend");
+      return;
+    }
+
+    // No seamless or Magic Link source: let the download page handle it
+    if ((!updateInfo?.autoUpdateSupported && !updateViaMagicLink) || !updateSource) {
+      openUpdateOnDownloadPage();
+      return;
+    }
+
+    const { provider: downloadProvider, url: downloadUrl } = updateSource;
+    console.log(`[GameScreen] Found update link from ${downloadProvider}:`, downloadUrl);
+
+    // Preserve update metadata when a browser provider returns its direct URL.
+    const startUpdate = async resolvedUrl => {
+      setIsStartingUpdate(true);
+      try {
+        const gameName = game?.game || game?.name;
+        const dir = await window.electron.getDownloadDirectory();
+
+        console.log(`[GameScreen] Starting update download for ${gameName}`);
+        await window.electron.downloadFile(
+          resolvedUrl,
+          gameName,
+          game?.online || false,
+          game?.dlc || false,
+          game?.isVr || false,
+          true, // isUpdating
+          updateInfo?.latestVersion || "",
+          game?.imgID,
+          updateInfo?.size || "",
+          dir,
+          game?.gameID || ""
+        );
+
+        toast.success(t("gameScreen.updateStarted"));
+        setShowUpdateDialog(false);
+        navigate("/downloads");
+      } catch (error) {
+        console.error("[GameScreen] Error starting update:", error);
+        toast.error(t("gameScreen.updateFailed"));
+      } finally {
+        setIsStartingUpdate(false);
+      }
+    };
+
+    if (!updateViaMagicLink) {
+      await startUpdate(downloadUrl);
+      return;
+    }
+
+    // MegaDB resolves without a window; the window is only a fallback
+    setUpdateLinkStage("opening");
+    if (downloadProvider === "megadb") {
+      let resolved;
+      try {
+        resolved = await window.electron.resolveMegaDbLink(downloadUrl);
+      } catch (error) {
+        resolved = { error: error.message };
+      }
+      if (resolved?.url) {
+        setUpdateLinkStage("starting");
+        try {
+          await startUpdate(resolved.url);
+        } finally {
+          setUpdateLinkStage(null);
+        }
+        return;
+      }
+      console.warn("[GameScreen] MegaDB link not resolved:", resolved?.error);
+    }
+
+    // The page is handled in a hidden window; only shown if it needs the user
+    pendingBrowserUpdate.current = startUpdate;
+    let intercepted = false;
+    try {
+      const result = await window.electron.openURL(downloadUrl, {
+        referrer: "https://steamrip.com/",
+        autoDownload: true,
+      });
+      intercepted = result?.status === "intercepted";
+      if (result?.status === "shown") {
+        toast.info(t("download.downloadOptions.buzzheavierReminder"));
+      }
+    } catch (error) {
+      pendingBrowserUpdate.current = null;
+      console.error("[GameScreen] Error opening update provider:", error);
+      toast.error(t("gameScreen.updateFailed"));
+    } finally {
+      // An intercepted link moves on to "starting", cleared once it's handed off
+      if (!intercepted) setUpdateLinkStage(null);
+    }
+  };
 
   // Logo state
   const [logoData, setLogoData] = useState(
@@ -3671,7 +3826,14 @@ function InstalledGameScreen() {
       />
 
       {/* Game Update Available Dialog */}
-      <AlertDialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
+      <AlertDialog
+        open={showUpdateDialog}
+        onOpenChange={open => {
+          // Keep it open while a Magic Link is being prepared, or the handoff is lost
+          if (!open && updateLinkStage) return;
+          setShowUpdateDialog(open);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-2xl font-bold text-foreground">
@@ -3698,6 +3860,12 @@ function InstalledGameScreen() {
                     </span>
                   </div>
                 </div>
+                {isAuthenticated && ascendAccess.hasAccess && updateViaMagicLink && (
+                  <div className="flex items-start gap-2.5 rounded-lg bg-primary/5 px-3 py-2.5 text-xs leading-relaxed text-primary">
+                    <WandSparkles className="mt-px h-4 w-4 shrink-0" />
+                    <span>{t("gameScreen.updateViaMagicLink")}</span>
+                  </div>
+                )}
                 {(!isAuthenticated || !ascendAccess.hasAccess) && (
                   <p className="text-xs text-muted-foreground/80">
                     {t("gameScreen.updateManualHint")}
@@ -3706,172 +3874,52 @@ function InstalledGameScreen() {
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex gap-2">
-            <Button
-              variant="outline"
-              className="text-primary"
-              onClick={() => setShowUpdateDialog(false)}
-            >
-              {t("common.later")}
-            </Button>
-            <Button
-              className="text-secondary"
-              disabled={isStartingUpdate}
-              onClick={async () => {
-                // Check if user has Ascend access - if not, promote Ascend
-                if (!isAuthenticated || !ascendAccess.hasAccess) {
-                  setShowUpdateDialog(false);
-                  navigate("/ascend");
-                  return;
+          {isAuthenticated && ascendAccess.hasAccess ? (
+            <div className="space-y-2">
+              <DownloadButton
+                stage={updateLinkStage || (isStartingUpdate ? "busy" : "idle")}
+                label={
+                  isStartingUpdate
+                    ? t("gameScreen.startingUpdate")
+                    : t("gameScreen.downloadUpdate")
                 }
-
-                const browserProviders = ["buzzheavier", "megadb"];
-                const downloadLinks = updateInfo?.downloadLinks || {};
-                const hasBrowserUpdate = browserProviders.some(
-                  provider =>
-                    Array.isArray(downloadLinks[provider]) &&
-                    downloadLinks[provider].some(link => typeof link === "string" && link)
-                );
-
-                if (!updateInfo?.autoUpdateSupported && !hasBrowserUpdate) {
-                  // No seamless provider, navigate to download page
-                  setShowUpdateDialog(false);
-                  navigate("/download", {
-                    state: {
-                      gameData: {
-                        game: updateInfo?.gameName || game?.game,
-                        gameID: updateInfo?.gameID || game?.gameID,
-                        version: updateInfo?.latestVersion,
-                        download_links: updateInfo?.downloadLinks,
-                        imgID: game?.imgID,
-                        isUpdate: true,
-                      },
-                    },
-                  });
-                  return;
-                }
-
-                // Try seamless providers in priority order from central config
-                const seamlessProviders = [...SEAMLESS_PROVIDERS, ...browserProviders];
-
-                let downloadUrl = null;
-                let downloadProvider = null;
-                for (const provider of seamlessProviders) {
-                  const links = downloadLinks[provider];
-                  if (Array.isArray(links) && links.length > 0) {
-                    const validLink = links.find(
-                      link => link && typeof link === "string"
-                    );
-                    if (validLink) {
-                      downloadUrl = validLink.replace(/^(?:https?:)?\/\//, "https://");
-                      downloadProvider = provider;
-                      console.log(
-                        `[GameScreen] Found seamless link from ${provider}:`,
-                        downloadUrl
-                      );
-                      break;
-                    }
-                  }
-                }
-
-                if (!downloadUrl) {
-                  // Fallback to download page if no seamless link found
-                  setShowUpdateDialog(false);
-                  navigate("/download", {
-                    state: {
-                      gameData: {
-                        game: updateInfo?.gameName || game?.game,
-                        gameID: updateInfo?.gameID || game?.gameID,
-                        version: updateInfo?.latestVersion,
-                        download_links: updateInfo?.downloadLinks,
-                        imgID: game?.imgID,
-                        isUpdate: true,
-                      },
-                    },
-                  });
-                  return;
-                }
-
-                // Preserve update metadata when a browser provider returns its direct URL.
-                const startUpdate = async resolvedUrl => {
-                  setIsStartingUpdate(true);
-                  try {
-                    const gameName = game?.game || game?.name;
-                    const dir = await window.electron.getDownloadDirectory();
-
-                    console.log(`[GameScreen] Starting update download for ${gameName}`);
-                    await window.electron.downloadFile(
-                      resolvedUrl,
-                      gameName,
-                      game?.online || false,
-                      game?.dlc || false,
-                      game?.isVr || false,
-                      true, // isUpdating
-                      updateInfo?.latestVersion || "",
-                      game?.imgID,
-                      updateInfo?.size || "",
-                      dir,
-                      game?.gameID || ""
-                    );
-
-                    toast.success(t("gameScreen.updateStarted"));
-                    setShowUpdateDialog(false);
-                    navigate("/downloads");
-                  } catch (error) {
-                    console.error("[GameScreen] Error starting update:", error);
-                    toast.error(t("gameScreen.updateFailed"));
-                  } finally {
-                    setIsStartingUpdate(false);
-                  }
-                };
-
-                // MegaDB resolves without a window; the window is only a fallback
-                if (downloadProvider === "megadb") {
-                  setIsStartingUpdate(true);
-                  let resolved;
-                  try {
-                    resolved = await window.electron.resolveMegaDbLink(downloadUrl);
-                  } catch (error) {
-                    resolved = { error: error.message };
-                  } finally {
-                    setIsStartingUpdate(false);
-                  }
-                  if (resolved?.url) {
-                    await startUpdate(resolved.url);
-                    return;
-                  }
-                  console.warn("[GameScreen] MegaDB link not resolved:", resolved?.error);
-                }
-
-                if (browserProviders.includes(downloadProvider)) {
-                  pendingBrowserUpdate.current = startUpdate;
-                  try {
-                    await window.electron.openURL(downloadUrl, {
-                      referrer: "https://steamrip.com/",
-                    });
-                  } catch (error) {
-                    pendingBrowserUpdate.current = null;
-                    console.error("[GameScreen] Error opening update provider:", error);
-                    toast.error(t("gameScreen.updateFailed"));
-                  }
-                  return;
-                }
-
-                await startUpdate(downloadUrl);
-              }}
-            >
-              {isStartingUpdate ? (
-                <Loader className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
+                stepLabels={{
+                  opening: t("download.downloadOptions.openingDownloadPage"),
+                  countdown: t("download.downloadOptions.waitingForCountdown"),
+                  resolving: t("download.downloadOptions.gettingDownloadLink"),
+                  starting: t("download.downloadOptions.startingDownload"),
+                }}
+                icon={ArrowUpFromLine}
+                onClick={handleStartUpdate}
+                disabled={isStartingUpdate || !!updateLinkStage}
+                countdown={updateCountdown}
+                showSteps={updateViaMagicLink}
+                hasCountdownStep={updateSource?.provider === "megadb"}
+              />
+              <Button
+                variant="ghost"
+                className="w-full text-muted-foreground"
+                disabled={!!updateLinkStage}
+                onClick={() => setShowUpdateDialog(false)}
+              >
+                {t("common.later")}
+              </Button>
+            </div>
+          ) : (
+            <AlertDialogFooter className="flex gap-2">
+              <Button
+                variant="outline"
+                className="text-primary"
+                onClick={() => setShowUpdateDialog(false)}
+              >
+                {t("common.later")}
+              </Button>
+              <Button className="text-secondary" onClick={handleStartUpdate}>
                 <Download className="mr-2 h-4 w-4" />
-              )}
-              {isAuthenticated && ascendAccess.hasAccess
-                ? isStartingUpdate
-                  ? t("gameScreen.startingUpdate")
-                  : t("gameScreen.downloadUpdate")
-                : t("gameScreen.getAscendToUpdate")}
-            </Button>
-          </AlertDialogFooter>
+                {t("gameScreen.getAscendToUpdate")}
+              </Button>
+            </AlertDialogFooter>
+          )}
         </AlertDialogContent>
       </AlertDialog>
 

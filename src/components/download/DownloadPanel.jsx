@@ -13,7 +13,7 @@ import DebridIcon from "@/components/DebridIcon";
 import { useLanguage } from "@/context/LanguageContext";
 import { VERIFIED_PROVIDERS } from "@/config/providers";
 import { cn } from "@/lib/utils";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   AlertTriangle,
   ArrowDownCircle,
@@ -33,7 +33,7 @@ import {
   X,
 } from "lucide-react";
 import AdDodgerGame from "@/components/download/AdDodgerGame";
-import DownloadButton from "@/components/download/DownloadButton";
+import DownloadButton, { useCountdown } from "@/components/download/DownloadButton";
 import { AnimatePresence, motion } from "framer-motion";
 import MagicLinkDialog from "@/components/download/MagicLinkDialog";
 
@@ -60,30 +60,6 @@ const getProviderLabel = provider => {
 };
 
 const isMagicProvider = provider => VERIFIED_PROVIDERS.includes(provider.toLowerCase());
-
-/**
- * Seconds left until `endsAt` and how far along the wait is (0-1), ticking a
- * few times a second; both null without a countdown.
- */
-function useCountdown(endsAt) {
-  const startedAt = useRef(null);
-  const read = () => {
-    if (!endsAt) return { seconds: null, progress: null };
-    const total = Math.max(1, endsAt - (startedAt.current ?? Date.now()));
-    const left = Math.max(0, endsAt - Date.now());
-    return { seconds: Math.ceil(left / 1000), progress: 1 - left / total };
-  };
-  const [state, setState] = useState(read);
-  useEffect(() => {
-    startedAt.current = endsAt ? Date.now() : null;
-    setState(read());
-    if (!endsAt) return;
-    const timer = setInterval(() => setState(read()), 200);
-    return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endsAt]);
-  return state;
-}
 
 function Notice({ tone = "warning", icon: Icon = AlertTriangle, children }) {
   return (

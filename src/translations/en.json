@@ -2817,6 +2817,7 @@
     "updateManualHint": "You can also update your local index manually and then reinstall the game to get the latest version.",
     "updateStarted": "Update download started!",
     "viewAll": "View All",
+    "updateViaMagicLink": "This update downloads through a Magic Link. Ascendara opens the host's page in the background and grabs the file for you, so there's nothing to click.",
     "viewOnFling": "View on FLiNG",
     "viewOnNexus": "View on Nexus Mods"
   },
