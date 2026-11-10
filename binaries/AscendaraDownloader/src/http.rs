@@ -338,6 +338,19 @@ fn page_excerpt(bytes: &[u8]) -> String {
     title.unwrap_or_else(|| text.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(160).collect())
 }
 
+/// The host answered with a different size than it listed. A small text body
+/// is its notice (expired link, quota, removed file): report what it says.
+async fn size_mismatch(response: Response, total: u64, expected: u64) -> anyhow::Error {
+    if total < 256 * 1024 {
+        if let Ok(body) = response.bytes().await {
+            if !body.is_empty() && std::str::from_utf8(&body).is_ok() {
+                return ErrorPage(page_excerpt(&body)).into();
+            }
+        }
+    }
+    anyhow!("Remote file size ({total} bytes) differs from the source listing ({expected} bytes)")
+}
+
 /// Time spent blocked in disk writes, summed over every connection, in nanoseconds.
 /// When this grows about as fast as the clock, the drive is what holds the download back.
 pub static WRITE_BLOCKED_NANOS: AtomicU64 = AtomicU64::new(0);
@@ -652,7 +665,7 @@ impl Transfer {
                 Opened::Ranged(response, total, validator_now) => {
                     if let Some(expected) = self.options.expected_size {
                         if total != expected {
-                            bail!("Remote file size ({total} bytes) differs from the source listing ({expected} bytes)");
+                            return Err(size_mismatch(response, total, expected).await);
                         }
                     }
                     if let Some(state) = &saved {
@@ -705,7 +718,7 @@ impl Transfer {
         if let Some(expected) = self.options.expected_size {
             if let Some(total) = total {
                 if total != expected {
-                    bail!("Remote file size ({total} bytes) differs from the source listing ({expected} bytes)");
+                    return Err(size_mismatch(response, total, expected).await);
                 }
             }
         }
