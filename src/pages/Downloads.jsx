@@ -1894,6 +1894,8 @@ const DownloadCard = ({
     "[WinError 225]",
     "Windows error 225",
     "Windows error 226",
+    "(os error 225)",
+    "(os error 226)",
     "Security software blocked",
     "Connection broken",
     "IncompleteRead",
@@ -1988,7 +1990,7 @@ const DownloadCard = ({
   }, [hasError, wasReported, downloadingData.message]);
 
   const isSecurityBlock =
-    /\[WinError 22[56]\]|Windows error 22[56]|Security software blocked/.test(
+    /\[WinError 22[56]\]|Windows error 22[56]|os error 22[56]\b|Security software blocked/.test(
       downloadingData?.message || ""
     );
 

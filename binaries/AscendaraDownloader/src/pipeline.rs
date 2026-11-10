@@ -1153,7 +1153,9 @@ pub fn failure_reason(error: &anyhow::Error) -> &'static str {
         return "password";
     }
     let text = format!("{error:#}").to_lowercase();
-    if text.contains("security software") || text.contains("windows error 225") || text.contains("windows error 226") {
+    if text.contains("security software") || text.contains("windows error 225") || text.contains("windows error 226")
+        || text.contains("os error 225") || text.contains("os error 226")
+    {
         return "security";
     }
     if text.contains("disk space") || text.contains("no space left") || text.contains("not enough space") {
@@ -1380,6 +1382,7 @@ mod tests {
         assert_eq!(failure_reason(&anyhow::Error::new(WrongPassword("x".into()))), "password");
         assert_eq!(failure_reason(&anyhow!("Insufficient disk space for extraction")), "disk");
         assert_eq!(failure_reason(&anyhow!("Access is denied. (os error 5)")), "blocked");
+        assert_eq!(failure_reason(&anyhow!("Could not move a to b: virus (os error 225)")), "security");
         assert_eq!(user_message(&anyhow!("Connection broken: the connection stalled")), "download_connection_error");
     }
 
