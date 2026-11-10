@@ -414,6 +414,28 @@ pub fn discard_partials(dest: &Path) {
     }
 }
 
+/// Move a fully downloaded `.ascpart` into place when its job stopped before
+/// doing so (a locked rename, a failed checksum, the helper exiting).
+/// Returns the destination, or None when the data is not complete.
+pub fn adopt_complete_partial(data: &Path) -> Result<Option<PathBuf>> {
+    let name = data.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let Some(stem) = name.strip_suffix(".ascpart") else { return Ok(None) };
+    let dest = data.with_file_name(stem);
+    let (_, state_path) = part_paths(&dest);
+    let Some(state) = std::fs::read_to_string(&state_path).ok().and_then(|t| serde_json::from_str::<SavedState>(&t).ok()) else {
+        return Ok(None);
+    };
+    // Partials are preallocated, so the size alone does not prove the data arrived.
+    let size = std::fs::metadata(data)?.len();
+    if size != state.total || !state.pieces.iter().all(|p| p[1] >= p[2]) {
+        return Ok(None);
+    }
+    crate::util::replace_file(data, &dest, Duration::from_secs(180))
+        .context("The finished download is still locked by another program (often security software scanning it). Retry once the scan finishes")?;
+    let _ = std::fs::remove_file(state_path);
+    Ok(Some(dest))
+}
+
 /// Load resume state, adopting partial downloads the older downloader left.
 fn load_state(dest: &Path) -> Option<SavedState> {
     let (data, state_path) = part_paths(dest);
@@ -1205,6 +1227,27 @@ mod tests {
         assert!(looks_like_page(br#"{"success":false,"value":"not_found"}"#));
         assert!(!looks_like_page(b"Rar!\x1a\x07\x01\x00"));
         assert!(!looks_like_page(b"PK\x03\x04"));
+    }
+
+    #[test]
+    fn adopts_only_complete_partials() {
+        let dir = std::env::temp_dir().join(format!("ascendara-adopt-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let write = |name: &str, pieces: Vec<[u64; 3]>| {
+            let dest = dir.join(name);
+            let (data, state) = part_paths(&dest);
+            std::fs::write(&data, [0u8; 10]).unwrap();
+            let saved = SavedState { version: 1, url: String::new(), total: 10, validator: None, pieces };
+            std::fs::write(state, serde_json::to_vec(&saved).unwrap()).unwrap();
+            (dest, data)
+        };
+        let (dest, data) = write("done.rar", vec![[0, 5, 5], [5, 10, 10]]);
+        assert_eq!(adopt_complete_partial(&data).unwrap(), Some(dest.clone()));
+        assert!(dest.is_file() && !data.exists());
+        let (_, data) = write("half.rar", vec![[0, 5, 5], [5, 7, 10]]);
+        assert_eq!(adopt_complete_partial(&data).unwrap(), None);
+        assert!(data.is_file());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

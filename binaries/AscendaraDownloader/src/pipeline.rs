@@ -1301,9 +1301,23 @@ fn scan_sources(job: &mut Job) -> Result<(Vec<PathBuf>, Vec<LooseFile>, Option<P
     }
     let cache = job.game_dir.join(DOWNLOADS);
     let files = util::walk_files(&cache, &|d| d == ".ascendara-receipts" || d.starts_with(".ascendara-inplace-") || d.starts_with(".ascendara-repair-"));
+    let mut unfinished = Vec::new();
     for (name, path, size) in files {
+        let (name, path) = match name.strip_suffix(".ascpart") {
+            Some(stem) => match crate::http::adopt_complete_partial(&path)? {
+                Some(dest) => {
+                    log::info!("Moving finished download into place: {stem}");
+                    (stem.to_string(), dest)
+                }
+                None => {
+                    unfinished.push(stem.to_string());
+                    continue;
+                }
+            },
+            None => (name, path),
+        };
         let lower = name.to_lowercase();
-        if lower.ends_with(".ascpart") || lower.ends_with(".partial") || lower.ends_with(".json") || lower.ends_with(".tmp") {
+        if lower.ends_with(".partial") || lower.ends_with(".json") || lower.ends_with(".tmp") {
             continue;
         }
         let base = archive::display_name(&path);
@@ -1327,6 +1341,9 @@ fn scan_sources(job: &mut Job) -> Result<(Vec<PathBuf>, Vec<LooseFile>, Option<P
             }
             Err(_) => {}
         }
+    }
+    if let Some(name) = unfinished.first() {
+        bail!("Part of the download did not finish ({name}). Resume the download instead of retrying extraction.");
     }
     Ok((archives, loose, None))
 }
