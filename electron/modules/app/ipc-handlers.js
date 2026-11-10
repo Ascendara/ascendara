@@ -2356,7 +2356,11 @@ function registerMiscHandlers() {
         timestamp.timestamp = existingData.timestamp;
       }
 
-      fs.writeFileSync(TIMESTAMP_FILE, JSON.stringify(timestamp, null, 2));
+      try {
+        fs.writeFileSync(TIMESTAMP_FILE, JSON.stringify(timestamp, null, 2));
+      } catch (err) {
+        console.error("Failed to write timestamp file:", err);
+      }
       completeOnboarding();
       return true;
     } catch (error) {
@@ -2381,7 +2385,12 @@ function registerMiscHandlers() {
       timestamp: Date.now(),
       v7: true,
     };
-    fs.writeFileSync(TIMESTAMP_FILE, JSON.stringify(timestamp, null, 2));
+    // A locked timestamp file must not block finishing setup
+    try {
+      fs.writeFileSync(TIMESTAMP_FILE, JSON.stringify(timestamp, null, 2));
+    } catch (err) {
+      console.error("Failed to write timestamp file:", err);
+    }
     completeOnboarding();
   });
 

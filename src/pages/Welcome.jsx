@@ -902,7 +902,11 @@ const Welcome = ({ welcomeData, onComplete }) => {
     setIsExiting(true);
     // Wait for animation to complete before calling onComplete
     await new Promise(resolve => setTimeout(resolve, 800));
-    await window.electron.createTimestamp();
+    try {
+      await window.electron.createTimestamp();
+    } catch (error) {
+      console.error("Error saving setup completion:", error);
+    }
     onComplete(showTour);
   };
 
