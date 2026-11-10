@@ -372,14 +372,14 @@ impl DownloadMeter {
         let blocked = crate::http::WRITE_BLOCKED_NANOS.load(std::sync::atomic::Ordering::Relaxed);
         let paced = crate::http::DRIVE_PACE_BPS.load(std::sync::atomic::Ordering::Relaxed) > 0;
         self.writes.push_back((now, blocked));
-        while self.writes.len() > 2 && now.duration_since(self.writes[1].0) >= Duration::from_secs(10) {
+        while self.writes.len() > 2 && now.duration_since(self.writes[1].0) >= Duration::from_secs(30) {
             self.writes.pop_front();
         }
         if paced {
             self.waiting_on_drive = false;
         } else if let (Some((t0, b0)), Some((t1, b1))) = (self.writes.front(), self.writes.back()) {
             let span = t1.duration_since(*t0).as_secs_f64();
-            if span >= 8.0 {
+            if span >= 25.0 {
                 let share = b1.saturating_sub(*b0) as f64 / 1e9 / span;
                 // Separate on and off levels so the notice does not flicker.
                 self.waiting_on_drive = if self.waiting_on_drive { share >= 0.2 } else { share >= 0.5 };

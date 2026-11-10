@@ -198,24 +198,35 @@ impl Limiter {
 /// of the download, since they all go to the same drive.
 pub static DRIVE_PACE_BPS: AtomicU64 = AtomicU64::new(0);
 
-const PACE_WINDOW: Duration = Duration::from_secs(4);
+/// Long enough to cover a whole fill-and-drain cycle of the write cache, so a
+/// reading is the drive's average, not one of its fast or slow stretches.
+const PACE_WINDOW: Duration = Duration::from_secs(20);
 /// Stay a little under the drive's speed so its write cache drains instead of filling.
-const PACE_MARGIN: f64 = 0.92;
+const PACE_MARGIN: f64 = 0.95;
 /// Below this the measurement is more likely a hiccup (a scan, another program) than the drive.
 const PACE_FLOOR: u64 = 4 * 1024 * 1024;
+/// How long writes must flow freely before a pace below the first reading is raised again.
+const PACE_RAISE_AFTER: Duration = Duration::from_secs(30);
 
 /// Watches for writes that block. A drive slower than the connection lets
 /// Windows' write cache fill, then stalls every connection until it drains,
-/// so the speed rises and falls. Once that has lasted a few seconds, the
-/// speed the drive kept up over that time is what it can sustain, and the
-/// download is held just under it from then on for an even speed.
+/// so the speed rises and falls. Averaged over a full cycle of that, the
+/// speed is what the drive can sustain, and the download is held just under
+/// it from then on for an even speed.
 struct DrivePacer {
     samples: VecDeque<(Instant, u64, u64)>,
+    /// The first pace set; a lower pace climbs back toward it while writes flow freely.
+    measured: u64,
+    changed: Instant,
 }
 
 impl DrivePacer {
     fn new() -> Self {
-        DrivePacer { samples: VecDeque::new() }
+        DrivePacer {
+            samples: VecDeque::new(),
+            measured: DRIVE_PACE_BPS.load(Ordering::Relaxed),
+            changed: Instant::now(),
+        }
     }
 
     /// `done` is the transfer's byte count; call it as often as convenient.
@@ -236,25 +247,40 @@ impl DrivePacer {
             return;
         }
         // Same test as the app's "drive can't keep up" notice.
-        if (b1.saturating_sub(b0) as f64 / 1e9 / span) < 0.5 {
-            return;
-        }
-        let target = (d1.saturating_sub(d0) as f64 / span * PACE_MARGIN) as u64;
-        if target < PACE_FLOOR {
-            return;
-        }
+        let share = b1.saturating_sub(b0) as f64 / 1e9 / span;
+        let rate = d1.saturating_sub(d0) as f64 / span;
         let current = DRIVE_PACE_BPS.load(Ordering::Relaxed);
-        // Still blocking under the pace: the drive slowed down, so follow it,
-        // but never drop by more than half on one reading.
-        let pace = if current == 0 { target } else { target.max(current / 2) };
-        if current == 0 || pace < current {
-            DRIVE_PACE_BPS.store(pace, Ordering::Relaxed);
-            log::info!(
-                "The drive cannot keep up with the connection; holding the download at {}/s",
-                crate::util::read_size(pace as f64)
-            );
-            self.samples.clear();
-        }
+        let pace = if current == 0 {
+            if share < 0.5 {
+                return;
+            }
+            let pace = (rate * PACE_MARGIN) as u64;
+            if pace < PACE_FLOOR {
+                return;
+            }
+            self.measured = pace;
+            pace
+        } else if share >= 0.5 && rate < current as f64 * 0.85 {
+            // Under the pace, data arrives at the pace; only a clear shortfall
+            // while writes block means the drive itself slowed down.
+            let pace = ((rate * PACE_MARGIN) as u64).max(current / 2);
+            if pace < PACE_FLOOR {
+                return;
+            }
+            pace
+        } else if share < 0.1 && current < self.measured && now.duration_since(self.changed) >= PACE_RAISE_AFTER {
+            // The slowdown passed: step back up toward the first reading.
+            ((current as f64 * 1.05) as u64).min(self.measured)
+        } else {
+            return;
+        };
+        DRIVE_PACE_BPS.store(pace, Ordering::Relaxed);
+        self.changed = now;
+        self.samples.clear();
+        log::info!(
+            "Holding the download at {}/s, the speed this drive keeps up with",
+            crate::util::read_size(pace as f64)
+        );
     }
 }
 
