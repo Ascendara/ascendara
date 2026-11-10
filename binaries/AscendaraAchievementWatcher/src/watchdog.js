@@ -19,7 +19,7 @@ const { spawn } = require("child_process");
 const homeDir = process.env.USERPROFILE || process.env.HOME || require("os").homedir();
 const timestampFilePath =
   process.platform === "win32"
-    ? path.join(homeDir, "timestamp.ascendara.json")
+    ? path.join(process.env.APPDATA || homeDir, "ascendara", "timestamp.ascendara.json")
     : path.join(homeDir, ".ascendara", "timestamp.ascendara.json");
 const pendingFilePath = path.join(
   process.env["APPDATA"] || path.join(homeDir, ".config"),

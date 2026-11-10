@@ -51,17 +51,18 @@ const STEAM_INSTALL_PATHS = isLinux
     ]
   : [];
 
-// File paths
-const TIMESTAMP_FILE = !isWindows
-  ? path.join(unixConfigDir, "timestamp.ascendara.json")
-  : path.join(process.env.USERPROFILE, "timestamp.ascendara.json");
+// File paths. Windows uses %APPDATA%\ascendara (next to ascendarasettings.json)
+// because the profile root is often locked down by antivirus or read-only flags.
+const appConfigDir = isWindows
+  ? path.join(process.env.APPDATA, "ascendara")
+  : unixConfigDir;
+const TIMESTAMP_FILE = path.join(appConfigDir, "timestamp.ascendara.json");
 
-// Older versions kept these files loose in the Unix home directory. Move them
-// into ~/.ascendara before anything else reads or writes them.
+// Older versions kept these files loose in the home directory. Move them into
+// the config directory before anything else reads or writes them.
 function migrateHomeFiles() {
-  if (isWindows) return;
   try {
-    fs.mkdirSync(unixConfigDir, { recursive: true });
+    fs.mkdirSync(appConfigDir, { recursive: true });
   } catch (error) {
     console.error("Failed to create config directory:", error);
     return;
@@ -70,9 +71,10 @@ function migrateHomeFiles() {
     "timestamp.ascendara.json",
     "onboarding.ascendara.json",
     "translation_progress.ascendara.json",
+    "branch.ascendara.json",
   ]) {
     const legacy = path.join(os.homedir(), name);
-    const target = path.join(unixConfigDir, name);
+    const target = path.join(appConfigDir, name);
     try {
       if (!fs.existsSync(legacy)) continue;
       if (fs.existsSync(target)) {
@@ -81,10 +83,15 @@ function migrateHomeFiles() {
       }
       try {
         fs.renameSync(legacy, target);
-      } catch (error) {
-        if (error.code !== "EXDEV") throw error;
+      } catch {
+        // Cross-device or locked files can't be renamed; copy and leave the
+        // old one behind if it can't be removed
         fs.copyFileSync(legacy, target);
-        fs.rmSync(legacy, { force: true });
+        try {
+          fs.rmSync(legacy, { force: true });
+        } catch (error) {
+          console.error(`Failed to remove old ${name}:`, error);
+        }
       }
     } catch (error) {
       console.error(`Failed to migrate ${name}:`, error);

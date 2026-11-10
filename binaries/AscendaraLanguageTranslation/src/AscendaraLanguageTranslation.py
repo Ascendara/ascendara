@@ -65,7 +65,7 @@ def language_directory():
 
 def default_progress_path():
     if sys.platform == "win32":
-        return Path.home() / "translation_progress.ascendara.json"
+        return Path(os.environ["APPDATA"]) / "ascendara" / "translation_progress.ascendara.json"
     return Path.home() / ".ascendara/translation_progress.ascendara.json"
 
 

@@ -591,10 +591,10 @@ def main():
         # Mark that user has successfully indexed
         try:
             if sys.platform == 'win32':
-                timestamp_path = os.path.join(os.path.expanduser('~'), 'timestamp.ascendara.json')
+                timestamp_path = os.path.join(os.environ['APPDATA'], 'ascendara', 'timestamp.ascendara.json')
             else:
                 timestamp_path = os.path.join(os.path.expanduser('~'), '.ascendara', 'timestamp.ascendara.json')
-                os.makedirs(os.path.dirname(timestamp_path), exist_ok=True)
+            os.makedirs(os.path.dirname(timestamp_path), exist_ok=True)
             timestamp_data = {}
             if os.path.exists(timestamp_path):
                 with open(timestamp_path, 'r', encoding='utf-8') as f:
