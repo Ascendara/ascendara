@@ -365,15 +365,21 @@ impl DownloadMeter {
         };
         // Writes to a drive with room to spare return at once. When they spend over
         // half the time blocked, the drive cannot take data as fast as it arrives
-        // (common on hard drives once Windows' write cache fills).
+        // (common on hard drives once Windows' write cache fills). The transfer
+        // then holds itself to the drive's pace within a few seconds, which ends
+        // the stalls; the notice waits longer than that and stays off once paced,
+        // so it only shows when pacing could not help.
         let blocked = crate::http::WRITE_BLOCKED_NANOS.load(std::sync::atomic::Ordering::Relaxed);
+        let paced = crate::http::DRIVE_PACE_BPS.load(std::sync::atomic::Ordering::Relaxed) > 0;
         self.writes.push_back((now, blocked));
-        while self.writes.len() > 2 && now.duration_since(self.writes[1].0) >= Duration::from_secs(4) {
+        while self.writes.len() > 2 && now.duration_since(self.writes[1].0) >= Duration::from_secs(10) {
             self.writes.pop_front();
         }
-        if let (Some((t0, b0)), Some((t1, b1))) = (self.writes.front(), self.writes.back()) {
+        if paced {
+            self.waiting_on_drive = false;
+        } else if let (Some((t0, b0)), Some((t1, b1))) = (self.writes.front(), self.writes.back()) {
             let span = t1.duration_since(*t0).as_secs_f64();
-            if span >= 2.0 {
+            if span >= 8.0 {
                 let share = b1.saturating_sub(*b0) as f64 / 1e9 / span;
                 // Separate on and off levels so the notice does not flicker.
                 self.waiting_on_drive = if self.waiting_on_drive { share >= 0.2 } else { share >= 0.5 };

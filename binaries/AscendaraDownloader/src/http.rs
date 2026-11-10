@@ -14,6 +14,7 @@ use reqwest::header::{HeaderMap, HeaderValue, CONTENT_RANGE, CONTENT_TYPE, ETAG,
 use reqwest::{Client, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::VecDeque;
 use std::fs::{File, OpenOptions};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -142,7 +143,7 @@ struct Shared {
     validator: Option<String>,
     counter: Arc<Counter>,
     active: AtomicUsize,
-    limiter: Option<Limiter>,
+    limiter: Limiter,
     first_error: Mutex<Option<anyhow::Error>>,
     stop: StopFlag,
     /// Set when one connection fails for good, to end the others.
@@ -155,19 +156,104 @@ impl Shared {
     }
 }
 
+/// Holds a transfer to the user's speed limit and to the pace the drive can
+/// sustain, whichever is lower.
 struct Limiter {
-    bytes_per_second: u64,
-    started: Instant,
-    consumed: AtomicU64,
+    user_bps: u64,
+    /// When the bytes already let through are due; later bytes queue behind it.
+    next: Mutex<Option<Instant>>,
 }
 
+/// Unused allowance a quiet moment may bank, so short gaps are not punished.
+const LIMIT_BURST: Duration = Duration::from_millis(250);
+
 impl Limiter {
+    fn new(user_bps: u64) -> Self {
+        Limiter { user_bps, next: Mutex::new(None) }
+    }
+
     async fn take(&self, bytes: u64) {
-        let consumed = self.consumed.fetch_add(bytes, Ordering::Relaxed) + bytes;
-        let due = Duration::from_secs_f64(consumed as f64 / self.bytes_per_second as f64);
-        let elapsed = self.started.elapsed();
-        if due > elapsed {
-            tokio::time::sleep(due - elapsed).await;
+        let rate = match (self.user_bps, DRIVE_PACE_BPS.load(Ordering::Relaxed)) {
+            (0, 0) => return,
+            (0, limit) | (limit, 0) => limit,
+            (user, drive) => user.min(drive),
+        };
+        let wait = {
+            let mut next = self.next.lock().unwrap();
+            let now = Instant::now();
+            let earliest = now.checked_sub(LIMIT_BURST).unwrap_or(now);
+            let start = next.filter(|t| *t > earliest).unwrap_or(earliest);
+            let due = start + Duration::from_secs_f64(bytes as f64 / rate as f64);
+            *next = Some(due);
+            due.saturating_duration_since(now)
+        };
+        if !wait.is_zero() {
+            tokio::time::sleep(wait).await;
+        }
+    }
+}
+
+/// The write speed, in bytes per second, this download is held to once the
+/// drive proved slower than the connection. 0 until then. Kept for every file
+/// of the download, since they all go to the same drive.
+pub static DRIVE_PACE_BPS: AtomicU64 = AtomicU64::new(0);
+
+const PACE_WINDOW: Duration = Duration::from_secs(4);
+/// Stay a little under the drive's speed so its write cache drains instead of filling.
+const PACE_MARGIN: f64 = 0.92;
+/// Below this the measurement is more likely a hiccup (a scan, another program) than the drive.
+const PACE_FLOOR: u64 = 4 * 1024 * 1024;
+
+/// Watches for writes that block. A drive slower than the connection lets
+/// Windows' write cache fill, then stalls every connection until it drains,
+/// so the speed rises and falls. Once that has lasted a few seconds, the
+/// speed the drive kept up over that time is what it can sustain, and the
+/// download is held just under it from then on for an even speed.
+struct DrivePacer {
+    samples: VecDeque<(Instant, u64, u64)>,
+}
+
+impl DrivePacer {
+    fn new() -> Self {
+        DrivePacer { samples: VecDeque::new() }
+    }
+
+    /// `done` is the transfer's byte count; call it as often as convenient.
+    fn tick(&mut self, done: u64) {
+        let now = Instant::now();
+        if self.samples.back().is_some_and(|(t, ..)| now.duration_since(*t) < Duration::from_millis(500)) {
+            return;
+        }
+        self.samples.push_back((now, done, WRITE_BLOCKED_NANOS.load(Ordering::Relaxed)));
+        while self.samples.len() > 2 && now.duration_since(self.samples[1].0) >= PACE_WINDOW {
+            self.samples.pop_front();
+        }
+        let (Some(&(t0, d0, b0)), Some(&(t1, d1, b1))) = (self.samples.front(), self.samples.back()) else {
+            return;
+        };
+        let span = t1.duration_since(t0).as_secs_f64();
+        if span < PACE_WINDOW.as_secs_f64() * 0.9 {
+            return;
+        }
+        // Same test as the app's "drive can't keep up" notice.
+        if (b1.saturating_sub(b0) as f64 / 1e9 / span) < 0.5 {
+            return;
+        }
+        let target = (d1.saturating_sub(d0) as f64 / span * PACE_MARGIN) as u64;
+        if target < PACE_FLOOR {
+            return;
+        }
+        let current = DRIVE_PACE_BPS.load(Ordering::Relaxed);
+        // Still blocking under the pace: the drive slowed down, so follow it,
+        // but never drop by more than half on one reading.
+        let pace = if current == 0 { target } else { target.max(current / 2) };
+        if current == 0 || pace < current {
+            DRIVE_PACE_BPS.store(pace, Ordering::Relaxed);
+            log::info!(
+                "The drive cannot keep up with the connection; holding the download at {}/s",
+                crate::util::read_size(pace as f64)
+            );
+            self.samples.clear();
         }
     }
 }
@@ -583,11 +669,8 @@ impl Transfer {
         let _ = std::fs::remove_file(state_path);
         self.counter.total.store(total.unwrap_or(0), Ordering::Relaxed);
         self.counter.done.store(0, Ordering::Relaxed);
-        let limiter = (self.options.limit_bps > 0).then(|| Limiter {
-            bytes_per_second: self.options.limit_bps,
-            started: Instant::now(),
-            consumed: AtomicU64::new(0),
-        });
+        let limiter = Limiter::new(self.options.limit_bps);
+        let mut pacer = DrivePacer::new();
         let mut written = 0u64;
         let mut first = true;
         loop {
@@ -605,9 +688,8 @@ impl Transfer {
             write_all_at(&file, &chunk, written)?;
             written += chunk.len() as u64;
             self.counter.done.store(written, Ordering::Relaxed);
-            if let Some(limiter) = &limiter {
-                limiter.take(chunk.len() as u64).await;
-            }
+            pacer.tick(written);
+            limiter.take(chunk.len() as u64).await;
         }
         if let Some(total) = total {
             if written != total {
@@ -664,11 +746,7 @@ impl Transfer {
             validator,
             counter: self.counter.clone(),
             active: AtomicUsize::new(0),
-            limiter: (self.options.limit_bps > 0).then(|| Limiter {
-                bytes_per_second: self.options.limit_bps,
-                started: Instant::now(),
-                consumed: AtomicU64::new(0),
-            }),
+            limiter: Limiter::new(self.options.limit_bps),
             first_error: Mutex::new(None),
             stop: self.stop.clone(),
             aborted: std::sync::atomic::AtomicBool::new(false),
@@ -711,11 +789,13 @@ impl Transfer {
             }
         }
         let mut last_save = Instant::now();
+        let mut pacer = DrivePacer::new();
         loop {
             if tasks.iter().all(|t| t.is_finished()) {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(250)).await;
+            pacer.tick(self.counter.done.load(Ordering::Relaxed));
             if last_save.elapsed() >= STATE_SAVE_INTERVAL {
                 let shared = shared.clone();
                 let file = file.clone();
@@ -1074,9 +1154,7 @@ impl Worker {
                     };
                     gained += added;
                     self.shared.counter.done.fetch_add(added, Ordering::Relaxed);
-                    if let Some(limiter) = &self.shared.limiter {
-                        limiter.take(take as u64).await;
-                    }
+                    self.shared.limiter.take(take as u64).await;
                 }
                 data = data.slice(take..);
                 if pos + take as u64 >= end {
