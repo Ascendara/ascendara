@@ -43,11 +43,18 @@ const { proxyLocalRequest } = require("./modules/core/local-api-proxy");
 const fs = require("fs-extra");
 const { isLinux } = require("./modules/core/config");
 const {
+  APP_HOST_RESOLVER_RULE,
   closeAppServers,
+  describePortHolder,
   holdAppPort,
   isAllowedLocalRequest,
   resolvePublicFile,
 } = require("./modules/core/local-server-security");
+
+// The window must only reach the local server on 127.0.0.1 (must be set before app ready)
+if (app.isPackaged) {
+  app.commandLine.appendSwitch("host-resolver-rules", APP_HOST_RESOLVER_RULE);
+}
 
 // Disable sandbox for Linux compatibility (must be set before app ready)
 if (process.platform === "linux") {
@@ -521,7 +528,9 @@ async function initializeApp() {
       );
       localServers = servers;
       if (owned) console.log("Local server running at http://localhost:46859");
-      windowModule.setAppServerOwned(owned, errorCode);
+      const portHolder = errorCode === "EADDRINUSE" ? await describePortHolder() : null;
+      if (portHolder) console.error("Port 46859 is held by", portHolder);
+      windowModule.setAppServerOwned(owned, errorCode, portHolder);
     } else {
       await ensureDevServerRunning();
     }

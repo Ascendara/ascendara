@@ -27,6 +27,7 @@ const appServerOwned = new Promise(resolve => {
   settleAppServerOwned = resolve;
 });
 let appServerErrorCode;
+let appServerPortHolder;
 
 const LOAD_FAILURE_CAUSES = [
   'Missing Visual C++ Redistributables - <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" style="color: #3b82f6;">Download here</a>',
@@ -35,6 +36,7 @@ const LOAD_FAILURE_CAUSES = [
 ];
 const PORT_IN_USE_CAUSES = [
   "Another program is serving port 46859, so Ascendara will not load that page as itself",
+  "If that program is Ascendara, an older copy is still running in the background. End it in Task Manager, then open Ascendara again",
   "To see which one: on Windows run <code>netstat -ano | findstr :46859</code>, on macOS or Linux run <code>lsof -i :46859</code>",
 ];
 // EACCES on Windows is almost always a range Hyper-V, WSL or Docker reserved, which
@@ -99,9 +101,11 @@ function showLoadFailure(
  * Whether this process holds the local server's port.
  * @param {boolean} owned
  * @param {string} [errorCode] - Why the port could not be held, when it was not
+ * @param {string|null} [portHolder] - The program holding the port, when known
  */
-function setAppServerOwned(owned, errorCode) {
+function setAppServerOwned(owned, errorCode, portHolder) {
   appServerErrorCode = errorCode;
+  appServerPortHolder = portHolder;
   settleAppServerOwned(owned === true);
 }
 
@@ -238,12 +242,20 @@ function createWindow() {
           "port reserved",
           PORT_RESERVED_CAUSES
         );
+      else if (appServerErrorCode === "EADDRINUSE")
+        showLoadFailure(
+          mainWindow,
+          appServerPortHolder
+            ? `Port 46859 is being used by ${appServerPortHolder}`
+            : "Another program is using port 46859",
+          "port in use",
+          PORT_IN_USE_CAUSES
+        );
       else
         showLoadFailure(
           mainWindow,
-          "Another program is using port 46859",
-          "port in use",
-          PORT_IN_USE_CAUSES
+          "Ascendara could not open port 46859",
+          appServerErrorCode || "unknown"
         );
     });
   }

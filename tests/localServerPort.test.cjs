@@ -4,7 +4,9 @@ const os = require("node:os");
 const Module = require("node:module");
 const http = require("node:http");
 const {
+  APP_HOST_RESOLVER_RULE,
   closeAppServers,
+  describePortHolder,
   holdAppPort,
 } = require("../electron/modules/core/local-server-security.js");
 
@@ -35,43 +37,61 @@ const hasIpv6Loopback = async () => {
 };
 const quick = { tries: 1, waitMs: 0 };
 
-test("the app port is held on both loopback addresses", async t => {
-  if (!(await hasIpv6Loopback())) return t.skip("no IPv6 loopback here");
+test("the app port is held on 127.0.0.1, where the window is pinned", async () => {
   const port = await freePort();
   const { owned, servers } = await holdAppPort(() => http.createServer(), {
     port,
     ...quick,
   });
   assert.equal(owned, true);
-  assert.deepEqual(servers.map(server => server.address().address).sort(), [
-    "127.0.0.1",
-    "::1",
-  ]);
-  // Nothing can sit on the address the browser may try first.
-  await assert.rejects(listen(port, "::1"), { code: "EADDRINUSE" });
+  assert.deepEqual(
+    servers.map(server => server.address().address),
+    ["127.0.0.1"]
+  );
+  await assert.rejects(listen(port, "127.0.0.1"), { code: "EADDRINUSE" });
   await closeAll(servers);
+  // Chromium would try ::1 first for "localhost", so the window is pinned to 127.0.0.1.
+  assert.equal(APP_HOST_RESOLVER_RULE, "MAP localhost:46859 127.0.0.1:46859");
 });
 
-for (const host of ["127.0.0.1", "::1"]) {
-  test(`another program on ${host} means the port is not the app's`, async t => {
-    if (host === "::1" && !(await hasIpv6Loopback()))
-      return t.skip("no IPv6 loopback here");
-    const port = await freePort();
-    const otherServer = await listen(port, host);
-    const realError = console.error;
-    console.error = () => {};
-    try {
-      const result = await holdAppPort(() => http.createServer(), { port, ...quick });
-      assert.deepEqual(result, { owned: false, servers: [], errorCode: "EADDRINUSE" });
-    } finally {
-      console.error = realError;
-    }
-    // What it held for a moment is free again.
-    const other = host === "::1" ? "127.0.0.1" : null;
-    if (other) await closeAll([await listen(port, other)]);
-    await closeAll([otherServer]);
+test("another program on 127.0.0.1 means the port is not the app's", async () => {
+  const port = await freePort();
+  const otherServer = await listen(port, "127.0.0.1");
+  const realError = console.error;
+  console.error = () => {};
+  try {
+    const result = await holdAppPort(() => http.createServer(), { port, ...quick });
+    assert.deepEqual(result, { owned: false, servers: [], errorCode: "EADDRINUSE" });
+  } finally {
+    console.error = realError;
+  }
+  await closeAll([otherServer]);
+});
+
+test("another program on ::1 does not stop the app", async t => {
+  if (!(await hasIpv6Loopback())) return t.skip("no IPv6 loopback here");
+  const port = await freePort();
+  const otherServer = await listen(port, "::1");
+  const { owned, servers } = await holdAppPort(() => http.createServer(), {
+    port,
+    ...quick,
   });
-}
+  assert.equal(owned, true);
+  await closeAll([...servers, otherServer]);
+});
+
+test("the program holding the port is named", async t => {
+  if (process.platform !== "win32") return t.skip("netstat parsing is Windows only");
+  const port = await freePort();
+  const server = await listen(port, "127.0.0.1");
+  try {
+    const holder = await describePortHolder(port);
+    assert.match(holder, new RegExp(`\\(PID ${process.pid}\\)$`));
+  } finally {
+    await closeAll([server]);
+  }
+  assert.equal(await describePortHolder(port), null);
+});
 
 test("no window trusts the port before the answer, and only a yes grants it", async () => {
   const realLoad = Module._load;
@@ -142,7 +162,7 @@ test("no window trusts the port before the answer, and only a yes grants it", as
     await new Promise(setImmediate);
     assert.deepEqual(windows[0].urls, [], "nothing loads before the answer");
     assert.equal(trusted.length, 0);
-    refused.setAppServerOwned(false);
+    refused.setAppServerOwned(false, "EADDRINUSE");
     await new Promise(setImmediate);
     assert.equal(trusted.length, 0, "no trust for a port someone else holds");
     assert.equal(windows[0].urls.length, 1);
@@ -177,6 +197,33 @@ test("no window trusts the port before the answer, and only a yes grants it", as
     assert.match(reservedHtml, /excludedportrange/);
     assert.match(reservedHtml, /net stop winnat/);
     assert.doesNotMatch(reservedHtml, /netstat -ano/);
+    windows.splice(1, 1);
+
+    const pageHtml = window => {
+      const page = new URL(window.urls[0]);
+      return decodeURIComponent(page.pathname.slice(page.pathname.indexOf(",") + 1));
+    };
+
+    // When the holder is known, the page names it (escaped: it comes from tasklist).
+    const named = fresh();
+    named.createWindow();
+    named.setAppServerOwned(false, "EADDRINUSE", "<b>Foo.exe (PID 42)");
+    await new Promise(setImmediate);
+    assert.match(
+      pageHtml(windows[1]),
+      /Port 46859 is being used by &lt;b&gt;Foo\.exe \(PID 42\) \(port in use\)/
+    );
+    windows.splice(1, 1);
+
+    // Any other failure is not blamed on another program.
+    const other = fresh();
+    other.createWindow();
+    other.setAppServerOwned(false, "EINVAL");
+    await new Promise(setImmediate);
+    assert.equal(trusted.length, 0);
+    const otherHtml = pageHtml(windows[1]);
+    assert.match(otherHtml, /Ascendara could not open port 46859 \(EINVAL\)/);
+    assert.doesNotMatch(otherHtml, /Another program/);
     windows.splice(1, 1);
 
     const owned = fresh();
