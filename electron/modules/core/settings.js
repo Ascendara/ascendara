@@ -173,6 +173,9 @@ class SettingsManager {
       // Custom Sources Mode (Hydra Library) + user-imported custom lists
       customSourcesMode: false,
       customSource: null,
+      // Keep the official index and several external sources in use together
+      combineSources: false,
+      extraSources: [],
       customSourcesLibrary: [],
       customLists: [],
       activeCustomList: null,

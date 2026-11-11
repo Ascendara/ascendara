@@ -180,7 +180,7 @@ function registerLocalRefreshHandlers() {
   let healthCache = null;
   const inspectLocalIndex = async () => {
     const settings = settingsManager.getSettings();
-    if (settings.customSourcesMode) return { status: "custom" };
+    if (settings.customSourcesMode && !settings.combineSources) return { status: "custom" };
     const indexPath = settings.localIndex;
     if (!indexPath) return { status: "missing-path" };
     try {
@@ -208,7 +208,7 @@ function registerLocalRefreshHandlers() {
   ipcMain.handle("repair-local-index", async () => {
     try {
       const settings = settingsManager.getSettings();
-      if (settings.customSourcesMode) {
+      if (settings.customSourcesMode && !settings.combineSources) {
         return {
           success: false,
           error: "Manage the selected source in Game Index settings.",

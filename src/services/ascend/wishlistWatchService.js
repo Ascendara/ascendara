@@ -100,7 +100,8 @@ async function catalogByTitle() {
   const byTitle = new Map();
   if (metadata?.customSource || !Array.isArray(games)) return byTitle;
   for (const game of games) {
-    if (!game?.gameID) continue;
+    // Combined catalogs also hold external games; only official ones count
+    if (!game?.gameID || game.customSource) continue;
     const title = gameService.normalizeForMatch(game.game);
     if (title && !byTitle.has(title)) byTitle.set(title, game);
   }

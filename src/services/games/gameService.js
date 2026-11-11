@@ -2,6 +2,7 @@ import { sanitizeText } from "@/lib/utils";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { API_URL } from "@/config/api";
 import { activePrivateSourceIds } from "@/lib/activePrivateSources";
+import { activeExternalSources, combinedSourceKey } from "@/lib/combinedSources";
 
 const CACHE_KEY = "ascendara_games_cache";
 const CACHE_TIMESTAMP_KEY = "local_ascendara_games_timestamp";
@@ -316,7 +317,15 @@ const gameService = {
     const settings = await window.electron.getSettings();
     const customMode = !!settings?.customSourcesMode;
     const customSource = settings?.customSource;
-    const activeCustomUrl = customMode && customSource?.url ? customSource.url : null;
+    const combinedSources = settings?.combineSources
+      ? activeExternalSources(settings)
+      : [];
+    const activeCustomUrl = combinedSources.length
+      ? combinedSourceKey(combinedSources)
+      : customMode && customSource?.url
+        ? customSource.url
+        : null;
+    const combined = combinedSources.length > 0;
 
     // Check memory cache FIRST - no async, instant return
     const now = Date.now();
@@ -325,7 +334,8 @@ const gameService = {
       memoryCache.metadata &&
       memoryCache.timestamp &&
       memoryCache.customSourceUrl === activeCustomUrl &&
-      (activeCustomUrl || memoryCache.localIndexPath === settings?.localIndex)
+      ((activeCustomUrl && !combined) ||
+        memoryCache.localIndexPath === settings?.localIndex)
     ) {
       const age = now - memoryCache.timestamp;
       if (age < CACHE_DURATION) {
@@ -339,6 +349,12 @@ const gameService = {
           metadata: memoryCache.metadata,
         };
       }
+    }
+
+    if (combined) {
+      const data = await this._loadCombinedData(settings?.localIndex, combinedSources);
+      await this.updateCache(data, true, settings?.localIndex || null, activeCustomUrl);
+      return data;
     }
 
     // Custom Sources Mode: fetch directly from a Hydra-compatible JSON source.
@@ -474,6 +490,45 @@ const gameService = {
       console.error("[GameService] Error reading local index file:", error);
       throw error;
     }
+  },
+
+  /**
+   * The official index plus every external source in the set, as one catalog.
+   * A source that fails to load is left out so the rest still show.
+   */
+  async _loadCombinedData(localIndexPath, sources) {
+    const [official, ...external] = await Promise.allSettled([
+      localIndexPath
+        ? this.fetchDataFromLocalIndex(localIndexPath)
+        : Promise.resolve(null),
+      ...sources.map(source => this._loadCustomSourceData(source)),
+    ]);
+    const failed = [];
+    const officialData = official.status === "fulfilled" ? official.value : null;
+    if (official.status === "rejected") {
+      console.warn("[GameService] Official index failed to load:", official.reason);
+    }
+    const externalGames = external.flatMap((result, i) => {
+      if (result.status === "fulfilled") return result.value?.games || [];
+      console.warn("[GameService] Source failed to load:", result.reason);
+      failed.push(sources[i].name || sources[i].url);
+      return [];
+    });
+    // Official games keep the index's categories, covers and ranking
+    const games = [...(officialData?.games || []), ...externalGames];
+    return {
+      games,
+      metadata: {
+        ...(officialData?.metadata || {}),
+        local: true,
+        localIndexPath,
+        customSource: false,
+        combined: true,
+        sources: sources.map(s => s.name || s.url),
+        failedSources: failed,
+        games: games.length,
+      },
+    };
   },
 
   /**
@@ -812,7 +867,12 @@ const gameService = {
     if (!target) return null;
     const { games, metadata } = await this.getCachedData();
     if (metadata?.customSource || !Array.isArray(games)) return null;
-    return games.find(game => this.normalizeForMatch(game.game) === target) || null;
+    // Combined catalogs also hold external games; only official ones count
+    return (
+      games.find(
+        game => !game.customSource && this.normalizeForMatch(game.game) === target
+      ) || null
+    );
   },
 
   async getGamesByCategory(category) {

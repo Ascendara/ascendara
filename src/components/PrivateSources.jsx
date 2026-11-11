@@ -22,6 +22,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { privateSourceMessage } from "@/lib/privateSourceMessages";
 import { activePrivateSourceIds, privateSourceSetting } from "@/lib/activePrivateSources";
+import {
+  activeExternalSources,
+  dropSource,
+  pickSource,
+  replaceSource,
+} from "@/lib/combinedSources";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -120,13 +126,28 @@ export default function PrivateSources() {
       setBusy(false);
     }
   };
-  const activeIds = settings.customSourcesMode
-    ? activePrivateSourceIds(settings.customSource)
-    : [];
+  const combining = !!settings.combineSources;
+  // The self-hosted set can sit anywhere in a combined set of sources
+  const privateEntry =
+    activeExternalSources(settings).find(s => s.privateSourceId) || null;
+  const activeIds = activePrivateSourceIds(privateEntry);
   const setActive = async ids => {
     const value = privateSourceSetting(
       ids.map(id => sources.find(s => s.id === id)).filter(Boolean)
     );
+    if (combining) {
+      const next = !value
+        ? dropSource(settings, privateEntry)
+        : privateEntry
+          ? { customSourcesMode: true, ...replaceSource(settings, privateEntry, value) }
+          : { customSourcesMode: true, ...pickSource(settings, value) };
+      await updateSetting("extraSources", next.extraSources);
+      await updateSetting("customSourcesMode", next.customSourcesMode);
+      if (!next.customSource?.isCustomList) await updateSetting("activeCustomList", null);
+      await updateSetting("customSource", next.customSource);
+      gameService.notifySourceChanged();
+      return;
+    }
     if (value) {
       await updateSetting("customSourcesMode", true);
       await updateSetting("activeCustomList", null);
@@ -135,8 +156,10 @@ export default function PrivateSources() {
     gameService.notifySourceChanged();
   };
   const activate = async source => {
-    // Browsing an active source keeps the rest of the set
-    if (!activeIds.includes(source.id)) await setActive([source.id]);
+    // Browsing an active source keeps the rest of the set; when combining,
+    // using another one adds it to the set
+    if (!activeIds.includes(source.id))
+      await setActive(combining ? [...activeIds, source.id] : [source.id]);
     navigate("/search");
   };
   const report = result => {
@@ -275,7 +298,7 @@ export default function PrivateSources() {
                       <RefreshCw className="h-4 w-4" />
                       {t("privateSources.rescan")}
                     </DropdownMenuItem>
-                    {!inUse && activeIds.length > 0 && (
+                    {!inUse && !combining && activeIds.length > 0 && (
                       <DropdownMenuItem
                         className="gap-2"
                         disabled={!s.count}
@@ -285,7 +308,7 @@ export default function PrivateSources() {
                         {t("privateSources.useTogether")}
                       </DropdownMenuItem>
                     )}
-                    {inUse && activeIds.length > 1 && (
+                    {inUse && (combining || activeIds.length > 1) && (
                       <DropdownMenuItem
                         className="gap-2"
                         onSelect={() =>

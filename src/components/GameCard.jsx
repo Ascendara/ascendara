@@ -26,6 +26,7 @@ import {
   HardDrive,
   Tag,
   Sparkles,
+  Database,
 } from "lucide-react";
 import { formatBytes } from "@/services/app/systemHealthService";
 import {
@@ -437,6 +438,10 @@ function GameCardContent({ game, compact, viewCount }) {
     },
   ].filter(Boolean);
 
+  // Mixed in with other sources, official games are marked so they stand out
+  const showOfficialBadge =
+    !!settings?.combineSources && !!settings?.customSourcesMode && !game.customSource;
+
   const hasStats =
     gameRating > 0 || viewCount > 0 || game.dlc || game.online || game.storyOnly;
 
@@ -486,31 +491,44 @@ function GameCardContent({ game, compact, viewCount }) {
 
             {/* Top: verified + install status */}
             <div className="absolute left-0 right-0 top-0 flex items-start justify-between gap-2 p-2.5">
-              {isVerified ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={e => {
-                        e.stopPropagation();
-                        setShowVerifiedDialog(true);
-                      }}
-                      className="flex items-center gap-1 rounded-full bg-primary px-2 py-1 text-[11px] font-semibold text-secondary shadow-[0_0_12px_rgba(59,130,246,0.55)] transition-transform animate-in fade-in-50 slide-in-from-left-3 hover:scale-105"
-                    >
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      {t("gameCard.verified.short")}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="text-secondary">
-                      {t("gameCard.verified.badge")} ·{" "}
-                      {t("gameCard.verified.clickForInfo")}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <span />
-              )}
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                {showOfficialBadge && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex cursor-default items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm animate-in fade-in-50">
+                        <Database className="h-3 w-3 text-primary" />
+                        {t("gameCard.official")}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-secondary">{t("gameCard.officialTooltip")}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                {isVerified && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setShowVerifiedDialog(true);
+                        }}
+                        className="flex items-center gap-1 rounded-full bg-primary px-2 py-1 text-[11px] font-semibold text-secondary shadow-[0_0_12px_rgba(59,130,246,0.55)] transition-transform animate-in fade-in-50 slide-in-from-left-3 hover:scale-105"
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        {t("gameCard.verified.short")}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-secondary">
+                        {t("gameCard.verified.badge")} ·{" "}
+                        {t("gameCard.verified.clickForInfo")}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
 
               {(isInstalled || needsUpdate) && (
                 <div

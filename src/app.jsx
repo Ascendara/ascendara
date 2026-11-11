@@ -106,6 +106,7 @@ import {
 import "./index.css";
 import "./styles/scrollbar.css";
 import "@/services/app/notificationSoundService";
+import { usesOfficialIndex } from "@/lib/combinedSources";
 import { AlertTriangle, RefreshCwIcon, X, Circle, Square, Triangle } from "lucide-react";
 import {
   AlertDialog,
@@ -376,7 +377,7 @@ const AutomaticIndexRefresher = () => {
 
   // Keep the shared game list up to date in the background
   useEffect(() => {
-    if (settings?.backgroundIndexSync === false || settings?.customSourcesMode) {
+    if (settings?.backgroundIndexSync === false || !usesOfficialIndex(settings)) {
       return;
     }
 
@@ -396,7 +397,7 @@ const AutomaticIndexRefresher = () => {
           await window.electron.setTimestampValue("hasIndexBefore", true);
         }
         const current = await window.electron.getSettings();
-        if (!current?.usingLocalIndex && !current?.customSourcesMode) {
+        if (!current?.usingLocalIndex && usesOfficialIndex(current)) {
           await updateSetting("usingLocalIndex", true);
         }
       } catch (error) {
@@ -425,7 +426,11 @@ const AutomaticIndexRefresher = () => {
       clearTimeout(retryTimeout);
       clearInterval(interval);
     };
-  }, [settings?.backgroundIndexSync, settings?.customSourcesMode]);
+  }, [
+    settings?.backgroundIndexSync,
+    settings?.customSourcesMode,
+    settings?.combineSources,
+  ]);
 
   return null;
 };

@@ -47,6 +47,7 @@ import { useImageLoader } from "@/hooks/useImageLoader";
 import gameService from "@/services/games/gameService";
 import imageCacheService from "@/services/images/imageCacheService";
 import { holdLoad, releaseWhenDecoded } from "@/lib/loadGate";
+import { activeExternalSources } from "@/lib/combinedSources";
 import steamGridImageService from "@/services/images/steamGridImageService";
 import recentGamesService from "@/services/library/recentGamesService";
 import { pullCloudGameDataBeforeLaunch } from "@/services/cloud/gameLaunchCloudSync";
@@ -90,6 +91,10 @@ const cachedSections = () =>
 const computeSourceKey = settings => {
   if (!settings) return "none";
   const customMode = !!settings.customSourcesMode;
+  if (customMode && settings.combineSources) {
+    const urls = activeExternalSources(settings).map(s => s.url);
+    return `combined:${settings.localIndex || "default"}:${urls.join("|")}`;
+  }
   if (customMode) {
     const list = settings.activeCustomList;
     if (list?.id) return `list:${list.id}`;
@@ -980,7 +985,8 @@ const Home = memo(() => {
 
     // Custom sources (Hydra Library) don't provide weight, category, or online
     // flags. Degrade the section layout so Home stays useful instead of empty.
-    const isCustomSource = games.some(g => g?.customSource);
+    // Combined catalogs still have official games to build the full layout from
+    const isCustomSource = games.length > 0 && games.every(g => g?.customSource);
     if (isCustomSource) {
       const usedGames = new Set();
 

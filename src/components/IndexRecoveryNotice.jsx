@@ -5,6 +5,7 @@ import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSettings } from "@/context/SettingsContext";
 import gameService from "@/services/games/gameService";
+import { usesOfficialIndex } from "@/lib/combinedSources";
 
 // Keep recovery available across pages, including when background sync is off.
 export default function IndexRecoveryNotice() {
@@ -40,7 +41,7 @@ export default function IndexRecoveryNotice() {
       window.removeEventListener("index-refreshed", check);
       window.removeEventListener("focus", check);
     };
-  }, [settings?.localIndex, settings?.customSourcesMode]);
+  }, [settings?.localIndex, settings?.customSourcesMode, settings?.combineSources]);
 
   const repair = async () => {
     if (busy.current) return;
@@ -62,7 +63,7 @@ export default function IndexRecoveryNotice() {
   };
 
   if (
-    settings?.customSourcesMode ||
+    !usesOfficialIndex(settings) ||
     !health ||
     ["ready", "custom"].includes(health.status)
   ) {

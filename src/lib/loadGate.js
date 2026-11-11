@@ -6,6 +6,8 @@
 // once every hold is released and nothing new has started for a short while.
 // Once boot is over, holds are no-ops so later navigation is unaffected.
 
+import { usesOfficialIndex } from "@/lib/combinedSources";
+
 // Quiet period after the last hold is released, so work kicked off by the
 // render that released it (cards mounting, section effects) can take a hold.
 const SETTLE_MS = 120;
@@ -89,7 +91,7 @@ export const afterBoot = () => ready;
  * background and refreshes the UI the usual way.
  */
 export function syncIndexDuringBoot(settings) {
-  if (settings?.backgroundIndexSync === false || settings?.customSourcesMode) {
+  if (settings?.backgroundIndexSync === false || !usesOfficialIndex(settings)) {
     return Promise.resolve(null);
   }
   bootIndexSync = window.electron.syncCommunityIndex().catch(error => ({

@@ -28,6 +28,7 @@ import {
   ClipboardList,
   Server,
   Trash2,
+  Layers,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,12 @@ import PrivateSources from "@/components/PrivateSources";
 import { cn } from "@/lib/utils";
 import { API_URL } from "@/config/api";
 import { canDownloadTorrents } from "@/services/downloads/debridService";
+import {
+  activeExternalSources,
+  dropSource,
+  pickSource,
+  usesOfficialIndex,
+} from "@/lib/combinedSources";
 
 // The shared index refresh finishes almost instantly, so hold the busy state
 // long enough to be seen and then confirm the result on the button itself.
@@ -141,6 +148,7 @@ const GameIndexManager = ({
   // Snapshot of the previous custom source, used to revert the selection if
   // the user bails out of the manual-paste fallback without ingesting JSON.
   const previousCustomSourceRef = useRef(null);
+  const previousExtraSourcesRef = useRef([]);
   const [indexInfo, setIndexInfo] = useState(null); // { gameCount, date, size }
   // Whether the API is keeping the index fresh itself, or is blocked and needs help
   const [indexStatus, setIndexStatus] = useState(null);
@@ -513,6 +521,7 @@ const GameIndexManager = ({
   const handleToggleCustomSourcesMode = async enabled => {
     setCustomSourcesMode(enabled);
     await updateSetting("customSourcesMode", enabled);
+    if (!enabled) await updateSetting("extraSources", []);
     // Force full reload of game data on next request
     gameService.clearMemoryCache();
     localStorage.removeItem("ascendara_games_cache");
@@ -520,7 +529,7 @@ const GameIndexManager = ({
     localStorage.removeItem("local_ascendara_metadata_cache");
     if (enabled) {
       // Ensure usingLocalIndex reflects that we're NOT using the official local index
-      await updateSetting("usingLocalIndex", false);
+      await updateSetting("usingLocalIndex", !!settings?.combineSources);
       toast.info(
         t("localRefresh.customModeEnabled") ||
           "External sources enabled. Set a source bucket URL to begin."
@@ -543,7 +552,61 @@ const GameIndexManager = ({
     if (customSourcesMode) return;
     setCustomSourcesMode(true);
     await updateSetting("customSourcesMode", true);
-    await updateSetting("usingLocalIndex", false);
+    if (!settings?.combineSources) await updateSetting("usingLocalIndex", false);
+  };
+
+  // Makes `next` the current source; when combining, the others stay in use
+  const commitPickedSource = async next => {
+    previousExtraSourcesRef.current = settings?.extraSources || [];
+    await updateSetting("extraSources", pickSource(settings, next).extraSources);
+  };
+
+  const clearGameCaches = () => {
+    gameService.clearMemoryCache();
+    localStorage.removeItem("ascendara_games_cache");
+    localStorage.removeItem("local_ascendara_games_timestamp");
+    localStorage.removeItem("local_ascendara_metadata_cache");
+    localStorage.removeItem("local_ascendara_last_updated");
+    window.dispatchEvent(
+      new CustomEvent("index-refreshed", { detail: { timestamp: Date.now() } })
+    );
+  };
+
+  const [combineWarningOpen, setCombineWarningOpen] = useState(false);
+  // Turning it on asks first, since external games come unchecked
+  const requestCombineSources = enabled =>
+    enabled ? setCombineWarningOpen(true) : handleToggleCombineSources(false);
+
+  const handleToggleCombineSources = async enabled => {
+    await updateSetting("combineSources", enabled);
+    if (!enabled) await updateSetting("extraSources", []);
+    // The official index is read alongside external sources only while combining
+    await updateSetting("usingLocalIndex", enabled || !customSourcesMode);
+    clearGameCaches();
+  };
+
+  // Takes one source out of a combined set
+  const handleStopUsingSource = async source => {
+    const next = dropSource(settings, source);
+    const list = next.customSource?.isCustomList
+      ? customLists.find(l => `custom_list_${l.id}` === next.customSource.url) || null
+      : null;
+    await updateSetting("extraSources", next.extraSources);
+    await updateSetting("customSource", next.customSource);
+    await updateSetting("activeCustomList", list);
+    if (!next.customSourcesMode) {
+      await updateSetting("customSourcesMode", false);
+      await updateSetting("usingLocalIndex", true);
+    }
+    setCustomSourcesMode(next.customSourcesMode);
+    setCustomSource(next.customSource);
+    setActiveCustomList(list);
+    setCustomSourceLastSynced(
+      next.customSource?.lastSynced ? new Date(next.customSource.lastSynced) : null
+    );
+    setCustomSourceGameCount(next.customSource?.gameCount ?? null);
+    clearGameCaches();
+    toast.success(t("externalSources.stoppedUsing", { name: source.name }));
   };
 
   // Self-hosted sources update settings directly, so follow them here
@@ -552,6 +615,12 @@ const GameIndexManager = ({
       setCustomSourcesMode(settings.customSourcesMode);
     }
   }, [settings?.customSourcesMode]);
+
+  // ...and the current source, which they can also swap out
+  const settingsCustomSource = settings?.customSource;
+  useEffect(() => {
+    if (settingsCustomSource !== undefined) setCustomSource(settingsCustomSource || null);
+  }, [settingsCustomSource]);
 
   // Fetch the list of sources for a given bucket URL.
   const fetchBucketSources = useCallback(
@@ -781,6 +850,7 @@ const GameIndexManager = ({
     setCustomSource(payload);
     setCustomSourceLastSynced(null);
     setCustomSourceGameCount(null);
+    await commitPickedSource(payload);
     await updateSetting("customSource", payload);
     await upsertLibraryEntry(payload);
     setSourceBrowserOpen(false);
@@ -812,6 +882,7 @@ const GameIndexManager = ({
     setCustomSourceGameCount(
       typeof entry.gameCount === "number" ? entry.gameCount : null
     );
+    await commitPickedSource(payload);
     await updateSetting("customSource", payload);
     await upsertLibraryEntry(payload);
     await enableCustomSourcesMode();
@@ -927,6 +998,7 @@ const GameIndexManager = ({
     setCustomSourceLastSynced(prev?.lastSynced ? new Date(prev.lastSynced) : null);
     setCustomSourceGameCount(typeof prev?.gameCount === "number" ? prev.gameCount : null);
     try {
+      await updateSetting("extraSources", previousExtraSourcesRef.current);
       await updateSetting("customSource", prev || null);
     } catch (e) {
       console.warn("Failed to revert customSource setting:", e);
@@ -1208,6 +1280,7 @@ const GameIndexManager = ({
 
       // IMPORTANT: settings.customSource must be set BEFORE ingestCustomSourceJson
       // since the game service reads customSource from settings internally.
+      await commitPickedSource(customSourcePayload);
       await updateSetting("customSource", customSourcePayload);
       setCustomSource(customSourcePayload);
       setCustomSourceLastSynced(new Date(now));
@@ -1455,41 +1528,62 @@ const GameIndexManager = ({
     community: { icon: Globe, label: t("externalSources.communityTitle") },
     list: { icon: ClipboardList, label: t("externalSources.kindList") },
     selfHosted: { icon: Server, label: t("externalSources.kindSelfHosted") },
+    combined: { icon: Layers, label: t("externalSources.kindCombined") },
     none: { icon: Globe, label: null },
   };
+  const combining = !!settings?.combineSources;
+  const officialInUse = usesOfficialIndex(settings);
+  // Every external source in use; only ever more than one while combining
+  const activeSources = activeExternalSources(settings);
+  const activeSourceUrls = new Set(activeSources.map(s => s.url));
+  const sourceKindOf = s =>
+    s.isCustomList
+      ? "list"
+      : s.privateSourceId || s.privateSourceIds
+        ? "selfHosted"
+        : "community";
+  const activeKindIds = new Set(activeSources.map(sourceKindOf));
   const activeKindId = !customSourcesMode
     ? "official"
-    : activeCustomList
-      ? "list"
-      : customSource?.privateSourceId
-        ? "selfHosted"
-        : customSource?.url
-          ? "community"
-          : "none";
+    : combining && activeSources.length
+      ? "combined"
+      : activeCustomList
+        ? "list"
+        : customSource?.privateSourceId
+          ? "selfHosted"
+          : customSource?.url
+            ? "community"
+            : "none";
   const activeKind = { id: activeKindId, ...sourceKinds[activeKindId] };
   const activeName =
     activeKindId === "official"
       ? t("localRefresh.ascendaraIndex") || "Ascendara Index"
-      : activeCustomList?.name ||
-        customSource?.name ||
-        t("localRefresh.noSourceSelected") ||
-        "No source selected";
+      : activeKindId === "combined"
+        ? [t("localRefresh.ascendaraIndex"), ...activeSources.map(s => s.name)].join(
+            " + "
+          )
+        : activeCustomList?.name ||
+          customSource?.name ||
+          t("localRefresh.noSourceSelected") ||
+          "No source selected";
   const activeSummary =
     activeKindId === "official"
       ? t("externalSources.officialDesc")
-      : activeKindId === "none"
-        ? t("externalSources.noSourceDesc")
-        : [
-            heroGameCount != null &&
-              `${heroGameCount.toLocaleString()} ${t("localRefresh.games") || "games"}`,
-            activeKindId !== "selfHosted" &&
-              `${t("localRefresh.lastSynced") || "Last synced"}: ${lastRefreshLabel}`,
-            activeKindId === "community" &&
-              sourceRating != null &&
-              `★ ${sourceRating.toFixed(1)}`,
-          ]
-            .filter(Boolean)
-            .join(" · ");
+      : activeKindId === "combined"
+        ? t("externalSources.combinedDesc", { count: activeSources.length + 1 })
+        : activeKindId === "none"
+          ? t("externalSources.noSourceDesc")
+          : [
+              heroGameCount != null &&
+                `${heroGameCount.toLocaleString()} ${t("localRefresh.games") || "games"}`,
+              activeKindId !== "selfHosted" &&
+                `${t("localRefresh.lastSynced") || "Last synced"}: ${lastRefreshLabel}`,
+              activeKindId === "community" &&
+                sourceRating != null &&
+                `★ ${sourceRating.toFixed(1)}`,
+            ]
+              .filter(Boolean)
+              .join(" · ");
   const sourceTabs = [
     { id: "community", icon: Globe, label: t("externalSources.communityTab") },
     { id: "list", icon: ClipboardList, label: t("externalSources.listsTab") },
@@ -1498,7 +1592,8 @@ const GameIndexManager = ({
   // Open on the tab that holds the active source until the user picks one
   const sourcesTab =
     selectedSourcesTab ??
-    (sourceTabs.some(tab => tab.id === activeKindId) ? activeKindId : "community");
+    sourceTabs.find(tab => activeKindIds.has(tab.id))?.id ??
+    "community";
   const communitySources = customSourcesLibrary.filter(
     s => s?.url && !s.isCustomList && !s.privateSourceId
   );
@@ -1657,9 +1752,11 @@ const GameIndexManager = ({
                       disabled={modeLocked}
                       onClick={() => handleToggleCustomSourcesMode(false)}
                     >
-                      {t("externalSources.useAscendaraIndex")}
+                      {combining
+                        ? t("externalSources.useOnlyAscendaraIndex")
+                        : t("externalSources.useAscendaraIndex")}
                     </Button>
-                    {activeKind.id === "community" && (
+                    {customSource?.url && sourceKindOf(customSource) === "community" && (
                       <Button
                         onClick={() => handleSyncCustomSource()}
                         disabled={isSyncingCustomSource}
@@ -1672,7 +1769,9 @@ const GameIndexManager = ({
                         )}
                         {isSyncingCustomSource
                           ? t("localRefresh.syncing") || "Syncing..."
-                          : t("localRefresh.syncNow") || "Sync now"}
+                          : combining
+                            ? t("externalSources.syncNamed", { name: customSource.name })
+                            : t("localRefresh.syncNow") || "Sync now"}
                       </Button>
                     )}
                   </div>
@@ -1693,6 +1792,27 @@ const GameIndexManager = ({
               )}
             </section>
 
+            {/* Keep the official index and several sources in use together */}
+            <section className="flex items-center justify-between gap-4 rounded-xl bg-card px-5 py-4 shadow">
+              <div className="flex min-w-0 items-start gap-3">
+                <Layers className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div className="space-y-0.5">
+                  <Label htmlFor="combine-sources-page">
+                    {t("externalSources.combineTitle")}
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t("externalSources.combineDesc")}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="combine-sources-page"
+                checked={combining}
+                disabled={modeLocked}
+                onCheckedChange={requestCombineSources}
+              />
+            </section>
+
             {/* One tab per kind of source, each laid out the same way */}
             <Tabs value={sourcesTab} onValueChange={setSourcesTab}>
               <TabsList className="grid h-auto w-full grid-cols-3">
@@ -1700,7 +1820,7 @@ const GameIndexManager = ({
                   <TabsTrigger key={tab.id} value={tab.id} className="gap-2 py-1.5">
                     <tab.icon className="h-4 w-4 shrink-0" />
                     <span className="truncate">{tab.label}</span>
-                    {activeKind.id === tab.id && (
+                    {activeKindIds.has(tab.id) && (
                       <span
                         className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
                         title={t("externalSources.inUse")}
@@ -1808,9 +1928,10 @@ const GameIndexManager = ({
                       </p>
                     ) : (
                       communitySources.map(entry => {
-                        const inUse =
-                          activeKind.id === "community" &&
-                          entry.url === customSource?.url;
+                        const inUse = combining
+                          ? activeSourceUrls.has(entry.url)
+                          : activeKind.id === "community" &&
+                            entry.url === customSource?.url;
                         return (
                           <div
                             key={entry.url}
@@ -1846,12 +1967,23 @@ const GameIndexManager = ({
                               </p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
-                              {inUse ? (
+                              {inUse && (
                                 <Badge className="gap-1 text-secondary">
                                   <CircleCheck className="h-3 w-3" />
                                   {t("externalSources.inUse")}
                                 </Badge>
-                              ) : (
+                              )}
+                              {inUse && combining && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isSyncingCustomSource}
+                                  onClick={() => handleStopUsingSource(entry)}
+                                >
+                                  {t("externalSources.stopUsing")}
+                                </Button>
+                              )}
+                              {!inUse && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -1909,8 +2041,10 @@ const GameIndexManager = ({
                       </p>
                     ) : (
                       customLists.map(list => {
-                        const inUse =
-                          activeKind.id === "list" && activeCustomList?.id === list.id;
+                        const listUrl = `custom_list_${list.id}`;
+                        const inUse = combining
+                          ? activeSourceUrls.has(listUrl)
+                          : activeKind.id === "list" && activeCustomList?.id === list.id;
                         return (
                           <div
                             key={list.id}
@@ -1942,12 +2076,27 @@ const GameIndexManager = ({
                               </p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
-                              {inUse ? (
+                              {inUse && (
                                 <Badge className="gap-1 text-secondary">
                                   <CircleCheck className="h-3 w-3" />
                                   {t("externalSources.inUse")}
                                 </Badge>
-                              ) : (
+                              )}
+                              {inUse && combining && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    handleStopUsingSource({
+                                      url: listUrl,
+                                      name: list.name,
+                                    })
+                                  }
+                                >
+                                  {t("externalSources.stopUsing")}
+                                </Button>
+                              )}
+                              {!inUse && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -2023,7 +2172,7 @@ const GameIndexManager = ({
             )}
 
             {/* The API is blocked from refreshing the index and needs a hand */}
-            {!customSourcesMode && needsRelay && (
+            {officialInUse && needsRelay && (
               <div
                 className={cn(
                   "flex flex-wrap items-center justify-between gap-3 rounded-xl border px-5 py-4",
@@ -2101,7 +2250,7 @@ const GameIndexManager = ({
                       <h3 className="mb-0 whitespace-nowrap text-lg font-semibold tracking-tight text-foreground">
                         {t("localRefresh.ascendaraIndex") || "Ascendara Index"}
                       </h3>
-                      {customSourcesMode ? (
+                      {!officialInUse ? (
                         <Badge
                           variant="outline"
                           className="whitespace-nowrap text-muted-foreground"
@@ -2118,7 +2267,7 @@ const GameIndexManager = ({
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {customSourcesMode
+                      {!officialInUse
                         ? t("localRefresh.heroDescAscendaraInactive")
                         : t("localRefresh.heroDescAscendara")}
                     </p>
@@ -2215,9 +2364,11 @@ const GameIndexManager = ({
                       </h3>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {customSourcesMode
-                        ? t("externalSources.activeDesc", { name: activeName })
-                        : t("externalSources.linkDesc")}
+                      {activeKindId === "combined"
+                        ? t("externalSources.combinedActiveDesc", { name: activeName })
+                        : customSourcesMode
+                          ? t("externalSources.activeDesc", { name: activeName })
+                          : t("externalSources.linkDesc")}
                     </p>
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                       <Button
@@ -2237,7 +2388,9 @@ const GameIndexManager = ({
                           disabled={modeLocked}
                           onClick={() => handleToggleCustomSourcesMode(false)}
                         >
-                          {t("externalSources.useAscendaraIndex")}
+                          {combining
+                            ? t("externalSources.useOnlyAscendaraIndex")
+                            : t("externalSources.useAscendaraIndex")}
                         </Button>
                       )}
                     </div>
@@ -2268,6 +2421,26 @@ const GameIndexManager = ({
                     onCheckedChange={checked =>
                       updateSetting("backgroundIndexSync", checked)
                     }
+                  />
+                </div>
+
+                <div
+                  id="combine-sources-setting"
+                  className="flex items-center justify-between gap-4 py-4"
+                >
+                  <div className="space-y-0.5">
+                    <Label htmlFor="combine-sources">
+                      {t("externalSources.combineTitle")}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t("externalSources.combineDesc")}
+                    </p>
+                  </div>
+                  <Switch
+                    id="combine-sources"
+                    checked={combining}
+                    disabled={modeLocked}
+                    onCheckedChange={requestCombineSources}
                   />
                 </div>
 
@@ -2502,6 +2675,30 @@ const GameIndexManager = ({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <AlertDialog open={combineWarningOpen} onOpenChange={setCombineWarningOpen}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
+                {t("externalSources.combineWarningTitle")}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground">
+                {t("externalSources.combineWarningBody")}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="text-primary">
+                {t("common.cancel")}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="text-secondary"
+                onClick={() => handleToggleCombineSources(true)}
+              >
+                {t("externalSources.combineWarningConfirm")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <AlertDialog open={torrentWarningOpen} onOpenChange={setTorrentWarningOpen}>
           <AlertDialogContent className="max-w-md">
             <AlertDialogHeader>

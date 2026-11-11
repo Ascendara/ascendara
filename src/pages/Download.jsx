@@ -573,7 +573,10 @@ function PublicDownloadPage() {
     const checkExternalSourcesMode = async () => {
       try {
         const { metadata } = await gameService.getCachedData();
-        const isCustomSource = metadata?.customSource === true;
+        // Combined catalogs mix official and external games, so ask per game
+        const isCustomSource =
+          metadata?.customSource === true ||
+          (metadata?.combined === true && !!gameData?.customSource);
         setIsExternalSourcesMode(isCustomSource);
       } catch (error) {
         console.error("Error checking external sources mode:", error);
@@ -582,7 +585,7 @@ function PublicDownloadPage() {
     };
 
     checkExternalSourcesMode();
-  }, []);
+  }, [gameData?.customSource]);
 
   // Keep the whereToDownload ref in sync with the latest function
   useEffect(() => {

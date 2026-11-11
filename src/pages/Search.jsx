@@ -59,6 +59,7 @@ import installedGamesService from "@/services/library/installedGamesService";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { useGameViews } from "@/hooks/useGameViews";
 import { catalogSizeText } from "@/lib/installSpace";
+import { usesOfficialIndex } from "@/lib/combinedSources";
 import { API_URL } from "@/config/api";
 
 // Module-level cache with timestamp
@@ -256,8 +257,9 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
   const gamesPerLoad = useWindowSize();
   const [apiMetadata, setApiMetadata] = useState(null);
   const { t } = useLanguage();
+  // Combined sources keep the official index, so its filters still apply
   const isCustomSource =
-    !!settings?.customSourcesMode || apiMetadata?.customSource === true;
+    !usesOfficialIndex(settings) || apiMetadata?.customSource === true;
   // Custom sources (Hydra Library) have no popularity/weight or categories, so
   // treat them the same as fitgirl for sort/filter UI degradation purposes.
   const isFitGirlSource = settings.gameSource === "fitgirl" || isCustomSource;

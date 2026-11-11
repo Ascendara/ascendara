@@ -799,6 +799,22 @@ export const settingsSearchData = [
     scrollTo: "external-sources",
   },
   {
+    id: "combine-sources",
+    title: "Use Several Sources at Once",
+    description: "Keep the Ascendara index on and add external sources to it",
+    keywords: [
+      "combine",
+      "multiple",
+      "several",
+      "sources",
+      "merge",
+      "together",
+      "external",
+    ],
+    section: "Game Index",
+    scrollTo: "combine-sources-setting",
+  },
+  {
     id: "index-background-sync",
     title: "Background Index Sync",
     description: "Keep the game index up to date in the background",
