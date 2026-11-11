@@ -74,6 +74,7 @@ const Ascend = () => {
     user,
     reloadUser,
     handleResendVerification,
+    handleChangeUnverifiedEmail,
     isResendingEmail,
     showDisplayNamePrompt,
     googleDisplayName,
@@ -416,6 +417,7 @@ const Ascend = () => {
         preview={previewVerification}
         reloadUser={reloadUser}
         onResend={handleResendVerification}
+        onChangeEmail={handleChangeUnverifiedEmail}
         isResending={isResendingEmail}
         onSignOut={handleLogout}
         onExitPreview={() => setPreviewVerification(false)}

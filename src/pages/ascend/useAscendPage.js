@@ -36,6 +36,8 @@ import {
   checkHardwareIdAccount,
   checkDeletedAccount,
   deleteNewAccount,
+  checkEmailDomain,
+  changeUnverifiedEmail,
   registerHardwareId,
   syncCloudLibrary,
   getCloudLibrary,
@@ -2562,6 +2564,17 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         return;
       }
 
+      // Catch domains that can't receive mail (gmail.con) before the account exists
+      if (!(await checkEmailDomain(formData.email.trim()))) {
+        toast.error(
+          t("account.errors.emailDomainNoMail", {
+            domain: formData.email.trim().split("@").pop(),
+          })
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       // Show email confirmation dialog before proceeding with signup
       setPendingSignupData({ ...formData });
       setShowEmailConfirmDialog(true);
@@ -2748,6 +2761,27 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
       toast.error(result.error || t("account.verification.emailFailed"));
     }
     setIsResendingEmail(false);
+  };
+
+  const handleChangeUnverifiedEmail = async email => {
+    const result = await changeUnverifiedEmail(email);
+    if (result.success) {
+      await reloadUser();
+      toast.success(t("account.verification.emailChanged", { email }));
+      return result;
+    }
+    const messages = {
+      INVALID_EMAIL: t("account.errors.invalidEmail"),
+      SAME_EMAIL: t("account.verification.sameEmail"),
+      EMAIL_IN_USE: t("account.verification.emailInUse"),
+      DOMAIN_NO_MAIL: t("account.errors.emailDomainNoMail", {
+        domain: email.split("@").pop(),
+      }),
+    };
+    toast.error(
+      messages[result.code] || result.error || t("account.verification.changeFailed")
+    );
+    return result;
   };
 
   // Webapp connection handlers
@@ -2988,6 +3022,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     user,
     reloadUser,
     handleResendVerification,
+    handleChangeUnverifiedEmail,
     isResendingEmail,
     showDisplayNamePrompt,
     googleDisplayName,

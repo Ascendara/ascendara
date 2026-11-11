@@ -45,6 +45,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { suggestEmail } from "@/utils/emailSuggestion";
 import GoogleIcon from "./GoogleIcon";
 import "./auth.css";
 
@@ -122,6 +123,12 @@ export default function AuthSection({
 }) {
   const modeIndicatorId = useId();
   const reduceMotion = useReducedMotion();
+  const emailSuggestion = suggestEmail(formData.email);
+  const pendingSuggestion = pendingSignupData
+    ? suggestEmail(pendingSignupData.email)
+    : null;
+  const setEmail = email =>
+    handleInputChange({ target: { name: "email", value: email } });
   return (
     <MotionConfig reducedMotion="user">
       <div className="ascend-auth mx-auto mt-12 w-full max-w-6xl px-6 pb-24 pt-4 lg:px-10">
@@ -524,6 +531,15 @@ export default function AuthSection({
                         disabled={isSubmitting}
                       />
                     </div>
+                    {!isLogin && emailSuggestion && (
+                      <button
+                        type="button"
+                        onClick={() => setEmail(emailSuggestion)}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        {t("account.form.didYouMean", { email: emailSuggestion })}
+                      </button>
+                    )}
                   </div>
 
                   {/* Password fields in a row for signup */}
@@ -753,6 +769,22 @@ export default function AuthSection({
                       {pendingSignupData?.email}
                     </p>
                   </div>
+                  {pendingSuggestion && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmail(pendingSuggestion);
+                        setPendingSignupData(data => ({
+                          ...data,
+                          email: pendingSuggestion,
+                        }));
+                      }}
+                      className="flex items-center gap-1.5 text-left text-xs font-medium text-amber-500 hover:underline"
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      {t("account.form.didYouMean", { email: pendingSuggestion })}
+                    </button>
+                  )}
                   <p className="text-destructive text-xs">
                     <AlertTriangle className="mr-1 inline h-3 w-3" />
                     {t("account.confirmEmail.warning")}

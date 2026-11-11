@@ -843,6 +843,61 @@ export const resendVerificationEmail = async () => {
 };
 
 /**
+ * Check that an email's domain can receive mail before creating an account
+ * @param {string} email - Email address
+ * @returns {Promise<boolean>} false only when the API is sure the domain has no mail server
+ */
+export const checkEmailDomain = async email => {
+  try {
+    const response = await fetch(`${API_URL}/account/check-email-domain`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getClientVersionHeaders() },
+      body: JSON.stringify({ email }),
+    });
+    if (!response.ok) return true;
+    const result = await response.json();
+    return result.acceptsMail !== false;
+  } catch (error) {
+    console.warn("Email domain check failed:", error);
+    return true;
+  }
+};
+
+/**
+ * Change the email of an account that hasn't verified it yet, and send a new link
+ * @param {string} email - The corrected email address
+ * @returns {Promise<{success: boolean, code: string|null, error: string|null}>}
+ */
+export const changeUnverifiedEmail = async email => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, code: null, error: "No user logged in" };
+    }
+    const response = await userAuthenticatedFetch(
+      user,
+      `${API_URL}/account/change-unverified-email`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      }
+    );
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { success: false, code: result.code || null, error: result.error || null };
+    }
+    // Pick up the new email in the session and its ID token
+    await user.reload();
+    await user.getIdToken(true);
+    return { success: true, code: null, error: null };
+  } catch (error) {
+    console.error("Change unverified email error:", error);
+    return { success: false, code: null, error: getErrorMessage(error.code) };
+  }
+};
+
+/**
  * Reload current user to get updated emailVerified status
  * @returns {Promise<{success: boolean, user: object|null, error: string|null}>}
  */

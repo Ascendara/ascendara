@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { suggestEmail } from "@/utils/emailSuggestion";
 import {
   Check,
   Loader2,
@@ -9,6 +11,7 @@ import {
   MailCheck,
   MousePointerClick,
   RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 
 const RESEND_COOLDOWN = 60;
@@ -26,6 +29,7 @@ const VerifyEmailScreen = ({
   preview,
   reloadUser,
   onResend,
+  onChangeEmail,
   isResending,
   onSignOut,
   onExitPreview,
@@ -33,6 +37,11 @@ const VerifyEmailScreen = ({
   const reduceMotion = useReducedMotion();
   const [isChecking, setIsChecking] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftEmail, setDraftEmail] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const suggestion = suggestEmail(email);
+  const draftSuggestion = isEditing ? suggestEmail(draftEmail) : null;
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -59,6 +68,29 @@ const VerifyEmailScreen = ({
     // Preview never sends a real email, it only exercises the cooldown
     if (!preview) await onResend();
     setCooldown(RESEND_COOLDOWN);
+  };
+
+  const startEditing = value => {
+    setDraftEmail(value);
+    setIsEditing(true);
+  };
+
+  const handleSaveEmail = async e => {
+    e.preventDefault();
+    const next = draftEmail.trim();
+    if (!next) return;
+    if (preview) {
+      setIsEditing(false);
+      return;
+    }
+    setIsSaving(true);
+    const result = await onChangeEmail(next);
+    setIsSaving(false);
+    if (result.success) {
+      setIsEditing(false);
+      // The server sent a fresh link along with the change
+      setCooldown(RESEND_COOLDOWN);
+    }
   };
 
   const fadeUp = delay => ({
@@ -104,21 +136,85 @@ const VerifyEmailScreen = ({
 
           <motion.div
             {...fadeUp(0.1)}
-            className="mt-6 flex items-center justify-between gap-3 rounded-xl bg-card/50 px-4 py-3 shadow"
+            className="mt-6 rounded-xl bg-card/50 px-4 py-3 shadow"
           >
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">
-                {t("account.verification.sentTo")}
-              </p>
-              <p className="mt-0.5 truncate text-sm font-medium">{email}</p>
-            </div>
-            <button
-              type="button"
-              onClick={preview ? onExitPreview : onSignOut}
-              className="shrink-0 text-xs font-medium text-primary hover:underline"
-            >
-              {t("account.verification.wrongEmail")}
-            </button>
+            {isEditing ? (
+              <form onSubmit={handleSaveEmail} className="space-y-2">
+                <label
+                  htmlFor="verify-new-email"
+                  className="text-xs text-muted-foreground"
+                >
+                  {t("account.verification.newEmailLabel")}
+                </label>
+                <Input
+                  id="verify-new-email"
+                  type="email"
+                  autoComplete="email"
+                  autoFocus
+                  value={draftEmail}
+                  onChange={e => setDraftEmail(e.target.value)}
+                  disabled={isSaving}
+                  className="h-10 text-sm"
+                />
+                {draftSuggestion && (
+                  <button
+                    type="button"
+                    onClick={() => setDraftEmail(draftSuggestion)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {t("account.form.didYouMean", { email: draftSuggestion })}
+                  </button>
+                )}
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditing(false)}
+                    disabled={isSaving}
+                  >
+                    {t("account.verification.cancelEdit")}
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="text-secondary"
+                    disabled={isSaving || !draftEmail.trim()}
+                  >
+                    {isSaving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                    {t("account.verification.saveEmail")}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">
+                      {t("account.verification.sentTo")}
+                    </p>
+                    <p className="mt-0.5 truncate text-sm font-medium">{email}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => startEditing(email)}
+                    className="shrink-0 text-xs font-medium text-primary hover:underline"
+                  >
+                    {t("account.verification.wrongEmail")}
+                  </button>
+                </div>
+                {suggestion && (
+                  <button
+                    type="button"
+                    onClick={() => startEditing(suggestion)}
+                    className="mt-2 flex items-center gap-1.5 text-left text-xs text-amber-500 hover:underline"
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {t("account.form.didYouMean", { email: suggestion })}
+                  </button>
+                )}
+              </>
+            )}
           </motion.div>
         </section>
 
