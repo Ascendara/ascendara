@@ -17,6 +17,9 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
+/// How long to wait for another program to release a finished download.
+const LOCK_WAIT: Duration = Duration::from_secs(180);
+
 const DOWNLOADS: &str = ".ascendara-downloads";
 
 #[derive(Clone, Debug)]
@@ -745,7 +748,30 @@ impl Job {
         }
     }
 
+    /// Security software scans a fresh multi-GB archive while holding it open
+    /// without read sharing; wait it out like the final rename does.
+    async fn wait_until_readable(&mut self, path: &Path) -> Result<()> {
+        let started = std::time::Instant::now();
+        let mut attempt = 0u32;
+        loop {
+            match std::fs::File::open(path) {
+                Err(error) if matches!(error.raw_os_error(), Some(32) | Some(33)) && started.elapsed() < LOCK_WAIT => {
+                    if attempt == 0 {
+                        log::warn!("{} is held by another program; waiting for it to release the file", archive::display_name(path));
+                        self.state.set(json!({"extracting": true, "timeUntilComplete": "Waiting for another program to release the file..."}));
+                        self.state.save()?;
+                    }
+                    self.stop.sleep_async(Duration::from_millis((250u64 << attempt.min(3)).min(2000))).await?;
+                    attempt += 1;
+                }
+                // Opened, or an error detect reports in full.
+                _ => return Ok(()),
+            }
+        }
+    }
+
     async fn extract_archive(&mut self, path: &Path, destination: &Path) -> Result<Manifest> {
+        self.wait_until_readable(path).await?;
         let kind = archive::detect(path)?;
         if kind != Kind::Exe {
             if let Ok(listing) = archive::list(path, kind) {
