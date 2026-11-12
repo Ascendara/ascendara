@@ -52,9 +52,23 @@
   flex: 1;
   text-align: left;
 }
+.bp-index-sections .bp-action {
+  position: relative;
+}
+/* The open section keeps an accent bar so it stays distinct from the focus ring. */
 .bp-index-sections [aria-current="page"] {
-  background: rgb(var(--color-primary) / 0.15);
-  border-color: rgb(var(--color-primary));
+  color: rgb(var(--color-primary));
+  border-color: rgb(var(--color-primary) / 0.5);
+}
+.bp-index-sections [aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: -0.85rem;
+  top: 20%;
+  bottom: 20%;
+  width: 4px;
+  border-radius: 2px;
+  background: rgb(var(--color-primary));
 }
 .bp-index-content {
   min-width: 0;
@@ -119,8 +133,13 @@
   opacity: 0.45;
   cursor: default;
 }
-.bp-index-manager .bp-action:focus-visible {
-  background: rgb(var(--color-primary) / 0.18);
+.bp-index-manager .bp-action:focus {
+  background: rgb(var(--color-primary));
+  color: rgb(var(--color-secondary));
+}
+.bp-index-manager .bp-action:focus svg,
+.bp-index-manager .bp-action:focus span {
+  color: inherit;
 }
 .bp-index-setting {
   display: flex;
@@ -226,7 +245,7 @@
   min-height: 2.75rem;
 }
 
-.bp-index-open :is(button, input, textarea, [tabindex]):focus-visible {
+.bp-index-open :is(button, input, textarea, [tabindex]):focus {
   outline: 3px solid rgb(var(--color-primary));
   outline-offset: 3px;
 }
