@@ -32,6 +32,7 @@ import {
   getPreferredProvider,
   getTorrentProvider,
 } from "@/services/downloads/debridService";
+import { wouldDisableActiveTorrentSource } from "@/services/downloads/torrentCapability";
 
 const STATUS_TONES = {
   connected: {
@@ -53,6 +54,32 @@ const STATUS_TONES = {
 const DOCS_URL = "https://ascendara.app/docs/downloads/debrid-services";
 
 const apiKeyOf = (settings, provider) => settings[provider.apiKeySetting]?.trim() || "";
+
+function useTorrentSafeSettings() {
+  const { settings, setSettings } = useSettings();
+  const { t } = useLanguage();
+  const setTorrentSafeSettings = useCallback(
+    async updater => {
+      let blocked = false;
+      await setSettings(current => {
+        const next = typeof updater === "function" ? updater(current) : updater;
+        if (wouldDisableActiveTorrentSource(current, next)) {
+          blocked = true;
+          return current;
+        }
+        return next;
+      });
+      if (blocked) {
+        toast.error(t("settings.torrentRequiredBySource"));
+        return false;
+      }
+      return true;
+    },
+    [setSettings, t]
+  );
+
+  return { settings, setSettings: setTorrentSafeSettings };
+}
 
 function DocsLink({ url, children }) {
   const { t } = useLanguage();
@@ -225,7 +252,7 @@ function SectionHeader({ title, description, action }) {
 // The master switch, plus either what debrid adds (when off) or where each kind of
 // download goes right now (when on).
 function Overview({ providers, accounts }) {
-  const { settings, setSettings } = useSettings();
+  const { settings, setSettings } = useTorrentSafeSettings();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const debridEnabled = settings.debridEnabled === true;
@@ -369,7 +396,7 @@ function StatusPill({ status }) {
 }
 
 function ServiceCard({ provider, position, account, onRetry }) {
-  const { settings, setSettings } = useSettings();
+  const { settings, setSettings } = useTorrentSafeSettings();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const apiKey = apiKeyOf(settings, provider);
@@ -381,20 +408,21 @@ function ServiceCard({ provider, position, account, onRetry }) {
 
   const saveKey = async value => {
     if (value) await provider.getUserInfo(value);
-    setSettings(current => ({
+    const saved = await setSettings(current => ({
       ...current,
       [provider.apiKeySetting]: value,
       // Only a new key ends a code sign-in: saving the same one keeps its refresh token
       ...(value !== current[provider.apiKeySetting] && provider.signIn?.clearedSettings),
     }));
-    setEditingKey(false);
+    if (saved) setEditingKey(false);
   };
-  const disconnect = () => {
-    setSettings(current => ({
+  const disconnect = async () => {
+    const disconnected = await setSettings(current => ({
       ...current,
       [provider.apiKeySetting]: "",
       ...provider.signIn?.clearedSettings,
     }));
+    if (!disconnected) return;
     setEditingKey(false);
     toast.success(t("debrid.disconnected", { provider: provider.name }));
   };

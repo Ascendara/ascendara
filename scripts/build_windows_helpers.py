@@ -3,8 +3,6 @@
 
 The historical .bat/.spec files are not in Git; this is the checked-in recipe.
 """
-import os
-from pathlib import Path
 import platform
 import shutil
 import subprocess
@@ -22,11 +20,7 @@ def main():
     for command in ('cargo', 'yarn.cmd'):
         if not shutil.which(command):
             raise RuntimeError(f'Missing dependency: {command}')
-    seven = Path(os.environ['ProgramFiles']) / '7-Zip'
-    for name in ('7z.exe', '7z.dll', 'License.txt'):
-        if not (seven / name).is_file():
-            raise RuntimeError(f'Install 7-Zip x64: missing {seven / name}')
-    names = ('AscendaraNotificationHelper', 'AscendaraTorrentHandler')
+    names = ('AscendaraNotificationHelper',)
     venv = ROOT / '.build_venv' / 'Scripts/python.exe'
     run([sys.executable, '-m', 'venv', venv.parent.parent])
     run([venv, '-m', 'pip', 'install', 'pyinstaller==6.16.0'])
@@ -42,10 +36,6 @@ def main():
         # The app starts these in the background; as console programs Windows
         # would open a terminal window for each one
         command += ['--windowed']
-        if name == 'AscendaraTorrentHandler':
-            for file in ('7z.exe', '7z.dll'):
-                command += ['--add-binary', f'{seven / file};.']
-            command += ['--add-data', f'{seven / "License.txt"};licenses/7zip']
         if name == 'AscendaraNotificationHelper':
             command += ['--add-data', f'{folder / "src/sounds"};sounds',
                         '--hidden-import', 'PyQt6.QtMultimedia']

@@ -3,8 +3,17 @@
 
 import { resolveHost } from "@/services/downloads/debridService";
 import pendingLibrarySwapService from "@/services/downloads/pendingLibrarySwapService";
+import {
+  TORRENT_DISABLED_CODE,
+  isTorrentLink,
+} from "@/services/downloads/torrentLink";
 
 const QUEUE_STORAGE_KEY = "ascendDownloadQueue";
+
+export const getQueueBlockReason = (item, settings) =>
+  isTorrentLink(item?.url) && settings?.torrentEnabled !== true
+    ? TORRENT_DISABLED_CODE
+    : null;
 
 // Get the current download queue
 export const getDownloadQueue = () => {
@@ -129,26 +138,17 @@ const _processNextInQueueInternal = async () => {
     return null; // Wait for current download to finish
   }
 
-  // If the user chose to switch this game from an imported (launcher-tied) copy
-  // to an Ascendara-managed download, remove the old imported entry right as the
-  // real download starts, so it downloads like any other normal game from here on.
-  const importedGameName = pendingLibrarySwapService.take(nextItem.gameName);
-  if (importedGameName) {
-    try {
-      await window.electron.removeCustomGame(importedGameName);
-    } catch (error) {
-      console.warn("Could not remove imported game before queued swap download:", error);
-    }
-  }
-
   // Start the download
   try {
     let url = nextItem.url;
     if (!url && !nextItem.debridLink && !nextItem.realDebridLink)
       throw new Error("This queued download has no link. Queue it again from its page.");
     const debridLink = nextItem.debridLink || nextItem.realDebridLink;
+    const queuedTorrent = isTorrentLink(url);
+    const settings =
+      debridLink || queuedTorrent ? await window.electron.getSettings() : null;
+
     if (debridLink) {
-      const settings = await window.electron.getSettings();
       if (settings.debridEnabled !== true) return null;
       const resolved = await resolveHost(
         settings,
@@ -162,6 +162,12 @@ const _processNextInQueueInternal = async () => {
         throw new Error("This debrid download is still processing in the cloud.");
       url = resolved.url;
     }
+
+    // Local torrent opt-in is a temporary queue block, not a fatal queue error.
+    // Leave the item in place so normal idle polling can start it after the user
+    // enables torrenting again.
+    if (getQueueBlockReason(nextItem, settings) === TORRENT_DISABLED_CODE) return null;
+
     const result = await window.electron.downloadFile(
       url,
       nextItem.gameName,
@@ -178,7 +184,23 @@ const _processNextInQueueInternal = async () => {
       nextItem.browserAssetGameId,
       nextItem.browserAssetLogoId
     );
-    if (result?.success === false) throw new Error(result.error);
+    if (result?.success === false) {
+      if (result.blocked === true && result.code === TORRENT_DISABLED_CODE) {
+        return null;
+      }
+      throw new Error(result.error);
+    }
+
+    // Only consume an imported-library swap after the queued download really
+    // started. Temporary queue blocks must not remove the user's imported entry.
+    const importedGameName = pendingLibrarySwapService.take(nextItem.gameName);
+    if (importedGameName) {
+      try {
+        await window.electron.removeCustomGame(importedGameName);
+      } catch (error) {
+        console.warn("Could not remove imported game after queued swap download:", error);
+      }
+    }
 
     // Wait for the download to appear in the games list before removing from queue
     // This prevents the empty page flash

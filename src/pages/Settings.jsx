@@ -1,4 +1,4 @@
-import { canUseCloudTorrents } from "@/services/downloads/debridService";
+import { canUseTorrentOnlySource } from "@/services/downloads/torrentCapability";
 import DebridSettings from "@/components/DebridSettings";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useTheme, clearCustomTheme } from "@/context/ThemeContext";
@@ -9,7 +9,6 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useLocation } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { resetPageTours } from "@/components/PageTours";
 import { Input } from "@/components/ui/input";
@@ -19,7 +18,6 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import SafeHtml from "@/components/SafeHtml";
 import "@/components/ui/tabs";
-import checkQbittorrentStatus from "@/services/downloads/qbittorrentCheckService";
 import {
   Select,
   SelectContent,
@@ -268,9 +266,6 @@ function Settings() {
   const [currentScreen, setCurrentScreen] = useState("none");
   const [isTriggering, setIsTriggering] = useState(false);
   const [apiMetadata, setApiMetadata] = useState(null);
-  const [qbitConfigDraft, setQbitConfigDraft] = useState(null);
-  const [qbitStatusRefreshKey, setQbitStatusRefreshKey] = useState(0);
-  const [hideQbitInstallNote, setHideQbitInstallNote] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isOnWindows, setIsOnWindows] = useState(null);
   const [isOnLinux, setIsOnLinux] = useState(false);
@@ -520,20 +515,6 @@ function Settings() {
       setIsLoading(false);
     }
   }, [settings]); // Simmplify dependencies
-
-  // Load qBittorrent install note dismissal state
-  useEffect(() => {
-    const dismissed = localStorage.getItem("hideQbitInstallNote");
-    if (dismissed === "true") {
-      setHideQbitInstallNote(true);
-    }
-  }, []);
-
-  // Save qBittorrent install note dismissal state
-  const handleDismissQbitInstallNote = () => {
-    localStorage.setItem("hideQbitInstallNote", "true");
-    setHideQbitInstallNote(true);
-  };
 
   const handleSettingChange = useCallback(
     async (key, value, ludusavi = false) => {
@@ -1071,6 +1052,16 @@ function Settings() {
       </div>
     );
   }
+
+  const localTorrentRequiredBySource = Boolean(
+    settings.customSourcesMode &&
+      settings.customSource?.torrentOnly &&
+      settings.torrentEnabled &&
+      !canUseTorrentOnlySource(settings.customSource, {
+        ...settings,
+        torrentEnabled: false,
+      })
+  );
 
   const handleTorrentToggle = () => {
     if (!settings.torrentEnabled) {
@@ -2066,26 +2057,11 @@ function Settings() {
                           <Switch
                             checked={settings.torrentEnabled}
                             onCheckedChange={handleTorrentToggle}
-                            disabled={
-                              !isOnWindows ||
-                              (settings.customSourcesMode &&
-                                settings.customSource?.torrentOnly &&
-                                settings.torrentEnabled &&
-                                !canUseCloudTorrents(settings))
-                            }
+                            disabled={localTorrentRequiredBySource}
                           />
                         </div>
                       </TooltipTrigger>
-                      {!isOnWindows ? (
-                        <TooltipContent>
-                          <p className="text-secondary">
-                            {t("settings.onlyWindowsSupported")}
-                          </p>
-                        </TooltipContent>
-                      ) : settings.customSourcesMode &&
-                        settings.customSource?.torrentOnly &&
-                        settings.torrentEnabled &&
-                        !canUseCloudTorrents(settings) ? (
+                      {localTorrentRequiredBySource ? (
                         <TooltipContent>
                           <p className="text-secondary">
                             {t("settings.torrentRequiredBySource") ||
@@ -2096,271 +2072,17 @@ function Settings() {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                {settings.customSourcesMode &&
-                  settings.customSource?.torrentOnly &&
-                  settings.torrentEnabled &&
-                  !canUseCloudTorrents(settings) && (
-                    <div className="mb-4 rounded-md border border-orange-500/30 bg-orange-500/5 p-3 text-xs text-orange-700 dark:text-orange-300">
-                      {(
-                        t("settings.torrentLockedBySourceNote") ||
-                        "Torrenting can't be disabled while {{name}} is selected — it only publishes magnet links. Change the external source in Local Refresh first."
-                      ).replace(
-                        "{{name}}",
-                        settings.customSource?.name || "this external source"
-                      )}
-                    </div>
-                  )}
-
-                <div className="space-y-6">
-                  {/* qBittorrent Status */}
-                  <div className="border-l-2 border-border py-1 pl-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      {settings.torrentEnabled ? (
-                        <QbittorrentStatus refreshKey={qbitStatusRefreshKey} />
-                      ) : (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Badge className="h-2 w-2 rounded-full bg-gray-400" />
-                          <span>{t("app.qbittorrent.inactive")}</span>
-                        </div>
-                      )}
-                    </div>
+                {localTorrentRequiredBySource && (
+                  <div className="mb-4 rounded-md border border-orange-500/30 bg-orange-500/5 p-3 text-xs text-orange-700 dark:text-orange-300">
+                    {(
+                      t("settings.torrentLockedBySourceNote") ||
+                      "Torrenting can't be disabled while {{name}} is selected - some of its torrent links require Ascendara's local torrent client. Change the external source in Local Refresh first."
+                    ).replace(
+                      "{{name}}",
+                      settings.customSource?.name || "this external source"
+                    )}
                   </div>
-
-                  {/* qBittorrent Installation */}
-                  {settings.torrentEnabled && !hideQbitInstallNote && (
-                    <div className="rounded-lg border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/50">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex flex-1 items-start gap-3">
-                          <Download className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
-                          <div className="space-y-2">
-                            <h4 className="font-semibold text-amber-900 dark:text-amber-100">
-                              {t("settings.qbitInstall.title")}
-                            </h4>
-                            <p className="text-sm text-amber-800 dark:text-amber-200">
-                              {t("settings.qbitInstall.description")}
-                            </p>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="mt-2 border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-100 dark:hover:bg-amber-800"
-                              onClick={() =>
-                                window.electron.openURL(
-                                  "https://www.qbittorrent.org/download"
-                                )
-                              }
-                            >
-                              <ExternalLink className="mr-2 h-4 w-4" />
-                              {t("settings.qbitInstall.downloadButton")}
-                            </Button>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 rounded-full hover:bg-amber-200/50 dark:hover:bg-amber-800/50"
-                          onClick={handleDismissQbitInstallNote}
-                        >
-                          <X className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* qBittorrent Configuration */}
-                  <div
-                    className={`space-y-4 ${!settings.torrentEnabled ? "pointer-events-none opacity-50" : ""}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold">
-                        {t("settings.qbitConfig.title")}
-                      </h3>
-                      {!settings.torrentEnabled && (
-                        <Badge variant="secondary" className="text-xs">
-                          {t("common.disabled")}
-                        </Badge>
-                      )}
-                    </div>
-                    <p
-                      className={`text-sm ${!settings.torrentEnabled ? "text-muted-foreground/60" : "text-muted-foreground"}`}
-                    >
-                      {t("settings.qbitConfig.description")}
-                    </p>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="qbit-host"
-                          className={
-                            !settings.torrentEnabled ? "text-muted-foreground/60" : ""
-                          }
-                        >
-                          {t("settings.qbitConfig.host")}
-                        </Label>
-                        <Input
-                          id="qbit-host"
-                          type="text"
-                          placeholder="localhost"
-                          disabled={!settings.torrentEnabled}
-                          value={
-                            qbitConfigDraft?.host ?? settings.torrentHost ?? "localhost"
-                          }
-                          onChange={e =>
-                            setQbitConfigDraft(prev => ({
-                              ...(prev || {
-                                host: settings.torrentHost ?? "localhost",
-                                port: settings.torrentPort ?? 8080,
-                                username: settings.torrentUsername ?? "admin",
-                                password: settings.torrentPassword ?? "adminadmin",
-                              }),
-                              host: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="qbit-port"
-                          className={
-                            !settings.torrentEnabled ? "text-muted-foreground/60" : ""
-                          }
-                        >
-                          {t("settings.qbitConfig.port")}
-                        </Label>
-                        <Input
-                          id="qbit-port"
-                          type="number"
-                          min={1}
-                          max={65535}
-                          placeholder="8080"
-                          disabled={!settings.torrentEnabled}
-                          value={qbitConfigDraft?.port ?? settings.torrentPort ?? 8080}
-                          onChange={e =>
-                            setQbitConfigDraft(prev => ({
-                              ...(prev || {
-                                host: settings.torrentHost ?? "localhost",
-                                port: settings.torrentPort ?? 8080,
-                                username: settings.torrentUsername ?? "admin",
-                                password: settings.torrentPassword ?? "adminadmin",
-                              }),
-                              port: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="qbit-username"
-                          className={
-                            !settings.torrentEnabled ? "text-muted-foreground/60" : ""
-                          }
-                        >
-                          {t("settings.qbitConfig.username")}
-                        </Label>
-                        <Input
-                          id="qbit-username"
-                          type="text"
-                          autoComplete="off"
-                          placeholder="admin"
-                          disabled={!settings.torrentEnabled}
-                          value={
-                            qbitConfigDraft?.username ??
-                            settings.torrentUsername ??
-                            "admin"
-                          }
-                          onChange={e =>
-                            setQbitConfigDraft(prev => ({
-                              ...(prev || {
-                                host: settings.torrentHost ?? "localhost",
-                                port: settings.torrentPort ?? 8080,
-                                username: settings.torrentUsername ?? "admin",
-                                password: settings.torrentPassword ?? "adminadmin",
-                              }),
-                              username: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="qbit-password"
-                          className={
-                            !settings.torrentEnabled ? "text-muted-foreground/60" : ""
-                          }
-                        >
-                          {t("settings.qbitConfig.password")}
-                        </Label>
-                        <Input
-                          id="qbit-password"
-                          type="password"
-                          autoComplete="new-password"
-                          placeholder="adminadmin"
-                          disabled={!settings.torrentEnabled}
-                          value={
-                            qbitConfigDraft?.password ??
-                            settings.torrentPassword ??
-                            "adminadmin"
-                          }
-                          onChange={e =>
-                            setQbitConfigDraft(prev => ({
-                              ...(prev || {
-                                host: settings.torrentHost ?? "localhost",
-                                port: settings.torrentPort ?? 8080,
-                                username: settings.torrentUsername ?? "admin",
-                                password: settings.torrentPassword ?? "adminadmin",
-                              }),
-                              password: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary"
-                        disabled={!qbitConfigDraft || !settings.torrentEnabled}
-                        onClick={() => setQbitConfigDraft(null)}
-                      >
-                        {t("common.cancel")}
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="text-muted"
-                        disabled={!qbitConfigDraft || !settings.torrentEnabled}
-                        onClick={() => {
-                          const draft = qbitConfigDraft;
-                          if (!draft) return;
-                          const portNum = parseInt(draft.port, 10);
-                          if (!draft.host || draft.host.trim() === "") {
-                            toast.error(t("settings.qbitConfig.errors.host"));
-                            return;
-                          }
-                          if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
-                            toast.error(t("settings.qbitConfig.errors.port"));
-                            return;
-                          }
-                          setSettings(s => ({
-                            ...s,
-                            torrentHost: draft.host.trim(),
-                            torrentPort: portNum,
-                            torrentUsername: (draft.username ?? "").trim() || "admin",
-                            torrentPassword: draft.password ?? "adminadmin",
-                          }));
-                          setQbitConfigDraft(null);
-                          setQbitStatusRefreshKey(k => k + 1);
-                          toast.success(t("settings.qbitConfig.saved"));
-                        }}
-                      >
-                        {t("settings.qbitConfig.save")}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                )}
               </SettingsSection>
             </SettingsCategory>
 
@@ -4569,182 +4291,6 @@ function Settings() {
     </div>
   );
 }
-
-const QbittorrentStatus = ({ refreshKey = 0 } = {}) => {
-  const { t } = useLanguage();
-  const { settings } = useSettings();
-  const [checking, setChecking] = useState(false);
-  const [status, setStatus] = useState({ checking: true });
-  const [showConfigAlert, setShowConfigAlert] = useState(false);
-  const [showStillCantConnectAlert, setShowStillCantConnectAlert] = useState(false);
-
-  const checkStatus = useCallback(async () => {
-    setChecking(true);
-    try {
-      const result = await checkQbittorrentStatus();
-      setStatus(result);
-    } catch (error) {
-      console.error("Error checking qBittorrent status:", error);
-      setStatus({ active: false, error: error.message });
-    } finally {
-      setChecking(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkStatus();
-    const interval = setInterval(checkStatus, 30000);
-    return () => clearInterval(interval);
-  }, [checkStatus, refreshKey]);
-
-  return (
-    <div className="flex w-full items-center justify-between">
-      <div className="flex items-center gap-2">
-        {checking ? (
-          <>
-            <Loader className="h-4 w-4 animate-spin" />
-            <span>{t("app.qbittorrent.checking")}</span>
-          </>
-        ) : status.active ? (
-          <>
-            <Badge className="h-2 w-2 rounded-full bg-green-500" />
-            <span>{t("app.qbittorrent.active", { version: status.version })}</span>
-          </>
-        ) : (
-          <>
-            <Badge className="h-2 w-2 rounded-full bg-red-500" />
-            <span>
-              {status.error ? (
-                <>
-                  {t("app.qbittorrent.inactiveWithError", { error: status.error })}
-                  <button
-                    onClick={() => setShowConfigAlert(true)}
-                    className="ml-2 underline"
-                  >
-                    {t("settings.checkConfig")}
-                  </button>
-                </>
-              ) : (
-                t("app.qbittorrent.inactive")
-              )}
-            </span>
-          </>
-        )}
-      </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={checkStatus}
-        disabled={checking}
-        className="h-8 w-8"
-      >
-        <RefreshCw className={`h-4 w-4 ${checking ? "animate-spin" : ""}`} />
-      </Button>
-      <AlertDialog open={showConfigAlert} onOpenChange={setShowConfigAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("app.qbittorrent.configRequired")}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-4 text-muted-foreground">
-                <div className="rounded-lg bg-muted p-4">
-                  <h4 className="mb-2 font-semibold">
-                    {t("settings.qbitConfigDialog.currentConfig")}
-                  </h4>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="font-medium">
-                        {t("settings.qbitConfigDialog.host")}:
-                      </span>{" "}
-                      {settings.torrentHost || "localhost"}
-                    </div>
-                    <div>
-                      <span className="font-medium">
-                        {t("settings.qbitConfigDialog.port")}:
-                      </span>{" "}
-                      {settings.torrentPort || 8080}
-                    </div>
-                    <div>
-                      <span className="font-medium">
-                        {t("settings.qbitConfigDialog.username")}:
-                      </span>{" "}
-                      {settings.torrentUsername || "admin"}
-                    </div>
-                    <div>
-                      <span className="font-medium">
-                        {t("settings.qbitConfigDialog.password")}:
-                      </span>{" "}
-                      {settings.torrentPassword || "adminadmin"}
-                    </div>
-                  </div>
-                </div>
-                <p>{t("app.qbittorrent.configInstructions")}</p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-primary sm:mr-auto"
-              onClick={() => {
-                setShowConfigAlert(false);
-                setShowStillCantConnectAlert(true);
-              }}
-            >
-              {t("settings.qbitConfigDialog.stillCantConnect.title")}
-            </Button>
-            <AlertDialogCancel className="text-primary">
-              {t("common.ok")}
-            </AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog
-        open={showStillCantConnectAlert}
-        onOpenChange={setShowStillCantConnectAlert}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold text-foreground">
-              {t("settings.qbitConfigDialog.stillCantConnect.title")}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-4 text-muted-foreground">
-                <p className="text-sm">
-                  {t("settings.qbitConfigDialog.stillCantConnect.intro")}
-                </p>
-                <ol className="list-inside list-decimal space-y-1 text-sm">
-                  <li>{t("settings.qbitConfigDialog.stillCantConnect.step1")}</li>
-                  <li>{t("settings.qbitConfigDialog.stillCantConnect.step2")}</li>
-                  <li>{t("settings.qbitConfigDialog.stillCantConnect.step3")}</li>
-                  <li>
-                    {t("settings.qbitConfigDialog.stillCantConnect.step4")}
-                    <ul className="ml-4 mt-1 list-inside list-disc space-y-1">
-                      <li>{t("settings.qbitConfigDialog.stillCantConnect.step4a")}</li>
-                      <li>{t("settings.qbitConfigDialog.stillCantConnect.step4b")}</li>
-                    </ul>
-                  </li>
-                  <li>{t("settings.qbitConfigDialog.stillCantConnect.step5")}</li>
-                  <li>{t("settings.qbitConfigDialog.stillCantConnect.step6")}</li>
-                </ol>
-                <p className="text-sm text-muted-foreground">
-                  {t("settings.qbitConfigDialog.stillCantConnect.vpnNote")}
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="text-primary">
-              {t("common.ok")}
-            </AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-};
 
 function SettingsNav({ categories, activeId, onSelect }) {
   return (

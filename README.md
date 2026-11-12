@@ -293,15 +293,16 @@ The Ascendara project is organized into the following main directories:
 
 - **AscendaraAchievementWatcher/** - Tracks and monitors game achievements
 - **AscendaraCrashReporter/** - Automated crash reporting and diagnostics
-- **AscendaraDownloader/** - Multi-threaded game download manager supporting various file hosts
+- **AscendaraDownloader/** - Multi-threaded game download manager with built-in BitTorrent support
 - **AscendaraGameHandler/** - Game execution, process management, and runtime monitoring
 - **AscendaraLocalRefresh/** - Game index scraper. No longer shipped with the app; the API runs it on a schedule
 - **AscendaraNotificationHelper/** - System notification helper for download events
 
-  > ℹ️ **INFO:** The tools below are additional tools that do not come with the official build of Ascendara. Instead, they utilize Ascendara's tool installation feature to install these supplementary tools as needed.
+  > ℹ️ **INFO:** The tool below does not come with the official build of Ascendara. Instead, Ascendara installs it as needed through the tool installation feature.
 
 - **AscendaraLanguageTranslation/** - Translation tool used to translate to the additional 93 languages
-- **AscendaraTorrentHandler/** - Torrent download functionality
+
+  > **LEGACY:** **AscendaraTorrentHandler/** is retained only as historical/reference source. It is not built, packaged, updated, monitored, or installed; current torrent downloads use AscendaraDownloader.
 
 ### **electron/** - Electron main process and IPC communication
 

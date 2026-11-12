@@ -2,6 +2,7 @@ import { sanitizeText } from "@/lib/utils";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { API_URL } from "@/config/api";
 import { activePrivateSourceIds } from "@/lib/activePrivateSources";
+import { hydraHostKey } from "./hydraSource";
 
 const CACHE_KEY = "ascendara_games_cache";
 const CACHE_TIMESTAMP_KEY = "local_ascendara_games_timestamp";
@@ -67,22 +68,6 @@ function cleanHydraTitle(title) {
     .replace(/\s{2,}/g, " ")
     .replace(/^[\s\-–—:|]+|[\s\-–—:|]+$/g, "")
     .trim();
-}
-
-function hydraHostKey(uri) {
-  if (!uri) return null;
-  const low = uri.trim().toLowerCase();
-  if (low.startsWith("magnet:")) return "torrent";
-  try {
-    let host = new URL(uri).hostname.toLowerCase();
-    if (host.startsWith("www.")) host = host.slice(4);
-    if (!host) return null;
-    const parts = host.split(".");
-    if (parts.length >= 2) return parts[parts.length - 2];
-    return host;
-  } catch {
-    return null;
-  }
 }
 
 function parseHydraDate(value) {

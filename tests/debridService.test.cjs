@@ -13,7 +13,6 @@ test("debrid is off by default and disabling it retains configuration without ro
   for (const settings of [saved, { ...saved, debridEnabled: false }]) {
     assert.deepEqual(debrid.getConfiguredProviders(settings), []);
     assert.equal(debrid.getTorrentProvider(settings), null);
-    assert.equal(debrid.canDownloadTorrents(settings), false);
     assert.equal(
       debrid.canUseForHost(settings, "custom", "https://1fichier.com/file"),
       false
@@ -35,7 +34,6 @@ test("debrid is off by default and disabling it retains configuration without ro
     debrid.getPreferredProvider({ ...saved, debridEnabled: true }).id,
     "realdebrid"
   );
-  assert.equal(debrid.canDownloadTorrents({ ...saved, torrentEnabled: true }), true);
   assert.deepEqual(saved.debridProviderOrder, ["realdebrid", "torbox"]);
   assert.equal(saved.torboxApiKey, "tb");
 });
@@ -72,28 +70,57 @@ test("registered providers select one configured service and expose its capabili
     debrid.canUseCloudTorrents({ ...preferred, useRealDebridForTorrents: false }),
     true
   );
+});
+
+test("torrent fallback follows the picked provider and requires local torrenting", async () => {
+  const debrid = await service;
+  const fallback = {
+    debridEnabled: true,
+    torrentEnabled: true,
+    torboxApiKey: "tb",
+    realDebridApiKey: "rd",
+    fallbackToQbittorrentOnTorboxFailure: true,
+  };
+
+  const defaultRealDebrid = {
+    ...fallback,
+    debridProviderOrder: ["realdebrid", "torbox"],
+  };
+  assert.equal(debrid.getTorrentProvider(defaultRealDebrid).id, "realdebrid");
   assert.equal(
-    debrid.canDownloadTorrents({
-      ...preferred,
-      useRealDebridForTorrents: false,
-      torrentEnabled: true,
-    }),
-    true
+    debrid.allowsTorrentFallback(defaultRealDebrid, "torbox"),
+    true,
+    "picked TorBox uses TorBox fallback even when Real-Debrid is the default"
   );
   assert.equal(
-    debrid.allowsTorrentFallback({
-      debridEnabled: true,
-      torboxApiKey: "tb",
-      fallbackToQbittorrentOnTorboxFailure: true,
-    }),
-    true
+    debrid.allowsTorrentFallback(defaultRealDebrid, "realdebrid"),
+    false,
+    "Real-Debrid must not inherit TorBox's fallback setting"
+  );
+
+  const defaultTorbox = {
+    ...fallback,
+    debridProviderOrder: ["torbox", "realdebrid"],
+  };
+  assert.equal(debrid.getTorrentProvider(defaultTorbox).id, "torbox");
+  assert.equal(
+    debrid.allowsTorrentFallback(defaultTorbox, "realdebrid"),
+    false,
+    "picked Real-Debrid must not inherit the default TorBox fallback"
   );
   assert.equal(
-    debrid.allowsTorrentFallback({
-      ...preferred,
-      fallbackToQbittorrentOnTorboxFailure: true,
-    }),
-    false
+    debrid.allowsTorrentFallback(defaultTorbox, "torbox"),
+    true,
+    "picked TorBox may fall back when local torrenting is available"
+  );
+
+  assert.equal(
+    debrid.allowsTorrentFallback(
+      { ...defaultTorbox, torrentEnabled: false },
+      "torbox"
+    ),
+    false,
+    "a saved fallback preference cannot route to a disabled local client"
   );
 });
 
@@ -203,7 +230,6 @@ test("a third adapter works through the same interface without provider-specific
   const debrid = createDebridService([provider]);
   const settings = { debridEnabled: true, thirdKey: " token ", debridProvider: "third" };
   const game = { game: "Example", isUpdating: true, gameID: "game1" };
-  assert.equal(debrid.canDownloadTorrents(settings), true);
   assert.equal(debrid.canUseForHost(settings, "custom", "https://third.test/file"), true);
   assert.equal(debrid.canUseCloudTorrents({ ...settings, thirdTorrents: false }), false);
   const torrent = await debrid.submitMagnet(settings, "magnet:?xt=test", game, 2);

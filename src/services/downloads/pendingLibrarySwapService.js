@@ -18,7 +18,7 @@ function writeMap(map) {
 
 // Tracks a game that the user chose to switch from an imported (launcher-tied)
 // copy to an Ascendara-managed download, so the imported entry can be removed
-// once that download actually finishes.
+// only after the replacement download has actually started.
 const pendingLibrarySwapService = {
   add(catalogGameName, importedGameName) {
     if (!catalogGameName || !importedGameName) return;

@@ -1922,8 +1922,8 @@
         "title": "Start download with Torbox"
       },
       "torrentInstructions": {
-        "description": "Click the button below to download the torrent file. Make sure you have a torrent client installed and a VPN enabled for safe downloading.",
-        "noTorrent": "qBittorrent WebUI cannot be accessed. Check settings for more information.",
+        "description": "Ascendara will download this torrent with its built-in client. A VPN is strongly recommended.",
+        "noTorrent": "Local torrent downloads are disabled. Enable torrenting in Settings.",
         "title": "Torrent Download"
       },
       "waitingForBrowser": "Waiting for your browser to send the download...",
@@ -2217,7 +2217,7 @@
       "torboxTorrentFallback": "TorBox failed to add the torrent. Retrying with qBittorrent.",
       "torboxUnsupportedSite": "TorBox does not support this {{provider}} download link. Choose another provider or disable TorBox for this download.",
       "torrentDisabled": "Enable torrenting in Settings to download this game.",
-      "torrentSent": "Torrent sent to qBittorrent"
+      "torrentSent": "Torrent download started in Ascendara"
     },
     "toolbar": {
       "copied": "Copied!",
@@ -2469,7 +2469,7 @@
     "verifyingDescription": "Ascendara is verifying the game files. This may also take a while depending on the game size.",
     "viewInstallLocation": "View Location",
     "waiting": "Waiting for Peers",
-    "waitingDescription": "qBittorrent is looking for peers to connect to download pieces of the torrent file from other users and upload to them in turn. Others may be able to see what you're downloading and/or determine your public IP address.",
+    "waitingDescription": "Ascendara's built-in torrent client is looking for peers to download pieces of the torrent and may upload pieces in return. Other peers may be able to see what you're downloading and/or determine your public IP address.",
     "waitingInQueue": "Waiting in queue",
     "windowsDefenderError": "Windows detected a false positive and prevented the download from completing. Please enable Protect Directories in Ascendara preferences.",
     "card": {
@@ -5682,7 +5682,7 @@
     "torboxApiKeyPlaceholder": "Paste Torbox API key",
     "torboxTitle": "TorBox",
     "torrentDescription": "Enable Ascendara's torrent functionality. This feature requires qBittorrent to be installed and is recommended for experienced users only.",
-    "torrentLockedBySourceNote": "Torrenting can't be disabled while {{name}} is selected - it only publishes magnet links. Change the external source in Local Refresh first.",
+    "torrentLockedBySourceNote": "Torrenting can't be disabled while {{name}} is selected - some of its torrent links require Ascendara's local torrent client. Change the external source in Local Refresh first.",
     "torrentOnAscendara": "Torrent on Ascendara",
     "torrentRequiredBySource": "Your selected external source requires torrenting.",
     "torrentWarningDialog": {
@@ -5690,12 +5690,12 @@
       "continue": "I Understand the Risks",
       "description": "Please read this carefully before enabling torrent functionality:",
       "legalWarning": "Downloading copyrighted content may be illegal in your region. You are responsible for your own actions.",
-      "qbitWarning": "This feature requires qBittorrent. Make sure it is properly configured with your VPN.",
+      "qbitWarning": "Torrent traffic is handled directly by Ascendara. Make sure your VPN is active before continuing.",
       "title": "Enable Torrent Support",
       "vpnWarning": "Your IP address will be visible to other peers. Use a VPN to protect your privacy and avoid potential legal issues."
     },
     "torrenting": "Torrenting",
-    "torrentingDescription": "Configure torrent downloads on Ascendara. Torrenting requires qBittorrent and a VPN is strongly recommended.",
+    "torrentingDescription": "Download torrents directly with Ascendara's built-in torrent client. A VPN is strongly recommended.",
     "uploadLogs": "Upload Logs",
     "useTorboxForTorrents": "Use TorBox for torrents",
     "useTorboxForTorrentsDesc": "Send magnet links to TorBox instead of downloading them directly through qBittorrent.",

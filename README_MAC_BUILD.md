@@ -5,13 +5,12 @@ Use `yarn dist-mac` on a Mac. The script builds native Python helpers, the Rust 
 ## Prerequisites
 
 - Xcode command line tools (including Swift and Git), Node, Yarn, Python 3 with venv, and Rust/Cargo.
-- Run `yarn setup-mac` to download the official macOS 7-Zip distribution into `.build-tools/macos/7zip`. Setup verifies a pinned SHA-256 checksum, the CPU architecture, and RAR decoder availability. The binary and license notices are bundled into both download helpers. Standalone UnRAR and `ASCENDARA_UNRAR_LICENSE` are no longer required for Mac builds. End users do not need Homebrew, Cargo, Python, or an archive utility installed.
+- No external 7-Zip or UnRAR setup is required. `AscendaraDownloader` handles ZIP, 7z, and RAR extraction in-process using its Rust dependencies, and the packaged app does not ship a separate archive utility.
 - Installed JavaScript dependencies (`yarn install --frozen-lockfile`).
 - The existing build-signature secret in `build.config.json` or `BUILD_SECRET`. Register the resulting `electron/build-signature.json` with the release backend using the project's release process. The repository does not include the private registration script.
 
 ```sh
 brew install rust   # developer build dependency; includes Cargo
-yarn setup-mac      # official 7zz with RAR support and notices
 yarn setup-highball # Highball CLI for running Windows games in development
 yarn dist-mac --check
 yarn dist-mac --dir  # local unpacked .app
@@ -28,7 +27,7 @@ yarn dist-mac-all                # both sets of artifacts
 yarn dist-mac --arch both --check
 ```
 
-`yarn dist-mac` defaults to the running host architecture. `--arch both` produces **separate** arm64 and x64 applications/installers with architecture-specific filenames. It builds the renderer and signature once, then builds and validates every helper for each target. Python environments and PyInstaller caches are isolated per architecture, and Rust receives an explicit Apple target triple. The shared official `7zz` contains both CPU slices; PyInstaller bundles the matching slice. No arm64 helper is reused inside the Intel app.
+`yarn dist-mac` defaults to the running host architecture. `--arch both` produces **separate** arm64 and x64 applications/installers with architecture-specific filenames. It builds the renderer and signature once, then builds and validates every helper for each target. Python environments and PyInstaller caches are isolated per architecture, and Rust receives an explicit Apple target triple. No arm64 helper is reused inside the Intel app.
 
 To build both targets on an Apple Silicon Mac:
 
@@ -72,18 +71,16 @@ To upgrade Highball, update `VERSION` and `COMMIT` in `scripts/build_highball.py
 - The Steam Workshop downloader installs Valve's official macOS SteamCMD into `~/ascendaraSteamcmd`. The binary is x86_64, so Apple Silicon needs Rosetta 2.
 - Windows dependency installers, Defender exclusions, and the Windows uninstaller do not run on macOS. Launcher discovery supports Steam on Mac; other launcher integrations still depend on Windows metadata.
 - Live branch updates download the matching `mac-arm64.zip` or `mac-x64.zip` from the GitHub release, replace the installed app after quit, and reopen it. The app must be installed in a writable location. Testing branch switches still require a manual installation.
-- Torrent downloads still require qBittorrent with its Web UI configured, as in the existing implementation.
+- Torrent downloads use the built-in BitTorrent engine in `AscendaraDownloader`; no qBittorrent installation, Web UI, or external torrent client is required.
 
 ## Validation
 
-Run `yarn test`, `yarn test-mac-extraction`, and `yarn build`. The extraction tests require the downloader’s Python requirements (`.build_venv_mac/arm64/bin/python3 -m unittest discover -s tests -p 'test_macos*.py'` after a build also works). Set `ASCENDARA_RAR_TEST_FIXTURE` to a local RAR5 test archive to include the optional RAR extraction test. Tests cover resource paths, architecture-independent helper naming, tool/language storage, platform packaging schema, and rejection of incompatible update payloads.
+Run `yarn test`, `yarn test-downloader`, and `yarn build`. The downloader's Rust suite covers its in-process archive implementation; packaging checks should additionally verify that the architecture-specific `AscendaraDownloader` binary is present in the finished app.
 
 Before publishing, test the actual signed app from Finder on each supported architecture: onboarding, deep links, download/extraction/resume, native and Wine game launches, stopping games/playtime, notifications, translations, achievement monitoring, and Ludusavi backups. Verify the app using `codesign --verify --deep --strict` and `spctl --assess --type execute`. These live workflows and Apple notarization cannot be established by the unit tests alone.
 
-The Mac extraction setup was verified with the downloader’s real extraction worker using ZIP, 7z, and RAR5 fixtures. The build preflight passes with Cargo and the project-local official 7-Zip distribution. An unsigned Apple Silicon `.app`, DMG, and ZIP were built successfully, and the compiled downloader passed its CLI startup smoke test. Both packaged download helpers contain `7zz` and license notices. Signing, notarization, backend build registration, Intel builds, and live app testing remain separate release checks.
+The current macOS build compiles archive support directly into `AscendaraDownloader`; it no longer stages a project-local `7zz` distribution. Signing, notarization, backend build registration, cross-architecture builds, and live app testing remain separate release checks.
 
-## Extraction tool choice
+## Extraction implementation
 
-The official macOS `7zz` supports both Intel and Apple Silicon and includes RAR decoders. The downloader already handles ordinary ZIP files in Python and uses 7-Zip for 7z, RAR, and ZIP methods requiring it. The bundled tool takes priority over PATH installations, since some distributions omit RAR codecs. An installed UnRAR remains an optional existing fallback/preferred RAR path in development; it is not required by the Mac package.
-
-Ascendara uses 7-Zip, licensed under the GNU LGPL with BSD portions and the unRAR restriction. Its complete distribution notices are shipped in `Contents/Resources/licenses/7zip` and inside the helpers. Source and upstream downloads are available at [7-zip.org](https://www.7-zip.org/download.html); the pinned release is [26.03](https://github.com/ip7z/7zip/releases/tag/26.03). Updating the pinned version requires updating both URL and SHA-256 in `scripts/setup_macos_tools.py` and rerunning extraction tests.
+`AscendaraDownloader` handles ZIP, 7z, and RAR archives in-process. Its Rust crate uses `zip`, `sevenz-rust2`, and `unrar`, so the macOS package does not depend on a separately downloaded `7zz` binary or a system UnRAR installation. Changes to archive support belong in the downloader's Cargo dependencies and Rust extraction tests rather than a separate macOS tool bootstrap.

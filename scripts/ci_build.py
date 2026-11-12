@@ -98,6 +98,9 @@ def collect(target):
                 subprocess.run(['lipo', str(helper), '-verify_arch', arch], check=True)
             if platform != 'win' and not os.access(helper, os.X_OK):
                 raise RuntimeError(f'Packaged helper not executable: {helper.name}')
+    notice = resource / 'THIRD_PARTY_NOTICES.md'
+    if not notice.is_file() or notice.stat().st_size == 0:
+        raise RuntimeError('Packaged third-party notices missing: THIRD_PARTY_NOTICES.md')
     output = ROOT / 'release-artifacts' / target
     output.mkdir(parents=True, exist_ok=False)
     artifacts = []

@@ -27,13 +27,13 @@ traverse(parse(component, { sourceType: "module", plugins: ["jsx"] }), {
   },
 });
 const { loadModule } = require("./helpers/loadModule.cjs");
-const support = loadModule("src/services/downloads/debridService.js");
+const torrentSupport = loadModule("src/services/downloads/torrentCapability.js");
 
 async function sourceActions(settings) {
   let warning = false;
   let selected = null;
   const context = vm.createContext({
-    ...(await support),
+    ...(await torrentSupport),
     window: { electron: { getSettings: async () => settings } },
     console,
     activeCustomList: null,
@@ -86,7 +86,7 @@ test("torrent-only source selection accepts the configured active magnet handler
         useTorboxForTorrents: false,
       },
     ],
-    ["qBittorrent", { torrentEnabled: true }],
+    ["Ascendara built-in torrent client", { torrentEnabled: true }],
   ]) {
     await t.test(name, async () => {
       const actions = await sourceActions(settings);
@@ -109,6 +109,25 @@ test("torrent-only source selection accepts the configured active magnet handler
       );
     });
   }
+});
+
+test("a synced raw .torrent-only source warns cloud-only users", async () => {
+  const actions = await sourceActions({
+    debridEnabled: true,
+    torboxApiKey: "tb",
+    torrentEnabled: false,
+  });
+
+  await actions.context.maybeWarnTorrentOnly(
+    { name: "Raw torrent source", torrentOnly: true },
+    [{ download_links: { torrent: ["https://example.test/game.torrent"] } }]
+  );
+
+  assert.equal(
+    actions.warning(),
+    true,
+    "cloud magnet support must not claim a raw .torrent-only source is usable"
+  );
 });
 
 test("torrent-only sources remain blocked when no enabled handler is available", async t => {
@@ -135,13 +154,99 @@ test("torrent-only sources remain blocked when no enabled handler is available",
   }
 });
 
-test("a cloud handler lets local torrenting be disabled while a torrent source is selected", async () => {
+test("Download auto-selection and cloud UI use link-level torrent capability", () => {
+  const downloadPage = fs.readFileSync(
+    path.join(__dirname, "../src/pages/Download.jsx"),
+    "utf8"
+  );
+
+  assert.match(
+    downloadPage,
+    /canDownloadTorrentLinks\(gameData\.download_links\.torrent, settings\)/,
+    "automatic torrent selection must use the actual torrent links"
+  );
+  assert.match(
+    downloadPage,
+    /const cloudTorrentAvailable =[\s\S]*activeTorrentLinks\.some\(isMagnetLink\)/,
+    "cloud torrent UI must only activate for an actual magnet route"
+  );
+  assert.match(
+    downloadPage,
+    /cloudTorrent=\{cloudTorrentAvailable\}/,
+    "DownloadPanel must receive the link-level cloud capability"
+  );
+  assert.match(
+    downloadPage,
+    /allowsTorrentFallback\(settings, pickedTorrent\.provider\?\.id\)/,
+    "local fallback must follow the provider picked for this download"
+  );
+  assert.ok(
+    downloadPage.indexOf("const resolvedTorrentLink") <
+      downloadPage.indexOf("const hasActive = await hasActiveDownloads()"),
+    "the concrete torrent URL must be resolved before queue policy runs"
+  );
+  assert.match(
+    downloadPage,
+    /if \(hasActive && !forceStart && !isTorrentRequest && !cloudHostRequest\)/,
+    "torrent requests must bypass the generic queue branch and enter torrent lifecycle policy"
+  );
+  assert.match(
+    downloadPage,
+    /const queueLocalTorrentIfBusy =[\s\S]*createLocalTorrentQueueData\(\{[\s\S]*torrentLink,/,
+    "queued local torrents must use the first-class torrent queue serializer"
+  );
+  assert.match(
+    downloadPage,
+    /if \(isTorrentRequest\) \{[\s\S]*queueTorrentInDebrid\(resolvedTorrentLink\)[\s\S]*startOrQueueLocalTorrent\(resolvedTorrentLink\)/,
+    "cloud failure and direct local torrents must converge on the same local queue/start path"
+  );
+  assert.match(
+    downloadPage,
+    /const startOrQueueLocalTorrent =[\s\S]*await queueLocalTorrentIfBusy\(torrentLink\)[\s\S]*window\.electron\.downloadFile\(/,
+    "local torrent execution must re-check queue policy immediately before starting"
+  );
+  assert.doesNotMatch(
+    downloadPage,
+    /availableProviders\.includes\("torrent"\)[\s\S]{0,120}canDownloadTorrents\(settings\)/,
+    "the old coarse automatic-selection policy must not return"
+  );
+});
+
+test("Big Picture delegates torrent route availability to shared link capability", () => {
+  const bigPicture = fs.readFileSync(
+    path.join(__dirname, "../src/pages/big-picture/useBigPicturePage.js"),
+    "utf8"
+  );
+
+  assert.match(
+    bigPicture,
+    /import \{ canDownloadTorrentLinks \} from "@\/services\/downloads\/torrentCapability";/
+  );
+  assert.match(
+    bigPicture,
+    /const torrentRouteAvailable = canDownloadTorrentLinks\([\s\S]*torrentCandidates,[\s\S]*settings[\s\S]*\)/
+  );
+  assert.doesNotMatch(
+    bigPicture,
+    /canUseCloudTorrents\(settings\)[\s\S]{0,80}firstLink\("torrent"\)/,
+    "Big Picture must not maintain a second coarse torrent capability rule"
+  );
+});
+
+test("the local torrent toggle uses persisted source link capability", async () => {
   const settingsComponent = fs.readFileSync(
     path.join(__dirname, "../src/pages/Settings.jsx"),
     "utf8"
   );
-  let disabledExpression;
+  let guardExpression;
+  let switchDisabledExpression;
   traverse(parse(settingsComponent, { sourceType: "module", plugins: ["jsx"] }), {
+    VariableDeclarator(nodePath) {
+      const { id, init } = nodePath.node;
+      if (id.name === "localTorrentRequiredBySource") {
+        guardExpression = settingsComponent.slice(init.start, init.end);
+      }
+    },
     JSXOpeningElement(nodePath) {
       const { name, attributes } = nodePath.node;
       if (name.name !== "Switch") return;
@@ -153,30 +258,81 @@ test("a cloud handler lets local torrenting be disabled while a torrent source i
       )
         return;
       const disabled = attributes.find(attribute => attribute.name?.name === "disabled")
-        .value.expression;
-      disabledExpression = settingsComponent.slice(disabled.start, disabled.end);
+        ?.value?.expression;
+      if (disabled)
+        switchDisabledExpression = settingsComponent.slice(disabled.start, disabled.end);
     },
   });
-  assert.ok(disabledExpression, "find the actual local-torrent toggle guard");
+
+  assert.ok(guardExpression, "find the local-torrent source capability guard");
+  assert.equal(
+    switchDisabledExpression,
+    "localTorrentRequiredBySource",
+    "the actual Settings toggle must use the source capability guard"
+  );
+  assert.doesNotMatch(
+    guardExpression,
+    /isOnWindows/,
+    "the built-in torrent client must not retain the legacy Windows-only guard"
+  );
+
+  const policy = await torrentSupport;
+  const disabled = settings =>
+    vm.runInNewContext(guardExpression, { ...policy, settings });
   const base = {
     customSourcesMode: true,
     customSource: { torrentOnly: true },
     torrentEnabled: true,
   };
-  const policy = await support;
-  const disabled = settings =>
-    vm.runInNewContext(disabledExpression, { ...policy, settings, isOnWindows: true });
+
   assert.equal(
     disabled(base),
     true,
     "keep local torrenting enabled when it is the only handler"
   );
-  assert.equal(disabled({ debridEnabled: true, ...base, torboxApiKey: "tb" }), false);
-  assert.equal(disabled({ debridEnabled: true, ...base, realDebridApiKey: "rd" }), false);
+  assert.equal(
+    disabled({ debridEnabled: true, ...base, torboxApiKey: "tb" }),
+    true,
+    "saved metadata-only sources stay conservative until their links are summarized"
+  );
+
+  const rawOnly = {
+    ...base,
+    customSource: {
+      torrentOnly: true,
+      torrentSupport: {
+        hasMagnet: false,
+        hasTorrentFile: true,
+        cloudCompatible: false,
+      },
+    },
+  };
+  assert.equal(
+    disabled({ debridEnabled: true, ...rawOnly, torboxApiKey: "tb" }),
+    true,
+    "a synced raw .torrent source must keep the local client enabled"
+  );
+
+  const magnetCovered = {
+    ...base,
+    customSource: {
+      torrentOnly: true,
+      torrentSupport: {
+        hasMagnet: true,
+        hasTorrentFile: true,
+        cloudCompatible: true,
+      },
+    },
+  };
+  assert.equal(
+    disabled({ debridEnabled: true, ...magnetCovered, torboxApiKey: "tb" }),
+    false,
+    "local torrenting may be disabled when every game has a cloud-compatible magnet"
+  );
   assert.equal(
     disabled({
       debridEnabled: true,
-      ...base,
+      ...magnetCovered,
       realDebridApiKey: "rd",
       useRealDebridForTorrents: false,
     }),

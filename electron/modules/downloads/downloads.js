@@ -18,6 +18,11 @@ const {
 const { getSettingsManager } = require("../core/settings");
 const { linkForLog } = require("../core/log-safe");
 const { prepareDownloaderRuntime } = require("./downloaderRuntime");
+const {
+  TORRENT_DISABLED_CODE,
+  isTorrentLink,
+  assertLocalTorrentEnabled,
+} = require("./torrentLink");
 const { startDownloadWatchdog, getDownloadStalls } = require("./downloadLiveness");
 
 const steamgrid = require("../library/steamgrid");
@@ -466,6 +471,19 @@ function registerDownloadHandlers() {
           }
         }
         const settings = settingsManager.getSettings();
+        try {
+          assertLocalTorrentEnabled(settings, link);
+        } catch (error) {
+          if (error?.code === TORRENT_DISABLED_CODE) {
+            return {
+              success: false,
+              error: error.message,
+              code: error.code,
+              blocked: true,
+            };
+          }
+          throw error;
+        }
         let targetDirectory;
         let gameDirectory;
         let createdGameDirectory = false;
@@ -475,10 +493,7 @@ function registerDownloadHandlers() {
         }
         console.log(`Sanitized game name: ${sanitizedGame}`);
 
-        const linkStr = typeof link === "string" ? link.trim().toLowerCase() : "";
-        const isMagnetLink = linkStr.startsWith("magnet:");
-        const isDotTorrentFile = linkStr.split("?")[0].endsWith(".torrent");
-        const isTorrentLink = isMagnetLink || isDotTorrentFile;
+        const torrentLink = isTorrentLink(link);
 
         // Check the helper before touching the download folder. Antivirus often
         // quarantines it, and starting anyway leaves a folder holding only artwork.
@@ -731,7 +746,7 @@ function registerDownloadHandlers() {
             gameID || "",
           ];
 
-          if (browserDirect === true && !isTorrentLink)
+          if (browserDirect === true && !torrentLink)
             spawnCommand.push("--provider", "direct");
           if (fileList) spawnCommand.push("--file-list");
 
@@ -1273,7 +1288,7 @@ function registerDownloadHandlers() {
               return true;
             } catch (error) {
               // A failed pause must not leave a successful-looking paused card while
-              // a helper or qBittorrent may still be transferring in the background.
+              // a helper may still be transferring in the background.
               if (!isKill && (await fs.pathExists(jsonFilePath))) {
                 const current = await fs.readJson(jsonFilePath);
                 current.downloadingData = {
@@ -1603,6 +1618,7 @@ function registerDownloadHandlers() {
       if (!settings.downloadDirectory) {
         throw new Error("Download directory not set. Please configure it in Settings.");
       }
+      assertLocalTorrentEnabled(settings, link);
       const gamesDirectory = settings.downloadDirectory;
 
       const executablePath = getHelperPath("AscendaraDownloader");
@@ -1749,8 +1765,10 @@ function registerDownloadHandlers() {
             };
           }
 
+          assertLocalTorrentEnabled(settings, downloadLink);
+
           // Torrents resume in the same downloader, which rechecks pieces on disk.
-          const torrentDownload = /^(magnet:)|\.torrent(?:\?|$)/i.test(downloadLink);
+          const torrentDownload = isTorrentLink(downloadLink);
           let executablePath = getHelperPath("AscendaraDownloader");
           const targetDirectory = path.dirname(gameDirectory);
           let spawnCommand = [

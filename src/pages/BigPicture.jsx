@@ -438,6 +438,7 @@ function BigPicture() {
                 active={!isMenuOpen && !showKillDialog && !showExitBigPictureDialog}
                 downloads={downloadingGames}
                 queue={queuedDownloads}
+                settings={settings}
                 torboxStates={torboxStates}
                 stopping={stoppingDownloads}
                 resuming={resumingDownloads}

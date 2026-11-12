@@ -1,4 +1,9 @@
-"""Drive the torrent handler through the client adapter, and check the qBittorrent mapping."""
+"""Legacy TorrentHandler regression tests.
+
+This file is intentionally excluded from the repository's default test_*.py
+discovery. The production torrent path is AscendaraDownloader; run this module
+explicitly only when maintaining the retained legacy handler source.
+"""
 import json
 import os
 from pathlib import Path

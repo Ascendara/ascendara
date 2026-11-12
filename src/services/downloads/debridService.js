@@ -34,8 +34,6 @@ export function createDebridService(providers) {
       provider => provider.submitMagnet && settings[provider.torrentSetting] !== false
     ) || null;
   const canUseCloudTorrents = settings => Boolean(getTorrentProvider(settings));
-  const canDownloadTorrents = settings =>
-    Boolean(settings?.torrentEnabled || canUseCloudTorrents(settings));
   const getSupportedHosts = async settings =>
     Object.fromEntries(
       await Promise.all(
@@ -93,10 +91,17 @@ export function createDebridService(providers) {
     );
     return { provider, supported };
   };
-  const allowsTorrentFallback = settings => {
-    const provider = getTorrentProvider(settings);
+  const allowsTorrentFallback = (settings, providerId) => {
+    if (settings?.torrentEnabled !== true) return false;
+
+    const picked = providerId
+      ? getPickedTorrentProvider(settings, providerId)
+      : { provider: getTorrentProvider(settings), supported: true };
+    const provider = picked.supported ? picked.provider : null;
+
     return Boolean(
-      provider?.torrentFallbackSetting && settings[provider.torrentFallbackSetting]
+      provider?.torrentFallbackSetting &&
+        settings[provider.torrentFallbackSetting] === true
     );
   };
   const remember = (provider, data) => {
@@ -206,7 +211,6 @@ export function createDebridService(providers) {
     getHostProvider,
     getSupportedHosts,
     canUseCloudTorrents,
-    canDownloadTorrents,
     canUseForHost,
     getPickerOptions,
     getPickedHostProvider,
@@ -227,7 +231,6 @@ export const {
   getHostProvider,
   getSupportedHosts,
   canUseCloudTorrents,
-  canDownloadTorrents,
   canUseForHost,
   getPickerOptions,
   getPickedHostProvider,

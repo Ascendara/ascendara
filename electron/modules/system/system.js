@@ -1135,7 +1135,6 @@ function registerSystemHandlers() {
         ["AscendaraDownloader", "target/release/AscendaraDownloader"],
         ["AscendaraGameHandler", "target/release/AscendaraGameHandler"],
         ["AscendaraLanguageTranslation", "src/AscendaraLanguageTranslation.py"],
-        ["AscendaraTorrentHandler", "src/AscendaraTorrentHandler.py"],
         ["AscendaraAchievementWatcher", "dist/AscendaraAchievementWatcher"],
       ];
       for (const [name, source] of helpers) {

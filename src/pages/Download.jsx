@@ -49,7 +49,6 @@ import {
 } from "@/services/ascend/downloadSyncService";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import checkQbittorrentStatus from "@/services/downloads/qbittorrentCheckService";
 import { Loader, Wine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -73,6 +72,13 @@ import { STEAM_LOOKUP_FAILED } from "@/components/download/GameOverview";
 import hltbService from "@/services/integrations/hltbService";
 import useDebridHosts from "@/hooks/useDebridHosts";
 import * as debrid from "@/services/downloads/debridService";
+import { canDownloadTorrentLinks } from "@/services/downloads/torrentCapability";
+import { createLocalTorrentQueueData } from "@/services/downloads/torrentLifecycle";
+import {
+  isMagnetLink,
+  isTorrentLink,
+  pickTorrentLink,
+} from "@/services/downloads/torrentLink";
 import {
   fetchProviderPatterns,
   getProviderPattern,
@@ -370,7 +376,6 @@ function PublicDownloadPage() {
   const [artworkReady, setArtworkReady] = useState(true);
   const [showArtworkDialog, setShowArtworkDialog] = useState(false);
   const [isValidLink, setIsValidLink] = useState(true);
-  const [torrentRunning, setIsTorrentRunning] = useState(false);
   const [showCopySuccess, setShowCopySuccess] = useState(false);
   const [showShareCopySuccess, setShowShareCopySuccess] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
@@ -815,7 +820,7 @@ function PublicDownloadPage() {
       await window.electron.removeCustomGame(importedGameName);
       toast.success(t("library.launcherImport.swapComplete", { game: gameData.game }));
     } catch (error) {
-      console.warn("Could not remove imported game before swap download:", error);
+      console.warn("Could not remove imported game after swap download started:", error);
     }
   }
 
@@ -943,16 +948,29 @@ function PublicDownloadPage() {
       supportedHosts
     );
     const pickedTorrent = debrid.getPickedTorrentProvider(settings, debridPick);
-    const isTorrentRequest =
+    const torrentLinks = gameData.download_links?.torrent;
+    const torrentLinksFromGame = (
+      Array.isArray(torrentLinks) ? torrentLinks : [torrentLinks]
+    ).filter(link => typeof link === "string" && link.trim());
+    const isTorrentProvider =
       downloadProvider === "torrent" ||
-      directUrl?.startsWith("magnet:") ||
-      (settings.gameSource === "fitgirl" &&
-        downloadProvider !== "direct" &&
-        gameData.torrentLink?.startsWith("magnet:")) ||
-      (!downloadProvider &&
-        (gameData.download_links?.torrent || []).some?.(link =>
-          link?.trim?.().toLowerCase().startsWith("magnet:")
-        ));
+      isTorrentLink(directUrl) ||
+      (!downloadProvider && torrentLinksFromGame.some(isTorrentLink));
+    const isFitgirlTorrentRequest =
+      settings.gameSource === "fitgirl" &&
+      downloadProvider !== "direct" &&
+      isTorrentLink(gameData.torrentLink);
+    const isTorrentRequest = isTorrentProvider || isFitgirlTorrentRequest;
+    const shouldUseCloudTorrent =
+      pickedTorrent.supported && Boolean(pickedTorrent.provider);
+    const resolvedTorrentLink = isTorrentProvider
+      ? (isTorrentLink(directUrl) ? directUrl : null) ||
+        pickTorrentLink(torrentLinksFromGame, {
+          preferMagnet: shouldUseCloudTorrent,
+        })
+      : isFitgirlTorrentRequest
+        ? gameData.torrentLink
+        : null;
     if (!(isTorrentRequest ? pickedTorrent.supported : pickedHost.supported)) {
       toast.error(
         t("debrid.pickUnsupported", {
@@ -980,16 +998,10 @@ function PublicDownloadPage() {
     console.log("[DL] hasActive:", hasActive, "isAuthenticated:", isAuthenticated);
 
     const cloudTorrentRequest =
-      pickedTorrent.supported &&
-      Boolean(pickedTorrent.provider) &&
-      (downloadProvider === "torrent" ||
-        directUrl?.startsWith("magnet:") ||
-        (settings.gameSource === "fitgirl" &&
-          downloadProvider !== "direct" &&
-          gameData.torrentLink?.startsWith("magnet:")));
+      shouldUseCloudTorrent && isMagnetLink(resolvedTorrentLink);
     const cloudHostRequest =
       routeThroughDebrid && downloadDebridProvider.hostDownloadMode === "cloud";
-    if (hasActive && !forceStart && !cloudTorrentRequest && !cloudHostRequest) {
+    if (hasActive && !forceStart && !isTorrentRequest && !cloudHostRequest) {
       const isVrGame = gameData.category?.includes("Virtual Reality");
       // Queue the host's page link rather than a file link, which can expire
       // while it waits. The downloader opens the page when its turn comes.
@@ -1043,21 +1055,6 @@ function PublicDownloadPage() {
       return;
     }
 
-    // Handle magnet/torrent links from custom (external) sources. These come
-    // through gameData.download_links.torrent = ["magnet:?xt=..."] from the
-    // Hydra-compatible JSON format. They're not DDL providers, so we skip the
-    // provider UI entirely and hand the magnet URI straight to the downloader.
-    const isMagnet = s =>
-      typeof s === "string" && s.trim().toLowerCase().startsWith("magnet:");
-    const torrentLinksFromGame = Array.isArray(gameData.download_links?.torrent)
-      ? gameData.download_links.torrent.filter(Boolean)
-      : [];
-    const isTorrentProvider =
-      downloadProvider === "torrent" ||
-      isMagnet(directUrl) ||
-      (!downloadProvider && torrentLinksFromGame.some(isMagnet));
-    const shouldUseCloudTorrent =
-      pickedTorrent.supported && Boolean(pickedTorrent.provider);
     const queueTorrentInDebrid = async magnet => {
       if (isStartingDownload) return true;
       setIsStartingDownload(true);
@@ -1079,7 +1076,9 @@ function PublicDownloadPage() {
         navigate(result.downloadsPath);
         return true;
       } catch (error) {
-        if (debrid.allowsTorrentFallback(settings)) {
+        if (
+          debrid.allowsTorrentFallback(settings, pickedTorrent.provider?.id)
+        ) {
           toast.info(t("debrid.torrentFallback"));
           return false;
         }
@@ -1091,25 +1090,32 @@ function PublicDownloadPage() {
       }
     };
 
-    if (isTorrentProvider) {
-      const magnetLink =
-        (isMagnet(directUrl) ? directUrl : null) ||
-        torrentLinksFromGame.find(isMagnet) ||
-        torrentLinksFromGame[0];
+    const queueLocalTorrentIfBusy = async torrentLink => {
+      if (forceStart || !(await hasActiveDownloads())) return false;
 
-      if (!magnetLink) {
-        console.log("[DL] EARLY RETURN: no magnet link in torrent provider");
+      const downloadData = createLocalTorrentQueueData({
+        torrentLink,
+        gameName: sanitizedGameName,
+        gameData,
+        dir,
+      });
+
+      if (!isAuthenticated && getDownloadQueue().length >= 1) {
+        toast.error(t("download.toast.downloadQueueLimit"));
+        return true;
+      }
+
+      setPendingDownloadData(downloadData);
+      setShowQueuePrompt(true);
+      return true;
+    };
+
+    const startOrQueueLocalTorrent = async torrentLink => {
+      if (!torrentLink) {
+        console.log("[DL] EARLY RETURN: no torrent link in torrent request");
         toast.error(t("download.toast.invalidLink"));
         return;
       }
-
-      if (
-        shouldUseCloudTorrent &&
-        isMagnet(magnetLink) &&
-        (await queueTorrentInDebrid(magnetLink))
-      )
-        return;
-
       if (!settings.torrentEnabled) {
         toast.error(
           t("download.toast.torrentDisabled") ||
@@ -1117,27 +1123,20 @@ function PublicDownloadPage() {
         );
         return;
       }
-
-      if (!torrentRunning) {
-        toast.error(
-          t("download.downloadOptions.torrentInstructions.noTorrent") ||
-            "qBittorrent is not running. Start qBittorrent and try again."
-        );
-        return;
-      }
+      if (await queueLocalTorrentIfBusy(torrentLink)) return;
 
       if (isStartingDownload) {
         console.log("Download already in progress, skipping");
         return;
       }
+
       setIsStartingDownload(true);
-      await consumePendingLauncherSwap(sanitizedGameName);
       cacheDownloadData(sanitizedGameName, gameData);
 
       try {
         const isVrGame = gameData.category?.includes("Virtual Reality");
-        await window.electron.downloadFile(
-          magnetLink,
+        const result = await window.electron.downloadFile(
+          torrentLink,
           sanitizedGameName,
           gameData.online || false,
           gameData.dlc || false,
@@ -1149,7 +1148,11 @@ function PublicDownloadPage() {
           dir,
           gameData.gameID || ""
         );
+        if (result?.success === false) {
+          throw new Error(result.error || t("download.toast.downloadFailed"));
+        }
 
+        await consumePendingLauncherSwap(sanitizedGameName);
         notifyDownloadStart(sanitizedGameName, gameData.game);
 
         try {
@@ -1178,106 +1181,21 @@ function PublicDownloadPage() {
         }, 2500);
       } catch (error) {
         console.error("Torrent download failed:", error);
-        toast.error(t("download.toast.downloadFailed"));
+        toast.error(error.message || t("download.toast.downloadFailed"));
         setIsStartingDownload(false);
         clearDownloadLock();
       }
-      return;
-    }
+    };
 
-    // Handle torrent links if Fitgirl is the source
-    if (settings.gameSource === "fitgirl" && downloadProvider !== "direct") {
-      const torrentLink = gameData.torrentLink;
-      if (torrentLink) {
-        if (
-          shouldUseCloudTorrent &&
-          isMagnet(torrentLink) &&
-          (await queueTorrentInDebrid(torrentLink))
-        )
-          return;
-
-        if (!settings.torrentEnabled) {
-          toast.error(
-            t("download.toast.torrentDisabled") ||
-              "Enable torrenting in Settings to download this game."
-          );
-          return;
-        }
-
-        if (!torrentRunning) {
-          toast.error(
-            t("download.downloadOptions.torrentInstructions.noTorrent") ||
-              "qBittorrent is not running. Start qBittorrent and try again."
-          );
-          return;
-        }
-
-        if (isStartingDownload) {
-          console.log("Download already in progress, skipping");
-          return;
-        }
-
-        setIsStartingDownload(true);
-        await consumePendingLauncherSwap(sanitizedGameName);
-
-        // Cache the download page data for retry functionality
-        cacheDownloadData(sanitizedGameName, gameData);
-
-        try {
-          const isVrGame = gameData.category?.includes("Virtual Reality");
-          await window.electron.downloadFile(
-            torrentLink,
-            sanitizedGameName,
-            gameData.online || false,
-            gameData.dlc || false,
-            isVrGame || false, // isVr
-            gameData.isUpdating || false, // updateFlow
-            gameData.version || "",
-            gameData.imgID,
-            gameData.size || "",
-            dir,
-            gameData.gameID || ""
-          );
-
-          // Notify webapp that download started immediately
-          console.log("[Download] Download initiated! Calling notifyDownloadStart");
-          notifyDownloadStart(sanitizedGameName, gameData.game);
-
-          // Track download statistics
-          try {
-            await fetch(`${API_URL}/stats/download`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ game: gameData.game }),
-            });
-          } catch (error) {
-            console.error("Failed to track download:", error);
-          }
-
-          // Keep isStarting true until download actually begins
-          const removeDownloadListener = window.electron.onDownloadProgress(
-            downloadInfo => {
-              if (downloadInfo.game === sanitizedGameName) {
-                setIsStartingDownload(false);
-                removeDownloadListener();
-                // Trigger immediate sync to monitor endpoint
-                forceSyncDownloads();
-              }
-            }
-          );
-
-          setTimeout(() => {
-            toast.success(t("download.toast.torrentSent"));
-            navigate("/downloads");
-          }, 2500);
-        } catch (error) {
-          console.error("Download failed:", error);
-          toast.error(t("download.toast.downloadFailed"));
-          setIsStartingDownload(false);
-          clearDownloadLock();
-        }
+    if (isTorrentRequest) {
+      if (
+        cloudTorrentRequest &&
+        (await queueTorrentInDebrid(resolvedTorrentLink))
+      )
         return;
-      }
+
+      await startOrQueueLocalTorrent(resolvedTorrentLink);
+      return;
     }
     const shouldUseDebrid = () => routeThroughDebrid;
 
@@ -1409,7 +1327,6 @@ function PublicDownloadPage() {
     console.log("Starting download with URL:", urlToUse);
 
     setIsStartingDownload(true);
-    await consumePendingLauncherSwap(sanitizedGameName);
 
     // Cache the download page data for retry functionality
     cacheDownloadData(sanitizedGameName, gameData);
@@ -1443,6 +1360,8 @@ function PublicDownloadPage() {
         clearDownloadLock();
         return;
       }
+
+      await consumePendingLauncherSwap(sanitizedGameName);
 
       // Notify webapp that download started immediately
       console.log("[Download] Download initiated! Calling notifyDownloadStart");
@@ -1499,16 +1418,6 @@ function PublicDownloadPage() {
       clearDownloadLock();
     }
   }
-
-  useEffect(() => {
-    const checkQbittorrent = async () => {
-      if (settings.torrentEnabled) {
-        const status = await checkQbittorrentStatus();
-        setIsTorrentRunning(status.active);
-      }
-    };
-    checkQbittorrent();
-  }, [t, settings.torrentEnabled]);
 
   useEffect(() => {
     const checkDevMode = async () => {
@@ -1881,15 +1790,7 @@ function PublicDownloadPage() {
           );
           if (!hasValidLink) return false;
           if (provider === "torrent") {
-            const hasMagnet = links.some(
-              link =>
-                typeof link === "string" &&
-                link.trim().toLowerCase().startsWith("magnet:")
-            );
-            return (
-              hasMagnet &&
-              (!!settings.torrentEnabled || debrid.canUseCloudTorrents(settings))
-            );
+            return canDownloadTorrentLinks(links, settings);
           }
           return true;
         })
@@ -1921,8 +1822,7 @@ function PublicDownloadPage() {
       } else if (ddlProviders.length > 0) {
         setSelectedProvider(ddlProviders[0]);
       } else if (
-        availableProviders.includes("torrent") &&
-        (settings.torrentEnabled || debrid.canUseCloudTorrents(settings))
+        canDownloadTorrentLinks(gameData.download_links.torrent, settings)
       ) {
         setSelectedProvider("torrent");
       } else {
@@ -1986,6 +1886,18 @@ function PublicDownloadPage() {
             selectedProvider === "megadb"
           ? "seamless"
           : "manual";
+  const activeTorrentLinks =
+    downloadMode === "fitgirl"
+      ? [gameData.torrentLink].filter(isTorrentLink)
+      : downloadMode === "torrent"
+        ? (Array.isArray(selectedLinks) ? selectedLinks : [selectedLinks]).filter(
+            isTorrentLink
+          )
+        : [];
+  const cloudTorrentAvailable =
+    pickedTorrentDebrid.supported &&
+    Boolean(pickedTorrentDebrid.provider) &&
+    activeTorrentLinks.some(isMagnetLink);
 
   // Approved correction or a verified game means the artwork is known to be right
   const artworkVerified = !!artworkOverride || isVerified;
@@ -2134,9 +2046,7 @@ function PublicDownloadPage() {
                   : selectedDebridProvider || defaultHostDebrid
               }
               debridAvailable={debridAvailable}
-              cloudTorrent={
-                pickedTorrentDebrid.supported && Boolean(pickedTorrentDebrid.provider)
-              }
+              cloudTorrent={cloudTorrentAvailable}
               debridPick={debridPick}
               debridPickOptions={debridPickOptions}
               onDebridPickChange={setDebridPick}
@@ -2145,7 +2055,6 @@ function PublicDownloadPage() {
                   ? !pickedTorrentDebrid.supported
                   : !pickedHostDebrid.supported
               }
-              torrentRunning={torrentRunning}
               isStartingDownload={isStartingDownload}
               linkStage={linkStage}
               countdownEndsAt={countdownEndsAt}

@@ -46,9 +46,8 @@
     "prepare": "husky",
     "lint-staged": "lint-staged",
     "dist-mac": "python3 ./scripts/build_ascendara_mac.py",
-    "setup-mac": "python3 ./scripts/setup_macos_tools.py",
     "setup-highball": "python3 ./scripts/build_highball.py",
-    "test-mac-extraction": "python3 -m unittest discover -s tests -p 'test_macos*.py'",
+    "test-downloader": "cargo test --manifest-path binaries/AscendaraDownloader/Cargo.toml --locked",
     "dist-mac-arm64": "python3 ./scripts/build_ascendara_mac.py --arch arm64",
     "dist-mac-intel": "python3 ./scripts/build_ascendara_mac.py --arch x64",
     "dist-mac-all": "python3 ./scripts/build_ascendara_mac.py --arch both"
@@ -174,6 +173,10 @@
           "to": "icon.ico"
         },
         {
+          "from": "THIRD_PARTY_NOTICES.md",
+          "to": "THIRD_PARTY_NOTICES.md"
+        },
+        {
           "from": "binaries/AscendaraDownloader/target/release/AscendaraDownloader.exe",
           "to": "."
         },
@@ -192,10 +195,6 @@
         {
           "from": "binaries/AscendaraAchievementWatcher/dist/AscendaraAchievementWatcher.exe",
           "to": "."
-        },
-        {
-          "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler.exe",
-          "to": "."
         }
       ]
     },
@@ -211,6 +210,10 @@
         {
           "from": "readme/logo/png/ascendara_512x.png",
           "to": "icon.png"
+        },
+        {
+          "from": "THIRD_PARTY_NOTICES.md",
+          "to": "THIRD_PARTY_NOTICES.md"
         },
         {
           "from": "binaries/AscendaraDownloader/target/release/AscendaraDownloader",
@@ -230,10 +233,6 @@
         },
         {
           "from": "binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler",
           "to": "."
         },
         {
@@ -294,6 +293,10 @@
           "to": "icon.png"
         },
         {
+          "from": "THIRD_PARTY_NOTICES.md",
+          "to": "THIRD_PARTY_NOTICES.md"
+        },
+        {
           "from": "binaries/AscendaraDownloader/target/release/AscendaraDownloader",
           "to": "."
         },
@@ -311,10 +314,6 @@
         },
         {
           "from": "binaries/AscendaraLanguageTranslation/dist/AscendaraLanguageTranslation",
-          "to": "."
-        },
-        {
-          "from": "binaries/AscendaraTorrentHandler/dist/AscendaraTorrentHandler",
           "to": "."
         },
         {

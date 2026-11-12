@@ -836,14 +836,6 @@ contextBridge.exposeInMainWorld("electron", {
 });
 
 //=============================================================================
-// QBITTORRENT API
-//=============================================================================
-contextBridge.exposeInMainWorld("qbittorrentApi", {
-  login: credentials => ipcRenderer.invoke("qbittorrent:login", credentials),
-  getVersion: () => ipcRenderer.invoke("qbittorrent:version"),
-});
-
-//=============================================================================
 // DOM CONTENT LOADED
 //=============================================================================
 window.addEventListener("DOMContentLoaded", () => {
