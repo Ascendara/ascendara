@@ -480,6 +480,7 @@ function BigPicture() {
               }}
               t={t}
               controllerType={settings.controllerType || "xbox"}
+              timemachineEnabled={!!settings.showOldDownloadLinks}
               dialogOpen={
                 showExitDialog ||
                 showProviderDialog ||

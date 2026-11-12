@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useGameImage } from "@/hooks/useGameImage";
 import steamService from "@/services/games/gameInfoService";
 import nexusModsService from "@/services/integrations/nexusModsService";
 import flingTrainerService from "@/services/integrations/flingTrainerService";
 import installedGamesService from "@/services/library/installedGamesService";
+import gameService from "@/services/games/gameService";
 import { catalogSizeText } from "@/lib/installSpace";
 import {
   Download,
@@ -19,12 +20,22 @@ import {
   Puzzle,
   Zap,
   ChevronDown,
+  History,
+  TriangleAlert,
   Image as ImageIcon,
 } from "lucide-react";
 import { checkSeamlessAvailable, getInAppProviders } from "./utils";
 import { getControllerButtons } from "./controller";
 import { useControllerInput } from "./useControllerInput";
 import { DetailBackButton } from "./DetailBackButton";
+import { TimemachineDialog } from "./TimemachineDialog";
+
+const hasAnyLink = links =>
+  Object.values(links || {}).some(candidates =>
+    (Array.isArray(candidates) ? candidates : [candidates]).some(
+      link => typeof link === "string" && link.trim()
+    )
+  );
 
 // --- GAME DETAILS & STORE COMPONENTS ---
 const GameDetailsView = ({
@@ -35,8 +46,8 @@ const GameDetailsView = ({
   t,
   controllerType,
   dialogOpen = false,
+  timemachineEnabled = false,
 }) => {
-  const isSeamless = checkSeamlessAvailable(game);
   const [showMedia, setShowMedia] = useState(false);
   const [steamData, setSteamData] = useState(null);
   const [loadingMedia, setLoadingMedia] = useState(false);
@@ -50,9 +61,96 @@ const GameDetailsView = ({
   const [needsUpdate, setNeedsUpdate] = useState(false);
   const isMounted = useRef(true);
 
+  // An older release picked in the Timemachine, like on the Download page
+  const [release, setRelease] = useState(null);
+  const [showTimemachine, setShowTimemachine] = useState(false);
+  const [isExternalSource, setIsExternalSource] = useState(!!game.customSource);
+  const shown = useMemo(
+    () =>
+      release
+        ? {
+            ...game,
+            ...release.game,
+            gameID: game.gameID,
+            game: game.game,
+            imgID: game.imgID,
+            hasHistory: true,
+          }
+        : game,
+    [game, release]
+  );
+
+  useEffect(() => {
+    setRelease(null);
+    setShowTimemachine(false);
+  }, [game]);
+
+  // Same rule as the Download page: on Ascendara's index, a game with no links
+  // of any kind had its files taken down
+  useEffect(() => {
+    let active = true;
+    gameService
+      .getCachedData()
+      .then(({ metadata }) => {
+        if (!active) return;
+        setIsExternalSource(
+          metadata?.customSource === true ||
+            (metadata?.combined === true && !!game.customSource)
+        );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [game.customSource]);
+
+  const filesUnavailable = !isExternalSource && !hasAnyLink(shown.download_links);
+  const timemachineAvailable =
+    timemachineEnabled && (!!game.hasHistory || !gameService.indexTracksHistory());
+  const actionButtons = useMemo(
+    () =>
+      timemachineAvailable
+        ? ["download", "playLater", "timemachine"]
+        : ["download", "playLater"],
+    [timemachineAvailable]
+  );
+
   // Provider selection for downloads Big Picture can run itself
   const [selectedProviderIndex, setSelectedProviderIndex] = useState(0);
-  const availableProviders = getInAppProviders(game);
+  const availableProviders = getInAppProviders(shown);
+  const isSeamless = checkSeamlessAvailable(shown);
+  const downloadBlocked = filesUnavailable || (isInstalled && !needsUpdate && !release);
+
+  // Land on Older Versions when the live release can't be downloaded
+  useEffect(() => {
+    setSelectedButton(filesUnavailable && timemachineAvailable ? 2 : 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, timemachineAvailable]);
+
+  const startDownload = useCallback(() => {
+    if (downloadBlocked) return;
+    const target = needsUpdate ? { ...shown, isUpdating: true } : shown;
+    if (isSeamless && availableProviders.length > 1) {
+      onShowProviderDialog(target, availableProviders);
+    } else {
+      onDownload(target);
+    }
+  }, [
+    downloadBlocked,
+    needsUpdate,
+    shown,
+    isSeamless,
+    availableProviders,
+    onShowProviderDialog,
+    onDownload,
+  ]);
+
+  const handleSelectRelease = useCallback(selected => {
+    setRelease(selected.live ? null : selected);
+    setShowTimemachine(false);
+    setFocusedSection("button");
+    setSelectedButton(0);
+  }, []);
 
   const descriptionRef = useRef(null);
   const screenshotsRef = useRef(null);
@@ -158,6 +256,7 @@ const GameDetailsView = ({
     const gameVersion = game.version;
 
     if (!gameName) return;
+    isMounted.current = true;
 
     installedGamesService
       .checkGameStatus(gameName, gameVersion)
@@ -218,7 +317,7 @@ const GameDetailsView = ({
 
   const handleInput = useCallback(
     action => {
-      if (dialogOpen) return;
+      if (dialogOpen || showTimemachine) return;
 
       if (action === "DOWN") {
         if (focusedSection === "button") {
@@ -259,7 +358,7 @@ const GameDetailsView = ({
       } else if (action === "RIGHT") {
         if (focusedSection === "button") {
           // Navigate between buttons (0 = View Details, 1 = Play Later)
-          setSelectedButton(prev => Math.min(1, prev + 1));
+          setSelectedButton(prev => Math.min(actionButtons.length - 1, prev + 1));
         } else if (focusedSection === "description" && descriptionRef.current) {
           // Scroll right in description
           descriptionRef.current.scrollBy({ top: 100, behavior: "smooth" });
@@ -269,29 +368,10 @@ const GameDetailsView = ({
         }
       } else if (action === "CONFIRM") {
         if (focusedSection === "button") {
-          if (selectedButton === 0) {
-            // Don't allow download if already installed and no update available
-            if (isInstalled && !needsUpdate) return;
-
-            // Start Download button
-            console.log(
-              "[DOWNLOAD] isSeamless:",
-              isSeamless,
-              "availableProviders:",
-              availableProviders
-            );
-            if (isSeamless && availableProviders && availableProviders.length > 1) {
-              console.log("[DOWNLOAD] Showing provider dialog");
-              onShowProviderDialog(game, availableProviders);
-            } else {
-              console.log("[DOWNLOAD] Starting download directly");
-              // Pass the game with isUpdating flag if update is needed
-              onDownload(needsUpdate ? { ...game, isUpdating: true } : game);
-            }
-          } else if (selectedButton === 1) {
-            // Play Later button
-            handlePlayLater();
-          }
+          const button = actionButtons[selectedButton];
+          if (button === "download") startDownload();
+          else if (button === "playLater") handlePlayLater();
+          else if (button === "timemachine") setShowTimemachine(true);
         } else if (focusedSection === "description") {
           // Move to screenshots if available
           if (steamData?.screenshots && steamData.screenshots.length > 0) {
@@ -313,18 +393,14 @@ const GameDetailsView = ({
     [
       showMedia,
       onBack,
-      onDownload,
-      onShowProviderDialog,
-      game,
       dialogOpen,
+      showTimemachine,
       focusedSection,
       steamData,
       selectedButton,
       handlePlayLater,
-      isSeamless,
-      availableProviders,
-      isInstalled,
-      needsUpdate,
+      startDownload,
+      actionButtons,
     ]
   );
 
@@ -356,7 +432,7 @@ const GameDetailsView = ({
       if (action === "MENU") onBack();
       else handleInput(action);
     },
-    { priority: 5, blocked: dialogOpen }
+    { priority: 5, blocked: dialogOpen || showTimemachine }
   );
 
   const hasScreenshots = steamData?.screenshots && steamData.screenshots.length > 0;
@@ -421,16 +497,24 @@ const GameDetailsView = ({
             </div>
 
             <div className="bp-dv-meta mb-8 flex shrink-0 gap-6 text-white/80">
-              {game.size && (
+              {shown.size && (
                 <div className="flex items-center gap-2">
                   <Download className="h-5 w-5" />
-                  <span className="font-medium">{catalogSizeText(game, t)}</span>
+                  <span className="font-medium">{catalogSizeText(shown, t)}</span>
                 </div>
               )}
-              {game.version && (
+              {shown.version && (
                 <div className="flex items-center gap-2">
                   <Info className="h-5 w-5" />
-                  <span className="font-medium">v{game.version}</span>
+                  <span className="font-medium">v{shown.version}</span>
+                </div>
+              )}
+              {release && (
+                <div className="flex items-center gap-2 text-amber-300">
+                  <History className="h-5 w-5" />
+                  <span className="font-medium">
+                    {t("download.timemachine.viewingOlderTitle")}
+                  </span>
                 </div>
               )}
             </div>
@@ -449,7 +533,12 @@ const GameDetailsView = ({
                     <span>{t("bigPicture.onlineFix")}</span>
                   </div>
                 )}
-                {isSeamless ? (
+                {filesUnavailable ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/20 px-4 py-2 text-sm font-medium text-amber-300 backdrop-blur-sm">
+                    <TriangleAlert className="h-4 w-4" />
+                    <span>{t("download.filesUnavailable.title")}</span>
+                  </div>
+                ) : isSeamless ? (
                   <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/20 px-4 py-2 text-sm font-medium text-green-300 backdrop-blur-sm">
                     <Check className="h-4 w-4" />
                     <span>{t("bigPicture.readyToDownload")}</span>
@@ -461,6 +550,15 @@ const GameDetailsView = ({
                   </div>
                 )}
               </div>
+            )}
+
+            {filesUnavailable && (
+              <p className="bp-dv-unavailable mb-6 max-w-2xl shrink-0 text-base leading-relaxed text-white/70">
+                {t("download.filesUnavailable.description")}{" "}
+                {timemachineAvailable
+                  ? t("download.timemachine.oldLinksNotice")
+                  : t("download.filesUnavailable.checkBack")}
+              </p>
             )}
 
             {/* Provider Selection UI */}
@@ -495,21 +593,15 @@ const GameDetailsView = ({
 
             <div className="bp-dv-actions mb-6 flex shrink-0 gap-4">
               <button
-                onClick={() => {
-                  // Don't allow download if already installed and no update available
-                  if (isInstalled && !needsUpdate) return;
-
-                  if (isSeamless && availableProviders.length > 1) {
-                    onShowProviderDialog(game, availableProviders);
-                  } else {
-                    // Pass the game with isUpdating flag if update is needed
-                    onDownload(needsUpdate ? { ...game, isUpdating: true } : game);
-                  }
-                }}
-                disabled={isInstalled && !needsUpdate}
+                onClick={startDownload}
+                disabled={downloadBlocked}
                 className={`group flex w-fit shrink-0 items-center gap-4 whitespace-nowrap rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 ${
-                  isInstalled && !needsUpdate
-                    ? "cursor-not-allowed bg-muted text-muted-foreground opacity-50"
+                  downloadBlocked
+                    ? `cursor-not-allowed bg-muted text-muted-foreground opacity-50 ${
+                        focusedSection === "button" && selectedButton === 0
+                          ? "ring-4 ring-primary/50"
+                          : ""
+                      }`
                     : focusedSection === "button" && selectedButton === 0
                       ? needsUpdate
                         ? "scale-110 bg-amber-500 text-secondary shadow-amber-500/50 ring-4 ring-amber-400/50"
@@ -519,7 +611,12 @@ const GameDetailsView = ({
                         : "bg-primary text-secondary shadow-primary/30 hover:scale-105 hover:bg-primary"
                 }`}
               >
-                {isInstalled && !needsUpdate ? (
+                {filesUnavailable ? (
+                  <>
+                    <TriangleAlert className="h-7 w-7" />
+                    <span>{t("bigPicture.filesUnavailable")}</span>
+                  </>
+                ) : isInstalled && !needsUpdate && !release ? (
                   <>
                     <Check className="h-7 w-7" />
                     <span>{t("bigPicture.installed")}</span>
@@ -565,6 +662,20 @@ const GameDetailsView = ({
                   </>
                 )}
               </button>
+
+              {timemachineAvailable && (
+                <button
+                  onClick={() => setShowTimemachine(true)}
+                  className={`group flex w-fit shrink-0 items-center gap-3 whitespace-nowrap rounded-2xl px-8 py-5 text-xl font-bold shadow-lg transition-all duration-200 ${
+                    focusedSection === "button" && selectedButton === 2
+                      ? "scale-110 border-2 border-primary bg-muted text-foreground shadow-primary/30 ring-4 ring-primary/50"
+                      : "border-2 border-border bg-muted text-foreground shadow-muted/30 hover:border-primary/40 hover:bg-muted/80"
+                  }`}
+                >
+                  <History className="h-6 w-6" />
+                  <span>{t("bigPicture.olderVersions")}</span>
+                </button>
+              )}
             </div>
 
             <div
@@ -732,6 +843,16 @@ const GameDetailsView = ({
           </div>
         </div>
       </div>
+
+      <TimemachineDialog
+        isOpen={showTimemachine}
+        game={game}
+        showingVersion={shown.version || ""}
+        onSelect={handleSelectRelease}
+        onClose={() => setShowTimemachine(false)}
+        t={t}
+        controllerType={controllerType}
+      />
     </div>
   );
 };

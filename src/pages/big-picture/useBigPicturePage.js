@@ -478,7 +478,7 @@ function useBigPicturePage() {
         setDownloadingGame(game);
         setShowExitDialog(true);
       } else {
-        toast.error(t("bigPicture.downloadError"));
+        toast.error(t("download.filesUnavailable.title"));
       }
       return;
     }
@@ -1059,6 +1059,18 @@ function useBigPicturePage() {
     };
     if (view === "store" || view === "carousel") fetchStore();
   }, [view, storeGames.length, storeRevision]);
+
+  // Reload the catalog when the index changes, the same way Search does, so
+  // Big Picture never offers links the index has since dropped or replaced
+  useEffect(() => {
+    const handleIndexRefresh = () => {
+      gameService.clearMemoryCache();
+      setStoreGames([]);
+      setStoreRevision(value => value + 1);
+    };
+    window.addEventListener("index-refreshed", handleIndexRefresh);
+    return () => window.removeEventListener("index-refreshed", handleIndexRefresh);
+  }, []);
 
   useEffect(() => {
     if (isMenuOpen) {

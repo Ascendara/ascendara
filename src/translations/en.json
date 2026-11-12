@@ -1603,6 +1603,8 @@
     "menu": "MENU",
     "modManager": "Mod Manager",
     "mouseRequired": "Mouse required",
+    "filesUnavailable": "UNAVAILABLE",
+    "olderVersions": "Older Versions",
     "navigate": "Navigate",
     "noDescriptionAvailable": "No description available",
     "noDriveFound": "No drives found",
