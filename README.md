@@ -301,8 +301,6 @@ The Ascendara project is organized into the following main directories:
 
 - **AscendaraLanguageTranslation/** - Translation tool used to translate to the additional 93 languages
 
-  > **LEGACY:** **AscendaraTorrentHandler/** is retained only as historical/reference source. It is not built, packaged, updated, monitored, or installed; current torrent downloads use AscendaraDownloader.
-
 ### **electron/** - Electron main process and IPC communication
 
 - **modules/** - Modular IPC handlers and backend logic (configuration, Discord RPC, downloads, games, settings, system utilities, updates, window management, and more)
