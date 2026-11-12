@@ -11,11 +11,14 @@ const source = fs.readFileSync(
   path.join(__dirname, "../src/pages/big-picture/useBigPicturePage.js"),
   "utf8"
 );
-let handler;
+// handleStartDownload and the helpers it calls to start a direct download
+const extracted = {};
+const wanted = ["handleStartDownload", "startResolvedDownload", "launchDownload"];
 traverse(parse(source, { sourceType: "module", plugins: ["jsx"] }), {
   VariableDeclarator(nodePath) {
-    if (nodePath.node.id.name === "handleStartDownload") {
-      handler = source.slice(nodePath.node.init.start, nodePath.node.init.end);
+    const name = nodePath.node.id.name;
+    if (wanted.includes(name)) {
+      extracted[name] = source.slice(nodePath.node.init.start, nodePath.node.init.end);
     }
   },
 });
@@ -81,6 +84,10 @@ test("Big Picture respects normal host priority and hands any adapter's cloud do
         settings: { debridEnabled: true, thirdKey: "key", ...extraSettings },
         debrid,
         canDownloadTorrentLinks,
+        isMagicLink: () => false,
+        isAuthenticated: true,
+        setPendingDownloadData: () => {},
+        setShowQueuePrompt: () => {},
         SEAMLESS_PROVIDERS: ["gofile", "pixeldrain"],
         hasActiveDownloads: async () => false,
         sanitizeText: value => value,
@@ -101,7 +108,14 @@ test("Big Picture respects normal host priority and hands any adapter's cloud do
         console,
         toast: { success: () => {}, error: message => assert.fail(message) },
       });
-      const start = vm.runInContext(`(${handler})`, context);
+      vm.runInContext(
+        wanted
+          .slice(1)
+          .map(name => `var ${name} = ${extracted[name]};`)
+          .join("\n"),
+        context
+      );
+      const start = vm.runInContext(`(${extracted.handleStartDownload})`, context);
       await start({ game: "Example", download_links: links }, preferredHost);
       assert.equal(exited, expected === "handoff");
       assert.equal(downloads.length, expected === "direct" ? 1 : 0);
