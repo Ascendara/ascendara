@@ -144,6 +144,8 @@ const _processNextInQueueInternal = async () => {
   // Start the download
   try {
     let url = nextItem.url;
+    if (!url && !nextItem.debridLink && !nextItem.realDebridLink)
+      throw new Error("This queued download has no link. Queue it again from its page.");
     const debridLink = nextItem.debridLink || nextItem.realDebridLink;
     if (debridLink) {
       const settings = await window.electron.getSettings();
@@ -176,6 +178,7 @@ const _processNextInQueueInternal = async () => {
       nextItem.browserAssetGameId,
       nextItem.browserAssetLogoId
     );
+    if (result?.success === false) throw new Error(result.error);
 
     // Wait for the download to appear in the games list before removing from queue
     // This prevents the empty page flash
@@ -198,7 +201,9 @@ const _processNextInQueueInternal = async () => {
       removeFromQueue(nextItem.id);
     };
 
-    waitForDownloadToAppear();
+    // Hold the queue lock until then, so a poll in the meantime cannot start
+    // the same item a second time.
+    await waitForDownloadToAppear();
 
     return nextItem;
   } catch (error) {

@@ -991,8 +991,21 @@ function PublicDownloadPage() {
       routeThroughDebrid && downloadDebridProvider.hostDownloadMode === "cloud";
     if (hasActive && !forceStart && !cloudTorrentRequest && !cloudHostRequest) {
       const isVrGame = gameData.category?.includes("Virtual Reality");
+      // Queue the host's page link rather than a file link, which can expire
+      // while it waits. The downloader opens the page when its turn comes.
+      const pageLinks = gameData.download_links?.[downloadProvider];
+      const pageLink = (
+        Array.isArray(pageLinks)
+          ? pageLinks.find(link => typeof link === "string" && link.trim())
+          : typeof pageLinks === "string"
+            ? pageLinks
+            : null
+      )?.replace(/^(?:https?:)?\/\//, "https://");
+      const queuesPageLink =
+        SEAMLESS_PROVIDERS.includes(downloadProvider) ||
+        (debridEligible && debridDisabledForSession);
       const downloadData = {
-        url: directUrl || inputLink || "",
+        url: (queuesPageLink && pageLink) || directUrl || inputLink || "",
         gameName: sanitizedGameName,
         online: gameData.online || false,
         dlc: gameData.dlc || false,
