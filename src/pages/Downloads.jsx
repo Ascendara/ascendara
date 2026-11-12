@@ -1919,6 +1919,7 @@ const DownloadCard = ({
     "(os error 225)",
     "(os error 226)",
     "Security software blocked",
+    "an online-fix test file",
     "Connection broken",
     "IncompleteRead",
     "HTTP 410",
@@ -2014,7 +2015,12 @@ const DownloadCard = ({
 
   // The downloaded archive was quarantined or deleted: only a fresh download helps.
   const isSourceMissing = Boolean(downloadingData?.sourceMissing);
+  // The online-fix preflight message is already user-facing and names the folder.
+  const isOnlineFixBlock = /Security software (blocked|removed|locked) an online-fix test file/.test(
+    downloadingData?.message || ""
+  );
   const isSecurityBlock =
+    isOnlineFixBlock ||
     /\[WinError 22[56]\]|Windows error 22[56]|os error 22[56]\b|Security software blocked/.test(
       downloadingData?.message || ""
     );
@@ -2044,6 +2050,7 @@ const DownloadCard = ({
         "downloads.noSpaceLeftError",
         "No space left on device. Please free up disk space."
       );
+    if (isOnlineFixBlock) return msg;
     if (isSecurityBlock) return t("downloads.securityBlockedError");
     if (/crc|corrupt data|bad archive data|unrar error 12/i.test(msg))
       return `${t("downloads.extractionRecovery.reasons.damaged.body")} ${t(
