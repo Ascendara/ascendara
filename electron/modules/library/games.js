@@ -1176,25 +1176,60 @@ function registerGameHandlers() {
       .filter(proc => !proc.sessionEnded)
       .map(proc => ({ ...proc.playSession, canStop: !!proc.stopSupported }))
   );
-  ipcMain.handle("stop-game", async (_, game, sessionId) => {
+  // Last resort for helpers without the stop protocol (or that ignore it):
+  // kill the helper and everything it started. The session's playtime may not
+  // be saved, which is why the graceful stop is always tried first.
+  const forceKillGame = proc =>
+    new Promise(resolve => {
+      proc.stopRequested = true;
+      if (proc.exitCode !== null || proc.signalCode !== null) return resolve();
+      const timeout = setTimeout(resolve, 5000);
+      proc.once("close", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      if (isWindows && proc.pid) {
+        spawn("taskkill", ["/PID", String(proc.pid), "/T", "/F"], {
+          windowsHide: true,
+          stdio: "ignore",
+        })
+          .on("error", () => proc.kill())
+          .on("close", code => code !== 0 && proc.kill());
+      } else {
+        proc.kill("SIGKILL");
+      }
+    });
+
+  // options.force: used by the in-app stop button, which must always end the
+  // game; remote stops keep requiring the graceful protocol.
+  ipcMain.handle("stop-game", async (_, game, sessionId, options = {}) => {
     const proc = runGameProcesses.get(game);
     if (!proc || (sessionId && proc.playSession.sessionId !== sessionId)) {
       throw new Error("This play session has already ended.");
     }
-    if (!proc.stopSupported)
+    if (!proc.stopSupported) {
+      if (options.force) {
+        await forceKillGame(proc);
+        return { success: true, forced: true };
+      }
       throw new Error(
         "Update the desktop game helper and relaunch this game to enable remote stop."
       );
+    }
     proc.stopRequested = true;
+    let forced = false;
     // Let the helper stop the actual game and flush the final playtime.
     await new Promise((resolve, reject) => {
-      const timeout = setTimeout(
-        () =>
+      const timeout = setTimeout(() => {
+        if (!options.force) {
           finish(
             new Error("Game did not stop. Check the desktop for permission errors.")
-          ),
-        15000
-      );
+          );
+          return;
+        }
+        forced = true;
+        forceKillGame(proc).then(() => finish());
+      }, 15000);
       const closed = () => finish();
       const finish = error => {
         clearTimeout(timeout);
@@ -1208,7 +1243,7 @@ function registerGameHandlers() {
         if (error) finish(error);
       });
     });
-    return { success: true };
+    return { success: true, forced };
   });
 
   // Check if game is running

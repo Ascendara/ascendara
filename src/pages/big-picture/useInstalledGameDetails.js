@@ -14,6 +14,7 @@ import {
   removeGameFromFolder,
 } from "@/lib/folderManager";
 import { readStoredList } from "./surfaceNavigation";
+import { useGameSession } from "@/hooks/useGameSession";
 import { getControllerButtons } from "./controller";
 import { useControllerInput } from "./useControllerInput";
 import {
@@ -59,6 +60,8 @@ function useInstalledGameDetails({
   const [achievementsToggleFocused, setAchievementsToggleFocused] = useState(false);
   const buttons = getControllerButtons(controllerType);
   const gameName = game.game || game.name;
+  const gameSession = useGameSession(gameName);
+  const [showStopGameDialog, setShowStopGameDialog] = useState(false);
   const [showDirectoryBrowser, setShowDirectoryBrowser] = useState(false);
   const [directoryBrowserPath, setDirectoryBrowserPath] = useState(null);
 
@@ -254,20 +257,31 @@ function useInstalledGameDetails({
     setPlayTime(game.playTime || 0);
   }, [game.playTime]);
 
-  // Check if game is running
+  // Follow the live launch/close events instead of polling
   useEffect(() => {
-    const checkRunning = async () => {
-      try {
-        const running = await window.electron.isGameRunning(gameName);
-        setIsRunning(running);
-      } catch (e) {
-        console.error("Error checking game status:", e);
-      }
-    };
-    checkRunning();
-    const interval = setInterval(checkRunning, 2000);
-    return () => clearInterval(interval);
-  }, [gameName]);
+    setIsRunning(gameSession.isRunning);
+    if (!gameSession.isRunning) setShowStopGameDialog(false);
+  }, [gameSession.isRunning]);
+
+  const handleStopGame = async () => {
+    if (gameSession.isStopping) return;
+    try {
+      const result = await gameSession.stop();
+      if (result?.success) toast.success(t("library.gameStopped", { game: gameName }));
+    } catch (error) {
+      toast.error(error?.message || t("library.stopGameFailed"));
+    } finally {
+      setShowStopGameDialog(false);
+      setDialogButtonIndex(0);
+    }
+  };
+
+  const openStopGameDialog = () => {
+    if (!gameSession.canStop) return;
+    setShowManagementMenu(false);
+    setDialogButtonIndex(0);
+    setShowStopGameDialog(true);
+  };
 
   // Fetch Steam data
   useEffect(() => {
@@ -686,7 +700,19 @@ function useInstalledGameDetails({
     ]
   );
 
-  const handleManagementAction = index => {
+  // While the game runs, the menu gains a "Stop game" entry at the top
+  const stopMenuOffset = gameSession.canStop ? 1 : 0;
+  const handleManagementAction = menuIndex => {
+    if (stopMenuOffset && menuIndex === 0) {
+      openStopGameDialog();
+      return;
+    }
+    const index = menuIndex - stopMenuOffset;
+    const lastIndex = folders.length + 3;
+    if (isRunning && (index === 1 || index === lastIndex)) {
+      toast.error(t("library.unavailableWhileRunning"));
+      return;
+    }
     if (index === 0) {
       window.electron.createGameShortcut(game).then(success => {
         if (success) toast.success(t("library.shortcutCreated"));
@@ -751,6 +777,7 @@ function useInstalledGameDetails({
         showBrowseExeWarning ||
         showExecutableSelect ||
         showExecutableManager ||
+        showStopGameDialog ||
         assetSearchOpen ||
         showDirectoryBrowser
       ) {
@@ -773,7 +800,7 @@ function useInstalledGameDetails({
                     ? 1
                     : showExecutableSelect
                       ? availableExecutables.length
-                      : showExecutableManager
+                      : showExecutableManager || showStopGameDialog
                         ? 1
                         : 0;
           setDialogButtonIndex(prev => Math.min(maxIndex, prev + 1));
@@ -787,6 +814,11 @@ function useInstalledGameDetails({
           }
         } else if (action === "CONFIRM") {
           // Trigger the selected button
+          if (showStopGameDialog) {
+            if (dialogButtonIndex === 0) setShowStopGameDialog(false);
+            else handleStopGame();
+            return;
+          }
           if (showVrWarning) {
             if (dialogButtonIndex === 0) {
               setShowVrWarning(false);
@@ -838,7 +870,9 @@ function useInstalledGameDetails({
           }
           setDialogButtonIndex(0);
         } else if (action === "BACK") {
-          if (showVrWarning) setShowVrWarning(false);
+          if (showStopGameDialog) {
+            if (!gameSession.isStopping) setShowStopGameDialog(false);
+          } else if (showVrWarning) setShowVrWarning(false);
           else if (showOnlineFixWarning) setShowOnlineFixWarning(false);
           else if (showSteamNotRunningWarning) closeSteamNotRunningWarning();
           else if (isDeleteDialogOpen) setIsDeleteDialogOpen(false);
@@ -889,10 +923,11 @@ function useInstalledGameDetails({
       // Management menu navigation
       if (showManagementMenu) {
         if (action === "DOWN") {
-          const menuItemCount = folders.length + 4; // Shortcut, Executable, Favorite, Folders, Delete
+          // [Stop game], Shortcut, Executable, Favorite, Folders, Delete
+          const menuItemCount = folders.length + 4 + stopMenuOffset;
           setSelectedMenuItem(prev => (prev + 1) % menuItemCount);
         } else if (action === "UP") {
-          const menuItemCount = folders.length + 4;
+          const menuItemCount = folders.length + 4 + stopMenuOffset;
           setSelectedMenuItem(prev => (prev - 1 + menuItemCount) % menuItemCount);
         } else if (action === "CONFIRM") {
           // Execute selected menu item
@@ -993,7 +1028,9 @@ function useInstalledGameDetails({
               : t("gameScreen.trainerDisabledToast")
           );
         } else if (!showMedia) {
-          if (selectedButton === "play" && !isLaunching && !isRunning) {
+          if (selectedButton === "play" && isRunning && !isLaunching) {
+            openStopGameDialog();
+          } else if (selectedButton === "play" && !isLaunching && !isRunning) {
             if (!canLaunchGame) {
               setShowBrowseExeWarning(true);
             } else {
@@ -1058,6 +1095,9 @@ function useInstalledGameDetails({
       achievementsToggleFocused,
       trainerToggleFocused,
       trainerExists,
+      showStopGameDialog,
+      stopMenuOffset,
+      gameSession,
     ]
   );
 
@@ -1065,11 +1105,15 @@ function useInstalledGameDetails({
   useEffect(() => {
     const handleKeyDown = e => {
       if (e.repeat) return;
-      // Block keyboard input when game is running or launching
-      if (isRunning || isLaunching) return;
+      // Block keyboard input behind the launch overlay. A running game no
+      // longer blocks input: the window only gets keys when it has focus, and
+      // the game must stay manageable (and its menus closable) from here.
+      if (isLaunching) return;
       const map = {
         ArrowDown: "DOWN",
         ArrowUp: "UP",
+        ArrowLeft: "LEFT",
+        ArrowRight: "RIGHT",
         Escape: "BACK",
         Backspace: "BACK",
         Enter: "CONFIRM",
@@ -1086,7 +1130,7 @@ function useInstalledGameDetails({
     };
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [handleInput, isRunning, isLaunching]);
+  }, [handleInput, isLaunching]);
 
   // Gamepad Polling
   useControllerInput(
@@ -1101,12 +1145,7 @@ function useInstalledGameDetails({
     },
     {
       priority: 5,
-      blocked:
-        !canInput ||
-        isRunning ||
-        isLaunching ||
-        showExecutableManager ||
-        showDirectoryBrowser,
+      blocked: !canInput || isLaunching || showExecutableManager || showDirectoryBrowser,
     }
   );
 
@@ -1166,6 +1205,12 @@ function useInstalledGameDetails({
     handlePlayGame,
     isLaunching,
     isRunning,
+    gameSession,
+    showStopGameDialog,
+    setShowStopGameDialog,
+    openStopGameDialog,
+    handleStopGame,
+    stopMenuOffset,
     selectedButton,
     setShowBrowseExeWarning,
     handleOpenDirectory,

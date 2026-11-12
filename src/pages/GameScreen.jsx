@@ -10,6 +10,7 @@ import {
   Trash2,
   Pencil,
   Loader,
+  StopCircle,
   Check,
   AlertTriangle,
   Info,
@@ -103,7 +104,7 @@ import GameOverviewTab from "@/components/gamescreen/GameOverviewTab";
 import AchievementsTab from "@/components/gamescreen/AchievementsTab";
 import SoundtrackTab from "@/components/gamescreen/SoundtrackTab";
 import ModsTrainersTab from "@/components/gamescreen/ModsTrainersTab";
-import { useGameRunning } from "@/hooks/useGameRunning";
+import { useGameSession, formatSessionTime } from "@/hooks/useGameSession";
 import { API_URL } from "@/config/api";
 
 const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t, onSave }) => {
@@ -1298,7 +1299,9 @@ function InstalledGameScreen() {
   const [isLaunching, setIsLaunching] = useState(false);
   const [isShiftKeyPressed, setIsShiftKeyPressed] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const liveIsRunning = useGameRunning(game?.game || game?.name);
+  const gameSession = useGameSession(game?.game || game?.name);
+  const liveIsRunning = gameSession.isRunning;
+  const [showStopGameDialog, setShowStopGameDialog] = useState(false);
   const [playtimeJustUpdated, setPlaytimeJustUpdated] = useState(false);
   const [isUninstalling, setIsUninstalling] = useState(false);
   const [isDeleteTransitioning, setIsDeleteTransitioning] = useState(false);
@@ -1812,7 +1815,20 @@ function InstalledGameScreen() {
   // Follow launch/close events instead of polling the main process
   useEffect(() => {
     setIsRunning(liveIsRunning);
+    if (!liveIsRunning) setShowStopGameDialog(false);
   }, [liveIsRunning]);
+
+  const handleStopGame = async () => {
+    const gameName = game?.game || game?.name;
+    try {
+      const result = await gameSession.stop();
+      if (result?.success) toast.success(t("library.gameStopped", { game: gameName }));
+    } catch (error) {
+      toast.error(error?.message || t("library.stopGameFailed"));
+    } finally {
+      setShowStopGameDialog(false);
+    }
+  };
 
   // Check for game updates
   useEffect(() => {
@@ -2933,6 +2949,10 @@ function InstalledGameScreen() {
             executableExists={executableExists}
             isLaunching={isLaunching}
             isRunning={isRunning}
+            sessionElapsedMs={gameSession.elapsedMs}
+            canStopGame={gameSession.canStop}
+            isStoppingGame={gameSession.isStopping}
+            onStopGame={() => setShowStopGameDialog(true)}
             isUninstalling={isUninstalling}
             onPlay={() => handlePlayGame()}
             onSetExecutable={() => setShowExecutableManager(true)}
@@ -3668,6 +3688,50 @@ function InstalledGameScreen() {
         isUninstalling={isUninstalling}
         t={t}
       />
+
+      {/* Stop running game confirmation */}
+      <AlertDialog
+        open={showStopGameDialog}
+        onOpenChange={open => {
+          if (!open && !gameSession.isStopping) setShowStopGameDialog(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-foreground">
+              {t("library.stopGameConfirm", { game: game.game || game.name })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("library.stopGameDescription", {
+                time: formatSessionTime(gameSession.elapsedMs),
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              className="text-primary"
+              disabled={gameSession.isStopping}
+              onClick={() => setShowStopGameDialog(false)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              className="gap-2"
+              disabled={gameSession.isStopping}
+              onClick={handleStopGame}
+            >
+              {gameSession.isStopping ? (
+                <Loader className="h-4 w-4 animate-spin" />
+              ) : (
+                <StopCircle className="h-4 w-4" />
+              )}
+              {gameSession.isStopping ? t("library.stoppingGame") : t("library.stopGame")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete/Remove transition overlay - eases the trip back to the library */}
       {isDeleteTransitioning && (

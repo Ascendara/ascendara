@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
+import { formatSessionTime } from "@/hooks/useGameSession";
 import {
   AlertTriangle,
   Bolt,
@@ -50,6 +51,10 @@ export default function GameActions({
   executableExists,
   isLaunching,
   isRunning,
+  sessionElapsedMs = 0,
+  canStopGame = false,
+  isStoppingGame = false,
+  onStopGame,
   isUninstalling,
   onPlay,
   onSetExecutable,
@@ -82,9 +87,13 @@ export default function GameActions({
         <Button
           data-tour="game-play"
           size="lg"
-          className="h-12 min-w-[11rem] gap-2 px-8 text-base text-secondary"
-          onClick={() => onPlay()}
-          disabled={isLaunching || isRunning}
+          variant={isRunning && !isLaunching ? "destructive" : "default"}
+          className={cn(
+            "h-12 min-w-[11rem] gap-2 px-8 text-base",
+            !(isRunning && !isLaunching) && "text-secondary"
+          )}
+          onClick={() => (isRunning ? onStopGame?.() : onPlay())}
+          disabled={isLaunching || isStoppingGame || (isRunning && !canStopGame)}
         >
           {isLaunching ? (
             <>
@@ -93,8 +102,21 @@ export default function GameActions({
             </>
           ) : isRunning ? (
             <>
-              <StopCircle className="h-5 w-5" />
-              {t("library.running")}
+              {isStoppingGame ? (
+                <Loader className="h-5 w-5 animate-spin" />
+              ) : (
+                <StopCircle className="h-5 w-5" />
+              )}
+              {isStoppingGame
+                ? t("library.stoppingGame")
+                : canStopGame
+                  ? t("library.stopGame")
+                  : t("library.running")}
+              {sessionElapsedMs > 0 && (
+                <span className="font-mono text-sm tabular-nums opacity-80">
+                  {formatSessionTime(sessionElapsedMs)}
+                </span>
+              )}
             </>
           ) : (
             <>
@@ -181,7 +203,33 @@ export default function GameActions({
               <Bolt className="h-4 w-4" />
               {t("gameScreen.launchOptions")}
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onSelect={onSetExecutable}>
+            {isRunning && (
+              <>
+                <div className="flex items-center gap-2 px-2 py-1.5 text-sm">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+                  <span className="font-medium">{t("library.runningSession")}</span>
+                  <span className="ml-auto font-mono tabular-nums text-muted-foreground">
+                    {formatSessionTime(sessionElapsedMs)}
+                  </span>
+                </div>
+                {canStopGame && (
+                  <DropdownMenuItem
+                    className="gap-2 text-red-500 focus:bg-red-500/10 focus:text-red-500"
+                    disabled={isStoppingGame}
+                    onSelect={onStopGame}
+                  >
+                    <StopCircle className="h-4 w-4" />
+                    {t("library.stopGame")}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <DropdownMenuItem
+              className="gap-2"
+              disabled={isRunning}
+              onSelect={onSetExecutable}
+            >
               <Pencil className="h-4 w-4" />
               {t("library.changeExecutable")}
               {!executableExists && (
@@ -217,7 +265,11 @@ export default function GameActions({
             </DropdownMenuItem>
             {!game.isCustom && (
               <>
-                <DropdownMenuItem className="gap-2" onSelect={onVerifyFiles}>
+                <DropdownMenuItem
+                  className="gap-2"
+                  disabled={isRunning}
+                  onSelect={onVerifyFiles}
+                >
                   <FileCheck2 className="h-4 w-4" />
                   {t("library.verifyGameFiles")}
                 </DropdownMenuItem>
@@ -236,7 +288,11 @@ export default function GameActions({
               </>
             )}
             {isOnLinux && (
-              <DropdownMenuItem className="gap-2" onSelect={onResetPrefix}>
+              <DropdownMenuItem
+                className="gap-2"
+                disabled={isRunning}
+                onSelect={onResetPrefix}
+              >
                 <FolderSync className="h-4 w-4" />
                 {t("gameScreen.resetPrefix")}
                 {prefixSize > 0 && (
@@ -264,7 +320,7 @@ export default function GameActions({
 
             <DropdownMenuItem
               className="gap-2 text-red-500 focus:bg-red-500/10 focus:text-red-500"
-              disabled={isUninstalling}
+              disabled={isUninstalling || isRunning}
               onSelect={onDelete}
             >
               <Trash2 className="h-4 w-4" />

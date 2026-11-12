@@ -48,6 +48,7 @@ import LaunchOverlay from "@/components/LaunchOverlay";
 import { useInstalledGameDetails } from "./useInstalledGameDetails";
 import { ExecutableManagerDialog } from "./ExecutableManagerDialog";
 import { DetailBackButton } from "./DetailBackButton";
+import { formatSessionTime } from "@/hooks/useGameSession";
 
 function InstalledGameDetailsView({
   game,
@@ -79,6 +80,12 @@ function InstalledGameDetailsView({
     handlePlayGame,
     isLaunching,
     isRunning,
+    gameSession,
+    showStopGameDialog,
+    setShowStopGameDialog,
+    openStopGameDialog,
+    handleStopGame,
+    stopMenuOffset,
     selectedButton,
     setShowBrowseExeWarning,
     handleOpenDirectory,
@@ -380,12 +387,16 @@ function InstalledGameDetailsView({
             <div className="flex flex-wrap items-center gap-6">
               {canLaunchGame ? (
                 <button
-                  onClick={handlePlayGame}
-                  disabled={isLaunching || isRunning}
+                  onClick={() => (isRunning ? openStopGameDialog() : handlePlayGame())}
+                  disabled={isLaunching || (isRunning && !gameSession.canStop)}
                   className={`group flex items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100 ${
-                    selectedButton === "play"
-                      ? "bg-primary text-secondary shadow-primary/50 ring-4 ring-primary/50"
-                      : "bg-white text-primary shadow-black/30 hover:scale-105 hover:bg-primary hover:text-secondary"
+                    isRunning && !isLaunching
+                      ? selectedButton === "play"
+                        ? "bg-red-500 text-white shadow-red-500/50 ring-4 ring-red-500/50"
+                        : "bg-red-500/80 text-white shadow-black/30 hover:scale-105 hover:bg-red-500"
+                      : selectedButton === "play"
+                        ? "bg-primary text-secondary shadow-primary/50 ring-4 ring-primary/50"
+                        : "bg-white text-primary shadow-black/30 hover:scale-105 hover:bg-primary hover:text-secondary"
                   }`}
                 >
                   {isLaunching ? (
@@ -395,8 +406,23 @@ function InstalledGameDetailsView({
                     </>
                   ) : isRunning ? (
                     <>
-                      <StopCircle className="h-7 w-7" />
-                      <span>{t("bigPicture.running")}</span>
+                      {gameSession.isStopping ? (
+                        <Loader className="h-7 w-7 animate-spin" />
+                      ) : (
+                        <StopCircle className="h-7 w-7" />
+                      )}
+                      <span>
+                        {gameSession.isStopping
+                          ? t("bigPicture.stopping")
+                          : gameSession.canStop
+                            ? t("bigPicture.stopGame")
+                            : t("bigPicture.running")}
+                      </span>
+                      {gameSession.elapsedMs > 0 && (
+                        <span className="font-mono text-lg font-semibold tabular-nums opacity-80">
+                          {formatSessionTime(gameSession.elapsedMs)}
+                        </span>
+                      )}
                     </>
                   ) : (
                     <>
@@ -534,7 +560,12 @@ function InstalledGameDetailsView({
 
       {/* Management Menu Overlay */}
       {showManagementMenu && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={event => {
+            if (event.target === event.currentTarget) handleInput("BACK");
+          }}
+        >
           <div
             ref={menuRef}
             className="max-h-[85vh] w-[600px] overflow-y-auto rounded-2xl border-2 border-primary/50 bg-background/95 p-8 shadow-2xl"
@@ -542,12 +573,35 @@ function InstalledGameDetailsView({
             <h2 className="mb-6 text-3xl font-bold text-primary">
               {t("bigPicture.gameManagement") || "Game Management"}
             </h2>
+            {isRunning && (
+              <div className="mb-4 flex items-center gap-3 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-green-300">
+                <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-green-400" />
+                <span className="font-semibold">{t("library.runningSession")}</span>
+                <span className="ml-auto font-mono tabular-nums">
+                  {formatSessionTime(gameSession.elapsedMs)}
+                </span>
+              </div>
+            )}
             <div className="space-y-3">
+              {stopMenuOffset > 0 && (
+                <button
+                  onClick={() => handleManagementAction(0)}
+                  data-menu-selected={selectedMenuItem === 0}
+                  className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
+                    selectedMenuItem === 0
+                      ? "bg-red-500 text-white shadow-lg"
+                      : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                  }`}
+                >
+                  <StopCircle className="h-6 w-6" />
+                  <span className="text-lg font-semibold">{t("library.stopGame")}</span>
+                </button>
+              )}
               <button
-                onClick={() => handleManagementAction(0)}
-                data-menu-selected={selectedMenuItem === 0}
+                onClick={() => handleManagementAction(stopMenuOffset)}
+                data-menu-selected={selectedMenuItem === stopMenuOffset}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 0
+                  selectedMenuItem === stopMenuOffset
                     ? "bg-primary text-secondary shadow-lg"
                     : "bg-muted hover:bg-muted/80"
                 }`}
@@ -558,15 +612,15 @@ function InstalledGameDetailsView({
                 </span>
               </button>
               <button
-                onClick={() => handleManagementAction(1)}
-                data-menu-selected={selectedMenuItem === 1}
+                onClick={() => handleManagementAction(1 + stopMenuOffset)}
+                data-menu-selected={selectedMenuItem === 1 + stopMenuOffset}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 1
+                  selectedMenuItem === 1 + stopMenuOffset
                     ? "bg-primary text-secondary shadow-lg"
                     : "bg-muted hover:bg-muted/80"
                 }`}
               >
-                <Pencil className="h-6 w-6" />
+                <Pencil className={`h-6 w-6 ${isRunning ? "opacity-40" : ""}`} />
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-semibold">
                     {t("library.changeExecutable")}
@@ -577,10 +631,10 @@ function InstalledGameDetailsView({
                 </div>
               </button>
               <button
-                onClick={() => handleManagementAction(2)}
-                data-menu-selected={selectedMenuItem === 2}
+                onClick={() => handleManagementAction(2 + stopMenuOffset)}
+                data-menu-selected={selectedMenuItem === 2 + stopMenuOffset}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 2
+                  selectedMenuItem === 2 + stopMenuOffset
                     ? "bg-primary text-secondary shadow-lg"
                     : "bg-muted hover:bg-muted/80"
                 }`}
@@ -597,10 +651,10 @@ function InstalledGameDetailsView({
                 return (
                   <button
                     key={folder.game}
-                    onClick={() => handleManagementAction(index + 3)}
-                    data-menu-selected={selectedMenuItem === index + 3}
+                    onClick={() => handleManagementAction(index + 3 + stopMenuOffset)}
+                    data-menu-selected={selectedMenuItem === index + 3 + stopMenuOffset}
                     className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                      selectedMenuItem === index + 3
+                      selectedMenuItem === index + 3 + stopMenuOffset
                         ? "bg-primary text-secondary shadow-lg"
                         : "bg-muted hover:bg-muted/80"
                     }`}
@@ -613,10 +667,14 @@ function InstalledGameDetailsView({
                 );
               })}
               <button
-                onClick={() => handleManagementAction(folders.length + 3)}
-                data-menu-selected={selectedMenuItem === folders.length + 3}
-                className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === folders.length + 3
+                onClick={() =>
+                  handleManagementAction(folders.length + 3 + stopMenuOffset)
+                }
+                data-menu-selected={
+                  selectedMenuItem === folders.length + 3 + stopMenuOffset
+                }
+                className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${isRunning ? "opacity-50" : ""} ${
+                  selectedMenuItem === folders.length + 3 + stopMenuOffset
                     ? "bg-red-500 text-white shadow-lg"
                     : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                 }`}
@@ -629,9 +687,13 @@ function InstalledGameDetailsView({
                 </span>
               </button>
             </div>
-            <div className="mt-6 text-center text-sm text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => handleInput("BACK")}
+              className="mt-6 w-full text-center text-sm text-muted-foreground hover:text-primary"
+            >
               {t("bigPicture.pressBackToClose") || "Press B to close"}
-            </div>
+            </button>
           </div>
         </div>
       )}
@@ -1092,6 +1154,60 @@ function InstalledGameDetailsView({
       />
 
       {/* Delete Confirmation Dialog - BigPicture Style */}
+      <AlertDialog
+        open={showStopGameDialog}
+        onOpenChange={open => {
+          if (!open && !gameSession.isStopping) setShowStopGameDialog(false);
+        }}
+      >
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-2xl">
+              {t("library.stopGameConfirm", { game: gameName })}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              {t("library.stopGameDescription", {
+                time: formatSessionTime(gameSession.elapsedMs),
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-4 py-4">
+            <button
+              onClick={() => setShowStopGameDialog(false)}
+              disabled={gameSession.isStopping}
+              className={`flex flex-1 items-center justify-center gap-3 rounded-xl p-4 text-lg font-semibold transition-all duration-200 ${
+                dialogButtonIndex === 0
+                  ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30 ring-4 ring-primary/50"
+                  : "bg-muted hover:bg-muted/80"
+              }`}
+            >
+              <X className="h-6 w-6" />
+              <span>{t("common.cancel")}</span>
+            </button>
+            <button
+              onClick={handleStopGame}
+              disabled={gameSession.isStopping}
+              className={`flex flex-1 items-center justify-center gap-3 rounded-xl p-4 text-lg font-semibold transition-all duration-200 ${
+                dialogButtonIndex === 1
+                  ? "scale-105 bg-red-500 text-white shadow-lg shadow-red-500/30 ring-4 ring-red-500/50"
+                  : "bg-red-500/80 text-white hover:bg-red-500"
+              } ${gameSession.isStopping ? "cursor-not-allowed opacity-50" : ""}`}
+            >
+              {gameSession.isStopping ? (
+                <Loader className="h-6 w-6 animate-spin" />
+              ) : (
+                <StopCircle className="h-6 w-6" />
+              )}
+              <span>
+                {gameSession.isStopping
+                  ? t("bigPicture.stopping")
+                  : t("library.stopGame")}
+              </span>
+            </button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
