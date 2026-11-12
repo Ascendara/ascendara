@@ -60,8 +60,8 @@ export const PROVIDER_DOMAINS = {
   datanodes: ["datanodes.to"],
   qiwi: ["qiwi.gg"],
   vikingfile: ["vikingfile.com"],
-  fileditch: ["fileditchfiles.me", "fileditch.com"],
-  fileditchfiles: ["fileditchfiles.me"],
+  fileditch: ["fileditchfiles.me", "itsfileditchfiles.st", "fileditch.com"],
+  fileditchfiles: ["fileditchfiles.me", "itsfileditchfiles.st"],
 };
 
 /**

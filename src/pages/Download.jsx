@@ -95,8 +95,10 @@ import {
 import { API_URL } from "@/config/api";
 
 const LOCAL_FALLBACK_PATTERNS = {
-  fileditch: /https?:\/\/(fileditchfiles\.me|fileditch\.com)\/file\.php\?f=.+/i,
-  fileditchfiles: /https?:\/\/(fileditchfiles\.me|fileditch\.com)\/file\.php\?f=.+/i,
+  fileditch:
+    /^https?:\/\/[^/]*fileditch[^/]*\/(?:file\.php\?f=.+|.+\.(?:rar|zip|7z)(?:\?.*)?$)/i,
+  fileditchfiles:
+    /^https?:\/\/[^/]*fileditch[^/]*\/(?:file\.php\?f=.+|.+\.(?:rar|zip|7z)(?:\?.*)?$)/i,
   buzzheavier:
     /^https?:\/\/(?:[a-z0-9-]+\.)?(?:bzzhr\.to|fafda\.to)\/(?:d\/)?[A-Za-z0-9]+(?:\?.*)?$/i,
   megadb: /^https?:\/\/(?:[a-z0-9-]+\.)?megadb\.(?:net|xyz)\/.+$/i,
