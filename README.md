@@ -4,31 +4,31 @@
     <p><em>Less setup. More play.</em></p>
     <p>
         <a href="https://discord.gg/ap6W3xMTKW"><img src="https://img.shields.io/discord/939249162887766139?color=7289da&label=discord&logo=discord&logoColor=white" alt="Discord"></a>
-        <a href="https://github.com/tagoWorks/ascendara/releases/latest"><img src="https://img.shields.io/github/v/release/tagoWorks/ascendara?include_prereleases&label=latest%20release" alt="Latest Release"></a>
+        <a href="https://github.com/Ascendara/ascendara/releases/latest"><img src="https://img.shields.io/github/v/release/Ascendara/ascendara?include_prereleases&label=latest%20release" alt="Latest Release"></a>
          <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.ascendara.app%2Fcount%2Fdownloads&query=downloads&style=flat&label=download%20count" alt="Download Count">
         <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
     </p>
     <p>
-        <a href="https://github.com/tagoWorks/ascendara/issues"><img src="https://img.shields.io/github/issues-raw/tagoWorks/ascendara" alt="Issues"></a>
-        <img src="https://img.shields.io/github/last-commit/tagoWorks/ascendara" alt="Last Commit">
-        <img src="https://img.shields.io/github/actions/workflow/status/ascendara/ascendara/build.yml" alt="Build Status">
-        <a href="https://github.com/tagoWorks/ascendara/network/members"><img src="https://img.shields.io/github/forks/tagoWorks/ascendara?style=flat&logo=github&logoColor=white" alt="Forks"></a>
-        <a href="https://github.com/tagoWorks/ascendara/stargazers"><img src="https://img.shields.io/github/stars/tagoWorks/ascendara?style=social" alt="GitHub Stars"></a>
+        <a href="https://github.com/Ascendara/ascendara/issues"><img src="https://img.shields.io/github/issues-raw/Ascendara/ascendara" alt="Issues"></a>
+        <img src="https://img.shields.io/github/last-commit/Ascendara/ascendara" alt="Last Commit">
+        <img src="https://img.shields.io/github/actions/workflow/status/Ascendara/ascendara/build.yml" alt="Build Status">
+        <a href="https://github.com/Ascendara/ascendara/network/members"><img src="https://img.shields.io/github/forks/Ascendara/ascendara?style=flat&logo=github&logoColor=white" alt="Forks"></a>
+        <a href="https://github.com/Ascendara/ascendara/stargazers"><img src="https://img.shields.io/github/stars/Ascendara/ascendara?style=social" alt="GitHub Stars"></a>
     </p>
 </div>
 
 ## 🎮 About
 
-Ascendara simplifies your game management experience by providing a seamless way to discover, organize, and test pre-installed games. No more hassle with extracting, installing, or moving files. The game library is powered by a custom webscraper, currently featuring titles mainly from [STEAMRIP](https://ascendara.app/sources/steamrip) with plans to expand to more sources and is available on both Windows and Linux platforms.
+Ascendara simplifies your game management experience by providing a seamless way to discover, organize, and test pre-installed games. No more hassle with extracting, installing, or moving files. The game library comes from a game index that the Ascendara API keeps up to date, featuring titles mainly from [STEAMRIP](https://ascendara.app/sources/steamrip), and you can add more through external sources. Ascendara is available on Windows, Linux, and macOS.
 
 ### 🔗 Quick Links
 
 - [Join the Discord](https://ascendara.app/discord) for discussions and support
 - [Submit feedback for Ascendara](https://ascendara.app/feedback)
-- [Contribute to Ascendara](https://github.com/tagoWorks/ascendara)
+- [Contribute to Ascendara](https://github.com/Ascendara/ascendara)
 - [Read the latest changelog](https://ascendara.app/changelog)
 - [Learn about Ascend](https://ascendara.app/ascend)
-- [Check latest releases on Github](https://github.com/tagoWorks/ascendara/releases)
+- [Check latest releases on Github](https://github.com/Ascendara/ascendara/releases)
 
 ## ✨ Features
 
@@ -137,6 +137,7 @@ These languages come with the app by default:
 - Georgian
 - Greek
 - Gujarati
+- Haitian Creole
 - Hausa
 - Hawaiian
 - Hebrew
@@ -175,7 +176,7 @@ These languages come with the app by default:
 - Punjabi
 - Romanian
 - Samoan
-- Scottish Gaelic
+- Scots Gaelic
 - Serbian
 - Sesotho
 - Shona
@@ -248,9 +249,9 @@ These languages come with the app by default:
 
 ## 📦 Install Ascendara
 
-Ascendara is available for both **Windows** and **Linux**.
+Ascendara is available for **Windows**, **Linux**, and **macOS**.
 
-The installer always downloads the latest version. Older versions can be found on the [GitHub Releases](https://github.com/Ascendara/ascendara/releases) page.
+The Windows installer and Linux script always download the latest version. Older versions can be found on the [GitHub Releases](https://github.com/Ascendara/ascendara/releases) page.
 
 The installer is also open source and available [here](https://github.com/Ascendara/installer).
 
@@ -266,6 +267,10 @@ Run:
 curl -fsSL https://ascendara.app/install.sh | bash
 ```
 
+### macOS
+
+Download the `.dmg` for your Mac (Apple Silicon or Intel) from the [latest release](https://github.com/Ascendara/ascendara/releases/latest).
+
 ## 🤝 Contributing
 
 Contributing to Ascendara is the best way to get your desired features, bug fixes, or improvements into the official build! When your contribution is accepted, your changes will be prominently featured in the Ascendara changelogs, giving you recognition for your valuable input to the project. Learn how to contribute to Ascendara [here](https://ascendara.app/docs/getting-started/contributing).
@@ -276,36 +281,40 @@ The Ascendara project is organized into the following main directories:
 
 ### **src/** - Core application logic and UI implementation
 
+- **assets/** - Bundled icons
 - **components/** - Reusable React components for the UI
   - **ui/** - shadcn/ui component library for modern UI elements
-- **context/** - React context providers for global state management (authentication, language, settings, themes, tour)
-- **hooks/** - Custom React hooks for efficient image loading and caching
+- **config/** - Shared app configuration (API endpoint, download providers)
+- **context/** - React context providers for global state management (authentication, language, search, settings, themes, tour)
+- **data/** - Static data used by the app, such as hardware tiers for requirement checks
+- **hooks/** - Custom React hooks for game sessions, downloads, search, library state, and image loading
+- **i18n/** - Translation resources for individual features
 - **lib/** - Utility libraries and helper functions
-- **pages/** - Main application pages and screens (Home, Library, Downloads, Settings, etc.)
+- **pages/** - Main application pages and screens (Home, Search, Library, Downloads, Big Picture, Retro, Settings, etc.)
 - **public/** - Static assets and public resources
   - **sounds/** - UI sound effects
-  - **guide/** - User guide assets
 - **services/** - Service modules for external APIs and core functionality (Firebase, game info, downloads, analytics, integrations)
 - **styles/** - CSS styling files for animations, menu bar, and scrollbars
 - **translations/** - Internationalization files for 12 base languages (English, Spanish, French, German, Italian, Chinese, Arabic, Hindi, Bengali, Portuguese, Russian, Japanese)
+- **utils/** - Small helpers for authentication and Ascend access
 
-### **binaries/** - Prebuilt Python binaries for core functionality
+### **binaries/** - Helper programs that ship with the app
 
-- **AscendaraAchievementWatcher/** - Tracks and monitors game achievements
-- **AscendaraCrashReporter/** - Automated crash reporting and diagnostics
-- **AscendaraDownloader/** - Multi-threaded game download manager with built-in BitTorrent support
-- **AscendaraGameHandler/** - Game execution, process management, and runtime monitoring
-- **AscendaraNotificationHelper/** - System notification helper for download events
+- **AscendaraAchievementWatcher/** (Node) - Tracks and monitors game achievements
+- **AscendaraCrashReporter/** (Rust) - Automated crash reporting and diagnostics
+- **AscendaraDownloader/** (Rust) - Multi-threaded game download manager with built-in BitTorrent support
+- **AscendaraGameHandler/** (Rust) - Game execution, process management, and runtime monitoring
+- **AscendaraNotificationHelper/** (Python) - System notification helper for download events
 
   > ℹ️ **INFO:** The tool below does not come with the official build of Ascendara. Instead, Ascendara installs it as needed through the tool installation feature.
 
-- **AscendaraLanguageTranslation/** - Translation tool used to translate to the additional 93 languages
+- **AscendaraLanguageTranslation/** (Python) - Translation tool used to translate to the additional 93 languages
 
 ### **electron/** - Electron main process and IPC communication
 
 - **modules/** - Modular IPC handlers and backend logic (configuration, Discord RPC, downloads, games, settings, system utilities, updates, window management, and more)
 
-### **scripts/** - Development and build automation scripts for Windows/Linux builds, translation checking, and code statistics
+### **scripts/** - Development and build automation scripts for Windows/Linux/macOS builds, releases, translation checking, and code statistics
 
 ## 🛠️ Running from Source
 
@@ -317,12 +326,12 @@ Before building, ensure you have all required dependencies. [View full requireme
 
 ### Quick Start
 
-> ⚠️ **WARNING:** Some API features like reporting and analytics services will not work on the public version of the app. Additionally, you will not be able to run games in development mode. Check the [Developer Docs](https://ascendara.app/docs/developer/build-from-source#important-limitations) for more information.
+> ⚠️ **WARNING:** Some API features like reporting and analytics services will not work on the public version of the app. Check the [Developer Docs](https://ascendara.app/docs/developer/build-from-source#important-limitations) for more information.
 
 1. **Clone the Repository**
 
    ```sh
-   git clone https://github.com/ascendara/ascendara.git
+   git clone https://github.com/Ascendara/ascendara.git
    ```
 
 2. **Install Node Dependencies**
@@ -359,7 +368,17 @@ yarn
    pip install -r requirements.txt
    ```
 
-5. **Run the Development App**
+5. **Build the Rust Helpers**
+
+   Development mode runs the downloader, game handler, and crash reporter built from source, so install [Rust](https://rustup.rs) and build each one:
+
+   ```sh
+   cargo build --release --manifest-path binaries/AscendaraDownloader/Cargo.toml
+   cargo build --release --manifest-path binaries/AscendaraGameHandler/Cargo.toml
+   cargo build --release --manifest-path binaries/AscendaraCrashReporter/Cargo.toml
+   ```
+
+6. **Run the Development App**
 
    Using npm:
 
@@ -374,10 +393,6 @@ yarn
    ```
 
 To build the source code into an executable, read the [Developer Docs](https://ascendara.app/docs/developer/build-from-source).
-
-## 🗺️ Development Roadmap
-
-Ascendara's development roadmap can be found [here](https://ascendara.app/roadmap).
 
 ## 📝 License & Contact
 
