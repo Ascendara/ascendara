@@ -6,6 +6,7 @@ use crate::install::{self, VerificationFailed};
 use crate::providers::{self, RemoteFile};
 use crate::state::{is_cancelled, Cancelled, DownloadMeter, ExtractMeter, GameState, StopFlag};
 use crate::system::{self, Settings};
+use crate::torrent::TorrentInput;
 use crate::util::{self, member_path, read_size, remove_path, sanitize_folder_name, wanted_member};
 use anyhow::{anyhow, bail, Context, Result};
 use reqwest::Client;
@@ -216,7 +217,7 @@ impl Job {
             return self.download_file_list(Path::new(link)).await;
         }
         if crate::torrent::is_torrent_link(link) {
-            return self.download_torrent(link).await;
+            return self.download_torrent(TorrentInput::Link(link.to_string())).await;
         }
         if !matches!(provider, "auto" | "direct" | "gofile") {
             bail!("Unknown download provider");
@@ -256,6 +257,13 @@ impl Job {
         self.state.save()?;
         let verified = options.sha256.is_some();
         self.fetch(&client, &url, &dest, options.clone(), 0, None).await?;
+        // Some links serve a .torrent file without saying so in the URL.
+        if crate::torrent::is_torrent_file(&dest) {
+            log::info!("The download is a .torrent file; starting the torrent instead");
+            let bytes = std::fs::read(&dest).context("Could not read the downloaded .torrent file")?;
+            let _ = std::fs::remove_file(&dest);
+            return self.download_torrent(TorrentInput::File(bytes)).await;
+        }
         let dest = self.fix_extension(&dest)?;
         self.sources.insert(dest.clone(), Source { url, options, client, verified });
         self.finish_download_phase(None)?;
@@ -483,6 +491,13 @@ impl Job {
             entries.push((file.filename.clone(), dest, size));
         }
         self.stop.check()?;
+        if let [(_, path, _)] = entries.as_slice() {
+            if crate::torrent::is_torrent_file(path) {
+                log::info!("The download is a .torrent file; starting the torrent instead");
+                let bytes = std::fs::read(path).context("Could not read the downloaded .torrent file")?;
+                return self.download_torrent(TorrentInput::File(bytes)).await;
+            }
+        }
         self.download_meter.update(&mut self.state, completed, Some(completed))?;
         self.finish_download_phase(Some(completed))?;
         let (archives, loose) = split_sources(&entries)?;
@@ -507,7 +522,7 @@ impl Job {
         self.download_batch(&client, files, &folder, &receipts, options).await
     }
 
-    async fn download_torrent(&mut self, link: &str) -> Result<()> {
+    async fn download_torrent(&mut self, input: TorrentInput) -> Result<()> {
         let folder = member_path(&self.downloads_dir()?, "torrent-files")?;
         self.state.set(json!({"downloading": true, "extracting": false, "verifying": false, "timeUntilComplete": "Finding peers..."}));
         self.state.save()?;
@@ -517,10 +532,9 @@ impl Job {
         let counter = Arc::new(Counter::default());
         let stop = self.stop.clone();
         let limit = self.settings.download_limit();
-        let link = link.to_string();
         let target = folder.clone();
         let task_counter = counter.clone();
-        let task = tokio::spawn(async move { crate::torrent::download(&client, &link, &target, &stop, task_counter, limit).await });
+        let task = tokio::spawn(async move { crate::torrent::download(&client, input, &target, &stop, task_counter, limit).await });
         self.watch_transfer(task, counter.clone(), 0, None).await?;
         let total = counter.done.load(Ordering::Relaxed);
         self.finish_download_phase(Some(total))?;

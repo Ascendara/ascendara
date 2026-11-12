@@ -16,6 +16,33 @@ pub fn is_torrent_link(link: &str) -> bool {
     lower.starts_with("magnet:") || lower.split(['?', '#']).next().unwrap_or("").ends_with(".torrent")
 }
 
+/// Where the torrent comes from: a magnet or .torrent URL, or the contents of
+/// a .torrent file that a regular download turned out to be.
+pub enum TorrentInput {
+    Link(String),
+    File(Vec<u8>),
+}
+
+/// Whether a downloaded file is a .torrent rather than game data, so it can be
+/// handed to the torrent client instead of being unpacked.
+pub fn is_torrent_file(path: &Path) -> bool {
+    use std::io::Read;
+    let Ok(meta) = std::fs::metadata(path) else { return false };
+    if meta.len() == 0 || meta.len() > MAX_TORRENT_FILE_BYTES as u64 {
+        return false;
+    }
+    let mut head = [0u8; 32];
+    let Ok(read) = std::fs::File::open(path).and_then(|mut f| f.read(&mut head)) else { return false };
+    let head = &head[..read];
+    let named = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("torrent"));
+    head.starts_with(b"d8:announce")
+        || head.starts_with(b"d13:announce-list")
+        || head.starts_with(b"d4:info")
+        || head.starts_with(b"d10:created by")
+        || head.starts_with(b"d7:comment")
+        || (named && head.first() == Some(&b'd'))
+}
+
 /// Largest .torrent file accepted; real ones are rarely more than a few MB.
 const MAX_TORRENT_FILE_BYTES: usize = 32 * 1024 * 1024;
 
@@ -51,34 +78,41 @@ fn check_torrent_file(bytes: &[u8], content_type: &str) -> Result<()> {
 /// `on_metadata` runs once the torrent's name and size are known.
 pub async fn download(
     client: &reqwest::Client,
-    link: &str,
+    input: TorrentInput,
     folder: &Path,
     stop: &StopFlag,
     counter: Arc<Counter>,
     limit_bps: u64,
 ) -> Result<()> {
     std::fs::create_dir_all(folder)?;
-    let add = if link.trim().to_lowercase().starts_with("magnet:") {
-        AddTorrent::from_url(link.trim().to_string())
-    } else {
-        crate::providers::validate_url(link)?;
-        let response = client
-            .get(link.trim())
-            .timeout(Duration::from_secs(60))
-            .send()
-            .await
-            .context("Could not download the .torrent file")?
-            .error_for_status()
-            .context("Could not download the .torrent file")?;
-        let content_type = response
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_lowercase();
-        let bytes = response.bytes().await.context("Could not download the .torrent file")?;
-        check_torrent_file(&bytes, &content_type)?;
-        AddTorrent::from_bytes(bytes)
+    let add = match input {
+        TorrentInput::File(bytes) => {
+            check_torrent_file(&bytes, "")?;
+            AddTorrent::from_bytes(bytes)
+        }
+        TorrentInput::Link(link) if link.trim().to_lowercase().starts_with("magnet:") => {
+            AddTorrent::from_url(link.trim().to_string())
+        }
+        TorrentInput::Link(link) => {
+            crate::providers::validate_url(&link)?;
+            let response = client
+                .get(link.trim())
+                .timeout(Duration::from_secs(60))
+                .send()
+                .await
+                .context("Could not download the .torrent file")?
+                .error_for_status()
+                .context("Could not download the .torrent file")?;
+            let content_type = response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_lowercase();
+            let bytes = response.bytes().await.context("Could not download the .torrent file")?;
+            check_torrent_file(&bytes, &content_type)?;
+            AddTorrent::from_bytes(bytes)
+        }
     };
     let options = SessionOptions {
         dht: Some(DhtSessionConfig { persistence: None, ..Default::default() }),
@@ -178,6 +212,22 @@ mod tests {
         assert!(err.to_string().contains("web page"));
         let err = check_torrent_file(b"{\"error\":\"login\"}", "application/json").unwrap_err();
         assert!(err.to_string().contains("web page"));
+    }
+
+    #[test]
+    fn detects_downloaded_torrent_files() {
+        let dir = std::env::temp_dir().join(format!("ascendara-torrent-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let unnamed = dir.join("game.download");
+        std::fs::write(&unnamed, b"d8:announce30:udp://tracker.example:1337e").unwrap();
+        assert!(is_torrent_file(&unnamed));
+        let archive = dir.join("game.rar");
+        std::fs::write(&archive, b"Rar! ").unwrap();
+        assert!(!is_torrent_file(&archive));
+        let named = dir.join("game.torrent");
+        std::fs::write(&named, b"d4:infod4:name4:teste").unwrap();
+        assert!(is_torrent_file(&named));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
