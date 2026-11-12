@@ -37,6 +37,9 @@ const { updateTimestampFile } = require("../core/utils");
 const { runTranslation, isTranslationRunning } = require("../app/translations");
 
 let isLatest = true;
+// The live version a testing branch user can switch to, once live is newer
+// than anything the branch offers
+let liveUpdateOffer = null;
 let updateDownloaded = false;
 let notificationShown = false;
 let updateDownloadInProgress = false;
@@ -208,6 +211,9 @@ async function checkVersionAndUpdate() {
     const currentBranch = appBranch;
 
     let latestVersion;
+    // On a testing branch: the live version and the branch's own latest build
+    let liveVersion = null;
+    let branchVersion = null;
 
     if (currentBranch === "live") {
       const response = await axios.get(`${API_URL}/`);
@@ -218,11 +224,14 @@ async function checkVersionAndUpdate() {
       try {
         const response = await axios.get(`${API_URL}/branch-versions`);
         const branchData = response.data;
+        liveVersion = branchData.live || null;
+        branchVersion = branchData[currentBranch] || null;
         latestVersion = branchData[currentBranch] || branchData.live || appVersion;
       } catch {
         // Fallback to live API if branch-versions endpoint fails
         const response = await axios.get(`${API_URL}/`);
         latestVersion = response.data.appVer;
+        liveVersion = latestVersion;
       }
     }
 
@@ -231,6 +240,17 @@ async function checkVersionAndUpdate() {
       currentBranch === "public-testing" || currentBranch === "experimental"
         ? testingVersion
         : appVersion;
+
+    // Live has passed every build this branch offers: the user chooses between
+    // switching to live and staying, and the branch only updates to its own builds
+    liveUpdateOffer =
+      currentBranch !== "live" &&
+      liveVersion &&
+      isVersionLower(currentVersion, liveVersion) &&
+      !isVersionLower(liveVersion, latestVersion)
+        ? liveVersion
+        : null;
+    if (liveUpdateOffer) latestVersion = branchVersion || currentVersion;
 
     // Use version comparison function instead of simple equality
     isLatest = !isVersionLower(currentVersion, latestVersion);
@@ -586,6 +606,9 @@ function registerUpdateHandlers() {
   });
 
   ipcMain.handle("is-portable", () => isPortable);
+
+  // Branch switching needs the installed version, so portable copies get no offer
+  ipcMain.handle("get-live-update-offer", () => (isPortable ? null : liveUpdateOffer));
 
   ipcMain.handle("download-update", async () => {
     if (isLatest) return;

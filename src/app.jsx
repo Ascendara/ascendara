@@ -19,6 +19,9 @@ import BrokenVersionDialog from "@/components/BrokenVersionDialog";
 import IndexRecoveryNotice from "@/components/IndexRecoveryNotice";
 import FirstIndexDialog from "@/components/FirstIndexDialog";
 import BranchWelcomeDialog from "@/components/BranchWelcomeDialog";
+import LiveUpdateOfferDialog, {
+  isLiveUpdateOfferDismissed,
+} from "@/components/LiveUpdateOfferDialog";
 import UpdateOverlay from "@/components/UpdateOverlay";
 import RepairAscendaraDialog from "@/components/RepairAscendaraDialog";
 import ChangelogDialog from "@/components/ChangelogDialog";
@@ -1257,6 +1260,7 @@ const AppRoutes = () => {
   const [missingAppFiles, setMissingAppFiles] = useState([]);
   const [missingDllInfo, setMissingDllInfo] = useState(null);
   const [appBranch, setAppBranch] = useState(null);
+  const [liveUpdateOffer, setLiveUpdateOffer] = useState(null);
   const location = useLocation();
   const hasChecked = useRef(false);
   const loadStartTime = useRef(Date.now());
@@ -1926,6 +1930,10 @@ const AppRoutes = () => {
         const settings = await window.electron.getSettings();
         const isLatestVersion = await checkForUpdates();
         const branch = await window.electron.getBranch();
+        const liveOffer = await window.electron.getLiveUpdateOffer?.();
+        if (isSubscribed && liveOffer && !isLiveUpdateOfferDismissed(liveOffer)) {
+          setLiveUpdateOffer(liveOffer);
+        }
         // Portable copies never auto-update, so they always get the prompt.
         const isPortable = await window.electron.isPortable();
 
@@ -2180,6 +2188,12 @@ const AppRoutes = () => {
         branch={appBranch}
         open={startupSettled && showBranchWelcome}
         onOpenChange={setShowBranchWelcome}
+      />
+      <LiveUpdateOfferDialog
+        branch={appBranch}
+        version={liveUpdateOffer}
+        open={startupSettled && !!appBranch && !!liveUpdateOffer && !showBranchWelcome}
+        onOpenChange={open => !open && setLiveUpdateOffer(null)}
       />
       <WatcherWarnDialog
         open={startupSettled && showWatcherWarn}

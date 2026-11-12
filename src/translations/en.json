@@ -3701,6 +3701,16 @@
       "watching": "Watching"
     }
   },
+  "liveUpdateOffer": {
+    "description": "Ascendara {{version}} is now live and newer than the latest {{branch}} build.",
+    "downloading": "Downloading the live installer...",
+    "stay": "Stay on {{branch}}",
+    "stayHint": "Switch to the live branch to get it now, or stay on {{branch}} and keep updating when its next build comes out.",
+    "switch": "Switch to Live {{version}}",
+    "switchFailed": "Failed to switch to the live branch",
+    "switching": "Downloading...",
+    "title": "A New Public Build Is Out"
+  },
   "localRefresh": {
     "activeList": "Active List",
     "advancedTitle": "Advanced",
