@@ -5110,8 +5110,8 @@
       "translatingDialog": "Don't Close Ascendara",
       "translatingDialogDesc": "Ascendara is translating the selected language. This may take a few minutes, you can leave this but do not close Ascendara."
     },
-    "fallbackToQbittorrentOnTorboxFailure": "Fall back to qBittorrent",
-    "fallbackToQbittorrentOnTorboxFailureDesc": "If TorBox cannot add a magnet, retry it through your configured qBittorrent WebUI. This may expose torrent traffic outside TorBox, so ensure your VPN is active.",
+    "fallbackToQbittorrentOnTorboxFailure": "Fall back to local torrenting",
+    "fallbackToQbittorrentOnTorboxFailureDesc": "If TorBox cannot add a magnet, retry it in the built-in torrent client. This may expose torrent traffic outside TorBox, so ensure your VPN is active.",
     "gameBackup": {
       "backupFormat": "Backup Format",
       "backupLocation": "Backup Location",
