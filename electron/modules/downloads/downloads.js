@@ -1490,6 +1490,7 @@ function registerDownloadHandlers() {
       const data = info.downloadingData;
       if (
         !data ||
+        data.sourceMissing ||
         !(
           data.error ||
           data.stopped ||

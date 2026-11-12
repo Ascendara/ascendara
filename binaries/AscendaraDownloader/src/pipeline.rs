@@ -51,6 +51,31 @@ impl std::fmt::Display for RecoveryCancelled {
 
 impl std::error::Error for RecoveryCancelled {}
 
+/// A downloaded file disappeared before extraction could use it. Retrying the
+/// extraction cannot help; the app offers a fresh download instead.
+#[derive(Debug)]
+pub struct SourceMissing(pub String);
+
+impl std::fmt::Display for SourceMissing {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "The downloaded file {} was removed from disk before it could be extracted. Security software often quarantines game archives: check its protection history and restore the file to retry extraction, or download the game again.",
+            self.0
+        )
+    }
+}
+
+impl std::error::Error for SourceMissing {}
+
+/// Fail with [`SourceMissing`] for the first path no longer on disk.
+fn ensure_present<'a>(paths: impl IntoIterator<Item = &'a PathBuf>) -> Result<()> {
+    match paths.into_iter().find(|p| !p.is_file()) {
+        Some(path) => Err(SourceMissing(archive::display_name(path)).into()),
+        None => Ok(()),
+    }
+}
+
 pub struct Job {
     pub game: String,
     pub game_dir: PathBuf,
@@ -160,6 +185,7 @@ impl Job {
         };
         if let Some(data) = info.get_mut("downloadingData").and_then(Value::as_object_mut) {
             data.remove("stopped");
+            data.remove("sourceMissing");
             // Shown as active straight away, before links resolve and data arrives.
             data.insert("downloading".into(), json!(true));
             data.insert("timeUntilComplete".into(), json!("Starting..."));
@@ -568,6 +594,8 @@ impl Job {
 
     async fn extract_once(&mut self, archives: &[PathBuf], loose: &[LooseFile], cleanup: Option<&Path>) -> Result<()> {
         self.stop.check()?;
+        // Catch a quarantined or deleted download now, not after a failed extraction.
+        ensure_present(archives.iter().chain(loose.iter().map(|l| &l.source)))?;
         let archives = primaries(archives)?;
         if archives.is_empty() && loose.is_empty() {
             bail!("No archive found to extract");
@@ -796,8 +824,18 @@ impl Job {
         let mut redownloaded = false;
         let mut auto_retried = false;
         let mut manual = false;
+        // Nested archives live in the stage and are consumed on purpose; only
+        // downloaded volumes can be taken away by another program.
+        let mut volumes = Vec::new();
+        if !path.starts_with(destination) {
+            volumes = archive::volumes(path);
+            if !volumes.iter().any(|v| v == path) {
+                volumes.push(path.to_path_buf());
+            }
+        }
         loop {
             self.stop.check()?;
+            ensure_present(&volumes)?;
             let before = self.progress.snapshot();
             let outcome = self.extract_archive(path, destination).await;
             let error = match outcome {
@@ -808,6 +846,11 @@ impl Job {
                 Err(error) if is_cancelled(&error) => return Err(error),
                 Err(error) => error,
             };
+            // Removed mid-extraction: say so instead of retrying or prompting.
+            if let Err(missing) = ensure_present(&volumes) {
+                log::error!("Extraction of {} failed because a source was removed: {error:#}", archive::display_name(path));
+                return Err(missing);
+            }
             // Progress for this archive starts over on a retry.
             self.progress.update(|p| {
                 p.files_done = before.files_done;
@@ -984,6 +1027,10 @@ impl Job {
             self.state.root().insert("version".into(), version);
         }
         self.set_executable();
+        // The game is in place: a retry after this point must finish, never extract again.
+        if let Some(plan) = self.state.root().get_mut("extractionSources").and_then(Value::as_object_mut) {
+            plan.insert("installed".into(), json!(true));
+        }
         self.state.save()?;
         self.stop.check()
     }
@@ -1012,6 +1059,33 @@ impl Job {
             self.state.root().remove("extractionSources");
             return self.state.save();
         }
+        // Record the finished install before deleting any source. If this write
+        // fails or a stop arrives, the sources are still on disk for a retry;
+        // deleting first left metadata pointing at archives that no longer exist.
+        let mut installer_pending = false;
+        if (self.may_be_installer || self.state.info.get("debridTransferId").is_some()) && cfg!(windows) {
+            if let Some(installer) = install::find_setup_installer(&self.game_dir) {
+                let dir = self.game_dir.to_string_lossy().into_owned();
+                self.state.root().insert("executable".into(), json!(""));
+                self.state.root().insert(
+                    "downloadingData".into(),
+                    json!({
+                        "downloading": false, "extracting": false, "verifying": false,
+                        "pendingManualInstall": true,
+                        "manualInstallerPath": installer.to_string_lossy(),
+                        "manualInstallDir": dir,
+                        "progressCompleted": "100.00", "progressDownloadSpeeds": "0.00 KB/s", "timeUntilComplete": "0s",
+                    }),
+                );
+                installer_pending = true;
+            }
+        }
+        if !installer_pending {
+            self.state.root().remove("downloadingData");
+        }
+        self.state.root().remove("extractionSources");
+        self.state.save()?;
+
         let downloads = self.game_dir.join(DOWNLOADS);
         for path in archives {
             if !path.starts_with(&self.game_dir) {
@@ -1040,36 +1114,19 @@ impl Job {
             let _ = std::fs::remove_dir(&downloads);
         }
         // The catalog size is the compressed download; record what the install occupies.
+        // The game is already recorded as installed, so this write is best effort.
         let measured = util::tree_size(&self.game_dir);
         let root = self.state.root();
         root.insert("size".into(), json!(read_size(measured as f64)));
         root.insert("sizeMeasured".into(), json!(true));
         root.insert("installedBytes".into(), json!(measured));
         root.remove("sizeReported");
-        if self.may_be_installer || self.state.info.get("debridTransferId").is_some() {
-            if cfg!(windows) {
-                if let Some(installer) = install::find_setup_installer(&self.game_dir) {
-                    let dir = self.game_dir.to_string_lossy().into_owned();
-                    self.state.root().insert("executable".into(), json!(""));
-                    self.state.root().insert(
-                        "downloadingData".into(),
-                        json!({
-                            "downloading": false, "extracting": false, "verifying": false,
-                            "pendingManualInstall": true,
-                            "manualInstallerPath": installer.to_string_lossy(),
-                            "manualInstallDir": dir,
-                            "progressCompleted": "100.00", "progressDownloadSpeeds": "0.00 KB/s", "timeUntilComplete": "0s",
-                        }),
-                    );
-                    self.state.root().remove("extractionSources");
-                    return self.state.save();
-                }
-            }
+        if let Err(error) = self.state.save() {
+            log::warn!("Could not record the installed size: {error:#}");
         }
-        self.state.root().remove("downloadingData");
-        self.state.root().remove("extractionSources");
-        self.state.save()?;
-        system::run_post_download_behavior(&self.settings);
+        if !installer_pending {
+            system::run_post_download_behavior(&self.settings);
+        }
         Ok(())
     }
 }
@@ -1264,6 +1321,17 @@ pub async fn retry_local_extraction(metadata: &Path) -> Result<()> {
     job.previous_error = previous_error;
     job.may_be_installer = job.state.info.get("debridTransferId").is_some();
     let result = async {
+        if let Some(plan) = &plan {
+            if install_finished(&game_dir, plan, update_flow, &stop)? {
+                // Only the clean-up after a finished install was interrupted.
+                log::info!("Game is already installed; finishing without extracting again");
+                let (archives, loose, cleanup) = planned_paths(&game_dir, plan)?;
+                if job.state.info.get("executable").and_then(Value::as_str).unwrap_or_default().is_empty() {
+                    job.set_executable();
+                }
+                return job.complete(&archives, &loose, cleanup.as_deref());
+            }
+        }
         let (archives, loose, cleanup) = match &plan {
             Some(plan) => planned_sources(&game_dir, plan)?,
             None => scan_sources(&mut job)?,
@@ -1288,29 +1356,60 @@ pub async fn retry_local_extraction(metadata: &Path) -> Result<()> {
     Ok(())
 }
 
-fn planned_sources(game_dir: &Path, plan: &Value) -> Result<(Vec<PathBuf>, Vec<LooseFile>, Option<PathBuf>)> {
+/// Whether the install already finished and only the clean-up after it was
+/// interrupted. Downloaders before the `installed` marker deleted the sources
+/// before recording completion; for those, a fresh install whose files all
+/// verify against the filemap it wrote last counts as finished.
+fn install_finished(game_dir: &Path, plan: &Value, update_flow: bool, stop: &StopFlag) -> Result<bool> {
+    if plan.get("installed").and_then(Value::as_bool).unwrap_or(false) {
+        return Ok(true);
+    }
+    let (archives, loose, _) = planned_paths(game_dir, plan)?;
+    let all_present = archives.iter().all(|p| p.is_file()) && loose.iter().all(|l| l.source.is_file());
+    if all_present || update_flow {
+        return Ok(false);
+    }
+    let rollback_pending = std::fs::read_dir(game_dir)
+        .map(|entries| {
+            entries.flatten().any(|e| e.file_name().to_string_lossy().starts_with(".ascendara-stage-") && stage_has_backups(&e.path()))
+        })
+        .unwrap_or(false);
+    if rollback_pending {
+        return Ok(false);
+    }
+    let Ok(bytes) = std::fs::read(game_dir.join("filemap.ascendara.json")) else { return Ok(false) };
+    let Ok(Value::Object(map)) = serde_json::from_slice::<Value>(&bytes) else { return Ok(false) };
+    let manifest: Manifest = map
+        .into_iter()
+        .filter_map(|(name, info)| info.get("size").and_then(Value::as_u64).map(|size| (name, size)))
+        .collect();
+    if manifest.is_empty() {
+        return Ok(false);
+    }
+    Ok(install::verify_manifest(game_dir, &manifest, stop)?.is_empty())
+}
+
+fn planned_paths(game_dir: &Path, plan: &Value) -> Result<(Vec<PathBuf>, Vec<LooseFile>, Option<PathBuf>)> {
     let resolve = |name: &str| -> Result<PathBuf> { member_path(game_dir, name) };
     let mut archives = Vec::new();
     for name in plan.get("archives").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str) {
-        let path = resolve(name)?;
-        if !path.is_file() {
-            bail!("Retained source is missing: {name}. Download the game again or choose another download source.");
-        }
-        archives.push(path);
+        archives.push(resolve(name)?);
     }
     let mut loose = Vec::new();
     for item in plan.get("loose").and_then(Value::as_array).into_iter().flatten() {
-        let source = resolve(item.get("source").and_then(Value::as_str).unwrap_or_default())?;
-        if !source.is_file() {
-            bail!("Retained source is missing: {}", source.display());
-        }
         loose.push(LooseFile {
             filename: item.get("filename").and_then(Value::as_str).unwrap_or_default().to_string(),
             size: item.get("size").and_then(Value::as_u64).unwrap_or(0),
-            source,
+            source: resolve(item.get("source").and_then(Value::as_str).unwrap_or_default())?,
         });
     }
     let cleanup = plan.get("cleanup").and_then(Value::as_str).map(resolve).transpose()?;
+    Ok((archives, loose, cleanup))
+}
+
+fn planned_sources(game_dir: &Path, plan: &Value) -> Result<(Vec<PathBuf>, Vec<LooseFile>, Option<PathBuf>)> {
+    let (archives, loose, cleanup) = planned_paths(game_dir, plan)?;
+    ensure_present(archives.iter().chain(loose.iter().map(|l| &l.source)))?;
     Ok((archives, loose, cleanup))
 }
 
@@ -1387,6 +1486,13 @@ pub fn finish(job: &mut Job, result: Result<()>) {
             let message = user_message(&error);
             let previous = job.previous_error.clone();
             job.state.fail(&message, previous.as_deref());
+            if error.chain().any(|c| c.is::<SourceMissing>()) {
+                // Lets the app offer a fresh download instead of an extraction retry.
+                job.state.data().insert("sourceMissing".into(), json!(true));
+                if let Err(error) = job.state.write_unchecked() {
+                    log::error!("Could not record the missing source: {error:#}");
+                }
+            }
             system::notify(job.theme.as_deref(), "Download Error", &format!("Error downloading {}: {error}", job.game));
         }
     }
@@ -1410,6 +1516,32 @@ mod tests {
         assert_eq!(failure_reason(&anyhow!("Access is denied. (os error 5)")), "blocked");
         assert_eq!(failure_reason(&anyhow!("Could not move a to b: virus (os error 225)")), "security");
         assert_eq!(user_message(&anyhow!("Connection broken: the connection stalled")), "download_connection_error");
+    }
+
+    #[test]
+    fn finished_install_with_removed_sources() {
+        let game = std::env::temp_dir().join(format!("ascendara-finished-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&game);
+        std::fs::create_dir_all(game.join(DOWNLOADS)).unwrap();
+        let plan = json!({"archives": [format!("{DOWNLOADS}/game.rar")], "loose": [], "cleanup": null});
+        let stop = StopFlag::default();
+        // Source still on disk: extract normally.
+        std::fs::write(game.join(DOWNLOADS).join("game.rar"), b"rar").unwrap();
+        assert!(!install_finished(&game, &plan, false, &stop).unwrap());
+        // Source gone and nothing installed: a real missing download.
+        std::fs::remove_file(game.join(DOWNLOADS).join("game.rar")).unwrap();
+        assert!(!install_finished(&game, &plan, false, &stop).unwrap());
+        assert!(planned_sources(&game, &plan).unwrap_err().is::<SourceMissing>());
+        // Source gone after a verified install: only clean-up was interrupted.
+        std::fs::write(game.join("game.exe"), b"exe").unwrap();
+        std::fs::write(game.join("filemap.ascendara.json"), br#"{"game.exe": {"size": 3}}"#).unwrap();
+        assert!(install_finished(&game, &plan, false, &stop).unwrap());
+        // Updates need the explicit marker.
+        assert!(!install_finished(&game, &plan, true, &stop).unwrap());
+        let mut marked = plan.clone();
+        marked["installed"] = json!(true);
+        assert!(install_finished(&game, &marked, true, &stop).unwrap());
+        let _ = std::fs::remove_dir_all(&game);
     }
 
     #[test]

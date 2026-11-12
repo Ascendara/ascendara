@@ -1924,6 +1924,7 @@ const DownloadCard = ({
     "HTTP 410",
     "No download link was provided",
     "Unable to fetch GOFile content information (HTTP 401",
+    "was removed from disk before it could be extracted",
   ];
 
   const isPredefinedError = message => {
@@ -2011,6 +2012,8 @@ const DownloadCard = ({
     }
   }, [hasError, wasReported, downloadingData.message]);
 
+  // The downloaded archive was quarantined or deleted: only a fresh download helps.
+  const isSourceMissing = Boolean(downloadingData?.sourceMissing);
   const isSecurityBlock =
     /\[WinError 22[56]\]|Windows error 22[56]|os error 22[56]\b|Security software blocked/.test(
       downloadingData?.message || ""
@@ -2021,6 +2024,7 @@ const DownloadCard = ({
     const msg = downloadingData.message;
     if (!msg) return null;
     if (game.privateSource) return privateSourceMessage(t, msg);
+    if (isSourceMissing) return t("downloads.sourceMissingError");
 
     if (msg.trim().toLowerCase() === "conflict")
       return t(
@@ -2056,7 +2060,7 @@ const DownloadCard = ({
   };
   const errorMessage = getErrorMessage();
   const offerProtection =
-    isSecurityBlock &&
+    (isSecurityBlock || isSourceMissing) &&
     window.electron.getPlatform() === "win32" &&
     !settings.excludeFolders;
 
@@ -2876,7 +2880,9 @@ const DownloadCard = ({
                   {t(
                     canRetryExtraction(game)
                       ? "downloads.retryExtraction"
-                      : "common.retry"
+                      : isSourceMissing
+                        ? "downloads.downloadAgain"
+                        : "common.retry"
                   )}
                 </Button>
                 {!isPredefinedError(downloadingData.message) && (

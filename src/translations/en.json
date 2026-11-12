@@ -2442,6 +2442,8 @@
     "retryExtraction": "Retry Extraction",
     "retryRetainedDescription": "Retry extraction using the files already downloaded for this game.",
     "runAsAdmin": "Run Installer as Admin",
+    "downloadAgain": "Download Again",
+    "sourceMissingError": "The downloaded game files were removed before they could be installed, usually by Windows Security or another antivirus quarantining them. Turn on folder protection so this doesn't happen again, then download the game again.",
     "securityBlockedError": "Windows Security blocked the game files. This happens a lot with game downloads and is almost always a false alarm, so it doesn't mean your PC is infected. Turn on folder protection so Windows stops blocking Ascendara's downloads, then retry.",
     "setInstallLocationDescription": "In the installer, set the destination folder to the path below. This must match the game's existing folder so Ascendara can detect it.",
     "setInstallLocationTitle": "Set the Install Location",

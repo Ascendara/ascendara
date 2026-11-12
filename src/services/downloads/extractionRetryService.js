@@ -1,5 +1,7 @@
 export function canRetryExtraction(game) {
   const data = game.downloadingData || {};
+  // The downloaded files are gone; only a fresh download can recover.
+  if (data.sourceMissing) return false;
   return Boolean(
     data.awaitingRecoveryAction ||
     ((data.error || data.stopped || data.verifyError?.length) &&
