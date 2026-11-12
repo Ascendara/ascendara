@@ -5,6 +5,10 @@ import nexusModsService from "@/services/integrations/nexusModsService";
 import flingTrainerService from "@/services/integrations/flingTrainerService";
 import installedGamesService from "@/services/library/installedGamesService";
 import gameService from "@/services/games/gameService";
+import gamePagePreparer from "@/services/games/gamePagePreparer";
+import artworkOverrideService from "@/services/images/artworkOverrideService";
+import steamGridImageService from "@/services/images/steamGridImageService";
+import { findGameDetails } from "@/lib/steamMatch";
 import { catalogSizeText } from "@/lib/installSpace";
 import {
   Download,
@@ -51,6 +55,12 @@ const GameDetailsView = ({
   const [showMedia, setShowMedia] = useState(false);
   const [steamData, setSteamData] = useState(null);
   const [loadingMedia, setLoadingMedia] = useState(false);
+  // Same preparation as the desktop game page: matched game info, approved
+  // artwork overrides and the index/SteamGridDB art
+  const [prepared, setPrepared] = useState(null);
+  // loading | ready | missing (not on Steam) | failed (Steam not reached)
+  const [infoState, setInfoState] = useState("loading");
+  const [infoAttempt, setInfoAttempt] = useState(0);
   const buttons = getControllerButtons(controllerType);
   const [focusedSection, setFocusedSection] = useState("button"); // 'button', 'description', 'screenshots', 'provider'
   const [selectedButton, setSelectedButton] = useState(0); // 0 = Download, 1 = Play Later
@@ -173,48 +183,81 @@ const GameDetailsView = ({
     }
   }, [game.game, game.name]);
 
-  const bgImage = playLaterImage || cachedImage || game.cover || game.image;
+  const bgImage =
+    prepared?.override?.heroUrl ||
+    playLaterImage ||
+    cachedImage ||
+    prepared?.cachedImage ||
+    game.cover ||
+    game.image;
 
-  // Fetch Data
+  // Fetch game info the same way the desktop game page does
   useEffect(() => {
-    let isMounted = true;
-    const fetchGameData = async () => {
-      const gameName = game.game || game.name;
-      if (!gameName) return;
-      console.log("[GameDetailsView] Fetching Steam data for:", gameName);
-      setSteamData(null);
-      setLoadingMedia(true);
-      try {
-        const data = await steamService.getGameDetails(gameName);
-        console.log("[GameDetailsView] Steam data received:", data);
-        if (data) {
-          console.log("[GameDetailsView] - short_description:", data.short_description);
-          console.log("[GameDetailsView] - about_the_game:", data.about_the_game);
-          console.log("[GameDetailsView] - screenshots:", data.screenshots);
-          console.log(
-            "[GameDetailsView] - screenshots count:",
-            data.screenshots?.length || 0
-          );
-        }
-        if (isMounted && data) {
-          setSteamData(data);
-        } else if (!data) {
-          console.log("[GameDetailsView] No Steam data found for game");
-        }
-      } catch (error) {
-        console.error("[GameDetailsView] Error fetching steam data:", error);
-      } finally {
-        if (isMounted) {
-          console.log("[GameDetailsView] Loading complete, loadingMedia set to false");
-          setLoadingMedia(false);
-        }
+    let live = true;
+    const apply = result => {
+      if (!live) return;
+      setPrepared(result);
+      setSteamData(result?.steamData || null);
+      setInfoState(
+        result?.steamFailed ? "failed" : result?.steamData ? "ready" : "missing"
+      );
+      setLoadingMedia(false);
+    };
+    const cached = gamePagePreparer.peek(game);
+    if (cached) {
+      apply(cached);
+      return () => {
+        live = false;
+      };
+    }
+    setPrepared(null);
+    setSteamData(null);
+    setInfoState("loading");
+    setLoadingMedia(true);
+    gamePagePreparer.prepare(game).then(async result => {
+      if (!live) return;
+      if (result && gamePagePreparer.matches(result, game)) {
+        apply(result);
+        return;
       }
-    };
-    fetchGameData();
+      // The preparer gave up waiting (slow network): finish the same lookups here
+      const name = game.game || game.name;
+      const usesOverrides = !!(game.gameID && !game.privateSource);
+      const [details, override] = await Promise.all([
+        name
+          ? findGameDetails(name, steamService.getGameDetails).catch(() => undefined)
+          : null,
+        usesOverrides
+          ? artworkOverrideService.fetch(game.gameID).catch(() => null)
+          : null,
+      ]);
+      const coverGridUrl =
+        override?.gridUrl ||
+        (name ? await steamGridImageService.getCover(name).catch(() => null) : null);
+      apply({
+        steamData: details || null,
+        steamFailed: details === undefined,
+        override: override || null,
+        coverGridUrl: coverGridUrl || null,
+        cachedImage: null,
+      });
+    });
     return () => {
-      isMounted = false;
+      live = false;
     };
+  }, [game, infoAttempt]);
+
+  // Steam not reached: try once more on its own before showing the message
+  const retriedInfo = useRef(false);
+  useEffect(() => {
+    retriedInfo.current = false;
   }, [game]);
+  useEffect(() => {
+    if (infoState !== "failed" || retriedInfo.current) return;
+    retriedInfo.current = true;
+    const timer = setTimeout(() => setInfoAttempt(value => value + 1), 3000);
+    return () => clearTimeout(timer);
+  }, [infoState]);
 
   // Check Nexus Mods support
   useEffect(() => {
@@ -696,7 +739,11 @@ const GameDetailsView = ({
                   steamData?.full_description ||
                   game.description ||
                   game.desc ||
-                  t("bigPicture.failedToFetchDescription")
+                  (infoState === "loading"
+                    ? t("bigPicture.loadingDescription")
+                    : infoState === "failed"
+                      ? t("bigPicture.failedToFetchDescription")
+                      : t("bigPicture.noDescriptionAvailable"))
                 ).replace(/<[^>]*>/g, "")}
               </p>
             </div>
@@ -812,10 +859,13 @@ const GameDetailsView = ({
             {steamData?.screenshots && steamData.screenshots.length > 0 ? (
               <div className="grid grid-cols-2 gap-6 lg:grid-cols-3">
                 {steamData.screenshots.map((screen, idx) => {
-                  const imageUrl =
+                  // Formatted like the desktop page: Steam's CDN needs the cache-busting URL
+                  const imageUrl = steamService.formatImageUrl(
                     typeof screen === "string"
                       ? screen
-                      : screen.path_full || screen.path_thumbnail || screen.url;
+                      : screen.url || screen.path_full || screen.path_thumbnail,
+                    "screenshot_huge"
+                  );
                   return (
                     <div
                       key={screen.id || idx}

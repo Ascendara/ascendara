@@ -21,6 +21,7 @@ import { SurfaceButton, useSurface } from "./Surface";
 import { BrowseGameCard } from "./BrowseGameCard";
 import { gameName, gameEntries, readStoredList } from "./surfaceNavigation";
 import { useHomeArtwork } from "./useHomeArtwork";
+import gamePagePreparer from "@/services/games/gamePagePreparer";
 import { useLanguage } from "@/context/LanguageContext";
 import { catalogSizeText } from "@/lib/installSpace";
 import "./browse-controls.css";
@@ -131,7 +132,15 @@ export function BrowseSurface({
   const focusedKey = focusedIndex >= 0 ? displayed[focusedIndex].key : null;
   const [spotlightKey, setSpotlightKey] = useState(null);
   useEffect(() => {
-    if (focusedKey) setSpotlightKey(focusedKey);
+    if (!focusedKey) return;
+    setSpotlightKey(focusedKey);
+    // Warm the game page like hovering a card does on desktop, so it opens ready
+    const timer = setTimeout(() => {
+      const game = displayed.find(({ key }) => key === focusedKey)?.game;
+      if (game) gamePagePreparer.prefetch(game);
+    }, 250);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedKey]);
   const spotlight =
     displayed.find(({ key }) => key === spotlightKey)?.game || displayed[0]?.game;
