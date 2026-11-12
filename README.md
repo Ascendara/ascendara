@@ -19,7 +19,9 @@
 
 ## 🎮 About
 
-Ascendara simplifies your game management experience by providing a seamless way to discover, organize, and test pre-installed games. No more hassle with extracting, installing, or moving files. The game library comes from a game index that the Ascendara API keeps up to date, featuring titles mainly from [STEAMRIP](https://ascendara.app/sources/steamrip). You can also add community sources, imported lists and self-hosted sources, and use several of them alongside the Ascendara index at the same time. Ascendara is available on Windows, Linux, and macOS.
+Ascendara is an all-in-one game tester and manager. Find a game, click download, and Ascendara downloads, extracts and sets it up for you, with no files to move by hand.
+
+Ascendara's official index is [SteamRIP](https://ascendara.app/sources/steamrip). You can also add community sources, imported lists or your own self-hosted library, and use them alongside the official index. Ascendara is available on Windows, Linux and macOS.
 
 ### 🔗 Quick Links
 
