@@ -69,6 +69,8 @@ function useInstalledGameDetails({
   const [executableExists, setExecutableExists] = useState(true);
   const canLaunchGame = executableExists;
   const [showExecutableManager, setShowExecutableManager] = useState(false);
+  const [showLaunchOptions, setShowLaunchOptions] = useState(false);
+  const [launchCommand, setLaunchCommand] = useState("");
   const [showExecutableSelect, setShowExecutableSelect] = useState(false);
   const [availableExecutables, setAvailableExecutables] = useState([]);
   const [pendingLaunchOptions, setPendingLaunchOptions] = useState(null);
@@ -708,7 +710,7 @@ function useInstalledGameDetails({
       return;
     }
     const index = menuIndex - stopMenuOffset;
-    const lastIndex = folders.length + 3;
+    const lastIndex = folders.length + 4;
     if (isRunning && (index === 1 || index === lastIndex)) {
       toast.error(t("library.unavailableWhileRunning"));
       return;
@@ -721,6 +723,14 @@ function useInstalledGameDetails({
     } else if (index === 1) {
       setShowExecutableManager(true);
     } else if (index === 2) {
+      window.electron
+        .getLaunchCommands(gameName, game.isCustom)
+        .then(commands => {
+          setLaunchCommand(commands || "");
+          setShowLaunchOptions(true);
+        })
+        .catch(() => toast.error(t("common.error")));
+    } else if (index === 3) {
       const favorites = readStoredList("game-favorites");
       const isSaved = favorites.includes(gameName);
       localStorage.setItem(
@@ -732,8 +742,8 @@ function useInstalledGameDetails({
       setIsFavorite(!isSaved);
       window.dispatchEvent(new CustomEvent("favorites-updated"));
       return;
-    } else if (index < folders.length + 3) {
-      const folder = folders[index - 3];
+    } else if (index < folders.length + 4) {
+      const folder = folders[index - 4];
       const contains = folder.items?.some(item => (item.game || item.name) === gameName);
       setFolders(
         contains
@@ -749,6 +759,17 @@ function useInstalledGameDetails({
     }
     setShowManagementMenu(false);
     setDialogButtonIndex(0);
+  };
+
+  const saveLaunchOptions = async () => {
+    const success = await window.electron.saveLaunchCommands(
+      gameName,
+      launchCommand.trim(),
+      game.isCustom
+    );
+    if (success) toast.success(t("gameScreen.launchOptionsSaved"));
+    else toast.error(t("common.error"));
+    setShowLaunchOptions(false);
   };
 
   const handleInput = useCallback(
@@ -923,11 +944,11 @@ function useInstalledGameDetails({
       // Management menu navigation
       if (showManagementMenu) {
         if (action === "DOWN") {
-          // [Stop game], Shortcut, Executable, Favorite, Folders, Delete
-          const menuItemCount = folders.length + 4 + stopMenuOffset;
+          // [Stop game], Shortcut, Executable, Launch options, Favorite, Folders, Delete
+          const menuItemCount = folders.length + 5 + stopMenuOffset;
           setSelectedMenuItem(prev => (prev + 1) % menuItemCount);
         } else if (action === "UP") {
-          const menuItemCount = folders.length + 4 + stopMenuOffset;
+          const menuItemCount = folders.length + 5 + stopMenuOffset;
           setSelectedMenuItem(prev => (prev - 1 + menuItemCount) % menuItemCount);
         } else if (action === "CONFIRM") {
           // Execute selected menu item
@@ -1108,7 +1129,8 @@ function useInstalledGameDetails({
       // Block keyboard input behind the launch overlay. A running game no
       // longer blocks input: the window only gets keys when it has focus, and
       // the game must stay manageable (and its menus closable) from here.
-      if (isLaunching) return;
+      // The launch options keyboard handles its own keys.
+      if (isLaunching || showLaunchOptions) return;
       const map = {
         ArrowDown: "DOWN",
         ArrowUp: "UP",
@@ -1130,7 +1152,7 @@ function useInstalledGameDetails({
     };
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [handleInput, isLaunching]);
+  }, [handleInput, isLaunching, showLaunchOptions]);
 
   // Gamepad Polling
   useControllerInput(
@@ -1145,7 +1167,12 @@ function useInstalledGameDetails({
     },
     {
       priority: 5,
-      blocked: !canInput || isLaunching || showExecutableManager || showDirectoryBrowser,
+      blocked:
+        !canInput ||
+        isLaunching ||
+        showExecutableManager ||
+        showLaunchOptions ||
+        showDirectoryBrowser,
     }
   );
 
@@ -1225,6 +1252,11 @@ function useInstalledGameDetails({
     isFavorite,
     handleManagementAction,
     setShowExecutableManager,
+    showLaunchOptions,
+    setShowLaunchOptions,
+    launchCommand,
+    setLaunchCommand,
+    saveLaunchOptions,
     executableExists,
     handleDeleteGame,
     setIsDeleteDialogOpen,

@@ -29,6 +29,7 @@ import {
   Cloud,
   CloudUpload,
   X,
+  Terminal,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Switch } from "@/components/ui/switch";
@@ -47,6 +48,7 @@ import { AnimatePresence } from "framer-motion";
 import LaunchOverlay from "@/components/LaunchOverlay";
 import { useInstalledGameDetails } from "./useInstalledGameDetails";
 import { ExecutableManagerDialog } from "./ExecutableManagerDialog";
+import { VirtualKeyboard } from "./VirtualKeyboard";
 import { DetailBackButton } from "./DetailBackButton";
 import { formatSessionTime } from "@/hooks/useGameSession";
 
@@ -55,6 +57,7 @@ function InstalledGameDetailsView({
   onBack,
   t,
   controllerType,
+  keyboardLayout,
   onChangeAssets,
   assetSearchOpen,
   autoLaunch,
@@ -100,6 +103,11 @@ function InstalledGameDetailsView({
     isFavorite,
     handleManagementAction,
     setShowExecutableManager,
+    showLaunchOptions,
+    setShowLaunchOptions,
+    launchCommand,
+    setLaunchCommand,
+    saveLaunchOptions,
     executableExists,
     handleDeleteGame,
     setIsDeleteDialogOpen,
@@ -639,6 +647,20 @@ function InstalledGameDetailsView({
                     : "bg-muted hover:bg-muted/80"
                 }`}
               >
+                <Terminal className="h-6 w-6" />
+                <span className="text-lg font-semibold">
+                  {t("gameScreen.launchOptions")}
+                </span>
+              </button>
+              <button
+                onClick={() => handleManagementAction(3 + stopMenuOffset)}
+                data-menu-selected={selectedMenuItem === 3 + stopMenuOffset}
+                className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
+                  selectedMenuItem === 3 + stopMenuOffset
+                    ? "bg-primary text-secondary shadow-lg"
+                    : "bg-muted hover:bg-muted/80"
+                }`}
+              >
                 <Heart className="h-6 w-6" fill={isFavorite ? "currentColor" : "none"} />
                 <span className="text-lg font-semibold">
                   {isFavorite ? "Remove favorite" : "Add favorite"}
@@ -651,10 +673,10 @@ function InstalledGameDetailsView({
                 return (
                   <button
                     key={folder.game}
-                    onClick={() => handleManagementAction(index + 3 + stopMenuOffset)}
-                    data-menu-selected={selectedMenuItem === index + 3 + stopMenuOffset}
+                    onClick={() => handleManagementAction(index + 4 + stopMenuOffset)}
+                    data-menu-selected={selectedMenuItem === index + 4 + stopMenuOffset}
                     className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                      selectedMenuItem === index + 3 + stopMenuOffset
+                      selectedMenuItem === index + 4 + stopMenuOffset
                         ? "bg-primary text-secondary shadow-lg"
                         : "bg-muted hover:bg-muted/80"
                     }`}
@@ -668,13 +690,13 @@ function InstalledGameDetailsView({
               })}
               <button
                 onClick={() =>
-                  handleManagementAction(folders.length + 3 + stopMenuOffset)
+                  handleManagementAction(folders.length + 4 + stopMenuOffset)
                 }
                 data-menu-selected={
-                  selectedMenuItem === folders.length + 3 + stopMenuOffset
+                  selectedMenuItem === folders.length + 4 + stopMenuOffset
                 }
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${isRunning ? "opacity-50" : ""} ${
-                  selectedMenuItem === folders.length + 3 + stopMenuOffset
+                  selectedMenuItem === folders.length + 4 + stopMenuOffset
                     ? "bg-red-500 text-white shadow-lg"
                     : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                 }`}
@@ -1305,6 +1327,21 @@ function InstalledGameDetailsView({
           </div>
         </AlertDialogContent>
       </AlertDialog>
+
+      {showLaunchOptions && (
+        <VirtualKeyboard
+          value={launchCommand}
+          onChange={setLaunchCommand}
+          onClose={() => setShowLaunchOptions(false)}
+          onConfirm={saveLaunchOptions}
+          suggestions={[]}
+          layout={keyboardLayout}
+          placeholder={t("gameScreen.launchCommandPlaceholder")}
+          symbols
+          t={t}
+          controllerType={controllerType}
+        />
+      )}
 
       {/* Executable Manager Dialog */}
       <ExecutableManagerDialog

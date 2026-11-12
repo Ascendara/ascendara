@@ -500,6 +500,7 @@ function BigPicture() {
               onBack={handleCloseInstalledGameDetails}
               t={t}
               controllerType={settings.controllerType || "xbox"}
+              keyboardLayout={keyboardLayout}
               onChangeAssets={() => {
                 setAssetSearchGame(
                   selectedInstalledGame.game || selectedInstalledGame.name

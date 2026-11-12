@@ -4,6 +4,9 @@ import { getControllerButtons } from "./controller";
 import { KEYBOARD_LAYOUTS } from "./keyboardLayouts";
 import { useControllerInput } from "./useControllerInput";
 
+// Characters needed for launch arguments such as -dx11 or "%command%"
+const SYMBOL_ROW = ["-", "_", "=", ".", "/", "\\", ":", "%", '"', "+"].map(k => ({ k }));
+
 // Virtual keyboard
 const VirtualKeyboard = ({
   value,
@@ -15,6 +18,8 @@ const VirtualKeyboard = ({
   layout = "qwerty",
   t,
   controllerType,
+  symbols = false,
+  placeholder,
 }) => {
   const [selectedRow, setSelectedRow] = useState(0);
   const [selectedCol, setSelectedCol] = useState(0);
@@ -22,7 +27,8 @@ const VirtualKeyboard = ({
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const buttons = getControllerButtons(controllerType);
 
-  const gridLayout = KEYBOARD_LAYOUTS[layout] || KEYBOARD_LAYOUTS.qwerty;
+  const baseLayout = KEYBOARD_LAYOUTS[layout] || KEYBOARD_LAYOUTS.qwerty;
+  const gridLayout = symbols ? [...baseLayout, SYMBOL_ROW] : baseLayout;
 
 
 
@@ -115,14 +121,14 @@ const VirtualKeyboard = ({
       };
 
       if (keyMap[e.key]) handleInput(keyMap[e.key]);
-      else if (e.key.length === 1 && /[a-zA-Z0-9 ]/.test(e.key)) {
+      else if (e.key.length === 1 && (symbols || /[a-zA-Z0-9 ]/.test(e.key))) {
         onChange(value + e.key);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleInput, onChange, value]);
+  }, [handleInput, onChange, value, symbols]);
 
   // Gamepad Polling for Virtual Keyboard
   useControllerInput(action => handleInput(
@@ -145,7 +151,7 @@ const VirtualKeyboard = ({
           <span className="flex-1 truncate text-2xl font-medium text-primary">
             {value || (
               <span className="text-muted-foreground">
-                {t("bigPicture.searchPlaceholder")}
+                {placeholder ?? t("bigPicture.searchPlaceholder")}
               </span>
             )}
             <span className="ml-1 animate-pulse text-primary">|</span>
