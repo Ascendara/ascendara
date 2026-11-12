@@ -120,6 +120,7 @@ import {
   deleteCloudGame,
 } from "@/services/firebase/firebaseService";
 import { syncFavoritesNow } from "@/services/cloud/favoritesCloudSync";
+import { restoreGameAchievementsFromCloud } from "@/services/cloud/achievementsCloudSync";
 import { calculateLibraryValue } from "@/services/integrations/cheapsharkService";
 import { getDownloadQueue } from "@/services/downloads/downloadQueueService";
 import { normalizeDriveTotals } from "@/services/app/systemHealthService";
@@ -1274,19 +1275,14 @@ const Library = () => {
             // Also restore achievements from cloud if available
             if (user) {
               try {
+                // The achievements file may not exist until the watcher picks
+                // the game up; achievementsCloudSync merges it in then
                 const achievementsResult = await getGameAchievements(gameName);
-                // Check if we have achievement data (could be in .achievements or directly in .data)
-                if (achievementsResult.data) {
-                  console.log(
-                    "Restoring achievements for:",
-                    gameName,
-                    achievementsResult.data
-                  );
-                  await window.electron.writeGameAchievements(
-                    gameName,
-                    achievementsResult.data
-                  );
-                }
+                await restoreGameAchievementsFromCloud(
+                  gameName,
+                  false,
+                  achievementsResult.data
+                );
               } catch (achError) {
                 console.error("Error restoring achievements:", achError);
               }

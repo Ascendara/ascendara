@@ -643,7 +643,7 @@ const Downloads = () => {
   const completedGamesRef = React.useRef(new Set());
   const fadingGamesRef = React.useRef(new Set());
   const resumingDownloadsRef = React.useRef(new Set());
-  const prevActiveCountRef = React.useRef(0);
+  const prevBusyCountRef = React.useRef(0);
   const settingsRef = React.useRef(settings);
   useEffect(() => {
     downloadingGamesRef.current = downloadingGames;
@@ -941,22 +941,36 @@ const Downloads = () => {
         if (activeCount === 0) {
           setPeakSpeed(0);
           localStorage.setItem("peakSpeed", "0");
-
-          // Process next queued download when transitioning from active to no active downloads
-          // This handles stopped downloads and other cases where games don't go through "completed" state
-          if (prevActiveCountRef.current > 0 && !freedByPause(prevGames, downloading)) {
-            processNextInQueue().then(nextItem => {
-              if (nextItem) {
-                toast.success(
-                  t("downloads.queuedDownloadStarted", {
-                    name: nextItem.gameName,
-                  })
-                );
-              }
-            });
-          }
         }
-        prevActiveCountRef.current = activeCount;
+
+        // The queue waits until no download is downloading, unpacking or
+        // verifying. It starts the next one when the last busy one finishes,
+        // fails or is cancelled (not paused), and whenever the list is empty, so
+        // a queue left behind by a finish this page missed still starts.
+        const busyCount = downloading.filter(
+          ({ downloadingData }) =>
+            (downloadingData.downloading ||
+              downloadingData.extracting ||
+              downloadingData.updating ||
+              downloadingData.verifying) &&
+            !isDownloadHalted(downloadingData)
+        ).length;
+        const slotFreed =
+          prevBusyCountRef.current > 0 &&
+          busyCount === 0 &&
+          !freedByPause(prevGames, downloading);
+        if ((slotFreed || downloading.length === 0) && getDownloadQueue().length > 0) {
+          processNextInQueue().then(nextItem => {
+            if (nextItem) {
+              toast.success(
+                t("downloads.queuedDownloadStarted", {
+                  name: nextItem.gameName,
+                })
+              );
+            }
+          });
+        }
+        prevBusyCountRef.current = busyCount;
 
         targetSpeedRef.current = totalSpeedNum;
       } catch (error) {

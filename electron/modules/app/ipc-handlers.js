@@ -1757,79 +1757,122 @@ function registerMiscHandlers() {
     }
   });
 
-  // Write game achievements (for cloud restore)
-  // isCustom parameter tells us if this is a custom game (stored in games.json)
-  ipcMain.handle(
-    "write-game-achievements",
-    async (_, gameName, achievements, isCustom = false) => {
-      const settings = settingsManager.getSettings();
+  // Where a game's achievement display lives: its own file, or the
+  // achievementWatcher key of its entry in games.json for custom games
+  const locateAchievementDisplay = (game, isCustom) => {
+    const settings = settingsManager.getSettings();
+    if (!settings.downloadDirectory || typeof game !== "string") return null;
+
+    if (!isCustom) {
+      for (const directory of [
+        settings.downloadDirectory,
+        ...(settings.additionalDirectories || []),
+      ]) {
+        const file = path.join(directory, game, "achievements.ascendara.json");
+        if (fs.existsSync(file)) return { file };
+      }
+      return null;
+    }
+
+    try {
+      const gamesFile = path.join(settings.downloadDirectory, "games.json");
+      const gameInfo = JSON.parse(fs.readFileSync(gamesFile, "utf8")).games?.find(
+        g => g.game === game
+      );
+      if (gameInfo?.achievementWatcher) return { file: gamesFile, custom: true };
+      if (gameInfo?.executable) {
+        const file = path.join(
+          path.dirname(gameInfo.executable),
+          "achievements.ascendara.json"
+        );
+        if (fs.existsSync(file)) return { file };
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  // Last-modified time of each game's achievement display, so the renderer
+  // can tell which games' achievements changed without reading every file
+  ipcMain.handle("get-achievement-stamps", async (_, games = []) => {
+    const stamps = {};
+    for (const game of Array.isArray(games) ? games : []) {
+      const location = locateAchievementDisplay(game?.name, !!game?.isCustom);
+      if (!location) continue;
       try {
-        if (!settings.downloadDirectory) {
-          return { success: false, error: "Download directory not set" };
+        stamps[game.name] = (await fs.promises.stat(location.file)).mtimeMs;
+      } catch (_) {}
+    }
+    return stamps;
+  });
+
+  // Same per-appid unlock database the achievement watcher keeps (track.js)
+  const achievementCacheDir = path.join(
+    process.env.APPDATA || path.join(os.homedir(), ".config"),
+    "Achievement Watcher/steam_cache/data"
+  );
+
+  // Merge unlocks from another device into a game's achievements. The watcher
+  // rebuilds the display from its unlock database, so unlocks go there too or
+  // its next write would drop them. Only ever unlocks, never locks.
+  // unlocks: [{ achID, unlockTime }]
+  ipcMain.handle(
+    "merge-game-achievements",
+    async (_, gameName, isCustom = false, unlocks = []) => {
+      try {
+        const location = locateAchievementDisplay(gameName, isCustom);
+        if (!location) return { success: false, error: "No achievement data yet" };
+
+        const document = JSON.parse(await fs.promises.readFile(location.file, "utf8"));
+        const display = location.custom
+          ? document.games?.find(g => g.game === gameName)?.achievementWatcher
+          : document;
+        if (!display?.appid || !Array.isArray(display.achievements)) {
+          return { success: false, error: "Achievements not linked to a Steam app yet" };
         }
 
-        // First, check if this is a custom game in games.json
-        const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
-        if (fs.existsSync(gamesFilePath)) {
-          const gamesData = JSON.parse(await fs.promises.readFile(gamesFilePath, "utf8"));
+        const byId = new Map(
+          display.achievements.filter(a => a?.achID).map(a => [a.achID, a])
+        );
+        const newlyUnlocked = (Array.isArray(unlocks) ? unlocks : []).filter(
+          u => byId.has(u?.achID) && !byId.get(u.achID).achieved
+        );
+        if (newlyUnlocked.length === 0) return { success: true, merged: 0 };
 
-          // Find the game by name (case-insensitive)
-          const gameIndex = gamesData.games?.findIndex(
-            g => g.game?.toLowerCase() === gameName.toLowerCase()
-          );
+        const cacheFile = path.join(achievementCacheDir, `${display.appid}.db`);
+        let cache = [];
+        try {
+          cache = JSON.parse(await fs.promises.readFile(cacheFile, "utf8"));
+        } catch (_) {}
+        if (!Array.isArray(cache)) cache = [];
 
-          if (gameIndex !== -1) {
-            // This is a custom game - store achievements in games.json
-            gamesData.games[gameIndex].achievementWatcher = achievements;
-            await fs.promises.writeFile(
-              gamesFilePath,
-              JSON.stringify(gamesData, null, 4),
-              "utf8"
-            );
-            console.log(`Wrote achievements for ${gameName} to games.json (custom game)`);
-            return { success: true };
-          }
+        for (const unlock of newlyUnlocked) {
+          const unlockTime = Number(unlock.unlockTime) || Math.floor(Date.now() / 1000);
+          const previous = cache.find(a => a.name === unlock.achID);
+          const entry = {
+            name: unlock.achID,
+            Notified: true,
+            Achieved: true,
+            UnlockTime: unlockTime,
+          };
+          if (!previous) cache.push(entry);
+          else if (!previous.Achieved) Object.assign(previous, entry);
+          Object.assign(byId.get(unlock.achID), {
+            achieved: true,
+            unlockTime: String(unlockTime),
+          });
         }
 
-        // Not a custom game - find the game directory
-        const { sanitizeText } = require("../core/utils");
-        const sanitizedGame = sanitizeText(gameName);
-        const allDirectories = [
-          settings.downloadDirectory,
-          ...(settings.additionalDirectories || []),
-        ];
-
-        // Find the game directory (try both sanitized and original name)
-        for (const directory of allDirectories) {
-          // Try sanitized name first
-          let gameDir = path.join(directory, sanitizedGame);
-          if (fs.existsSync(gameDir)) {
-            const achievementsPath = path.join(gameDir, "achievements.ascendara.json");
-            await fs.promises.writeFile(
-              achievementsPath,
-              JSON.stringify(achievements, null, 4),
-              "utf8"
-            );
-            console.log(`Wrote achievements for ${gameName} to ${achievementsPath}`);
-            return { success: true };
-          }
-          // Try original name
-          gameDir = path.join(directory, gameName);
-          if (fs.existsSync(gameDir)) {
-            const achievementsPath = path.join(gameDir, "achievements.ascendara.json");
-            await fs.promises.writeFile(
-              achievementsPath,
-              JSON.stringify(achievements, null, 4),
-              "utf8"
-            );
-            console.log(`Wrote achievements for ${gameName} to ${achievementsPath}`);
-            return { success: true };
-          }
-        }
-
-        return { success: false, error: "Game not found" };
+        await fs.promises.mkdir(achievementCacheDir, { recursive: true });
+        await fs.promises.writeFile(cacheFile, JSON.stringify(cache), "utf8");
+        display.lastUpdated = new Date().toISOString();
+        await fs.promises.writeFile(
+          location.file,
+          JSON.stringify(document, null, 2),
+          "utf8"
+        );
+        return { success: true, merged: newlyUnlocked.length };
       } catch (error) {
-        console.error("Error writing game achievements:", error);
+        console.error("Error merging game achievements:", error);
         return { success: false, error: error.message };
       }
     }

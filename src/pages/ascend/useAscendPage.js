@@ -60,6 +60,7 @@ import {
   saveAscendUiState,
 } from "@/services/firebase/firebaseService";
 import { syncFavoritesNow } from "@/services/cloud/favoritesCloudSync";
+import { restoreGameAchievementsFromCloud } from "@/services/cloud/achievementsCloudSync";
 import { takePrefetched } from "@/services/ascend/ascendPrefetch";
 import { API_URL } from "@/config/api";
 import { whenAscendCelebrationDone } from "@/services/ascend/ascendCelebration";
@@ -1355,8 +1356,13 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         // Also restore full achievement data for this game if available in cloud
         try {
           const achResult = await getGameAchievements(match.name);
-          if (achResult?.data && window.electron?.writeGameAchievements) {
-            await window.electron.writeGameAchievements(match.name, achResult.data);
+          if (
+            await restoreGameAchievementsFromCloud(
+              match.name,
+              match.isCustom,
+              achResult?.data
+            )
+          ) {
             achievementsRestored += 1;
           }
         } catch (e) {

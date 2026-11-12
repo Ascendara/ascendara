@@ -64,6 +64,10 @@ import {
   stopFavoritesSync,
 } from "@/services/cloud/favoritesCloudSync";
 import {
+  initializeAchievementsSync,
+  stopAchievementsSync,
+} from "@/services/cloud/achievementsCloudSync";
+import {
   initializeWishlistWatch,
   stopWishlistWatch,
   WISHLIST_MATCHES_EVENT,
@@ -1096,16 +1100,19 @@ const DownloadSyncInitializer = () => {
           );
           initializeDownloadSync(user, hasAccess);
           initializeFavoritesSync(user, hasAccess);
+          initializeAchievementsSync(user, hasAccess);
           initializeWishlistWatch(user, hasAccess);
         } catch (error) {
           console.error("[App] Error checking Ascend access:", error);
           stopDownloadSync();
           stopFavoritesSync();
+          stopAchievementsSync();
           stopWishlistWatch();
         }
       } else {
         stopDownloadSync();
         stopFavoritesSync();
+        stopAchievementsSync();
         stopWishlistWatch();
       }
     };
@@ -1116,6 +1123,7 @@ const DownloadSyncInitializer = () => {
       stopDesktopLibrarySync();
       stopDownloadSync();
       stopFavoritesSync();
+      stopAchievementsSync();
       stopWishlistWatch();
     };
   }, [isAuthenticated, user]);
