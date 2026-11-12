@@ -427,8 +427,9 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("read-game-achievements", game, isCustom),
   getAchievementsLeaderboard: (games, options) =>
     ipcRenderer.invoke("get-achievements-leaderboard", games, options),
-  writeGameAchievements: (gameName, achievements) =>
-    ipcRenderer.invoke("write-game-achievements", gameName, achievements),
+  getAchievementStamps: games => ipcRenderer.invoke("get-achievement-stamps", games),
+  mergeGameAchievements: (gameName, isCustom, unlocks) =>
+    ipcRenderer.invoke("merge-game-achievements", gameName, isCustom, unlocks),
   restoreCloudGameData: (gameName, cloudData) =>
     ipcRenderer.invoke("restore-cloud-game-data", gameName, cloudData),
 

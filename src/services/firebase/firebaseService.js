@@ -1406,7 +1406,7 @@ export const recomputeProfileStats = async (joinDate = null) => {
  * @param {string} gameName - Name of the game
  * @param {boolean} isCustom - Whether it's a custom game
  * @param {object} achievementData - Full achievement data object
- * @returns {Promise<{success: boolean, error: string|null}>}
+ * @returns {Promise<{success: boolean, error: string|null, data?: object}>}
  */
 export const syncGameAchievements = async (gameName, isCustom, achievementData) => {
   try {
@@ -1422,23 +1422,38 @@ export const syncGameAchievements = async (gameName, isCustom, achievementData) 
     // Store achievements in a subcollection for the game
     const gameAchievementsRef = doc(db, "users", user.uid, "gameAchievements", gameName);
 
-    await setDoc(gameAchievementsRef, {
-      gameName: gameName,
-      isCustom: isCustom || false,
-      achievements: achievementData.achievements.map(ach => ({
+    // Keep unlocks another device already uploaded, so a device that hasn't
+    // pulled them yet can't lock them again
+    const existing = await getDoc(gameAchievementsRef);
+    const cloudUnlocks = new Map();
+    for (const ach of existing.exists() ? existing.data().achievements || [] : []) {
+      if (ach.achieved) cloudUnlocks.set(ach.achID || ach.name, ach.unlockTime || null);
+    }
+
+    const achievements = achievementData.achievements.map(ach => {
+      const name = ach.message || ach.name || "Unknown";
+      const key = ach.achID || name;
+      return {
         achID: ach.achID || null,
-        name: ach.message || ach.name || "Unknown",
+        name,
         description: ach.description || "",
         icon: ach.icon || null,
-        achieved: ach.achieved || false,
-        unlockTime: ach.unlockTime || null,
-      })),
-      totalAchievements: achievementData.achievements.length,
-      unlockedAchievements: achievementData.achievements.filter(a => a.achieved).length,
-      lastSynced: new Date().toISOString(),
+        achieved: !!ach.achieved || cloudUnlocks.has(key),
+        unlockTime: ach.achieved ? ach.unlockTime || null : cloudUnlocks.get(key) || null,
+      };
     });
+    const data = {
+      gameName: gameName,
+      isCustom: isCustom || false,
+      achievements,
+      totalAchievements: achievements.length,
+      unlockedAchievements: achievements.filter(a => a.achieved).length,
+      lastSynced: new Date().toISOString(),
+    };
 
-    return { success: true, error: null };
+    await setDoc(gameAchievementsRef, data);
+
+    return { success: true, error: null, data };
   } catch (error) {
     console.error("Sync game achievements error:", error);
     return { success: false, error: error.message };
