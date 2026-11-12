@@ -22,6 +22,7 @@ import { PreferencesSurface } from "./big-picture/PreferencesSurface";
 import "./big-picture/big-picture.css";
 import "./big-picture/design-system.css";
 import "./big-picture/motion.css";
+import "./big-picture/console.css";
 import { StoreSearchBar } from "./big-picture/StoreSearchBar";
 import { StoreGameCard } from "./big-picture/StoreGameCard";
 import { FloatingContextMenu } from "./big-picture/FloatingContextMenu";

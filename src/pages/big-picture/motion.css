@@ -114,7 +114,7 @@
     outline-color 0.18s ease,
     outline-offset 0.24s var(--bp-ease);
 }
-.bp-stage .bp-surface .bp-cover img {
+.bp-stage .bp-surface .bp-cover img:not(.bp-crossfade) {
   transition: transform 0.45s var(--bp-ease);
 }
 

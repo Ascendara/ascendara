@@ -3,7 +3,8 @@ import { Menu, Library, Power } from "lucide-react";
 import { BigPictureShell } from "./BigPictureShell";
 import { SurfaceButton, SurfaceGame, useSurface } from "./Surface";
 import { gameEntries, gameName, libraryGames } from "./surfaceNavigation";
-import { useHomeArtwork } from "./useHomeArtwork";
+import { useHomeArtworkState } from "./useHomeArtwork";
+import { CrossfadeImage } from "./CrossfadeImage";
 import { loadFolders } from "@/lib/folderManager";
 import recentGamesService from "@/services/library/recentGamesService";
 import { scrollSurfaceFocus } from "./controllerNavigation";
@@ -32,7 +33,11 @@ export function ClassicHome({
   const entries = gameEntries([...new Set([...recent, ...visible])]);
   const [selectedKey, setSelectedKey] = useState(null);
   const selected = entries.find(entry => entry.key === selectedKey) || entries[0];
-  const artwork = useHomeArtwork(selected?.game);
+  const { name: artworkName, image: artwork } = useHomeArtworkState(selected?.game);
+  // Only hand the expanded tile art that belongs to its game, never the art
+  // of the game it was just moved away from.
+  const tileArtwork =
+    selected && artworkName === gameName(selected.game) ? artwork : null;
   const { root, focus, current } = useSurface(
     navigation,
     [
@@ -63,12 +68,9 @@ export function ClassicHome({
       className="bp-classic"
       focus={focus}
     >
-      <div
-        key={artwork || "none"}
-        className="bp-classic-art"
-        style={artwork ? { backgroundImage: `url("${artwork}")` } : undefined}
-        aria-hidden="true"
-      />
+      <div className="bp-classic-art" aria-hidden="true">
+        <CrossfadeImage src={artwork} />
+      </div>
       <section className="bp-classic-content" aria-label="Your games">
         <div className="bp-classic-heading">
           <span>HOME</span>
@@ -92,7 +94,7 @@ export function ClassicHome({
                   <SurfaceGame
                     game={game}
                     artworkOnly
-                    landscapeArtwork={selected?.key === key ? artwork : null}
+                    landscapeArtwork={selected?.key === key ? tileArtwork : null}
                     focus={{
                       ...props,
                       onFocus: () => {

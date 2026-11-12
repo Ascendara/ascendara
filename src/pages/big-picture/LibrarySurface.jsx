@@ -1,16 +1,41 @@
-import { Search, RefreshCw, ChevronDown, Folder, Eye, Heart } from "lucide-react";
+import {
+  Search,
+  RefreshCw,
+  ChevronDown,
+  Folder,
+  Eye,
+  Heart,
+  Clock,
+  CalendarDays,
+} from "lucide-react";
 import { useGridColumns } from "./useGridColumns";
 import {
   BigPictureShell,
   BigPictureToolbar,
   BigPictureEmptyState,
+  BigPictureHero,
+  BigPictureSpotlight,
+  BigPicturePager,
 } from "./BigPictureShell";
 import { useEffect, useMemo, useState } from "react";
 import { loadFolders } from "@/lib/folderManager";
 import recentGamesService from "@/services/library/recentGamesService";
 import { SurfaceButton, SurfaceGame, useSurface } from "./Surface";
 import { VirtualKeyboard } from "./VirtualKeyboard";
-import { gameName, gameEntries, libraryGames, readStoredList } from "./surfaceNavigation";
+import {
+  gameName,
+  gameEntries,
+  libraryGames,
+  readStoredList,
+  formatPlaytime,
+  formatShortDate,
+} from "./surfaceNavigation";
+import { useHomeArtwork } from "./useHomeArtwork";
+
+// Portrait box art needs more columns than the landscape grids elsewhere.
+const libraryColumns = width =>
+  width < 1000 ? 4 : width < 1500 ? 6 : width < 2200 ? 7 : 8;
+const ROWS_PER_PAGE = 4;
 
 export function LibrarySurface({
   navigation,
@@ -25,7 +50,8 @@ export function LibrarySurface({
   controllerType,
   keyboardLayout,
 }) {
-  const columns = useGridColumns();
+  const columns = useGridColumns(libraryColumns);
+  const pageSize = columns * ROWS_PER_PAGE;
   const [query, setQuery] = useState("");
   const [keyboard, setKeyboard] = useState(false);
   const [filter, setFilter] = useState("all");
@@ -67,10 +93,10 @@ export function LibrarySurface({
       ),
     [games, recent, query, sort, selectedFolder, filter, favorites, hidden, folders]
   );
-  const pageCount = Math.max(1, Math.ceil(filtered.length / 24));
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pageCount - 1);
   const entries = useMemo(() => gameEntries(filtered), [filtered]);
-  const displayed = entries.slice(currentPage * 24, (currentPage + 1) * 24);
+  const displayed = entries.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
   const visibleFolders = folders.filter(item => hidden || !item.hidden);
   const toolbar = [
     "search",
@@ -86,10 +112,21 @@ export function LibrarySurface({
     ...Array.from({ length: Math.ceil(displayed.length / columns) }, (_, i) =>
       displayed.slice(i * columns, i * columns + columns).map(({ key }) => `game-${key}`)
     ),
-    ["previous", "next"],
+    ...(pageCount > 1 ? [["previous", "next"]] : []),
   ];
   const back = () => (folder ? setFolder(null) : onBack());
-  const { root, focus } = useSurface(navigation, rows, back, active && !keyboard);
+  const { root, focus, current } = useSurface(navigation, rows, back, active && !keyboard);
+  // The spotlight follows the focused game and stays on it while the toolbar is focused.
+  const focusedKey = displayed.find(({ key }) => `game-${key}` === current)?.key;
+  const [spotlightKey, setSpotlightKey] = useState(null);
+  useEffect(() => {
+    if (focusedKey) setSpotlightKey(focusedKey);
+  }, [focusedKey]);
+  const spotlight =
+    displayed.find(({ key }) => key === spotlightKey)?.game || displayed[0]?.game;
+  const artwork = useHomeArtwork(spotlight);
+  const spotlightPlaytime = spotlight && formatPlaytime(spotlight.playTime);
+  const spotlightDate = spotlight && formatShortDate(spotlight.lastPlayed);
   // The existing virtual keyboard owns input while visible.
   if (keyboard) navigation.current = () => {};
   const reset = setter => value => {
@@ -98,6 +135,27 @@ export function LibrarySurface({
   };
   return (
     <BigPictureShell ref={root} className="bp-library" title="Library" focus={focus}>
+      <BigPictureHero
+        backdrop={artwork}
+        eyebrow="Library"
+        title={folder?.game || (filter === "favorites" ? "Favorites" : "All your games")}
+        meta={`${filtered.length} ${filtered.length === 1 ? "game" : "games"}${
+          sort !== "name"
+            ? ` · ${sort === "recent" ? "Recently played" : "Most played"} first`
+            : ""
+        }`}
+        aside={
+          spotlight && (
+            <BigPictureSpotlight
+              title={gameName(spotlight)}
+              chips={[
+                { icon: Clock, label: spotlightPlaytime || "Not played yet" },
+                spotlightDate && { icon: CalendarDays, label: `Last played ${spotlightDate}` },
+              ]}
+            />
+          )
+        }
+      />
       <BigPictureToolbar label="Library filters">
         <SurfaceButton
           className="bp-search-button"
@@ -155,7 +213,7 @@ export function LibrarySurface({
           {`Review unresolved duplicates (${pendingCount})`}
         </SurfaceButton>
       )}
-      <p className="bp-section-label">Folders</p>
+      {visibleFolders.length > 0 && <p className="bp-section-label">Folders</p>}
       <div className="bp-chip-row">
         <SurfaceButton
           {...focus("root")}
@@ -178,16 +236,13 @@ export function LibrarySurface({
           </SurfaceButton>
         ))}
       </div>
-      <h2>
-        {folder?.game || "Your games"} · {filtered.length}
-      </h2>
       {!displayed.length && (
         <BigPictureEmptyState title="No games match">
           <p>Change your filters, search again, or refresh your library.</p>
         </BigPictureEmptyState>
       )}
       <div
-        className="bp-grid"
+        className="bp-grid bp-library-grid"
         style={{
           gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
         }}
@@ -201,30 +256,18 @@ export function LibrarySurface({
             subtitle={
               game._hasMultipleInstalls
                 ? `${game.isCustom ? "Custom / imported" : "Installed"} · ${game.executable || game._sourceDir || "Unknown location"}`
-                : game.playTime
-                  ? `${(Number(game.playTime) / 3600).toFixed(1)}h played`
-                  : "Installed"
+                : formatPlaytime(game.playTime) || "Ready to play"
             }
           />
         ))}
       </div>
-      <div className="bp-pagination">
-        <SurfaceButton
-          {...focus("previous")}
-          onClick={() => setPage(Math.max(0, currentPage - 1))}
-        >
-          Previous page
-        </SurfaceButton>
-        <span className="self-center">
-          {currentPage + 1} / {pageCount}
-        </span>
-        <SurfaceButton
-          {...focus("next")}
-          onClick={() => setPage(Math.min(pageCount - 1, currentPage + 1))}
-        >
-          Next page
-        </SurfaceButton>
-      </div>
+      <BigPicturePager
+        page={currentPage}
+        count={pageCount}
+        setPage={setPage}
+        focus={focus}
+        label="Library pages"
+      />
       {keyboard && (
         <VirtualKeyboard
           value={query}

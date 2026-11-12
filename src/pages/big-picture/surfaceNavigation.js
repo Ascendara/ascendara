@@ -58,3 +58,15 @@ export function libraryGames(games, { query = "", favorites, folder, sort = "nam
       ? (Date.parse(b.lastPlayed) || 0) - (Date.parse(a.lastPlayed) || 0) || gameName(a).localeCompare(gameName(b))
       : gameName(a).localeCompare(gameName(b)));
 }
+
+export const formatPlaytime = seconds => {
+  const value = Number(seconds) || 0;
+  if (value >= 3600) return `${(value / 3600).toFixed(1).replace(/\.0$/, "")}h played`;
+  if (value >= 60) return `${Math.floor(value / 60)}m played`;
+  return null;
+};
+
+export const formatShortDate = value =>
+  value && !Number.isNaN(Date.parse(value))
+    ? new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+    : null;

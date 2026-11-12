@@ -1,0 +1,413 @@
+/* Console polish shared by every Big Picture page: ambient light behind the
+   page, frosted panels, a glowing focus ring and the download/queue cards.
+   Loaded after design-system.css and motion.css so it can refine them. */
+
+.bp-surface.bp-page {
+  background:
+    radial-gradient(1100px 620px at 88% -12%, rgb(var(--color-primary) / 0.1), transparent 62%),
+    radial-gradient(900px 520px at -8% 108%, rgb(var(--color-primary) / 0.06), transparent 60%),
+    rgb(var(--color-background));
+  background-attachment: fixed;
+}
+
+/* Focus: a soft glow around the ring reads from across the room. */
+.bp-surface .bp-action[data-selected="true"],
+.bp-surface .bp-action:focus-visible {
+  outline: 2px solid rgb(var(--color-primary));
+  outline-offset: 3px;
+  box-shadow:
+    0 0 0 6px rgb(var(--color-primary) / 0.16),
+    0 12px 30px -12px rgb(var(--color-primary) / 0.6);
+}
+/* The nav tabs scroll sideways; pad them so the selected tab's glow isn't clipped. */
+.bp-surface .bp-navigation-tabs {
+  padding: 12px;
+  margin: -12px 0 -12px -12px;
+}
+.bp-page .bp-action[data-selected="true"]:not(.bp-setting-row) {
+  transform: scale(1.03);
+}
+.bp-page .bp-action[aria-disabled="true"] {
+  opacity: 0.45;
+}
+
+/* Frosted panels instead of flat cards. */
+.bp-page
+  :is(
+    .bp-panel,
+    .bp-settings-panel,
+    .bp-feature,
+    .bp-profile-identity,
+    .bp-category-nav,
+    .bp-cloud-row,
+    .bp-empty
+  ) {
+  border-radius: 18px;
+  border: 1px solid rgb(var(--color-foreground) / 0.08);
+  background: rgb(var(--color-card) / 0.72);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 20px 50px -32px rgb(0 0 0 / 0.65);
+}
+.bp-page .bp-empty {
+  padding: clamp(32px, 6vh, 80px) clamp(24px, 4vw, 64px);
+}
+.bp-page .bp-empty h2 {
+  font-size: 1.4em;
+  font-weight: 650;
+  margin-bottom: 0.4em;
+}
+.bp-page .bp-category-nav .bp-action[aria-pressed="true"] {
+  box-shadow: inset 3px 0 0 rgb(var(--color-primary));
+}
+
+/* Page titles that predate BigPictureHero get the same type scale. */
+:is(.bp-retro-heading, .bp-cloud-heading, .bp-index-heading) h1 {
+  font-size: clamp(32px, 3.2vw, 68px);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.bp-retro-heading .bp-section-label,
+.bp-index-eyebrow {
+  color: rgb(var(--color-primary));
+  font-weight: 650;
+  letter-spacing: 0.22em;
+}
+.bp-cloud-heading {
+  margin: 1.5rem 0 1.25rem;
+}
+.bp-cloud-heading > svg {
+  box-sizing: content-box;
+  padding: 0.7rem;
+  border-radius: 18px;
+  background: rgb(var(--color-primary) / 0.12);
+  box-shadow: 0 12px 30px -12px rgb(var(--color-primary) / 0.6);
+}
+
+/* Power: big tiles with a round icon badge. */
+.bp-power .bp-power-symbol {
+  box-sizing: content-box;
+  padding: 14px;
+  border-radius: 999px;
+  background: rgb(var(--color-primary) / 0.12);
+}
+.bp-power .bp-panel > h2 {
+  font-size: clamp(26px, 2.2vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.bp-power-option {
+  border-radius: 16px;
+  min-height: 84px;
+}
+.bp-power-option > svg {
+  box-sizing: content-box;
+  padding: 0.6em;
+  border-radius: 999px;
+  background: rgb(var(--color-foreground) / 0.07);
+}
+.bp-power-option[data-selected="true"] > svg {
+  background: rgb(var(--color-primary) / 0.16);
+  color: rgb(var(--color-primary));
+}
+.bp-power .bp-action--danger > svg {
+  color: rgb(239 68 68);
+}
+
+/* Confirmation panels. */
+.bp-confirm {
+  width: min(720px, 100%);
+  margin: clamp(24px, 8vh, 120px) auto;
+  text-align: center;
+}
+.bp-confirm-symbol {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 18px;
+  padding: 12px;
+  box-sizing: content-box;
+  border-radius: 999px;
+  color: rgb(239 68 68);
+  background: rgb(239 68 68 / 0.12);
+}
+.bp-confirm h2 {
+  font-size: 1.5em;
+  font-weight: 650;
+}
+.bp-confirm .bp-actions {
+  justify-content: center;
+  margin-top: 24px;
+}
+
+/* Browse "load more" footer. */
+.bp-page .bp-browse-more {
+  justify-content: center;
+  gap: 1.5rem;
+  border-top-color: rgb(var(--color-foreground) / 0.08);
+  color: rgb(var(--color-muted-foreground));
+}
+.bp-page .bp-browse-more .bp-action {
+  border-radius: 999px;
+  min-width: 10em;
+}
+
+/* Downloads. */
+.bp-dl-list {
+  display: grid;
+  gap: 1rem;
+}
+.bp-dl-card,
+.bp-dl-note {
+  --tone: var(--color-primary);
+}
+:is(.bp-dl-card, .bp-dl-note)[data-tone="warning"] {
+  --tone: 245 158 11;
+}
+:is(.bp-dl-card, .bp-dl-note)[data-tone="error"] {
+  --tone: 239 68 68;
+}
+:is(.bp-dl-card, .bp-dl-note)[data-tone="success"] {
+  --tone: 34 197 94;
+}
+.bp-dl-card[data-tone="muted"] {
+  --tone: var(--color-muted-foreground);
+}
+.bp-dl-card {
+  display: grid;
+  grid-template-columns: clamp(150px, 17vw, 300px) minmax(0, 1fr);
+  gap: clamp(16px, 1.6vw, 32px);
+  padding: clamp(14px, 1.2vw, 22px);
+  border-radius: 20px;
+  border: 1px solid rgb(var(--color-foreground) / 0.08);
+  background: rgb(var(--color-card) / 0.72);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 20px 50px -32px rgb(0 0 0 / 0.65);
+  transition: border-color 0.2s ease;
+}
+.bp-dl-card:has([data-selected="true"]) {
+  border-color: rgb(var(--tone) / 0.45);
+}
+.bp-dl-art {
+  display: grid;
+  place-items: center;
+  align-self: start;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgb(var(--color-muted));
+}
+.bp-dl-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bp-dl-art svg {
+  width: 30%;
+  height: 30%;
+  color: rgb(var(--color-muted-foreground));
+}
+.bp-dl-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.bp-dl-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.bp-dl-title {
+  min-width: 0;
+}
+.bp-dl-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  font-size: 0.72em;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgb(var(--tone));
+}
+.bp-dl-spin {
+  width: 1.1em;
+  height: 1.1em;
+  animation: bp-dl-spin 1s linear infinite;
+}
+.bp-dl-title h3 {
+  margin-top: 0.15em;
+  font-size: 1.45em;
+  font-weight: 650;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-dl-percent {
+  flex-shrink: 0;
+  font-size: 2.3em;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.bp-dl-percent small {
+  margin-left: 0.08em;
+  font-size: 0.45em;
+  opacity: 0.6;
+}
+.bp-dl-bar {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(var(--color-foreground) / 0.1);
+}
+.bp-dl-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgb(var(--tone) / 0.7), rgb(var(--tone)));
+  box-shadow: 0 0 16px rgb(var(--tone) / 0.6);
+  transition: width 0.5s ease;
+}
+.bp-dl-bar[data-indeterminate="true"] span {
+  width: 35% !important;
+  animation: bp-dl-sweep 1.4s ease-in-out infinite;
+}
+.bp-dl-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em 1.4em;
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--color-muted-foreground));
+}
+.bp-dl-file {
+  flex: 1 1 12em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-dl-note {
+  padding: 0.7em 1em;
+  border-radius: 12px;
+  font-size: 0.85em;
+  border: 1px solid rgb(var(--tone) / 0.35);
+  background: rgb(var(--tone) / 0.1);
+}
+.bp-dl-note[data-tone="error"] {
+  color: rgb(var(--tone));
+}
+.bp-dl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: auto;
+}
+.bp-dl-actions .bp-action {
+  border-radius: 999px;
+  padding-inline: 1.1em;
+}
+.bp-dl-actions .bp-dl-primary {
+  background: rgb(var(--color-primary));
+  color: rgb(var(--color-secondary));
+  border-color: transparent;
+}
+.bp-dl-actions .bp-action:disabled {
+  opacity: 0.5;
+}
+@keyframes bp-dl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes bp-dl-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+.bp-queue-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bp-page .bp-queue-item {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0.9rem 0.75rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgb(var(--color-foreground) / 0.08);
+  background: rgb(var(--color-card) / 0.6);
+  backdrop-filter: blur(10px);
+}
+.bp-queue-position {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.2em;
+  height: 2.2em;
+  border-radius: 999px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--color-primary));
+  background: rgb(var(--color-primary) / 0.14);
+}
+.bp-queue-info {
+  flex: 1;
+  min-width: 0;
+}
+.bp-queue-info strong,
+.bp-queue-info span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-queue-info strong {
+  font-weight: 600;
+}
+.bp-queue-info span {
+  font-size: 0.82em;
+  color: rgb(var(--color-muted-foreground));
+}
+.bp-queue-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.bp-queue-actions .bp-action {
+  border-radius: 999px;
+}
+.bp-downloads section + section {
+  margin-top: 2rem;
+}
+
+@media (max-width: 800px) {
+  .bp-dl-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bp-page .bp-action[data-selected="true"] {
+    transform: none;
+  }
+  .bp-dl-bar span,
+  .bp-dl-card {
+    transition: none;
+  }
+  .bp-dl-spin,
+  .bp-dl-bar[data-indeterminate="true"] span {
+    animation: none;
+  }
+}

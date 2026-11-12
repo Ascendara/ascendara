@@ -4,6 +4,7 @@ import { Gamepad2 } from "lucide-react";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { moveFocus, gameName } from "./surfaceNavigation";
 import { scrollSurfaceFocus, cancelSurfaceScroll } from "./controllerNavigation";
+import { CrossfadeImage } from "./CrossfadeImage";
 
 export function useSurface(
   navigation,
@@ -137,7 +138,7 @@ export const SurfaceGame = memo(function SurfaceGame({
       observer.disconnect();
     };
   }, [name, game.imgID, game.platform]);
-  const artwork = landscapeArtwork || image || cachedImage;
+  const artwork = image || cachedImage;
   return (
     <button
       ref={ref}
@@ -157,6 +158,9 @@ export const SurfaceGame = memo(function SurfaceGame({
           />
         ) : (
           <Gamepad2 aria-hidden="true" />
+        )}
+        {artworkOnly && (
+          <CrossfadeImage src={landscapeArtwork} className="bp-cover-landscape" />
         )}
       </div>
       <strong>{name}</strong>

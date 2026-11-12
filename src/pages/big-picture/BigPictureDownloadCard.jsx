@@ -1,11 +1,10 @@
-import React from "react";
-import { FolderOpen, Trash2, Play, Pause, Loader, RefreshCcw } from "lucide-react";
+import { FolderOpen, Trash2, Play, Pause, Loader, RefreshCcw, Download } from "lucide-react";
+import { useHomeArtwork } from "./useHomeArtwork";
 import { canRetryExtraction } from "@/services/downloads/extractionRetryService";
 
 // --- BIG PICTURE DOWNLOAD CARD ---
 const BigPictureDownloadCard = ({
   game,
-  isSelected,
   torboxState,
   onPause,
   onResume,
@@ -15,10 +14,10 @@ const BigPictureDownloadCard = ({
   isStopping,
   isResuming,
   t,
-  buttons,
   focus,
 }) => {
   const data = game.downloadingData || {};
+  const artwork = useHomeArtwork(game);
   const progress = parseFloat(data.progressCompleted || 0);
   const speed = data.progressDownloadSpeeds || "0 KB/s";
 
@@ -99,186 +98,120 @@ const BigPictureDownloadCard = ({
 
   const actions = getActions();
 
+  const tone = data.awaitingRecoveryAction
+    ? "warning"
+    : hasError
+      ? "error"
+      : isExtracting || isResuming || isStopping
+        ? "warning"
+        : isVerifying
+          ? "success"
+          : isPaused
+            ? "muted"
+            : "active";
+  const extraction = data.extractionProgress;
+  const extractionPercent = parseFloat(extraction?.percentComplete || 0);
+  const shownPercent = isExtracting ? extractionPercent : progress;
+
   return (
-    <div
-      className={`relative rounded-xl border-2 p-6 transition-all duration-200 ${
-        isSelected
-          ? "scale-[1.02] border-primary bg-primary/10 shadow-lg shadow-primary/20"
-          : "border-border/50 bg-card/50"
-      }`}
-    >
-      {/* Game Name and Status */}
-      <div className="mb-4 flex items-start justify-between">
-        <div className="flex-1">
-          <h3 className="mb-1 text-xl font-bold text-primary">{game.game}</h3>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">{game.size}</span>
-            {!hasError && !isPaused && !hasError && (
-              <span className={`text-sm font-semibold ${status.color}`}>
-                • {status.text}
-              </span>
-            )}
-            {isDownloading && !hasError && (
-              <span className="text-xs text-muted-foreground">• {speed}</span>
-            )}
-          </div>
-        </div>
+    <article className="bp-dl-card" data-tone={tone}>
+      <div className="bp-dl-art">
+        {artwork ? <img src={artwork} alt="" /> : <Download aria-hidden="true" />}
       </div>
-
-      {/* Progress Bar - Only show for downloading, not extracting */}
-      {!hasError && !isExtracting && (
-        <div className="mb-4">
-          <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className={`absolute left-0 top-0 h-full rounded-full transition-all duration-300 ${
-                isVerifying ? "bg-green-500" : "bg-primary"
-              }`}
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              {downloaded} / {total}
+      <div className="bp-dl-body">
+        <header className="bp-dl-head">
+          <div className="bp-dl-title">
+            <span className="bp-dl-status">
+              {(isExtracting || isResuming || isStopping) && !hasError && (
+                <Loader className="bp-dl-spin" aria-hidden="true" />
+              )}
+              {status.text}
             </span>
-            <span className="font-bold">{progress.toFixed(1)}%</span>
+            <h3>{game.game}</h3>
           </div>
-        </div>
-      )}
-
-      {/* Extraction Progress */}
-      {isExtracting && !hasError && (
-        <div className="mb-4 space-y-3">
-          {data.extractionProgress?.totalFiles > 0 ? (
-            <>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-foreground">
-                    {parseFloat(data.extractionProgress.percentComplete || 0).toFixed(1)}%
-                  </span>
-                  <span className="text-muted-foreground">
-                    {data.extractionProgress.filesExtracted} /{" "}
-                    {data.extractionProgress.totalFiles} files
-                  </span>
-                </div>
-                <div className="relative h-3 overflow-hidden rounded-full bg-muted/50">
-                  <div
-                    className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-300"
-                    style={{
-                      width: `${parseFloat(data.extractionProgress.percentComplete || 0)}%`,
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10">
-                  <Loader className="h-4 w-4 animate-spin text-amber-600" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-foreground">
-                      {t("downloads.extracting")}
-                    </p>
-                    <span className="text-xs text-muted-foreground">
-                      {data.extractionProgress.extractionSpeed}
-                    </span>
-                  </div>
-                  <p
-                    className="truncate text-xs text-muted-foreground"
-                    title={data.extractionProgress.currentFile}
-                  >
-                    {data.extractionProgress.currentFile ||
-                      t("downloads.extractingDescription")}
-                  </p>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="relative h-3 overflow-hidden rounded-full bg-muted/50">
-                <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-amber-500/20 via-amber-500 to-amber-500/20" />
-              </div>
-              <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10">
-                  <Loader className="h-4 w-4 animate-spin text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {t("downloads.extracting")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t("downloads.preparingExtraction") || "Preparing extraction..."}
-                  </p>
-                </div>
-              </div>
-            </>
+          {!hasError && (isExtracting ? extraction?.totalFiles > 0 : true) && (
+            <strong className="bp-dl-percent">
+              {shownPercent.toFixed(shownPercent >= 100 ? 0 : 1)}
+              <small>%</small>
+            </strong>
           )}
-        </div>
-      )}
+        </header>
 
-      {/* Error Message */}
-      {data.awaitingRecoveryAction && (
-        <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
-          <p>
-            {data.recoverableError?.message ||
-              t("downloads.extractionRecovery.description")}
+        {!hasError && (
+          <div
+            className="bp-dl-bar"
+            data-indeterminate={isExtracting && !(extraction?.totalFiles > 0)}
+            role="progressbar"
+            aria-label={status.text}
+            aria-valuenow={Math.round(shownPercent)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <span style={{ width: `${Math.min(100, Math.max(0, shownPercent))}%` }} />
+          </div>
+        )}
+
+        {!hasError && (
+          <div className="bp-dl-stats">
+            {isExtracting ? (
+              <>
+                {extraction?.totalFiles > 0 && (
+                  <span>
+                    {extraction.filesExtracted} / {extraction.totalFiles} files
+                  </span>
+                )}
+                {extraction?.extractionSpeed && <span>{extraction.extractionSpeed}</span>}
+                <span className="bp-dl-file" title={extraction?.currentFile}>
+                  {extraction?.currentFile ||
+                    t("downloads.preparingExtraction") ||
+                    t("downloads.extractingDescription")}
+                </span>
+              </>
+            ) : (
+              <>
+                <span>
+                  {downloaded} / {total}
+                </span>
+                {isDownloading && !isPaused && <span>{speed}</span>}
+                {isDownloading && !isPaused && data.timeUntilComplete && (
+                  <span>{data.timeUntilComplete} left</span>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {data.awaitingRecoveryAction && (
+          <p className="bp-dl-note" data-tone="warning">
+            {data.recoverableError?.message || t("downloads.extractionRecovery.description")}
           </p>
-        </div>
-      )}
-      {hasError && (
-        <div className="mb-4 rounded-lg border border-red-500/50 bg-red-500/10 p-3">
-          <p className="text-sm text-red-500">
+        )}
+        {hasError && (
+          <p className="bp-dl-note" data-tone="error">
             {data.message ||
               data.recoverableError?.message ||
               (data.verifyError?.length && JSON.stringify(data.verifyError[0])) ||
               t("downloads.unknownError")}
           </p>
-        </div>
-      )}
+        )}
 
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        {actions.map((action, idx) => (
-          <button
-            {...focus?.(`download-${game.game}-${idx}`)}
-            key={idx}
-            onClick={action.action}
-            disabled={isStopping || isResuming}
-            className={`bp-action flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
-              action.danger
-                ? "bg-red-500/20 text-red-500 hover:bg-red-500/30"
-                : "bg-primary/20 text-primary hover:bg-primary/30"
-            } ${isStopping || isResuming ? "cursor-not-allowed opacity-50" : ""}`}
-          >
-            <action.icon className="h-4 w-4" />
-            {action.label}
-          </button>
-        ))}
+        <div className="bp-dl-actions">
+          {actions.map((action, idx) => (
+            <button
+              type="button"
+              {...focus?.(`download-${game.game}-${idx}`)}
+              key={idx}
+              onClick={action.action}
+              disabled={isStopping || isResuming}
+              className={`bp-action${action.danger ? " bp-action--danger" : idx === 0 ? " bp-dl-primary" : ""}`}
+            >
+              <action.icon aria-hidden="true" />
+              {action.label}
+            </button>
+          ))}
+        </div>
       </div>
-
-      {/* Controller Hint */}
-      {isSelected && (
-        <div className="mt-4 flex items-center justify-center gap-4 border-t border-border/50 pt-4 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <span className="rounded bg-primary/20 px-2 py-1 font-bold text-primary">
-              ← →
-            </span>
-            {t("bigPicture.navigate")}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="rounded bg-primary/20 px-2 py-1 font-bold text-primary">
-              {buttons.confirm}
-            </span>
-            {t("bigPicture.select")}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="rounded bg-primary/20 px-2 py-1 font-bold text-primary">
-              {buttons.cancel}
-            </span>
-            {t("bigPicture.back")}
-          </span>
-        </div>
-      )}
-    </div>
+    </article>
   );
 };
 

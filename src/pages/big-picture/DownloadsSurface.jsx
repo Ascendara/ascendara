@@ -2,8 +2,22 @@ import {
   BigPictureShell,
   BigPictureToolbar,
   BigPictureEmptyState,
+  BigPictureHero,
+  BigPictureSpotlight,
+  BigPicturePanel,
 } from "./BigPictureShell";
 import { useState } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Compass,
+  Download,
+  Gauge,
+  ListOrdered,
+  Play,
+  X,
+} from "lucide-react";
+import { useHomeArtwork } from "./useHomeArtwork";
 import { canRetryExtraction } from "@/services/downloads/extractionRetryService";
 import { toast } from "sonner";
 import {
@@ -71,6 +85,11 @@ export function DownloadsSurface({
         }),
         ...queue.map(item => [`up-${item.id}`, `down-${item.id}`, `remove-${item.id}`]),
       ];
+  const lead = downloads[0];
+  const artwork = useHomeArtwork(lead);
+  const running = downloads.filter(
+    game => game.downloadingData?.downloading && !game.downloadingData?.stopped
+  );
   const { root, focus } = useSurface(
     navigation,
     rows,
@@ -100,7 +119,8 @@ export function DownloadsSurface({
   return (
     <BigPictureShell ref={root} className="bp-downloads" title="Downloads" focus={focus}>
       {remove ? (
-        <>
+        <BigPicturePanel className="bp-confirm">
+          <X className="bp-confirm-symbol" aria-hidden="true" />
           <h2>Remove {remove.gameName} from the queue?</h2>
           <p className="bp-muted">This removes only the queued request.</p>
           <div className="bp-actions">
@@ -109,6 +129,7 @@ export function DownloadsSurface({
             </SurfaceButton>
             <SurfaceButton
               {...focus("remove")}
+              variant="danger"
               onClick={() => {
                 removeFromQueue(remove.id);
                 setRemove(null);
@@ -117,26 +138,67 @@ export function DownloadsSurface({
               Remove
             </SurfaceButton>
           </div>
-        </>
+        </BigPicturePanel>
       ) : (
         <>
+          <BigPictureHero
+            backdrop={artwork}
+            eyebrow="Downloads"
+            title={
+              lead
+                ? lead.game
+                : queue.length
+                  ? "Ready when you are"
+                  : "Nothing downloading"
+            }
+            meta={
+              downloads.length || queue.length
+                ? [
+                    downloads.length &&
+                      `${downloads.length} in progress`,
+                    queue.length && `${queue.length} queued`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                : "Find a game in Browse to get started."
+            }
+            aside={
+              (running.length > 0 || queue.length > 0) && (
+                <BigPictureSpotlight
+                  chips={[
+                    running.length > 0 && {
+                      icon: Gauge,
+                      label: running[0].downloadingData.progressDownloadSpeeds || "Starting",
+                    },
+                    running.length > 0 && {
+                      icon: Download,
+                      label: `${running.length} active`,
+                    },
+                    queue.length > 0 && { icon: ListOrdered, label: `${queue.length} up next` },
+                  ]}
+                />
+              )
+            }
+          />
           <BigPictureToolbar label="Download controls">
             <SurfaceButton {...focus("browse")} onClick={browse}>
+              <Compass />
               Browse games
             </SurfaceButton>
             <SurfaceButton {...focus("start")} onClick={start}>
+              <Play />
               {starting ? "Starting…" : "Start next queued download"}
             </SurfaceButton>
           </BigPictureToolbar>
           {!downloads.length && !queue.length && (
-            <BigPictureEmptyState title="No downloads">
-              <p>Find a game in Browse to get started.</p>
+            <BigPictureEmptyState title="Your download shelf is empty">
+              <p>Games you download or queue will show up here with live progress.</p>
             </BigPictureEmptyState>
           )}
           {downloads.length > 0 && (
             <section>
-              <h2>Downloads · {downloads.length}</h2>
-              <div className="space-y-6">
+              <p className="bp-section-label">In progress</p>
+              <div className="bp-dl-list">
                 {downloads.map(game => (
                   <BigPictureDownloadCard
                     key={game.game}
@@ -160,37 +222,50 @@ export function DownloadsSurface({
           )}
           {queue.length > 0 && (
             <section>
-              <h2>Queue · {queue.length}</h2>
-              {queue.map((item, index) => (
-                <section className="bp-queue-item" key={item.id}>
-                  <h3>
-                    {index + 1}. {item.gameName} · {item.size}
-                  </h3>
-                  {getQueueBlockReason(item, settings) === TORRENT_DISABLED_CODE && (
-                    <p className="bp-muted">{t("download.toast.torrentDisabled")}</p>
-                  )}
-                  <div className="bp-actions">
-                    <SurfaceButton
-                      {...focus(`up-${item.id}`)}
-                      onClick={() => reorderQueue(index, index - 1)}
-                    >
-                      Move up
-                    </SurfaceButton>
-                    <SurfaceButton
-                      {...focus(`down-${item.id}`)}
-                      onClick={() => reorderQueue(index, index + 1)}
-                    >
-                      Move down
-                    </SurfaceButton>
-                    <SurfaceButton
-                      {...focus(`remove-${item.id}`)}
-                      onClick={() => setRemove(item)}
-                    >
-                      Remove from queue
-                    </SurfaceButton>
-                  </div>
-                </section>
-              ))}
+              <p className="bp-section-label">Up next</p>
+              <ol className="bp-queue-list">
+                {queue.map((item, index) => (
+                  <li className="bp-queue-item" key={item.id}>
+                    <span className="bp-queue-position">{index + 1}</span>
+                    <div className="bp-queue-info">
+                      <strong>{item.gameName}</strong>
+                      <span>
+                        {item.size}
+                        {getQueueBlockReason(item, settings) === TORRENT_DISABLED_CODE &&
+                          ` · ${t("download.toast.torrentDisabled")}`}
+                      </span>
+                    </div>
+                    <div className="bp-queue-actions">
+                      <SurfaceButton
+                        variant="icon"
+                        aria-label={`Move ${item.gameName} up`}
+                        aria-disabled={index === 0}
+                        {...focus(`up-${item.id}`)}
+                        onClick={() => reorderQueue(index, index - 1)}
+                      >
+                        <ArrowUp />
+                      </SurfaceButton>
+                      <SurfaceButton
+                        variant="icon"
+                        aria-label={`Move ${item.gameName} down`}
+                        aria-disabled={index === queue.length - 1}
+                        {...focus(`down-${item.id}`)}
+                        onClick={() => reorderQueue(index, index + 1)}
+                      >
+                        <ArrowDown />
+                      </SurfaceButton>
+                      <SurfaceButton
+                        variant="icon"
+                        aria-label={`Remove ${item.gameName} from the queue`}
+                        {...focus(`remove-${item.id}`)}
+                        onClick={() => setRemove(item)}
+                      >
+                        <X />
+                      </SurfaceButton>
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </section>
           )}
         </>

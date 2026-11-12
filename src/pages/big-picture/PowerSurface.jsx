@@ -37,7 +37,7 @@ function PowerConfirmation({ navigation, active, action, onBack, downloads }) {
       {error && <p role="status">{error}</p>}
       <div className="bp-actions">
         <SurfaceButton {...focus("cancel")} disabled={busy} onClick={onBack}>Cancel</SurfaceButton>
-        <SurfaceButton {...focus("confirm")} disabled={busy} variant="danger" onClick={confirm}>{busy ? "Please wait?" : shutdown ? "Shut down computer" : "Exit Ascendara"}</SurfaceButton>
+        <SurfaceButton {...focus("confirm")} disabled={busy} variant="danger" onClick={confirm}>{busy ? "Please wait…" : shutdown ? "Shut down computer" : "Exit Ascendara"}</SurfaceButton>
       </div>
     </BigPicturePanel>
   </BigPictureShell>;

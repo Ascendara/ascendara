@@ -1,14 +1,28 @@
-import { Search, X, RefreshCw, ChevronDown, Database } from "lucide-react";
+import {
+  Search,
+  X,
+  RefreshCw,
+  ChevronDown,
+  Database,
+  HardDrive,
+  Tag,
+  Users,
+} from "lucide-react";
 import { useGridColumns } from "./useGridColumns";
 import {
   BigPictureShell,
   BigPictureToolbar,
   BigPictureEmptyState,
+  BigPictureHero,
+  BigPictureSpotlight,
 } from "./BigPictureShell";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SurfaceButton, useSurface } from "./Surface";
 import { BrowseGameCard } from "./BrowseGameCard";
 import { gameName, gameEntries, readStoredList } from "./surfaceNavigation";
+import { useHomeArtwork } from "./useHomeArtwork";
+import { useLanguage } from "@/context/LanguageContext";
+import { catalogSizeText } from "@/lib/installSpace";
 import "./browse-controls.css";
 
 const genresFor = (game) =>
@@ -35,6 +49,7 @@ export function BrowseSurface({
   retry,
   openIndexes,
 }) {
+  const { t } = useLanguage();
   const columns = useGridColumns();
   const [page, setPage] = useState(0);
   const [savedOnly, setSavedOnly] = useState(false);
@@ -112,6 +127,15 @@ export function BrowseSurface({
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
   }, [active, loading, hasMore, loadMore, root]);
+  // Keep the spotlight on the last focused game while the toolbar has focus.
+  const focusedKey = focusedIndex >= 0 ? displayed[focusedIndex].key : null;
+  const [spotlightKey, setSpotlightKey] = useState(null);
+  useEffect(() => {
+    if (focusedKey) setSpotlightKey(focusedKey);
+  }, [focusedKey]);
+  const spotlight =
+    displayed.find(({ key }) => key === spotlightKey)?.game || displayed[0]?.game;
+  const artwork = useHomeArtwork(spotlight);
   const sorts = {
     weight: ["Popular", "latest_update-desc"],
     "latest_update-desc": ["Recently updated", "name"],
@@ -124,6 +148,34 @@ export function BrowseSurface({
       title="Browse"
       focus={focus}
     >
+      <BigPictureHero
+        backdrop={artwork}
+        eyebrow="Browse"
+        title={
+          query
+            ? `“${query}”`
+            : genre || (savedOnly ? "Saved for later" : "Discover games")
+        }
+        meta={
+          <span role="status">
+            {loading
+              ? "Loading catalogue…"
+              : `${filtered.length.toLocaleString()} ${filtered.length === 1 ? "game" : "games"} · ${sorts[sort]?.[0] || "Popular"}`}
+          </span>
+        }
+        aside={
+          spotlight && (
+            <BigPictureSpotlight
+              title={gameName(spotlight)}
+              chips={[
+                genresFor(spotlight)[0] && { icon: Tag, label: genresFor(spotlight)[0] },
+                spotlight.size && { icon: HardDrive, label: catalogSizeText(spotlight, t) },
+                spotlight.online && { icon: Users, label: "Online" },
+              ]}
+            />
+          )
+        }
+      />
       <div className="bp-browse-controls">
         <BigPictureToolbar label="Search catalogue">
           <SurfaceButton
@@ -202,11 +254,6 @@ export function BrowseSurface({
           </div>
         </BigPictureToolbar>
       </div>
-      <p className="bp-muted" role="status">
-        {loading
-          ? "Loading catalogue…"
-          : `${filtered.length.toLocaleString()} games`}
-      </p>
       {!loading && !displayed.length && (
         <BigPictureEmptyState title="No games found">
           <p>Clear your search or filters, or retry loading the catalogue.</p>
@@ -225,7 +272,7 @@ export function BrowseSurface({
           />
         ))}
       </div>
-      <div className="bp-pagination" ref={loadMoreRef}>
+      <div className="bp-pagination bp-browse-more" ref={loadMoreRef}>
         <span role="status">
           {displayed.length.toLocaleString()} of {filtered.length.toLocaleString()} games
         </span>

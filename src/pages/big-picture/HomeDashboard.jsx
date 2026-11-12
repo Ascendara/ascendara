@@ -1,12 +1,21 @@
 import { BigPictureShell } from "./BigPictureShell";
 import { pageFocusIds } from "./PageHeader";
 import { useMemo } from "react";
-import { Play, ChevronRight, Download, Pause, Gamepad2 } from "lucide-react";
+import {
+  Play,
+  ChevronRight,
+  Download,
+  Pause,
+  Gamepad2,
+  Clock,
+  CalendarDays,
+} from "lucide-react";
 import recentGamesService from "@/services/library/recentGamesService";
 import { loadFolders } from "@/lib/folderManager";
 import { SurfaceButton, SurfaceGame, useSurface } from "./Surface";
 import { gameName, gameEntries, libraryGames, readStoredList } from "./surfaceNavigation";
 import { useHomeArtwork } from "./useHomeArtwork";
+import { CrossfadeImage } from "./CrossfadeImage";
 
 export function HomeDashboard({
   navigation,
@@ -91,7 +100,13 @@ export function HomeDashboard({
   const lastPlayed = history.find(
     item => item.game === (hero && gameName(hero))
   )?.lastPlayed;
-  const hours = Number(hero?.playTime) / 3600;
+  const seconds = Number(hero?.playTime) || 0;
+  const playtime =
+    seconds >= 3600
+      ? `${(seconds / 3600).toFixed(1).replace(/\.0$/, "")}h played`
+      : seconds >= 60
+        ? `${Math.floor(seconds / 60)}m played`
+        : null;
   const lastDate =
     lastPlayed && !Number.isNaN(Date.parse(lastPlayed))
       ? new Date(lastPlayed).toLocaleDateString(undefined, {
@@ -124,19 +139,8 @@ export function HomeDashboard({
       }}
     >
       <div className="bp-home-hero">
-        {image ? (
-          <img
-            key={image}
-            className="bp-home-art"
-            src={image}
-            alt=""
-            onError={event => {
-              event.currentTarget.style.visibility = "hidden";
-            }}
-          />
-        ) : (
-          <Gamepad2 className="bp-home-placeholder" aria-hidden="true" />
-        )}
+        {!image && <Gamepad2 className="bp-home-placeholder" aria-hidden="true" />}
+        <CrossfadeImage src={image} className="bp-home-art" />
         <div className="bp-home-shade" />
         <div className="bp-home-hero-content">
           <p className="bp-home-eyebrow">
@@ -149,15 +153,21 @@ export function HomeDashboard({
                   : "Make room for your next favorite"}
           </p>
           <h1>{hero ? gameName(hero) : "Build your library"}</h1>
-          {(hours > 0 || lastDate) && (
-            <p className="bp-home-meta">
-              {[
-                hours > 0 ? `${hours.toFixed(1)}h played` : null,
-                lastDate ? `Last played ${lastDate}` : null,
-              ]
-                .filter(Boolean)
-                .join(" ? ")}
-            </p>
+          {(playtime || lastDate) && (
+            <div className="bp-home-chips">
+              {playtime && (
+                <span>
+                  <Clock aria-hidden="true" />
+                  {playtime}
+                </span>
+              )}
+              {lastDate && (
+                <span>
+                  <CalendarDays aria-hidden="true" />
+                  Last played {lastDate}
+                </span>
+              )}
+            </div>
           )}
           <div className="bp-home-hero-actions">
             <SurfaceButton
@@ -194,14 +204,14 @@ export function HomeDashboard({
             <span>
               <strong>
                 {download
-                  ? `${status} ? ${download.game}`
+                  ? `${status} · ${download.game}`
                   : `${queue.length} games queued`}
               </strong>
               {download && (
                 <span className="bp-home-meta">
                   {progress.toFixed(0)}%
-                  {data.progressDownloadSpeeds ? ` ? ${data.progressDownloadSpeeds}` : ""}
-                  {queue.length ? ` ? ${queue.length} queued` : ""}
+                  {data.progressDownloadSpeeds ? ` · ${data.progressDownloadSpeeds}` : ""}
+                  {queue.length ? ` · ${queue.length} queued` : ""}
                 </span>
               )}
             </span>
