@@ -6120,9 +6120,11 @@
     "recommendedSetupInfo": "Install both tools below for the best experience. UMU Launcher handles the runtime container and Protonfixes, while Proton-CachyOS is the most compatible Wine-based engine.",
     "referral": {
       "friendThankYou": "Thank your friend for sharing Ascendara around! People like them and you are the reason why Ascendara can grow.",
+      "aiPlaceholder": "What were you talking about with the AI when it mentioned Ascendara?",
       "linkPlaceholder": "Can you share the link or post where you found Ascendara?",
       "otherPlaceholder": "Where exactly did you find Ascendara?",
       "sources": {
+        "ai": "AI Chat Bot",
         "discord": "Discord",
         "fmhy": "FMHY",
         "friend": "A Friend",

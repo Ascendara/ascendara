@@ -112,6 +112,7 @@ const REFERRAL_SOURCES = [
   "google",
   "discord",
   "fmhy",
+  "ai",
   "other",
   "notsay",
 ];
@@ -1702,9 +1703,11 @@ const Welcome = ({ welcomeData, onComplete }) => {
                       <motion.button
                         key={source}
                         type="button"
-                        onClick={() =>
-                          setReferralSource(current => (current === source ? "" : source))
-                        }
+                        onClick={() => {
+                          setReferralSource(current => (current === source ? "" : source));
+                          setReferralLink("");
+                          setReferralLinkError("");
+                        }}
                         className={`rounded-xl border-2 px-4 py-3 text-sm font-medium transition-colors ${
                           referralSource === source
                             ? "border-primary bg-primary/10 text-primary"
@@ -1755,7 +1758,11 @@ const Welcome = ({ welcomeData, onComplete }) => {
                     >
                       <Input
                         type="text"
-                        placeholder={t("welcome.referral.linkPlaceholder")}
+                        placeholder={
+                          referralSource === "ai"
+                            ? t("welcome.referral.aiPlaceholder")
+                            : t("welcome.referral.linkPlaceholder")
+                        }
                         className={`w-full ${referralLinkError ? "border-red-500" : ""}`}
                         value={referralLink}
                         onChange={async e => {
