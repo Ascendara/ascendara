@@ -1,9 +1,9 @@
 name: Source checks
 on:
   push:
-    branches: [main]
+    branches: [main, development]
   pull_request:
-    branches: [main]
+    branches: [main, development]
 permissions:
   contents: read
 jobs:
@@ -27,6 +27,7 @@ jobs:
       - run: yarn install --frozen-lockfile
         env:
           HUSKY: '0'
+      - run: yarn test
       - run: yarn build
   rust:
     strategy:

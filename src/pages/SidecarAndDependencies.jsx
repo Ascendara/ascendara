@@ -50,14 +50,6 @@ const ALL_SIDECARS = [
     source: "https://developer.valvesoftware.com/wiki/SteamCMD#Downloading_SteamCMD",
   },
   {
-    id: "torrent",
-    name: "Torrent Handler",
-    description: "Download and manage torrents",
-    builtIn: true,
-    source:
-      "https://github.com/Ascendara/ascendara/tree/main/binaries/AscendaraTorrentHandler/src",
-  },
-  {
     id: "translator",
     name: "Language Translator",
     description: "Automatically translate Ascendara UI text",

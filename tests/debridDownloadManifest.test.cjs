@@ -70,6 +70,8 @@ function loadDownloadHandlers(root, settings, spawns) {
     },
     "./downloadControl": control,
     "./downloadLiveness": { startDownloadWatchdog() {} },
+    "./torrentLink": require("../electron/modules/downloads/torrentLink"),
+    "./privateSources": { resume: async () => null },
     "./dllRepair": {},
     "./downloaderRuntime": {},
     "./gameUpdateBackup": {},
@@ -116,6 +118,107 @@ const args = [
   "",
   true,
 ];
+
+test("download IPC refuses local torrent execution when the opt-in is disabled", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-torrent-optin-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const settings = {
+    downloadDirectory: path.join(root, "games"),
+    torrentEnabled: false,
+  };
+  fs.mkdirSync(settings.downloadDirectory);
+  const spawns = [];
+  const start = loadDownloadHandlers(root, settings, spawns).get("download-file");
+
+  for (const [index, link] of [
+    "magnet:?xt=urn:btih:blocked",
+    "https://example.test/game.torrent?download=1#mirror",
+  ].entries()) {
+    const result = await start(
+      { sender: { send() {} } },
+      link,
+      `Blocked Torrent ${index}`,
+      false,
+      false,
+      false,
+      false,
+      "1",
+      undefined,
+      "1 GB",
+      0,
+      "",
+      false
+    );
+    assert.deepEqual(
+      { success: result.success, blocked: result.blocked, code: result.code },
+      { success: false, blocked: true, code: "TORRENT_DISABLED" }
+    );
+    assert.match(result.error, /Local torrenting is disabled/);
+  }
+
+  assert.equal(spawns.length, 0, "disabled torrenting must reject before any helper spawn");
+});
+
+test("retry and resume cannot bypass a disabled local torrent opt-in", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-torrent-resume-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const settings = {
+    downloadDirectory: path.join(root, "games"),
+    torrentEnabled: false,
+  };
+  fs.mkdirSync(settings.downloadDirectory);
+  const spawns = [];
+  const handlers = loadDownloadHandlers(root, settings, spawns);
+
+  const retry = handlers.get("retry-download");
+  assert.equal(
+    await retry(
+      null,
+      "magnet:?xt=urn:btih:retry-blocked",
+      "Retry Blocked",
+      false,
+      false,
+      "1"
+    ),
+    false
+  );
+  assert.equal(
+    await retry(
+      null,
+      "https://example.test/retry.torrent",
+      "Retry File Blocked",
+      false,
+      false,
+      "1"
+    ),
+    false
+  );
+
+  const game = "Paused Torrent";
+  const gameDirectory = path.join(settings.downloadDirectory, game);
+  fs.mkdirSync(gameDirectory, { recursive: true });
+  fs.writeFileSync(
+    path.join(gameDirectory, `${game}.ascendara.json`),
+    JSON.stringify({
+      game,
+      downloadingData: { stopped: true, downloading: false },
+    })
+  );
+  fs.mkdirSync(path.join(root, "downloadCache"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "downloadCache", `${game}.json`),
+    JSON.stringify({ link: "magnet:?xt=urn:btih:resume-blocked" })
+  );
+
+  const resumed = await handlers.get("resume-download")(null, game);
+  assert.equal(resumed.success, false);
+  assert.match(resumed.error, /Local torrenting is disabled/);
+  assert.equal(
+    spawns.length,
+    0,
+    "retry and resume must reject disabled torrents before any helper spawn"
+  );
+});
 
 test("download IPC launches a grouped torrent with the downloader and prevents duplicate starts", async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-handoff-"));

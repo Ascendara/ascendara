@@ -81,7 +81,6 @@ const BUNDLED_WINDOWS_BINARIES = [
   "AscendaraCrashReporter.exe",
   "AscendaraNotificationHelper.exe",
   "AscendaraAchievementWatcher.exe",
-  "AscendaraTorrentHandler.exe",
 ];
 
 /**

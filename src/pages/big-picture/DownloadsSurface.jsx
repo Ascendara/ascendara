@@ -7,10 +7,12 @@ import { useState } from "react";
 import { canRetryExtraction } from "@/services/downloads/extractionRetryService";
 import { toast } from "sonner";
 import {
+  getQueueBlockReason,
   removeFromQueue,
   reorderQueue,
   processNextInQueue,
 } from "@/services/downloads/downloadQueueService";
+import { TORRENT_DISABLED_CODE } from "@/services/downloads/torrentLink";
 import { BigPictureDownloadCard } from "./BigPictureDownloadCard";
 import { SurfaceButton, useSurface } from "./Surface";
 
@@ -19,6 +21,7 @@ export function DownloadsSurface({
   active,
   downloads,
   queue,
+  settings,
   torboxStates,
   stopping,
   resuming,
@@ -76,6 +79,10 @@ export function DownloadsSurface({
   );
   const start = async () => {
     if (starting) return;
+    if (getQueueBlockReason(queue[0], settings) === TORRENT_DISABLED_CODE) {
+      toast.info(t("download.toast.torrentDisabled"));
+      return;
+    }
     setStarting(true);
     try {
       const item = await processNextInQueue();
@@ -159,6 +166,9 @@ export function DownloadsSurface({
                   <h3>
                     {index + 1}. {item.gameName} · {item.size}
                   </h3>
+                  {getQueueBlockReason(item, settings) === TORRENT_DISABLED_CODE && (
+                    <p className="bp-muted">{t("download.toast.torrentDisabled")}</p>
+                  )}
                   <div className="bp-actions">
                     <SurfaceButton
                       {...focus(`up-${item.id}`)}

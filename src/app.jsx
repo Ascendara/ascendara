@@ -81,7 +81,6 @@ import {
   checkForUpdates,
   startBackgroundUpdateChecks,
 } from "@/services/app/updateCheckingService";
-import checkQbittorrentStatus from "@/services/downloads/qbittorrentCheckService";
 import { startStatusCheck } from "@/services/app/serverStatus";
 import { motion } from "framer-motion";
 import React, { useEffect, useRef, useState } from "react";
@@ -2347,39 +2346,6 @@ function App() {
 
     calculateStorageInfo();
   }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const checkQbittorrent = async () => {
-      // Check if torrenting is enabled in settings
-      const settings = await window.electron.getSettings();
-      if (!mounted) return; // Don't proceed if unmounted
-
-      if (settings.torrentEnabled) {
-        const status = await checkQbittorrentStatus();
-        if (!mounted) return; // Don't proceed if unmounted
-
-        if (!status.active) {
-          toast.error(t("app.qbittorrent.notAccessible"), {
-            description: status.error || t("app.qbittorrent.checkWebUI"),
-            duration: 10000,
-          });
-        }
-      }
-    };
-
-    checkQbittorrent().catch(error => {
-      if (mounted) {
-        console.error("[App] Error checking qBittorrent:", error);
-      }
-    });
-
-    // Cleanup function
-    return () => {
-      mounted = false;
-    };
-  }, [t]);
 
   useEffect(() => {
     const style = document.createElement("style");

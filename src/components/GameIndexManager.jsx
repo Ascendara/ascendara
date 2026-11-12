@@ -66,13 +66,17 @@ import gameService from "@/services/games/gameService";
 import PrivateSources from "@/components/PrivateSources";
 import { cn } from "@/lib/utils";
 import { API_URL } from "@/config/api";
-import { canDownloadTorrents } from "@/services/downloads/debridService";
 import {
   activeExternalSources,
   dropSource,
   pickSource,
   usesOfficialIndex,
 } from "@/lib/combinedSources";
+import {
+  canUseTorrentOnlySource,
+  isSourceMetaTorrentOnly,
+  withTorrentSourceCapabilities,
+} from "@/services/downloads/torrentCapability";
 
 // The shared index refresh finishes almost instantly, so hold the busy state
 // long enough to be seen and then confirm the result on the button itself.
@@ -755,48 +759,23 @@ const GameIndexManager = ({
     [updateSetting]
   );
 
-  // Check source metadata (topDownloadOption) to see if the upstream
-  // only advertises torrent links. This is the authoritative signal when
-  // browsing sources, because it doesn't require syncing first.
-  const isSourceMetaTorrentOnly = source => {
-    const opts = Array.isArray(source?.topDownloadOption)
-      ? source.topDownloadOption
-      : null;
-    if (!opts || opts.length === 0) return false;
-    return opts.every(o => String(o?.name || "").toLowerCase() === "torrent");
-  };
-
-  // Inspect a mapped dataset to determine whether it's torrent-only.
-  // Bucket sources map magnet links to download_links.torrent, and most DDL hosts
-  // produce non-torrent keys (gofile, buzzheavier, 1fichier, etc.).
-  const isTorrentOnlyDataset = games => {
-    if (!Array.isArray(games) || games.length === 0) return false;
-    let sampled = 0;
-    let nonTorrent = 0;
-    for (const g of games) {
-      const links = g?.download_links;
-      if (!links || typeof links !== "object") continue;
-      sampled++;
-      const keys = Object.keys(links).filter(k => (links[k] || []).length > 0);
-      if (keys.some(k => k !== "torrent")) nonTorrent++;
-      if (sampled >= 50) break; // sampling is enough
-    }
-    if (sampled === 0) return false;
-    return nonTorrent === 0;
-  };
-
   const maybeWarnTorrentOnly = async (source, games) => {
     try {
-      const torrentOnly = isSourceMetaTorrentOnly(source) || isTorrentOnlyDataset(games);
-      if (!torrentOnly) return;
+      const resolvedSource = withTorrentSourceCapabilities(source, games);
+      if (!resolvedSource.torrentOnly) return;
       const current = await window.electron.getSettings();
-      if (canDownloadTorrents(current)) return;
-      setTorrentWarningSource({ ...source, torrentOnly: true });
+      if (
+        canUseTorrentOnlySource(resolvedSource, current, {
+          allowUnknownCloud: !resolvedSource.torrentSupport,
+        })
+      )
+        return;
+      setTorrentWarningSource(resolvedSource);
       setTorrentWarningOpen(true);
-      // Mark the source so the UI can decorate it later
+      // Persist the resolved link capability so Settings and saved-source switching
+      // make the same decision without re-reading the source dataset.
       await upsertLibraryEntry({
-        ...source,
-        torrentOnly: true,
+        ...resolvedSource,
         lastUsed: Date.now(),
       });
     } catch (e) {
@@ -828,8 +807,10 @@ const GameIndexManager = ({
     if (isSourceMetaTorrentOnly(payload)) {
       try {
         const current = await window.electron.getSettings();
-        if (!canDownloadTorrents(current)) {
-          setTorrentWarningSource({ ...payload, torrentOnly: true, blocked: true });
+        if (
+          !canUseTorrentOnlySource(payload, current, { allowUnknownCloud: true })
+        ) {
+          setTorrentWarningSource({ ...payload, blocked: true });
           setTorrentWarningOpen(true);
           return;
         }
@@ -870,6 +851,19 @@ const GameIndexManager = ({
     if (!entry?.url) return;
     const now = Date.now();
     const payload = { ...entry, lastUsed: now };
+
+    if (payload.torrentOnly) {
+      try {
+        const current = await window.electron.getSettings();
+        if (!canUseTorrentOnlySource(payload, current)) {
+          setTorrentWarningSource({ ...payload, blocked: true });
+          setTorrentWarningOpen(true);
+          return;
+        }
+      } catch (e) {
+        console.warn("[LocalRefresh] saved-source torrent pre-check failed:", e);
+      }
+    }
 
     // Clear active custom list when switching to a regular external source.
     if (activeCustomList) {
@@ -916,12 +910,15 @@ const GameIndexManager = ({
       const now = Date.now();
       setCustomSourceLastSynced(new Date(now));
       setCustomSourceGameCount(count);
-      const nextPayload = {
-        ...source,
-        lastSynced: now,
-        lastUsed: now,
-        gameCount: count,
-      };
+      const nextPayload = withTorrentSourceCapabilities(
+        {
+          ...source,
+          lastSynced: now,
+          lastUsed: now,
+          gameCount: count,
+        },
+        data?.games
+      );
       setCustomSource(nextPayload);
       await updateSetting("customSource", nextPayload);
       // Save to library so the user can swap back to it later
@@ -1021,16 +1018,19 @@ const GameIndexManager = ({
       const now = Date.now();
       setCustomSourceLastSynced(new Date(now));
       setCustomSourceGameCount(count);
-      const nextPayload = {
-        ...(customSource || {}),
-        lastSynced: now,
-        lastUsed: now,
-        gameCount: count,
-        // Flag this source as user-provided so gameService never tries to
-        // re-fetch it from the upstream URL (the user's pasted JSON is
-        // persisted to disk and will be used on future loads).
-        userProvided: true,
-      };
+      const nextPayload = withTorrentSourceCapabilities(
+        {
+          ...(customSource || {}),
+          lastSynced: now,
+          lastUsed: now,
+          gameCount: count,
+          // Flag this source as user-provided so gameService never tries to
+          // re-fetch it from the upstream URL (the user's pasted JSON is
+          // persisted to disk and will be used on future loads).
+          userProvided: true,
+        },
+        data?.games
+      );
       setCustomSource(nextPayload);
       await updateSetting("customSource", nextPayload);
       await upsertLibraryEntry(nextPayload);

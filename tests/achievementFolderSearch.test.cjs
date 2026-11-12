@@ -32,15 +32,15 @@ test("windows roots mirror the achievement watcher defaults", () => {
     documentsPath: "D:\\Documents",
   });
   for (const expected of [
-    "D:\\Public\\Documents\\Steam\\CODEX",
-    "D:\\Public\\Documents\\Steam\\RUNE",
-    "D:\\Public\\Documents\\OnlineFix",
-    "D:\\AppData\\Goldberg SteamEmu Saves",
-    "D:\\AppData\\GSE Saves",
-    "D:\\AppData\\SmartSteamEmu",
-    "D:\\Local\\SKIDROW",
-    "D:\\ProgramData\\Steam",
-    "D:\\Documents\\SKIDROW",
+    path.join("D:\\Public", "Documents", "Steam", "CODEX"),
+    path.join("D:\\Public", "Documents", "Steam", "RUNE"),
+    path.join("D:\\Public", "Documents", "OnlineFix"),
+    path.join("D:\\AppData", "Goldberg SteamEmu Saves"),
+    path.join("D:\\AppData", "GSE Saves"),
+    path.join("D:\\AppData", "SmartSteamEmu"),
+    path.join("D:\\Local", "SKIDROW"),
+    path.join("D:\\ProgramData", "Steam"),
+    path.join("D:\\Documents", "SKIDROW"),
   ]) {
     assert.ok(roots.includes(expected), `missing ${expected}`);
   }

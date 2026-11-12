@@ -17,8 +17,10 @@ function moduleUrl(filename) {
   }
   const source = fs
     .readFileSync(filename, "utf8")
-    .replace(/\bfrom\s+["'](\.[^"']+)["']/g, (_, relative) => {
-      let dependency = path.resolve(path.dirname(filename), relative);
+    .replace(/\bfrom\s+["']((?:\.[^"']+)|(?:@\/[^"']+))["']/g, (_, specifier) => {
+      let dependency = specifier.startsWith("@/")
+        ? path.resolve(__dirname, "../../src", specifier.slice(2))
+        : path.resolve(path.dirname(filename), specifier);
       if (!path.extname(dependency)) dependency += ".js";
       return `from ${JSON.stringify(moduleUrl(dependency))}`;
     });

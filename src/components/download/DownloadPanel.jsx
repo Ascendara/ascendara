@@ -270,7 +270,6 @@ export default function DownloadPanel({
   debridPickOptions,
   onDebridPickChange,
   debridPickUnsupported,
-  torrentRunning,
   isStartingDownload,
   isDev,
   providerLink,
@@ -337,15 +336,11 @@ export default function DownloadPanel({
 
   const downloadDisabled =
     debridPickUnsupported ||
-    (isTorrentMode && cloudTorrent
-      ? isStartingDownload
-      : mode === "fitgirl"
-        ? isStartingDownload || !torrentRunning
-        : mode === "torrent"
-          ? isStartingDownload || !settings.torrentEnabled || !torrentRunning
-          : mode === "seamless"
-            ? isStartingDownload || !!linkStage
-            : isStartingDownload || !selectedProvider || !inputLink || !isValidLink);
+    (isTorrentMode
+      ? isStartingDownload || (!cloudTorrent && !settings.torrentEnabled)
+      : mode === "seamless"
+        ? isStartingDownload || !!linkStage
+        : isStartingDownload || !selectedProvider || !inputLink || !isValidLink);
 
   const stepLabels = {
     opening: t("download.downloadOptions.openingDownloadPage"),
@@ -529,20 +524,12 @@ export default function DownloadPanel({
           )}
 
           {/* Torrent flows */}
-          {mode === "torrent" && !cloudTorrent && !settings.torrentEnabled && (
+          {isTorrentMode && !cloudTorrent && !settings.torrentEnabled && (
             <Notice>
               {t("download.toast.torrentDisabled") ||
                 "Enable torrenting in Settings to download this game."}
             </Notice>
           )}
-          {isTorrentMode &&
-            !cloudTorrent &&
-            (mode === "fitgirl" || settings.torrentEnabled) &&
-            !torrentRunning && (
-              <Notice>
-                {t("download.downloadOptions.torrentInstructions.noTorrent")}
-              </Notice>
-            )}
           {isTorrentMode && cloudTorrent && (
             <Notice tone="info" icon={Magnet}>
               {t("debrid.torrentVia", { provider: debridProvider?.name })}

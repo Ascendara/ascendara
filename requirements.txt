@@ -3,4 +3,3 @@ patool>=1.12
 psutil>=5.9.0
 pypresence>=4.3.0
 PyQt6>=6.6.0
-qbittorrent-api>=2024.1.5

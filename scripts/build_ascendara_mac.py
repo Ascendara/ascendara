@@ -9,13 +9,10 @@ import shutil
 import subprocess
 import sys
 from build_support import register_after_build, validate_resources
-from setup_macos_tools import TOOL_DIR, validate_tool
 import build_highball
 
 ROOT = Path(__file__).resolve().parents[1]
-HELPERS = (
-    'AscendaraLanguageTranslation', 'AscendaraTorrentHandler', 'AscendaraNotificationHelper',
-)
+HELPERS = ('AscendaraLanguageTranslation', 'AscendaraNotificationHelper')
 RUST_HELPERS = ('AscendaraCrashReporter', 'AscendaraGameHandler', 'AscendaraDownloader')
 
 
@@ -72,10 +69,6 @@ def preflight(arch):
     for command in ('node', 'yarn', 'xcrun', 'lipo'):
         if not shutil.which(command):
             errors.append(f'Missing build dependency: {command}')
-    try:
-        validate_tool(architecture=MACH_ARCH[arch])
-    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
-        errors.append(str(error))
     try:
         actual = subprocess.check_output(python_command(arch) +
             ['-c', 'import platform; print(platform.machine())'], text=True, stderr=subprocess.PIPE).strip()
@@ -168,10 +161,6 @@ def build_arch(arch, args, identity):
         if identity:
             # Onefile payloads must be signed before they are embedded.
             command += ['--codesign-identity', identity]
-        if name == 'AscendaraTorrentHandler':
-            command += ['--add-binary', f'{TOOL_DIR / "7zz"}:.',
-                        '--add-data', f'{TOOL_DIR / "License.txt"}:licenses/7zip',
-                        '--add-data', f'{TOOL_DIR / "readme.txt"}:licenses/7zip']
         if name == 'AscendaraNotificationHelper':
             command += ['--add-data', f'{ROOT / "binaries" / name / "src/sounds"}:sounds',
                         '--hidden-import', 'PyQt6.QtMultimedia']
@@ -196,8 +185,7 @@ def build_arch(arch, args, identity):
     config = json.loads((ROOT / 'package.json').read_text())['build']
     config['mac']['extraResources'] = [
         {'from': 'readme/logo/png/ascendara_512x.png', 'to': 'icon.png'},
-        {'from': str(TOOL_DIR / 'License.txt'), 'to': 'licenses/7zip/License.txt'},
-        {'from': str(TOOL_DIR / 'readme.txt'), 'to': 'licenses/7zip/readme.txt'},
+        {'from': 'THIRD_PARTY_NOTICES.md', 'to': 'THIRD_PARTY_NOTICES.md'},
         *({'from': str(staging / name), 'to': name} for name in names),
         *({'from': str(highball / name), 'to': f'Highball/{name}'}
           for name in (build_highball.STAGED_FILES if highball else ())),

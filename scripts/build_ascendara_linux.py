@@ -155,46 +155,23 @@ def build_python_binaries_linux():
         print("Failed to install PyInstaller")
         return False
 
-    # Install all binary requirements into the build venv so PyInstaller bundles them
-    print("Installing binary dependencies into build venv...")
-    for binary_name in sorted(os.listdir(binaries_dir)):
-        req_file = os.path.join(binaries_dir, binary_name, 'requirements.txt')
-        if os.path.exists(req_file):
-            print(f"  Installing requirements for {binary_name}...")
-            if not run_command([venv_pip, 'install', '--quiet', '-r', req_file]):
-                print(f"Failed to install requirements for {binary_name}")
-                return False
-
-    unrar = shutil.which('unrar')
-    license_paths = [os.environ.get('ASCENDARA_UNRAR_LICENSE', ''),
-                     '/usr/share/doc/unrar/copyright', '/usr/share/licenses/unrar/license.txt',
-                     '/usr/share/licenses/unrar/LICENSE']
-    unrar_license = next((path for path in license_paths if path and os.path.isfile(path)), None)
-    if not unrar or not unrar_license:
-        print('Linux builds require UnRAR and its redistribution license on the build machine. '
-              'Install the build dependency and, if needed, set ASCENDARA_UNRAR_LICENSE to its license file.')
-        return False
-    seven = '/usr/lib/p7zip/7z'
-    seven_library = '/usr/lib/p7zip/7z.so'
-    seven_license = '/usr/share/doc/p7zip-full/copyright'
-    if not all(os.path.isfile(path) for path in (seven, seven_library, seven_license)):
-        print('Install p7zip-full, including /usr/lib/p7zip/7z and 7z.so.')
-        return False
-    extraction_args = ['--add-binary', f'{seven}:.',
-                       '--add-binary', f'{seven_library}:.',
-                       '--add-data', f'{seven_license}:licenses/7zip',
-                       '--add-binary', f'{unrar}:.',
-                       '--add-data', f'{unrar_license}:licenses/unrar']
-
-
     # Map: (output name, script path relative to binaries_dir, extra PyInstaller args)
     binaries = [
         ('AscendaraLanguageTranslation', 'AscendaraLanguageTranslation/src/AscendaraLanguageTranslation.py', []),
-        ('AscendaraTorrentHandler',      'AscendaraTorrentHandler/src/AscendaraTorrentHandler.py',  extraction_args),
         ('AscendaraNotificationHelper',  'AscendaraNotificationHelper/src/AscendaraNotificationHelper.py',
          ['--windowed', '--hidden-import', 'PyQt6.QtMultimedia',
           '--add-data', f'{os.path.join(binaries_dir, "AscendaraNotificationHelper/src/sounds")}:sounds']),
     ]
+
+    # Install requirements only for helpers that are actually part of this build.
+    print("Installing binary dependencies into build venv...")
+    for folder_name in sorted({rel_script.split('/')[0] for _, rel_script, _ in binaries}):
+        req_file = os.path.join(binaries_dir, folder_name, 'requirements.txt')
+        if os.path.exists(req_file):
+            print(f"  Installing requirements for {folder_name}...")
+            if not run_command([venv_pip, 'install', '--quiet', '-r', req_file]):
+                print(f"Failed to install requirements for {folder_name}")
+                return False
 
     # 1. Find all the unique folders and clean them up ONCE before compiling
     unique_dirs = set(rel_script.split('/')[0] for _, rel_script, _ in binaries)

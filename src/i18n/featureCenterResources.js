@@ -76,7 +76,7 @@ const featureCenterResources = {
         "Download from hosts that are slow or capped for free users at full speed.",
       featureTorrents: "Cloud torrents",
       featureTorrentsDescription:
-        "Magnets download on the service's servers, so qBittorrent isn't needed.",
+        "Magnets download on the service's servers instead of your PC.",
       featureHandoff: "Straight to your PC",
       featureHandoffDescription:
         "Finished cloud downloads move to your PC and install like any other game.",
@@ -85,7 +85,7 @@ const featureCenterResources = {
       summaryHosts: "Hosted links",
       summaryMagnets: "Magnets",
       routeDirect: "Direct download",
-      routeLocal: "qBittorrent",
+      routeLocal: "Ascendara",
       routeNone: "Not handled",
       openDownloads: "Open debrid downloads",
       torrentParts: {
@@ -152,12 +152,11 @@ const featureCenterResources = {
       },
       keyDescription: "The key is checked before it is saved.",
       useMagnets: "Cloud torrents",
-      useMagnetsDescription:
-        "Allow this service to handle magnet links without qBittorrent.",
+      useMagnetsDescription: "Allow this service to handle magnet links in the cloud.",
       preferSeamless: "Prefer over direct downloads",
       preferSeamlessDescription:
         "Use this service for supported hosts that can also download directly.",
-      localFallback: "Fall back to qBittorrent",
+      localFallback: "Fall back to local torrent download",
       localFallbackDescription:
         "Use local torrenting if this service cannot submit a magnet. Requires local torrenting to be enabled.",
       preferredProvider: "Preferred debrid service",
@@ -170,7 +169,8 @@ const featureCenterResources = {
       pickNone: "No debrid",
       pickUnsupported:
         "{{provider}} can't take this download. Pick another service or Default.",
-      torrentFallback: "Cloud torrent submission failed. Falling back to qBittorrent.",
+      torrentFallback:
+        "Cloud torrent submission failed. Falling back to local torrent download.",
       handoff: {
         folderHasInstall:
           "Folder already has an install: remove it or pick another download folder",
@@ -182,7 +182,7 @@ const featureCenterResources = {
     },
     localRefresh: {
       torrentHandlerRequired:
-        "{{name}} only publishes magnet links. Enable local torrenting or configure a debrid service with torrent support in Settings to use this source.",
+        "{{name}} only publishes torrent links that your current setup cannot handle. Enable local torrenting or choose another source.",
     },
     featureCenters: {
       common: {

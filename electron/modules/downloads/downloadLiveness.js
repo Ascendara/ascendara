@@ -12,7 +12,7 @@ const { execFile } = require("child_process");
 const { BrowserWindow } = require("electron");
 const { isWindows } = require("../core/config");
 
-const HELPERS = /Ascendara(Downloader|GofileHelper|TorrentHandler)/i;
+const HELPERS = /Ascendara(Downloader|GofileHelper)/i;
 // Metadata written this recently may belong to a helper that is still starting.
 const GRACE_MS = 30000;
 const CHECK_INTERVAL_MS = 15000;

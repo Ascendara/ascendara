@@ -1,7 +1,7 @@
 const { execFile } = require("child_process");
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const helper = /Ascendara(Downloader|GofileHelper|TorrentHandler)(?:\.exe|\.py)?/i;
+const helper = /Ascendara(Downloader|GofileHelper)(?:\.exe|\.py)?/i;
 
 function run(command, args) {
   return new Promise((resolve, reject) => {
@@ -20,7 +20,7 @@ async function listHelpers(windows = process.platform === "win32") {
       "-NoProfile",
       "-NonInteractive",
       "-Command",
-      "ConvertTo-Json -Compress -InputObject @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object { $_.Name -match '^Ascendara(Downloader|GofileHelper|TorrentHandler)(\\.exe)?$' } | Select-Object ProcessId,CommandLine)",
+      "ConvertTo-Json -Compress -InputObject @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object { $_.Name -match '^Ascendara(Downloader|GofileHelper)(\\.exe)?$' } | Select-Object ProcessId,CommandLine)",
     ]);
     const parsed = JSON.parse(output.trim() || "[]") || [];
     return (Array.isArray(parsed) ? parsed : [parsed]).map(p => ({

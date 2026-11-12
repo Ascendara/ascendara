@@ -123,7 +123,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y unrar p7zip-full libfuse2 libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libpango1.0-dev libgl1-mesa-dev libglu1-mesa-dev libssl-dev pkg-config
+          sudo apt-get install -y libfuse2 libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libpango1.0-dev libgl1-mesa-dev libglu1-mesa-dev libssl-dev pkg-config
       - name: Install JavaScript dependencies
         run: yarn install --frozen-lockfile
       - name: Configure application
@@ -133,9 +133,6 @@ jobs:
           ASCENDARA_SECRET_SEED: ${{ secrets.ASCENDARA_SECRET_SEED }}
           REACT_APP_DISCKEY: ${{ vars.REACT_APP_DISCKEY }}
         run: python scripts/ci_build.py configure
-      - name: Set up Mac extraction tools
-        if: runner.os == 'macOS'
-        run: yarn setup-mac
       - name: Check signing configuration
         id: signing
         shell: bash

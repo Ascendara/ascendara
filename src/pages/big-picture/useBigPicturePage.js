@@ -11,6 +11,7 @@ import {
 } from "@/services/downloads/downloadQueueService";
 import { toast } from "sonner";
 import * as debrid from "@/services/downloads/debridService";
+import { canDownloadTorrentLinks } from "@/services/downloads/torrentCapability";
 import { freedByPause } from "@/services/downloads/downloadState";
 import * as torboxService from "@/services/downloads/torboxService";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
@@ -371,9 +372,15 @@ function useBigPicturePage() {
     const torrentOnly = Object.keys(links).every(
       host => host === "torrent" || !firstLink(host)
     );
+    const torrentCandidates = (
+      Array.isArray(links.torrent) ? links.torrent : [links.torrent]
+    ).filter(link => typeof link === "string" && link.trim());
+    const torrentRouteAvailable = canDownloadTorrentLinks(
+      torrentCandidates,
+      settings
+    );
     if (
-      debrid.canUseCloudTorrents(settings) &&
-      firstLink("torrent") &&
+      torrentRouteAvailable &&
       (preferredProvider === "torrent" || (!preferredProvider && torrentOnly))
     ) {
       setDownloadingGame(game);
@@ -594,7 +601,7 @@ function useBigPicturePage() {
           newSet.delete(game.game);
           return newSet;
         });
-        toast.error(t("downloads.resumeError"));
+        toast.error(result.error || t("downloads.resumeError"));
       }
     } catch (error) {
       console.error("Error resuming download:", error);
@@ -603,7 +610,7 @@ function useBigPicturePage() {
         newSet.delete(game.game);
         return newSet;
       });
-      toast.error(t("downloads.resumeError"));
+      toast.error(error.message || t("downloads.resumeError"));
     }
   };
 

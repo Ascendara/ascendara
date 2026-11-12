@@ -69,9 +69,11 @@ import { useSettings } from "@/context/SettingsContext";
 import {
   processNextInQueue,
   getDownloadQueue,
+  getQueueBlockReason,
   removeFromQueue,
   reorderQueue,
 } from "@/services/downloads/downloadQueueService";
+import { TORRENT_DISABLED_CODE } from "@/services/downloads/torrentLink";
 import {
   checkDownloadCommands,
   acknowledgeCommand,
@@ -1456,7 +1458,9 @@ const Downloads = () => {
                 </h2>
                 <div className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card shadow">
                   {queuedDownloads.map((item, index) => {
-                    const startsNext = index === 0 && queueStartsNext;
+                    const blockReason = getQueueBlockReason(item, settings);
+                    const torrentBlocked = blockReason === TORRENT_DISABLED_CODE;
+                    const startsNext = index === 0 && queueStartsNext && !torrentBlocked;
                     return (
                       <div
                         key={item.id}
@@ -1499,7 +1503,9 @@ const Downloads = () => {
                       >
                         <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-muted-foreground" />
                         <div className="flex h-6 w-6 shrink-0 items-center justify-center text-sm font-medium tabular-nums text-muted-foreground">
-                          {startsNext ? (
+                          {torrentBlocked ? (
+                            <AlertCircle className="h-4 w-4 text-amber-500" />
+                          ) : startsNext ? (
                             <Loader className="h-4 w-4 animate-spin text-primary" />
                           ) : (
                             index + 1
@@ -1509,9 +1515,11 @@ const Downloads = () => {
                           {item.gameName}
                         </p>
                         <span className="shrink-0 text-xs text-muted-foreground">
-                          {startsNext
-                            ? t("downloads.startingSoon", "Starting soon...")
-                            : t("downloads.waitingInQueue", "Waiting in queue")}
+                          {torrentBlocked
+                            ? t("download.toast.torrentDisabled")
+                            : startsNext
+                              ? t("downloads.startingSoon", "Starting soon...")
+                              : t("downloads.waitingInQueue", "Waiting in queue")}
                         </span>
                         <IconAction
                           label={t("downloads.removeFromQueue", "Remove from queue")}

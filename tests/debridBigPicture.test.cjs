@@ -36,6 +36,13 @@ test("Big Picture respects normal host priority and hands any adapter's cloud do
     submitMagnet: async () => {},
   };
   const debrid = createDebridService([provider]);
+  const { isMagnetLink, isTorrentLink } = await loadModule(
+    "src/services/downloads/torrentLink.js"
+  );
+  const canDownloadTorrentLinks = (links, settings) =>
+    (settings?.torrentEnabled === true && links.some(isTorrentLink)) ||
+    (debrid.canUseCloudTorrents(settings) && links.some(isMagnetLink));
+
   for (const [name, extraSettings, preferredHost, links, expected] of [
     [
       "normal seamless priority",
@@ -49,16 +56,23 @@ test("Big Picture respects normal host priority and hands any adapter's cloud do
       { thirdPriority: true },
       null,
       { custom: ["https://files.test/file"], gofile: ["https://gofile.io/d/file"] },
-      "cloud",
+      "handoff",
     ],
     [
       "explicit hosted selection",
       {},
       "custom",
       { custom: ["https://files.test/file"], gofile: ["https://gofile.io/d/file"] },
-      "cloud",
+      "handoff",
     ],
-    ["cloud torrent", {}, null, { torrent: ["magnet:?xt=test"] }, "cloud"],
+    ["cloud torrent", {}, null, { torrent: ["magnet:?xt=test"] }, "handoff"],
+    [
+      "local raw torrent",
+      { torrentEnabled: true, thirdTorrents: false },
+      null,
+      { torrent: ["https://example.test/game.torrent"] },
+      "handoff",
+    ],
   ]) {
     await t.test(name, async () => {
       const downloads = [];
@@ -66,6 +80,7 @@ test("Big Picture respects normal host priority and hands any adapter's cloud do
       const context = vm.createContext({
         settings: { debridEnabled: true, thirdKey: "key", ...extraSettings },
         debrid,
+        canDownloadTorrentLinks,
         SEAMLESS_PROVIDERS: ["gofile", "pixeldrain"],
         hasActiveDownloads: async () => false,
         sanitizeText: value => value,
@@ -88,9 +103,20 @@ test("Big Picture respects normal host priority and hands any adapter's cloud do
       });
       const start = vm.runInContext(`(${handler})`, context);
       await start({ game: "Example", download_links: links }, preferredHost);
-      assert.equal(exited, expected === "cloud");
+      assert.equal(exited, expected === "handoff");
       assert.equal(downloads.length, expected === "direct" ? 1 : 0);
       if (downloads.length) assert.equal(downloads[0][0], "https://gofile.io/d/file");
     });
   }
+});
+
+test("Big Picture resume surfaces the main-process error instead of hiding it", () => {
+  assert.match(
+    source,
+    /toast\.error\(result\.error \|\| t\("downloads\.resumeError"\)\)/
+  );
+  assert.match(
+    source,
+    /toast\.error\(error\.message \|\| t\("downloads\.resumeError"\)\)/
+  );
 });
