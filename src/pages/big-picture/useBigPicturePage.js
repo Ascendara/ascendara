@@ -14,7 +14,11 @@ import * as debrid from "@/services/downloads/debridService";
 import { canDownloadTorrentLinks } from "@/services/downloads/torrentCapability";
 import { freedByPause } from "@/services/downloads/downloadState";
 import * as torboxService from "@/services/downloads/torboxService";
-import { SEAMLESS_PROVIDERS } from "@/config/providers";
+import {
+  SEAMLESS_PROVIDERS,
+  MAGIC_LINK_PROVIDERS,
+  isMagicLink,
+} from "@/config/providers";
 import { sanitizeText } from "@/lib/utils";
 import recentGamesService from "@/services/library/recentGamesService";
 import gameService from "@/services/games/gameService";
@@ -375,10 +379,7 @@ function useBigPicturePage() {
     const torrentCandidates = (
       Array.isArray(links.torrent) ? links.torrent : [links.torrent]
     ).filter(link => typeof link === "string" && link.trim());
-    const torrentRouteAvailable = canDownloadTorrentLinks(
-      torrentCandidates,
-      settings
-    );
+    const torrentRouteAvailable = canDownloadTorrentLinks(torrentCandidates, settings);
     if (
       torrentRouteAvailable &&
       (preferredProvider === "torrent" || (!preferredProvider && torrentOnly))
@@ -457,86 +458,221 @@ function useBigPicturePage() {
       }
     }
 
+    // Magic Link hosts (Buzzheavier, MegaDB) resolve in a hidden window, the
+    // same as on the Download page, so they need no mouse or desktop mode.
+    // Seamless hosts come first again in case debrid priority skipped them above.
+    if (!downloadUrl) {
+      for (const provider of [...seamlessProviders, ...MAGIC_LINK_PROVIDERS]) {
+        const link = firstLink(provider);
+        if (typeof link === "string" && link.trim()) {
+          selectedProvider = provider;
+          downloadUrl = link;
+          break;
+        }
+      }
+    }
+
+    // Any other host still has a page to click through: do that outside Big Picture
     if (!downloadUrl || !selectedProvider) {
-      toast.error(t("bigPicture.downloadError"));
+      if (Object.keys(links).some(host => firstLink(host))) {
+        setDownloadingGame(game);
+        setShowExitDialog(true);
+      } else {
+        toast.error(t("bigPicture.downloadError"));
+      }
       return;
     }
 
-    // Check if the selected host should download without debrid
-    const isSeamlessWithoutDebrid =
-      seamlessProviders.includes(selectedProvider) &&
-      !debrid.canUseForHost(settings, selectedProvider, downloadUrl, debridHosts);
+    downloadUrl = downloadUrl.replace(/^(?:https?:)?\/{2}/, "https://");
+    const routeThroughDebrid = debrid.canUseForHost(
+      settings,
+      selectedProvider,
+      downloadUrl,
+      debridHosts
+    );
 
-    if (isSeamlessWithoutDebrid) {
-      // Check if there's an active download
-      const hasActive = await hasActiveDownloads();
-
-      if (hasActive && !forceStart) {
-        // Non-Ascend users can only have 1 download at a time - show error toast
-        if (!isAuthenticated) {
-          toast.error(t("download.toast.downloadQueueLimit"));
-          return;
-        }
-
-        // Ascend users get the queue dialog with options
-        const sanitizedGameName = sanitizeText(game.game);
-        const isVrGame = game.category?.includes("Virtual Reality");
-
-        setPendingDownloadData({
-          url: downloadUrl,
-          gameName: sanitizedGameName,
-          online: game.online || false,
-          dlc: game.dlc || false,
-          isVr: isVrGame || false,
-          updateFlow: false,
-          version: game.version || "",
-          imgID: game.imgID,
-          size: game.size || "",
-          additionalDirIndex: 0,
-          gameID: game.gameID || "",
-        });
-        setShowQueuePrompt(true);
-        return;
-      }
-
-      // Seamless download - start it directly
-      try {
-        // Properly format the link
-        downloadUrl = downloadUrl.replace(/^(?:https?:)?\/{2}/, "https://");
-
-        const sanitizedGameName = sanitizeText(game.game);
-        const isVrGame = game.category?.includes("Virtual Reality");
-
-        // Start the download
-        const result = await window.electron.downloadFile(
-          downloadUrl,
-          sanitizedGameName,
-          game.online || false,
-          game.dlc || false,
-          isVrGame || false,
-          false, // updateFlow
-          game.version || "",
-          game.imgID,
-          game.size || "",
-          0, // dir index
-          game.gameID || ""
-        );
-
-        if (result?.success === false) {
-          throw new Error(result.error || t("bigPicture.downloadError"));
-        }
-        toast.success(t("bigPicture.downloadStarted"));
-        changeView("downloads");
-      } catch (error) {
-        console.error("Error starting download:", error);
-        toast.error(error.message || t("bigPicture.downloadError"));
-      }
+    if (!routeThroughDebrid && seamlessProviders.includes(selectedProvider)) {
+      await startResolvedDownload(game, downloadUrl, forceStart);
+    } else if (!routeThroughDebrid && isMagicLink(selectedProvider, downloadUrl)) {
+      await startMagicLinkDownload(game, downloadUrl, forceStart);
     } else {
-      // Non-seamless or cloud download - show exit dialog
+      // Debrid or cloud download - show exit dialog
       setDownloadingGame(game);
       setShowExitDialog(true);
     }
   };
+
+  // Starts (or offers to queue) a download whose file link is already known
+  const startResolvedDownload = async (game, downloadUrl, forceStart = false) => {
+    const sanitizedGameName = sanitizeText(game.game);
+    const isVrGame = game.category?.includes("Virtual Reality");
+    const downloadData = {
+      url: downloadUrl,
+      gameName: sanitizedGameName,
+      online: game.online || false,
+      dlc: game.dlc || false,
+      isVr: isVrGame || false,
+      updateFlow: game.isUpdating || false,
+      version: game.version || "",
+      imgID: game.imgID,
+      size: game.size || "",
+      additionalDirIndex: 0,
+      gameID: game.gameID || "",
+    };
+
+    if (!forceStart && (await hasActiveDownloads())) {
+      // Non-Ascend users can only have 1 download at a time
+      if (!isAuthenticated) {
+        toast.error(t("download.toast.downloadQueueLimit"));
+        return;
+      }
+      setPendingDownloadData(downloadData);
+      setShowQueuePrompt(true);
+      return;
+    }
+
+    await launchDownload(downloadData);
+  };
+
+  const launchDownload = async data => {
+    try {
+      const result = await window.electron.downloadFile(
+        data.url,
+        data.gameName,
+        data.online,
+        data.dlc,
+        data.isVr,
+        data.updateFlow,
+        data.version,
+        data.imgID,
+        data.size,
+        data.additionalDirIndex,
+        data.gameID
+      );
+      if (result?.success === false) {
+        throw new Error(
+          result.code === "HELPER_MISSING"
+            ? t("download.toast.downloaderMissing")
+            : result.error || t("bigPicture.downloadError")
+        );
+      }
+      toast.success(t("bigPicture.downloadStarted"));
+      changeView("downloads");
+    } catch (error) {
+      console.error("Error starting download:", error);
+      toast.error(error.message || t("bigPicture.downloadError"));
+    }
+  };
+
+  // --- MAGIC LINK (hidden provider window) ---
+  const pendingMagicLink = useRef(null);
+  const magicLinkToastId = "bp-magic-link";
+  const showMagicLinkStage = useCallback(
+    stage => {
+      const labels = {
+        opening: t("download.downloadOptions.openingDownloadPage"),
+        countdown: t("download.downloadOptions.waitingForCountdown"),
+        resolving: t("download.downloadOptions.gettingDownloadLink"),
+        starting: t("download.downloadOptions.startingDownload"),
+      };
+      if (labels[stage]) toast.loading(labels[stage], { id: magicLinkToastId });
+    },
+    [t]
+  );
+  // Set while a link is being opened or resolved, so a second press is ignored
+  const magicLinkBusy = useRef(false);
+  const clearMagicLink = useCallback(() => {
+    pendingMagicLink.current = null;
+    magicLinkBusy.current = false;
+    toast.dismiss(magicLinkToastId);
+  }, []);
+
+  const startMagicLinkDownload = async (game, pageUrl, forceStart) => {
+    if (magicLinkBusy.current) return;
+    magicLinkBusy.current = true;
+    const start = url => startResolvedDownload(game, url, forceStart);
+    pendingMagicLink.current = start;
+    showMagicLinkStage("opening");
+
+    // MegaDB resolves without any window; the window is only a fallback
+    if (/megadb\.(?:net|xyz)/i.test(pageUrl)) {
+      let resolved;
+      try {
+        resolved = await window.electron.resolveMegaDbLink(pageUrl);
+      } catch (error) {
+        resolved = { error: error.message };
+      }
+      if (resolved?.url) {
+        showMagicLinkStage("starting");
+        try {
+          await start(resolved.url);
+        } finally {
+          clearMagicLink();
+        }
+        return;
+      }
+      console.warn("[BigPicture] MegaDB link not resolved:", resolved?.error);
+    }
+
+    // The page is handled in a hidden window; only shown if it needs the user
+    try {
+      const result = await window.electron.openURL(pageUrl, {
+        referrer: "https://steamrip.com/",
+        autoDownload: true,
+      });
+      if (result?.status === "intercepted") return; // handed to the listener below
+      if (result?.status === "shown") {
+        // Still waiting on the window: the user clicks through it, then the
+        // listener below picks the download up
+        magicLinkBusy.current = false;
+        toast.dismiss(magicLinkToastId);
+        toast.info(t("download.downloadOptions.buzzheavierReminder"));
+        return;
+      }
+      clearMagicLink();
+      if (result?.status === "blocked") {
+        toast.error(t("bigPicture.downloadError"));
+      }
+    } catch (error) {
+      console.error("[BigPicture] Error opening provider page:", error);
+      clearMagicLink();
+      toast.error(t("bigPicture.downloadError"));
+    }
+  };
+
+  useEffect(() => {
+    const handleIntercepted = async (_event, url) => {
+      const start = pendingMagicLink.current;
+      if (!start || !url?.startsWith("ascendara://")) return;
+      pendingMagicLink.current = null;
+      showMagicLinkStage("starting");
+      try {
+        const downloadUrl = decodeURIComponent(url.slice("ascendara://".length)).replace(
+          /\/$/,
+          ""
+        );
+        if (!["https:", "http:"].includes(new URL(downloadUrl).protocol)) {
+          throw new Error("Invalid intercepted download URL");
+        }
+        await start(downloadUrl);
+      } catch (error) {
+        console.error("[BigPicture] Error handling intercepted download:", error);
+        toast.error(t("bigPicture.downloadError"));
+      } finally {
+        clearMagicLink();
+      }
+    };
+    const removeIntercepted = window.electron.onInterceptedDownloadUrl(handleIntercepted);
+    const removeProgress = window.electron.onExternalWindowProgress(({ stage }) => {
+      // Only while a hidden-window download is still being worked on
+      if (pendingMagicLink.current) showMagicLinkStage(stage);
+    });
+    return () => {
+      removeIntercepted && removeIntercepted();
+      removeProgress && removeProgress();
+      clearMagicLink();
+    };
+  }, [showMagicLinkStage, clearMagicLink, t]);
 
   const handlePauseDownload = async game => {
     setStoppingDownloads(prev => new Set([...prev, game.game]));
@@ -1403,6 +1539,7 @@ function useBigPicturePage() {
     setView,
     setSelectedStoreGame,
     handleStartDownload,
+    launchDownload,
     setProviderDialogGame,
     setProviderDialogProviders,
     setShowProviderDialog,

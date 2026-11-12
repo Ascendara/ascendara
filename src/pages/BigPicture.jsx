@@ -143,6 +143,7 @@ function BigPicture() {
     setView,
     setSelectedStoreGame,
     handleStartDownload,
+    launchDownload,
     setProviderDialogGame,
     setProviderDialogProviders,
     setShowProviderDialog,
@@ -565,28 +566,7 @@ function BigPicture() {
           }}
           onStartNow={async () => {
             setShowQueuePrompt(false);
-            if (pendingDownloadData) {
-              try {
-                await window.electron.downloadFile(
-                  pendingDownloadData.url,
-                  pendingDownloadData.gameName,
-                  pendingDownloadData.online,
-                  pendingDownloadData.dlc,
-                  pendingDownloadData.isVr,
-                  pendingDownloadData.updateFlow,
-                  pendingDownloadData.version,
-                  pendingDownloadData.imgID,
-                  pendingDownloadData.size,
-                  pendingDownloadData.additionalDirIndex,
-                  pendingDownloadData.gameID
-                );
-                toast.success(t("bigPicture.downloadStarted"));
-                changeView("downloads");
-              } catch (error) {
-                console.error("Error starting download:", error);
-                toast.error(t("bigPicture.downloadError"));
-              }
-            }
+            if (pendingDownloadData) await launchDownload(pendingDownloadData);
             setPendingDownloadData(null);
           }}
           onAddToQueue={() => {

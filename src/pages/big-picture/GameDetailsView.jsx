@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { useGameImage } from "@/hooks/useGameImage";
 import steamService from "@/services/games/gameInfoService";
 import nexusModsService from "@/services/integrations/nexusModsService";
@@ -22,7 +21,7 @@ import {
   ChevronDown,
   Image as ImageIcon,
 } from "lucide-react";
-import { checkSeamlessAvailable } from "./utils";
+import { checkSeamlessAvailable, getInAppProviders } from "./utils";
 import { getControllerButtons } from "./controller";
 import { useControllerInput } from "./useControllerInput";
 import { DetailBackButton } from "./DetailBackButton";
@@ -51,12 +50,9 @@ const GameDetailsView = ({
   const [needsUpdate, setNeedsUpdate] = useState(false);
   const isMounted = useRef(true);
 
-  // Provider selection for seamless downloads
+  // Provider selection for downloads Big Picture can run itself
   const [selectedProviderIndex, setSelectedProviderIndex] = useState(0);
-  const seamlessProviders = SEAMLESS_PROVIDERS;
-  const availableProviders = isSeamless
-    ? seamlessProviders.filter(provider => game.download_links?.[provider])
-    : [];
+  const availableProviders = getInAppProviders(game);
 
   const descriptionRef = useRef(null);
   const screenshotsRef = useRef(null);
@@ -385,7 +381,7 @@ const GameDetailsView = ({
       <div className="absolute inset-0 z-0 bg-gradient-to-r from-[#0e0e10] via-[#0e0e10]/70 to-transparent" />
 
       <div
-        className={`bp-detail-art absolute right-0 top-0 z-10 flex h-full w-[55%] items-center justify-center p-12 transition-all duration-500 ease-in-out ${
+        className={`bp-detail-art bp-dv-art absolute right-0 top-0 z-10 flex h-full w-[55%] items-center justify-center p-12 transition-all duration-500 ease-in-out ${
           showMedia
             ? "pointer-events-none translate-y-[-10%] scale-95 opacity-0"
             : "translate-y-0 scale-100 opacity-100"
@@ -408,11 +404,11 @@ const GameDetailsView = ({
       >
         {/* VIEW 1: DETAILS */}
         <div className="relative h-full w-full flex-shrink-0">
-          <div className="bp-detail-hero flex h-full w-[45%] flex-col justify-center p-16 pl-24">
-            <h1 className="mb-6 text-6xl font-black leading-tight tracking-tight text-white drop-shadow-lg">
+          <div className="bp-detail-hero bp-dv-hero flex h-full w-[45%] flex-col justify-center overflow-hidden px-16 pb-16 pl-24 pt-28">
+            <h1 className="bp-dv-title mb-6 line-clamp-2 shrink-0 text-6xl font-black leading-tight tracking-tight text-white drop-shadow-lg">
               {game.name || game.game}
             </h1>
-            <div className="mb-6 flex flex-wrap gap-3">
+            <div className="bp-dv-tags mb-6 flex shrink-0 flex-wrap gap-3">
               {game.category &&
                 game.category.slice(0, 4).map((cat, idx) => (
                   <span
@@ -424,13 +420,11 @@ const GameDetailsView = ({
                 ))}
             </div>
 
-            <div className="mb-8 flex gap-6 text-white/80">
+            <div className="bp-dv-meta mb-8 flex shrink-0 gap-6 text-white/80">
               {game.size && (
                 <div className="flex items-center gap-2">
                   <Download className="h-5 w-5" />
-                  <span className="font-medium">
-                    {catalogSizeText(game, t)}
-                  </span>
+                  <span className="font-medium">{catalogSizeText(game, t)}</span>
                 </div>
               )}
               {game.version && (
@@ -442,7 +436,7 @@ const GameDetailsView = ({
             </div>
 
             {(game.dlc || game.online || isSeamless !== undefined) && (
-              <div className="mb-6 flex flex-wrap gap-4">
+              <div className="bp-dv-badges mb-6 flex shrink-0 flex-wrap gap-4">
                 {game.dlc && (
                   <div className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/20 px-4 py-2 text-sm font-medium text-purple-300 backdrop-blur-sm">
                     <Download className="h-4 w-4" />
@@ -499,7 +493,7 @@ const GameDetailsView = ({
                 </div>
               )}
 
-            <div className="mb-6 flex gap-4">
+            <div className="bp-dv-actions mb-6 flex shrink-0 gap-4">
               <button
                 onClick={() => {
                   // Don't allow download if already installed and no update available
@@ -513,7 +507,7 @@ const GameDetailsView = ({
                   }
                 }}
                 disabled={isInstalled && !needsUpdate}
-                className={`group flex w-fit items-center gap-4 rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 ${
+                className={`group flex w-fit shrink-0 items-center gap-4 whitespace-nowrap rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 ${
                   isInstalled && !needsUpdate
                     ? "cursor-not-allowed bg-muted text-muted-foreground opacity-50"
                     : focusedSection === "button" && selectedButton === 0
@@ -549,7 +543,7 @@ const GameDetailsView = ({
 
               <button
                 onClick={handlePlayLater}
-                className={`group flex w-fit items-center gap-3 rounded-2xl px-8 py-5 text-xl font-bold shadow-lg transition-all duration-200 ${
+                className={`group flex w-fit shrink-0 items-center gap-3 whitespace-nowrap rounded-2xl px-8 py-5 text-xl font-bold shadow-lg transition-all duration-200 ${
                   focusedSection === "button" && selectedButton === 1
                     ? isPlayLater
                       ? "scale-110 bg-green-500 text-secondary shadow-green-500/50 ring-4 ring-green-400/50"
@@ -575,13 +569,13 @@ const GameDetailsView = ({
 
             <div
               ref={descriptionRef}
-              className={`mb-8 max-h-[400px] min-h-[200px] max-w-3xl overflow-y-auto rounded-xl p-6 transition-all duration-200 ${
+              className={`bp-dv-desc mb-8 max-h-[400px] min-h-0 max-w-3xl shrink overflow-y-auto rounded-xl p-6 transition-all duration-200 ${
                 focusedSection === "description"
                   ? "bg-muted/50 ring-4 ring-primary"
                   : "bg-muted/20"
               }`}
             >
-              <p className="text-lg leading-relaxed text-white/90">
+              <p className="bp-dv-desc-text text-lg leading-relaxed text-white/90">
                 {(
                   steamData?.summary ||
                   steamData?.description ||
@@ -596,7 +590,7 @@ const GameDetailsView = ({
               </p>
             </div>
 
-            <div className="mt-8 space-y-4">
+            <div className="bp-dv-features mt-8 shrink-0 space-y-4">
               {/* Ascend Features Banner */}
               <div className="group relative max-w-2xl overflow-hidden rounded-xl border border-white/10 bg-muted/50 p-5 shadow-xl backdrop-blur-sm transition-all duration-300 hover:border-white/20 hover:bg-muted/70">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
@@ -683,7 +677,7 @@ const GameDetailsView = ({
             </div>
           </div>
 
-          <div className="absolute bottom-20 left-1/2 z-20 flex -translate-x-1/2 animate-bounce flex-col items-center gap-2 opacity-60">
+          <div className="bp-dv-hint absolute bottom-20 left-1/2 z-20 flex -translate-x-1/2 animate-bounce flex-col items-center gap-2 opacity-60">
             <span className="text-xs font-bold uppercase tracking-widest text-secondary">
               {hasScreenshots ? t("bigPicture.screenshots") : t("bigPicture.mediaInfo")}
             </span>

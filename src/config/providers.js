@@ -9,6 +9,19 @@
 // Providers that support seamless (in-app) downloads.
 export const SEAMLESS_PROVIDERS = ["gofile", "pixeldrain"];
 
+// Providers whose page Ascendara clicks through in a hidden window (Magic Link),
+// so they download without the user opening a browser.
+export const MAGIC_LINK_PROVIDERS = ["buzzheavier", "megadb"];
+
+export function isMagicLink(provider, url) {
+  return (
+    MAGIC_LINK_PROVIDERS.includes(String(provider || "").toLowerCase()) ||
+    /bzzhr\.(?:to|co)|buzzheavier|fafda\.to|fuckingfast\.(?:net|co)|megadb\.(?:net|xyz)/i.test(
+      url || ""
+    )
+  );
+}
+
 // Providers whose downloads are considered "verified" / trusted.
 export const VERIFIED_PROVIDERS = ["megadb", "gofile", "buzzheavier", "pixeldrain"];
 

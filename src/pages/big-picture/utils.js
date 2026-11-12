@@ -1,4 +1,4 @@
-import { SEAMLESS_PROVIDERS } from "@/config/providers";
+import { SEAMLESS_PROVIDERS, MAGIC_LINK_PROVIDERS } from "@/config/providers";
 
 // UTILS
 const formatBytes = (bytes, decimals = 2) => {
@@ -81,21 +81,27 @@ const showInstalledGameDetails = (
 };
 
 // Seamless verification
-const checkSeamlessAvailable = game => {
-  if (!game || !game.download_links) return false;
-  const links = game.download_links;
-  if (typeof links !== "object" || links === null) return false;
-  try {
-    const hosts = Object.keys(links);
-    return hosts.some(host => SEAMLESS_PROVIDERS.includes(host.toLowerCase()));
-  } catch (e) {
-    return false;
-  }
+// Hosts Big Picture downloads from without leaving it: seamless hosts, then
+// Magic Link hosts that resolve in a hidden window
+const IN_APP_PROVIDERS = [...SEAMLESS_PROVIDERS, ...MAGIC_LINK_PROVIDERS];
+
+const getInAppProviders = game => {
+  const links = game?.download_links;
+  if (!links || typeof links !== "object") return [];
+  return IN_APP_PROVIDERS.filter(provider => {
+    const candidates = links[provider];
+    return Array.isArray(candidates)
+      ? candidates.some(link => typeof link === "string" && link.trim())
+      : typeof candidates === "string" && candidates.trim();
+  });
 };
+
+const checkSeamlessAvailable = game => getInAppProviders(game).length > 0;
 
 export {
   formatBytes,
   createFuzzyMatcher,
   showInstalledGameDetails,
   checkSeamlessAvailable,
+  getInAppProviders,
 };
