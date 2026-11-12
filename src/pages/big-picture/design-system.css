@@ -1156,6 +1156,13 @@
 .bp-crossfade[data-shown="true"] {
   opacity: 1;
 }
+/* Cover images get a transform-only transition (.bp-home .bp-cover img),
+   which would otherwise drop the opacity fade on artwork inside game tiles. */
+.bp-surface .bp-cover img.bp-crossfade {
+  transition:
+    opacity 0.42s ease,
+    transform 0.3s ease;
+}
 .bp-classic-art .bp-crossfade[data-shown="true"] {
   animation: bp-classic-art-drift 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
@@ -1173,7 +1180,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .bp-classic-tile,
-  .bp-crossfade {
+  .bp-crossfade,
+  .bp-surface .bp-cover img.bp-crossfade {
     transition: none;
   }
   .bp-classic-art .bp-crossfade[data-shown="true"] {
