@@ -29,11 +29,12 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { checkSeamlessAvailable, getInAppProviders } from "./utils";
-import { getControllerButtons } from "./controller";
+import { getControllerButtons, getButtonBadgeClass } from "./controller";
 import { useMediaSwipe } from "./useMediaSwipe";
 import { useControllerInput } from "./useControllerInput";
 import { DetailBackButton } from "./DetailBackButton";
 import { TimemachineDialog } from "./TimemachineDialog";
+import { ScreenshotGallery, getScreenshotColumns } from "./ScreenshotGallery";
 
 const hasAnyLink = links =>
   Object.values(links || {}).some(candidates =>
@@ -94,6 +95,8 @@ const GameDetailsView = ({
   useEffect(() => {
     setRelease(null);
     setShowTimemachine(false);
+    setScreenshotIndex(0);
+    setLightboxOpen(false);
   }, [game]);
 
   // Same rule as the Download page: on Ascendara's index, a game with no links
@@ -165,6 +168,22 @@ const GameDetailsView = ({
 
   const descriptionRef = useRef(null);
   const screenshotsRef = useRef(null);
+  const [screenshotIndex, setScreenshotIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  const screenshots = useMemo(() => {
+    return (steamData?.screenshots || []).map((screen, idx) => {
+      const raw =
+        typeof screen === "string"
+          ? screen
+          : screen?.url || screen?.path_full || screen?.path_thumbnail;
+      return {
+        id: screen?.id ?? idx,
+        url: steamService.formatImageUrl(raw, "screenshot_huge"),
+        alt: `Screenshot ${idx + 1}`,
+      };
+    });
+  }, [steamData]);
 
   // Use unified game image hook for consistency with Library
   const { imageData: cachedImage, loading: imageLoading } = useGameImage(game, {
@@ -359,9 +378,41 @@ const GameDetailsView = ({
     window.dispatchEvent(new CustomEvent("play-later-updated"));
   }, [game, isPlayLater, cachedImage]);
 
+  const moveScreenshotFocus = useCallback(
+    action => {
+      if (!screenshots.length) return;
+      const columns = getScreenshotColumns();
+      setScreenshotIndex(prev => {
+        if (action === "LEFT") return Math.max(0, prev - 1);
+        if (action === "RIGHT") return Math.min(screenshots.length - 1, prev + 1);
+        if (action === "UP") return Math.max(0, prev - columns);
+        if (action === "DOWN") return Math.min(screenshots.length - 1, prev + columns);
+        return prev;
+      });
+    },
+    [screenshots.length]
+  );
+
+  const stepLightbox = useCallback(
+    delta => {
+      if (!screenshots.length) return;
+      setScreenshotIndex(
+        prev => (prev + delta + screenshots.length) % screenshots.length
+      );
+    },
+    [screenshots.length]
+  );
+
   const handleInput = useCallback(
     action => {
       if (dialogOpen || showTimemachine) return;
+
+      if (lightboxOpen) {
+        if (action === "LEFT" || action === "UP") stepLightbox(-1);
+        else if (action === "RIGHT" || action === "DOWN") stepLightbox(1);
+        else if (action === "BACK" || action === "MENU") setLightboxOpen(false);
+        return;
+      }
 
       if (action === "DOWN") {
         if (focusedSection === "button") {
@@ -369,21 +420,23 @@ const GameDetailsView = ({
           setFocusedSection("description");
         } else if (focusedSection === "description") {
           // Move from description to screenshots if available
-          if (steamData?.screenshots && steamData.screenshots.length > 0) {
+          if (screenshots.length > 0) {
             setShowMedia(true);
             setFocusedSection("screenshots");
+            setScreenshotIndex(0);
           }
         } else if (focusedSection === "screenshots") {
-          // Scroll screenshots down
-          if (screenshotsRef.current) {
-            screenshotsRef.current.scrollBy({ top: 200, behavior: "smooth" });
-          }
+          moveScreenshotFocus("DOWN");
         }
       } else if (action === "UP") {
         if (focusedSection === "screenshots") {
-          // Move back from screenshots to description
-          setShowMedia(false);
-          setFocusedSection("description");
+          // Move up a row, or leave the media view from the first row
+          if (screenshotIndex >= getScreenshotColumns()) {
+            moveScreenshotFocus("UP");
+          } else {
+            setShowMedia(false);
+            setFocusedSection("description");
+          }
         } else if (focusedSection === "description") {
           // Move back from description to button
           setFocusedSection("button");
@@ -395,9 +448,8 @@ const GameDetailsView = ({
         } else if (focusedSection === "description" && descriptionRef.current) {
           // Scroll left in description
           descriptionRef.current.scrollBy({ top: -100, behavior: "smooth" });
-        } else if (focusedSection === "screenshots" && screenshotsRef.current) {
-          // Scroll left in screenshots
-          screenshotsRef.current.scrollBy({ top: -200, behavior: "smooth" });
+        } else if (focusedSection === "screenshots") {
+          moveScreenshotFocus("LEFT");
         }
       } else if (action === "RIGHT") {
         if (focusedSection === "button") {
@@ -406,9 +458,8 @@ const GameDetailsView = ({
         } else if (focusedSection === "description" && descriptionRef.current) {
           // Scroll right in description
           descriptionRef.current.scrollBy({ top: 100, behavior: "smooth" });
-        } else if (focusedSection === "screenshots" && screenshotsRef.current) {
-          // Scroll right in screenshots
-          screenshotsRef.current.scrollBy({ top: 200, behavior: "smooth" });
+        } else if (focusedSection === "screenshots") {
+          moveScreenshotFocus("RIGHT");
         }
       } else if (action === "CONFIRM") {
         if (focusedSection === "button") {
@@ -418,15 +469,18 @@ const GameDetailsView = ({
           else if (button === "timemachine") setShowTimemachine(true);
         } else if (focusedSection === "description") {
           // Move to screenshots if available
-          if (steamData?.screenshots && steamData.screenshots.length > 0) {
+          if (screenshots.length > 0) {
             setShowMedia(true);
             setFocusedSection("screenshots");
+            setScreenshotIndex(0);
           }
+        } else if (focusedSection === "screenshots" && screenshots.length > 0) {
+          setLightboxOpen(true);
         }
-      } else if (action === "BACK") {
+      } else if (action === "BACK" || action === "MENU") {
         if (showMedia) {
           setShowMedia(false);
-          setFocusedSection("button");
+          setFocusedSection("description");
         } else if (focusedSection === "description") {
           setFocusedSection("button");
         } else {
@@ -439,8 +493,12 @@ const GameDetailsView = ({
       onBack,
       dialogOpen,
       showTimemachine,
+      lightboxOpen,
       focusedSection,
-      steamData,
+      screenshotIndex,
+      screenshots.length,
+      moveScreenshotFocus,
+      stepLightbox,
       selectedButton,
       handlePlayLater,
       startDownload,
@@ -473,19 +531,20 @@ const GameDetailsView = ({
   // Gamepad Polling
   useControllerInput(
     action => {
-      if (action === "MENU") onBack();
+      if (action === "MENU" && !showMedia && !lightboxOpen) onBack();
       else handleInput(action);
     },
     { priority: 5, blocked: dialogOpen || showTimemachine }
   );
 
-  const hasScreenshots = steamData?.screenshots && steamData.screenshots.length > 0;
+  const hasScreenshots = screenshots.length > 0;
   const mediaSwipe = useMediaSwipe({
     showMedia,
-    enabled: !!hasScreenshots && !dialogOpen && !showTimemachine,
+    enabled: hasScreenshots && !lightboxOpen && !dialogOpen && !showTimemachine,
     open: () => {
       setShowMedia(true);
       setFocusedSection("screenshots");
+      setScreenshotIndex(0);
     },
     close: () => {
       setShowMedia(false);
@@ -864,46 +923,48 @@ const GameDetailsView = ({
             <h2 className="text-4xl font-light tracking-wider text-primary">
               {t("bigPicture.media")}
             </h2>
+            {hasScreenshots && (
+              <div className="ml-auto flex items-center gap-8 text-xs font-bold uppercase tracking-widest text-white/60">
+                <span>← / → {t("bigPicture.navigate")}</span>
+                <span>
+                  <span
+                    className={`mr-2 ${getButtonBadgeClass(controllerType)} bg-primary px-2.5 py-1 text-secondary`}
+                  >
+                    {buttons.confirm}
+                  </span>
+                  {t("bigPicture.openSelect")}
+                </span>
+                <span>
+                  <span
+                    className={`mr-2 ${getButtonBadgeClass(controllerType)} border border-border bg-muted px-2.5 py-1 text-muted-foreground`}
+                  >
+                    {buttons.cancel}
+                  </span>
+                  {t("bigPicture.cancel")}
+                </span>
+              </div>
+            )}
           </div>
 
           <div
             ref={screenshotsRef}
             className="no-scrollbar flex-1 overflow-y-auto p-12 px-24 pb-32"
           >
-            {steamData?.screenshots && steamData.screenshots.length > 0 ? (
-              <div className="grid grid-cols-2 gap-6 lg:grid-cols-3">
-                {steamData.screenshots.map((screen, idx) => {
-                  // Formatted like the desktop page: Steam's CDN needs the cache-busting URL
-                  const imageUrl = steamService.formatImageUrl(
-                    typeof screen === "string"
-                      ? screen
-                      : screen.url || screen.path_full || screen.path_thumbnail,
-                    "screenshot_huge"
-                  );
-                  return (
-                    <div
-                      key={screen.id || idx}
-                      className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-muted transition-all hover:scale-[1.02] hover:border-primary"
-                    >
-                      <img
-                        src={imageUrl}
-                        alt={`Screenshot ${idx + 1}`}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        onError={e => {
-                          console.log("[Screenshot] Failed to load:", imageUrl);
-                          e.target.style.display = "none";
-                        }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex h-full items-center justify-center text-muted-foreground">
-                <p>{t("bigPicture.noScreenshotsAvailable")}</p>
-              </div>
-            )}
+            <ScreenshotGallery
+              screenshots={screenshots}
+              index={screenshotIndex}
+              lightboxOpen={lightboxOpen}
+              focused={focusedSection === "screenshots"}
+              onFocus={setScreenshotIndex}
+              onOpen={() => setLightboxOpen(true)}
+              onClose={() => setLightboxOpen(false)}
+              onNavigate={setScreenshotIndex}
+              loading={loadingMedia}
+              emptyLabel={t("bigPicture.noScreenshotsAvailable")}
+              t={t}
+              controllerType={controllerType}
+              buttons={buttons}
+            />
           </div>
         </div>
       </div>
