@@ -1334,6 +1334,7 @@ function Settings() {
                         handleSettingChange("windowControlsStyle", style)
                       }
                       t={t}
+                      side={settings.menuBarSide}
                     />
                   </div>
 

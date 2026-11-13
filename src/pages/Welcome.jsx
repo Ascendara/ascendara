@@ -2193,6 +2193,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
                         value={appSettings.windowControlsStyle}
                         onChange={style => updateSetting("windowControlsStyle", style)}
                         t={t}
+                        side={appSettings.menuBarSide}
                       />
                     </div>
 
