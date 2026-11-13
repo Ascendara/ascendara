@@ -19,6 +19,12 @@ import {
 import { useAscendNotificationCount } from "@/services/ascend/ascendNotificationBadgeService";
 import { useNewSecurityFeature } from "@/services/ascend/newFeatureBadgeService";
 import { prefetchAscendData } from "@/services/ascend/ascendPrefetch";
+import {
+  NAVIGATION_EDGE_PADDING_PX,
+  NAVIGATION_COMPACT_ITEM_HEIGHT_PX,
+  NAVIGATION_COMPACT_SEPARATOR_HEIGHT_PX,
+  NAVIGATION_COMPACT_PADDING_Y_PX,
+} from "@/lib/navigationGeometry";
 
 // A dock item collapses to no width, and the negative margin cancels the dock's
 // 8px gap, so its neighbours close up fully while it is hidden
@@ -36,7 +42,7 @@ const DOCK_ITEM_SHOWN = {
 const dockItemCompact = active => ({
   ...DOCK_ITEM_SHOWN,
   width: active ? 22 : 8,
-  height: 8,
+  height: NAVIGATION_COMPACT_ITEM_HEIGHT_PX,
 });
 // How far from the top a page has to be scrolled before the dock goes compact
 const COMPACT_MIN_SCROLL = 80;
@@ -53,8 +59,8 @@ const DOCK_SHELL_EXPANDED = {
   gap: 8,
 };
 const DOCK_SHELL_COMPACT = {
-  paddingTop: 10,
-  paddingBottom: 10,
+  paddingTop: NAVIGATION_COMPACT_PADDING_Y_PX,
+  paddingBottom: NAVIGATION_COMPACT_PADDING_Y_PX,
   paddingLeft: 14,
   paddingRight: 14,
   gap: 6,
@@ -378,14 +384,19 @@ const Navigation = memo(({ items }) => {
   const parkRight = isGamePage && compactEnabled && scrolled;
 
   return (
-    <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 flex select-none justify-center p-6">
+    <div
+      className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 flex select-none justify-center"
+      style={{ padding: NAVIGATION_EDGE_PADDING_PX }}
+    >
       {/* Scrolled on a game page, the compact dock glides to the bottom-right corner,
           clear of the content. A transform percentage is the element's own width, so
           this lands its right edge at the window's padding while it shrinks */}
       <div
         className="transition-transform duration-500"
         style={{
-          transform: parkRight ? "translateX(calc(50vw - 50% - 24px))" : "translateX(0)",
+          transform: parkRight
+            ? `translateX(calc(50vw - 50% - ${NAVIGATION_EDGE_PADDING_PX}px))`
+            : "translateX(0)",
           transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
         }}
       >
@@ -436,7 +447,11 @@ const Navigation = memo(({ items }) => {
                     initial={false}
                     animate={
                       compact
-                        ? { height: 12, marginLeft: 2, marginRight: 2 }
+                        ? {
+                            height: NAVIGATION_COMPACT_SEPARATOR_HEIGHT_PX,
+                            marginLeft: 2,
+                            marginRight: 2,
+                          }
                         : { height: 32, marginLeft: 0, marginRight: 0 }
                     }
                     transition={DOCK_SPRING}
@@ -445,11 +460,17 @@ const Navigation = memo(({ items }) => {
                   <motion.div
                     key={item.path}
                     className="relative flex shrink-0 items-center justify-center"
-                    initial={{ ...DOCK_ITEM_HIDDEN, height: compact ? 8 : 48 }}
+                    initial={{
+                      ...DOCK_ITEM_HIDDEN,
+                      height: compact ? NAVIGATION_COMPACT_ITEM_HEIGHT_PX : 48,
+                    }}
                     animate={
                       compact ? dockItemCompact(isActive(item.path)) : DOCK_ITEM_SHOWN
                     }
-                    exit={{ ...DOCK_ITEM_HIDDEN, height: compact ? 8 : 48 }}
+                    exit={{
+                      ...DOCK_ITEM_HIDDEN,
+                      height: compact ? NAVIGATION_COMPACT_ITEM_HEIGHT_PX : 48,
+                    }}
                     transition={DOCK_ITEM_TRANSITION}
                   >
                     <motion.span
