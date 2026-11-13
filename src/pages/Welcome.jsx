@@ -527,7 +527,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const [isImportChooserOpen, setIsImportChooserOpen] = useState(false);
   const [isStoreAccountsOpen, setIsStoreAccountsOpen] = useState(false);
   const storeLibrary = useStoreLibrary();
-  const [autoUpdate, setAutoUpdate] = useState(true);
+  const [autoUpdate, setAutoUpdate] = useState(false);
   const [referralSource, setReferralSource] = useState("");
   const [customReferral, setCustomReferral] = useState("");
   const [referralSent, setReferralSent] = useState(false);
@@ -540,7 +540,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
     showOldDownloadLinks: false,
     seeInappropriateContent: false,
     autoCreateShortcuts: true,
-    autoUpdate: true,
+    autoUpdate: false,
     language: "en",
     theme: "purple",
     threadCount: 4,
@@ -914,11 +914,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
   const saveAutoUpdate = async enableAutoUpdate => {
     setAutoUpdate(enableAutoUpdate);
     try {
-      const currentSettings = await window.electron.getSettings();
-      await window.electron.saveSettings(
-        { ...currentSettings, autoUpdate: enableAutoUpdate },
-        currentSettings.downloadDirectory || ""
-      );
+      await window.electron.updateSetting("autoUpdate", enableAutoUpdate);
     } catch (error) {
       console.error("Error saving auto-update preference:", error);
     }

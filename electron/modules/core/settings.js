@@ -30,6 +30,15 @@ function applyDownloaderDefaults(settings) {
     settings.threadCount = 16;
 }
 
+// Older files can contain autoUpdate=true only because that used to be the default.
+// A separate marker is required before that value can authorize background transfer.
+function applyAutoUpdateConsent(settings) {
+  if (settings.autoUpdateChosen !== true) {
+    settings.autoUpdate = false;
+    settings.autoUpdateChosen = false;
+  }
+}
+
 class SettingsManager {
   constructor() {
     this.filePath = path.join(app.getPath("userData"), "ascendarasettings.json");
@@ -86,7 +95,8 @@ class SettingsManager {
       bigPictureSounds: true,
       windowControlsStyle: "icons",
       menuBarSide: "left",
-      autoUpdate: true,
+      autoUpdate: false,
+      autoUpdateChosen: false,
       endOnClose: false,
       language: "en",
       theme: "purple",
@@ -368,6 +378,7 @@ class SettingsManager {
         mergedSettings.debridEnabled = true;
       }
       applyDownloaderDefaults(mergedSettings);
+      applyAutoUpdateConsent(mergedSettings);
       // Only return the merged settings without writing to disk
       return mergedSettings;
     } catch (error) {
@@ -396,6 +407,7 @@ class SettingsManager {
         ...existingSettings,
         ...settings,
       };
+      applyAutoUpdateConsent(mergedSettings);
 
       let protectedAll = true;
       // Saved secrets that now say something else, or nothing.
@@ -483,6 +495,7 @@ class SettingsManager {
       };
       if (key === "singleStream") updatedSettings.singleStreamChosen = true;
       if (key === "threadCount") updatedSettings.threadCountChosen = true;
+      if (key === "autoUpdate") updatedSettings.autoUpdateChosen = true;
 
       // Clean up any flat ludusavi properties if we're updating the ludusavi object
       if (key === "ludusavi") {
@@ -501,6 +514,7 @@ class SettingsManager {
   }
 
   getSetting(key) {
+    if (key === "autoUpdate" && this.settings.autoUpdateChosen !== true) return false;
     const value = this.settings[key];
 
     // Decrypt value if it's a sensitive key
@@ -511,6 +525,7 @@ class SettingsManager {
     // Create a copy of settings with decrypted sensitive values
     const decryptedSettings = { ...this.settings };
     applyDownloaderDefaults(decryptedSettings);
+    applyAutoUpdateConsent(decryptedSettings);
 
     for (const key of this.sensitiveKeysIn(decryptedSettings)) {
       if (decryptedSettings[key])
@@ -624,6 +639,8 @@ function registerSettingsHandlers() {
       sanitizedOptions.singleStreamChosen = true;
     if ("threadCount" in options && options.threadCount !== currentSettings.threadCount)
       sanitizedOptions.threadCountChosen = true;
+    if ("autoUpdate" in options && options.autoUpdate !== currentSettings.autoUpdate)
+      sanitizedOptions.autoUpdateChosen = true;
 
     // Bulk saves may contain an uninitialized renderer default. Clearing the
     // index path must be explicit via update-setting, not a stale snapshot.
