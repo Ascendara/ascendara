@@ -8,33 +8,70 @@ const { mergeNestedSettingValue } = require("../electron/modules/core/nested-set
 const read = relative => fs.readFileSync(path.join(__dirname, "..", relative), "utf8");
 
 test("sequential Wine and Proton field merges preserve sibling values", () => {
+  const wineDefaults = {
+    wineBin: "wine",
+    winePrefix: "",
+  };
   let wine = {
     wineBin: "wine",
     winePrefix: "/prefix/original",
   };
 
-  wine = mergeNestedSettingValue(wine, "wineBin", "wine-staging");
-  wine = mergeNestedSettingValue(wine, "winePrefix", "/prefix/new");
+  wine = mergeNestedSettingValue(wineDefaults, wine, "wineBin", "wine-staging");
+  wine = mergeNestedSettingValue(wineDefaults, wine, "winePrefix", "/prefix/new");
 
   assert.deepEqual(wine, {
     wineBin: "wine-staging",
     winePrefix: "/prefix/new",
   });
 
+  const protonDefaults = {
+    enabled: false,
+    protonBin: "",
+    steamCompatDataPath: "",
+  };
   let proton = {
     enabled: false,
     protonBin: "/proton/original",
     steamCompatDataPath: "/compat/original",
   };
 
-  proton = mergeNestedSettingValue(proton, "enabled", true);
-  proton = mergeNestedSettingValue(proton, "protonBin", "/proton/new");
+  proton = mergeNestedSettingValue(protonDefaults, proton, "enabled", true);
+  proton = mergeNestedSettingValue(protonDefaults, proton, "protonBin", "/proton/new");
 
   assert.deepEqual(proton, {
     enabled: true,
     protonBin: "/proton/new",
     steamCompatDataPath: "/compat/original",
   });
+});
+
+test("old or partial nested settings retain schema defaults", () => {
+  const wineDefaults = {
+    wineBin: "wine",
+    winePrefix: "",
+  };
+  assert.deepEqual(
+    mergeNestedSettingValue(wineDefaults, undefined, "winePrefix", "/new"),
+    {
+      wineBin: "wine",
+      winePrefix: "/new",
+    }
+  );
+
+  const protonDefaults = {
+    enabled: false,
+    protonBin: "",
+    steamCompatDataPath: "",
+  };
+  assert.deepEqual(
+    mergeNestedSettingValue(protonDefaults, { protonBin: "/custom" }, "enabled", true),
+    {
+      enabled: true,
+      protonBin: "/custom",
+      steamCompatDataPath: "",
+    }
+  );
 });
 
 test("Wine and Proton field writes merge in the main-process settings authority", () => {
@@ -44,7 +81,7 @@ test("Wine and Proton field writes merge in the main-process settings authority"
 
   assert.match(
     manager,
-    /const updatedValue = mergeNestedSettingValue\(currentSettings\[key\], field, value\)/
+    /mergeNestedSettingValue\(\s*this\.defaultSettings\[key\],\s*this\.settings\[key\],\s*field,\s*value\s*\)/
   );
   assert.match(manager, /return this\.updateSetting\(key, updatedValue\)/);
   assert.match(

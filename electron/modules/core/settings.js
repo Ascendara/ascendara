@@ -506,14 +506,15 @@ class SettingsManager {
 
   updateNestedSetting(key, field, value) {
     try {
-      // Merge against the latest persisted nested object so rapid renderer edits
-      // cannot rebuild from a stale closure snapshot.
-      let currentSettings = {};
-      if (fs.existsSync(this.filePath)) {
-        currentSettings = JSON.parse(fs.readFileSync(this.filePath, "utf8"));
-      }
-
-      const updatedValue = mergeNestedSettingValue(currentSettings[key], field, value);
+      // Merge against the manager's authoritative, default-merged state. This
+      // preserves sibling defaults for older or partial settings files while
+      // still observing every successful write made through this manager.
+      const updatedValue = mergeNestedSettingValue(
+        this.defaultSettings[key],
+        this.settings[key],
+        field,
+        value
+      );
       return this.updateSetting(key, updatedValue);
     } catch (error) {
       console.error("Failed to update nested setting:", error);

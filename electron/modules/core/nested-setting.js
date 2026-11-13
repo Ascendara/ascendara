@@ -1,11 +1,11 @@
-function mergeNestedSettingValue(currentValue, field, value) {
-  const base =
-    currentValue && typeof currentValue === "object" && !Array.isArray(currentValue)
-      ? currentValue
-      : {};
+function isObjectRecord(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
 
+function mergeNestedSettingValue(defaultValue, currentValue, field, value) {
   return {
-    ...base,
+    ...isObjectRecord(defaultValue),
+    ...isObjectRecord(currentValue),
     [field]: value,
   };
 }
