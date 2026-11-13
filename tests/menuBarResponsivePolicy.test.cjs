@@ -47,6 +47,11 @@ test("compact MenuBar policy preserves critical controls and collapses simultane
   assert.equal(compact.showSearchLabel, false);
   assert.equal(compact.showSearchShortcut, false);
   assert.equal(compact.showBrandLabel, false);
+  assert.equal(
+    compact.showBranchIdentity,
+    true,
+    "release-channel identity must collapse to an icon instead of disappearing"
+  );
 });
 
 test("MenuBar source protects one-row critical controls from flex shrink and wrapping", async () => {
@@ -64,7 +69,7 @@ test("MenuBar source protects one-row critical controls from flex shrink and wra
   assert.match(menuBar, /getMenuBarResponsivePolicy/);
   assert.match(
     menuBar,
-    /responsivePolicy\.showSecondary && appBranch === "experimental"/
+    /responsivePolicy\.showBranchIdentity && appBranch === "experimental"/
   );
   assert.match(menuBar, /responsivePolicy\.showCriticalLabels/);
   assert.match(menuBar, /responsivePolicy\.showActivityLabels/);
