@@ -544,27 +544,47 @@ function Settings() {
 
       // Handle Wine settings
       if (key === "wine" || key === "_wine_field") {
-        const [field, val] = key === "_wine_field" ? value : [null, null];
-        const updatedWine = field ? { ...(settings.wine || {}), [field]: val } : value;
-        window.electron.updateSetting("wine", updatedWine).then(success => {
+        if (key === "_wine_field") {
+          const [field, val] = value;
+          const success = await window.electron.updateNestedSetting("wine", field, val);
           if (success) {
-            setSettingsLocal(prev => ({ ...prev, wine: updatedWine }));
+            setSettingsLocal(prev => ({
+              ...prev,
+              wine: {
+                ...(prev.wine || {}),
+                [field]: val,
+              },
+            }));
           }
-        });
+        } else {
+          const success = await window.electron.updateSetting("wine", value);
+          if (success) {
+            setSettingsLocal(prev => ({ ...prev, wine: value }));
+          }
+        }
         return;
       }
 
       // Handle Proton settings
       if (key === "proton" || key === "_proton_field") {
-        const [field, val] = key === "_proton_field" ? value : [null, null];
-        const updatedProton = field
-          ? { ...(settings.proton || {}), [field]: val }
-          : value;
-        window.electron.updateSetting("proton", updatedProton).then(success => {
+        if (key === "_proton_field") {
+          const [field, val] = value;
+          const success = await window.electron.updateNestedSetting("proton", field, val);
           if (success) {
-            setSettingsLocal(prev => ({ ...prev, proton: updatedProton }));
+            setSettingsLocal(prev => ({
+              ...prev,
+              proton: {
+                ...(prev.proton || {}),
+                [field]: val,
+              },
+            }));
           }
-        });
+        } else {
+          const success = await window.electron.updateSetting("proton", value);
+          if (success) {
+            setSettingsLocal(prev => ({ ...prev, proton: value }));
+          }
+        }
         return;
       }
 

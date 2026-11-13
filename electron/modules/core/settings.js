@@ -14,6 +14,7 @@ const {
   createSecretStore,
   writeFileAtomic,
 } = require("./secret-store");
+const { mergeNestedSettingValue } = require("./nested-setting");
 
 // The copy made before secrets moved to safeStorage holds every old value, so it only
 // stays as long as it is useful for recovering from a failed move.
@@ -503,6 +504,23 @@ class SettingsManager {
     }
   }
 
+  updateNestedSetting(key, field, value) {
+    try {
+      // Merge against the latest persisted nested object so rapid renderer edits
+      // cannot rebuild from a stale closure snapshot.
+      let currentSettings = {};
+      if (fs.existsSync(this.filePath)) {
+        currentSettings = JSON.parse(fs.readFileSync(this.filePath, "utf8"));
+      }
+
+      const updatedValue = mergeNestedSettingValue(currentSettings[key], field, value);
+      return this.updateSetting(key, updatedValue);
+    } catch (error) {
+      console.error("Failed to update nested setting:", error);
+      return false;
+    }
+  }
+
   getSetting(key) {
     const value = this.settings[key];
 
@@ -600,6 +618,15 @@ function registerSettingsHandlers() {
       if (key === "openOnStartup" || key === "startMinimized") {
         applyLoginItemSettings();
       }
+    }
+    return success;
+  });
+
+  // Atomically update one field inside an object-valued setting.
+  ipcMain.handle("update-nested-setting", async (event, key, field, value) => {
+    const success = manager.updateNestedSetting(key, field, value);
+    if (success) {
+      event.sender.send("settings-updated", manager.getSettings());
     }
     return success;
   });

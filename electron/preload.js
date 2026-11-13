@@ -125,6 +125,8 @@ contextBridge.exposeInMainWorld("electron", {
   saveSettings: (options, directory) =>
     ipcRenderer.invoke("save-settings", options, directory),
   updateSetting: (key, value) => ipcRenderer.invoke("update-setting", key, value),
+  updateNestedSetting: (key, field, value) =>
+    ipcRenderer.invoke("update-nested-setting", key, field, value),
   getDefaultLocalIndexPath: () => ipcRenderer.invoke("get-default-local-index-path"),
   getDownloadDirectory: () => ipcRenderer.invoke("get-download-directory"),
   getSteamApiKey: () => ipcRenderer.invoke("get-steam-api-key"),
