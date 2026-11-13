@@ -5,6 +5,9 @@
   background: rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(2px);
   z-index: 1000;
+  /* Covers the title bar's drag region, so clicks there close the menu instead of
+     moving the window or pressing its buttons */
+  -webkit-app-region: no-drag;
 }
 
 /* Main context menu container */

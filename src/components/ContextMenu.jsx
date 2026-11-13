@@ -68,13 +68,16 @@ const ContextMenu = () => {
     const handleEscape = e => {
       if (e.key === "Escape") setIsVisible(false);
     };
+    const close = () => setIsVisible(false);
     document.addEventListener("contextmenu", handleContextMenu);
     document.addEventListener("click", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
+    window.addEventListener("blur", close);
     return () => {
       document.removeEventListener("contextmenu", handleContextMenu);
       document.removeEventListener("click", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("blur", close);
     };
   }, []);
 
@@ -121,6 +124,11 @@ const ContextMenu = () => {
               transition={{ duration: 0.15 }}
               className="context-menu-backdrop"
               onClick={() => setIsVisible(false)}
+              // A right-click outside dismisses the menu rather than moving it
+              onContextMenu={e => {
+                e.preventDefault();
+                setIsVisible(false);
+              }}
             />
             
             <motion.div
