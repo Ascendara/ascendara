@@ -181,6 +181,7 @@ class SettingsManager {
       activeCustomList: null,
       extraGameOptions: false,
     };
+    this.settingsLoadError = null;
     this.initializeSettingsFile();
     this.settings = this.loadSettings();
     // Secrets move to safeStorage in migrateSecretStorage, which needs app ready.
@@ -345,6 +346,7 @@ class SettingsManager {
   }
 
   loadSettings() {
+    this.settingsLoadError = null;
     try {
       let settings = {};
       if (fs.existsSync(this.filePath)) {
@@ -371,6 +373,7 @@ class SettingsManager {
       // Only return the merged settings without writing to disk
       return mergedSettings;
     } catch (error) {
+      this.settingsLoadError = error;
       console.error("Error loading settings:", error);
       return { ...this.defaultSettings };
     }
@@ -518,6 +521,10 @@ class SettingsManager {
     }
 
     return decryptedSettings;
+  }
+
+  hasSettingsLoadError() {
+    return this.settingsLoadError !== null;
   }
 
   /**

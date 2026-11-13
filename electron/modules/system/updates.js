@@ -34,6 +34,7 @@ const {
   appDirectory,
 } = require("../core/config");
 const { updateTimestampFile } = require("../core/utils");
+const { getSettingsManager } = require("../core/settings");
 const { runTranslation, isTranslationRunning } = require("../app/translations");
 
 let isLatest = true;
@@ -152,28 +153,6 @@ async function checkBrokenVersion() {
 }
 
 /**
- * Get settings helper
- */
-async function getSettings() {
-  try {
-    const filePath = path.join(app.getPath("userData"), "ascendarasettings.json");
-    console.log("Reading settings from:", filePath);
-
-    if (!fs.existsSync(filePath)) {
-      console.log("Settings file does not exist");
-      return { autoUpdate: true };
-    }
-
-    const data = fs.readFileSync(filePath, "utf8");
-    const settings = JSON.parse(data);
-    return settings;
-  } catch (error) {
-    console.error("Error reading settings:", error);
-    return { autoUpdate: true };
-  }
-}
-
-/**
  * Compare version strings, handling branch-specific formats
  * Returns true if v1 < v2, false otherwise
  */
@@ -207,7 +186,9 @@ function isVersionLower(v1, v2) {
  */
 async function checkVersionAndUpdate() {
   try {
-    const settings = await getSettings();
+    const settingsManager = getSettingsManager();
+    const settings = settingsManager.getSettings();
+    const settingsReadable = !settingsManager.hasSettingsLoadError();
     const currentBranch = appBranch;
 
     let latestVersion;
@@ -260,15 +241,16 @@ async function checkVersionAndUpdate() {
     );
     if (!isLatest) {
       const canAutoUpdate = !isPortable;
+      const automaticUpdatesEnabled = settingsReadable && settings.autoUpdate === true;
       if (
-        settings.autoUpdate &&
+        automaticUpdatesEnabled &&
         canAutoUpdate &&
         !updateDownloadInProgress &&
         !updateDownloaded
       ) {
         // Start background download
         downloadUpdatePromise = downloadUpdateInBackground();
-      } else if ((!settings.autoUpdate || !canAutoUpdate) && !notificationShown) {
+      } else if ((!automaticUpdatesEnabled || !canAutoUpdate) && !notificationShown) {
         // Show update available notification
         notificationShown = true;
         BrowserWindow.getAllWindows().forEach(window => {
