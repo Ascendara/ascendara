@@ -70,9 +70,10 @@ test("Layout and Navigation share the compact-dock geometry contract", () => {
   assert.match(layoutSource, /marginBottom: navigationBottomSafeArea \|\| undefined/);
   assert.match(
     layoutSource,
-    /hasNavigationBottomSafeArea \? "h-screen overflow-hidden" : "min-h-screen"/
+    /className="flex min-h-screen flex-col bg-background text-foreground"/
   );
-  assert.match(layoutSource, /hasNavigationBottomSafeArea \? "min-h-0" : ""/);
+  assert.doesNotMatch(layoutSource, /h-screen overflow-hidden/);
+  assert.doesNotMatch(layoutSource, /hasNavigationBottomSafeArea/);
 
   for (const token of [
     "NAVIGATION_EDGE_PADDING_PX",
