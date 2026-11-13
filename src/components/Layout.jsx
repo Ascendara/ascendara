@@ -7,6 +7,7 @@ import Tour from "./Tour";
 import PageTours from "./PageTours";
 import { useNaturalDownloadScroll } from "@/hooks/useNaturalDownloadScroll";
 import Search from "@/pages/Search";
+import { MENU_BAR_HEIGHT_STYLE } from "@/lib/appChromeGeometry";
 
 const EASE_OUT = [0.22, 1, 0.36, 1];
 // The leaving page is pinned on top of the new one, so it has to drop off
@@ -212,7 +213,7 @@ const Layout = memo(() => {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <div className="h-8" />
+      <div className="shrink-0" aria-hidden="true" style={MENU_BAR_HEIGHT_STYLE} />
       {/* Search is rendered persistently so scroll position and loaded games survive navigation */}
       <motion.main
         ref={searchScrollRef}
