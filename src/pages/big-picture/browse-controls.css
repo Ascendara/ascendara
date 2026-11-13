@@ -63,3 +63,19 @@
     border-top: 1px solid var(--bp-line);
   }
 }
+
+.bp-browse-genres {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.bp-browse-genres .bp-action {
+  min-width: 0;
+}
+
+.bp-browse-genres .bp-action span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -23,17 +23,21 @@ import { gameName, gameEntries, readStoredList } from "./surfaceNavigation";
 import { useHomeArtwork } from "./useHomeArtwork";
 import gamePagePreparer from "@/services/games/gamePagePreparer";
 import { useLanguage } from "@/context/LanguageContext";
+import { useSettings } from "@/context/SettingsContext";
 import { catalogSizeText } from "@/lib/installSpace";
 import "./browse-controls.css";
 
-const genresFor = (game) =>
-    Array.isArray(game.genre || game.genres)
-      ? (game.genre || game.genres)
-          .map((item) => (typeof item === "string" ? item : item.name))
-          .filter(Boolean)
-      : typeof (game.genre || game.genres) === "string"
-        ? (game.genre || game.genres).split(",").map((item) => item.trim())
-        : [];
+// Catalogue entries keep their genres in `category`; other sources use genre(s).
+const genresFor = (game) => {
+  const value = game.category || game.genre || game.genres;
+  return Array.isArray(value)
+    ? value
+        .map((item) => (typeof item === "string" ? item : item?.name))
+        .filter(Boolean)
+    : typeof value === "string"
+      ? value.split(",").map((item) => item.trim()).filter(Boolean)
+      : [];
+};
 
 export function BrowseSurface({
   navigation,
@@ -51,16 +55,29 @@ export function BrowseSurface({
   openIndexes,
 }) {
   const { t } = useLanguage();
+  const { settings } = useSettings();
   const columns = useGridColumns();
   const [page, setPage] = useState(0);
   const [savedOnly, setSavedOnly] = useState(false);
-  const [genre, setGenre] = useState("");
+  const [selectedGenre, setGenre] = useState("");
+  const [genreOpen, setGenreOpen] = useState(false);
   const [lastQuery, setLastQuery] = useState(query);
   if (query !== lastQuery) {
     setLastQuery(query);
     setPage(0);
   }
-  const genres = useMemo(() => [...new Set(games.flatMap(genresFor))].sort(), [games]);
+  const genres = useMemo(() => [...new Set(games.flatMap(genresFor))]
+    .filter(item => settings.seeInappropriateContent || item !== "Nudity")
+    .sort(), [games, settings.seeInappropriateContent]);
+  // A genre picked from another index (or a hidden mature one) no longer applies.
+  const genre = genres.includes(selectedGenre) ? selectedGenre : "";
+  const genreOptions = ["", ...genres];
+  const pickGenre = (value) => {
+    setGenre(value);
+    setGenreOpen(false);
+    setPage(0);
+    selectFocus("genre");
+  };
   const [savedRevision, setSavedRevision] = useState(0);
   useEffect(() => {
     const refresh = () => setSavedRevision(value => value + 1);
@@ -84,14 +101,19 @@ export function BrowseSurface({
   ), [entries, currentPage, batchSize]);
   const hasMore = displayed.length < filtered.length;
   const loadMoreRef = useRef(null);
+  const filters = ["sort", "saved", ...(genres.length ? ["genre"] : [])];
   const rows = [
     ["search", ...(query ? ["clear"] : [])],
     ...(columns === 3
-      ? [
-          ["sort", "saved", "genre"],
-          ["retry", "indexes"],
-        ]
-      : [["sort", "saved", "genre", "retry", "indexes"]]),
+      ? [filters, ["retry", "indexes"]]
+      : [[...filters, "retry", "indexes"]]),
+    ...(genreOpen
+      ? Array.from({ length: Math.ceil(genreOptions.length / columns) }, (_, i) =>
+          genreOptions
+            .slice(i * columns, i * columns + columns)
+            .map((_, j) => `genre-option-${i * columns + j}`),
+        )
+      : []),
     ...Array.from({ length: Math.ceil(displayed.length / columns) }, (_, i) =>
       displayed
         .slice(i * columns, i * columns + columns)
@@ -99,7 +121,13 @@ export function BrowseSurface({
     ),
     ...(hasMore ? [["next"]] : []),
   ];
-  const { root, focus, current, selectFocus } = useSurface(navigation, rows, onBack, active);
+  // Back closes the genre picker before leaving the page.
+  const back = () => {
+    if (!genreOpen) return onBack?.();
+    setGenreOpen(false);
+    selectFocus("genre");
+  };
+  const { root, focus, current, selectFocus } = useSurface(navigation, rows, back, active);
   const focusedIndex = displayed.findIndex(({ key }) => `store-${key}` === current);
   const lastRowStart = Math.floor((displayed.length - 1) / columns) * columns;
   const nextFocus = entries[displayed.length]?.key;
@@ -235,10 +263,11 @@ export function BrowseSurface({
             </SurfaceButton>
             <SurfaceButton
               {...focus("genre")}
+              disabled={!genres.length}
+              aria-expanded={genreOpen}
               onClick={() => {
-                const index = genres.indexOf(genre);
-                setGenre(genres[index + 1] || "");
-                setPage(0);
+                setGenreOpen(!genreOpen);
+                if (!genreOpen) selectFocus(`genre-option-${genreOptions.indexOf(genre)}`);
               }}
             >
               <span>{genre || "All genres"}</span>
@@ -263,6 +292,25 @@ export function BrowseSurface({
           </div>
         </BigPictureToolbar>
       </div>
+      {genreOpen && (
+        <div
+          className="bp-browse-genres"
+          role="group"
+          aria-label="Genres"
+          style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+        >
+          {genreOptions.map((option, index) => (
+            <SurfaceButton
+              key={option || "all"}
+              {...focus(`genre-option-${index}`)}
+              aria-pressed={option === genre}
+              onClick={() => pickGenre(option)}
+            >
+              <span>{option || "All genres"}</span>
+            </SurfaceButton>
+          ))}
+        </div>
+      )}
       {!loading && !displayed.length && (
         <BigPictureEmptyState title="No games found">
           <p>Clear your search or filters, or retry loading the catalogue.</p>
