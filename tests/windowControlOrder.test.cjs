@@ -60,3 +60,25 @@ test("both WindowControls styles render from the shared action order", () => {
     "WindowControls should not apply a second branch-specific reversal"
   );
 });
+
+test("window-control style previews follow the selected menu-bar side", () => {
+  const root = path.join(__dirname, "..");
+  const component = fs.readFileSync(
+    path.join(root, "src/components/WindowControls.jsx"),
+    "utf8"
+  );
+  const settings = fs.readFileSync(path.join(root, "src/pages/Settings.jsx"), "utf8");
+  const welcome = fs.readFileSync(path.join(root, "src/pages/Welcome.jsx"), "utf8");
+
+  const start = component.indexOf("export function WindowControlsStylePicker");
+  const end = component.indexOf("// A sketch of the menu bar", start);
+  const picker = component.slice(start, end);
+
+  assert.match(picker, /getWindowControlOrder\(side === "right"\)/);
+  assert.ok(
+    (picker.match(/controlOrder\.map\(id =>/g) || []).length >= 2,
+    "both preview styles should render from the shared action order"
+  );
+  assert.match(settings, /side=\{settings\.menuBarSide\}/);
+  assert.match(welcome, /side=\{appSettings\.menuBarSide\}/);
+});

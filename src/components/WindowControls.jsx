@@ -188,7 +188,15 @@ function OptionCards({ options, value, onChange }) {
   );
 }
 
-export function WindowControlsStylePicker({ value = "icons", onChange, t }) {
+function WindowControlPreviewIcon({ id }) {
+  if (id === "minimize") return <Minus className="h-3.5 w-3.5" />;
+  if (id === "fullscreen") return <Maximize className="h-3 w-3" />;
+  return <X className="h-3.5 w-3.5" />;
+}
+
+export function WindowControlsStylePicker({ value = "icons", onChange, t, side = "left" }) {
+  const controlOrder = getWindowControlOrder(side === "right");
+
   return (
     <OptionCards
       value={value}
@@ -199,9 +207,9 @@ export function WindowControlsStylePicker({ value = "icons", onChange, t }) {
           label: t("settings.windowControlsIcons"),
           preview: (
             <span className="flex items-center gap-1.5">
-              <Minus className="h-3.5 w-3.5" />
-              <Maximize className="h-3 w-3" />
-              <X className="h-3.5 w-3.5" />
+              {controlOrder.map(id => (
+                <WindowControlPreviewIcon key={id} id={id} />
+              ))}
             </span>
           ),
         },
@@ -210,13 +218,16 @@ export function WindowControlsStylePicker({ value = "icons", onChange, t }) {
           label: t("settings.windowControlsTraffic"),
           preview: (
             <span className="flex items-center gap-1.5">
-              {TRAFFIC_LIGHTS.map(({ id, color }) => (
-                <span
-                  key={id}
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: color }}
-                />
-              ))}
+              {controlOrder.map(id => {
+                const { color } = TRAFFIC_LIGHT_BY_ID[id];
+                return (
+                  <span
+                    key={id}
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                );
+              })}
             </span>
           ),
         },
