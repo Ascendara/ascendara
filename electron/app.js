@@ -36,6 +36,7 @@ const {
   Menu,
   nativeImage,
   powerMonitor,
+  safeStorage,
   session,
 } = require("electron");
 const http = require("http");
@@ -64,6 +65,10 @@ if (process.platform === "linux") {
   // Disable GPU process crash limit to prevent crashes from affecting the app
   app.commandLine.appendSwitch("--disable-gpu-process-crash-limit");
 }
+
+// Same keyring as the launch that sealed the saved logins (must be set before app ready)
+const { pinPasswordStore, rememberPasswordStore } = require("./modules/core/password-store");
+pinPasswordStore({ app });
 
 // Import modules
 const {
@@ -480,6 +485,7 @@ async function initializeApp() {
     app.isQuitting = false;
 
     // safeStorage only works from here on
+    rememberPasswordStore({ app, safeStorage });
     settings.getSettingsManager().migrateSecretStorage();
     settings.getSettingsManager().retirePreMigrationBackup();
 
