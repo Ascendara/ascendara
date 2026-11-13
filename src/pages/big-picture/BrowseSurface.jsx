@@ -205,6 +205,9 @@ export function BrowseSurface({
             <BigPictureSpotlight
               title={gameName(spotlight)}
               chips={[
+                settings.combineSources &&
+                  settings.customSourcesMode &&
+                  !spotlight.customSource && { icon: Database, label: t("gameCard.official") },
                 genresFor(spotlight)[0] && { icon: Tag, label: genresFor(spotlight)[0] },
                 spotlight.size && { icon: HardDrive, label: catalogSizeText(spotlight, t) },
                 spotlight.online && { icon: Users, label: "Online" },

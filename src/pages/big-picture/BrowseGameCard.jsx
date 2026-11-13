@@ -1,6 +1,7 @@
 import { memo, useEffect, useId, useRef, useState } from "react";
 import {
   ArrowUpRight,
+  Database,
   Gamepad2,
   Gift,
   HardDrive,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { useLanguage } from "@/context/LanguageContext";
+import { useSettings } from "@/context/SettingsContext";
 import ratingQueueService from "@/services/games/ratingQueueService";
 import { catalogSizeText } from "@/lib/installSpace";
 import { gameName } from "./surfaceNavigation";
@@ -22,6 +24,10 @@ const validRating = value => {
 
 export const BrowseGameCard = memo(function BrowseGameCard({ game, focus, onOpen }) {
   const { t } = useLanguage();
+  const { settings } = useSettings();
+  // Mixed in with other sources, official games are marked so they stand out
+  const official =
+    !!settings?.combineSources && !!settings?.customSourcesMode && !game.customSource;
   const ref = useRef(null);
   const id = useId();
   const name = gameName(game);
@@ -120,6 +126,12 @@ export const BrowseGameCard = memo(function BrowseGameCard({ game, focus, onOpen
           >
             <Star aria-hidden="true" />
             <span>{Math.round(rating)}</span>
+          </span>
+        )}
+        {official && (
+          <span className="bp-browse-official" title={t("gameCard.officialTooltip")}>
+            <Database aria-hidden="true" />
+            {t("gameCard.official")}
           </span>
         )}
         <span className="bp-browse-open" aria-hidden="true">
