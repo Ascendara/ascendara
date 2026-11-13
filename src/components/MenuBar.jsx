@@ -36,6 +36,7 @@ import { useAppIcon } from "@/hooks/useAppIcon";
 import { useSettings } from "@/context/SettingsContext";
 import { WindowControls } from "@/components/WindowControls";
 import { FEATURE_CENTER_EVENTS, openFeatureCenter } from "@/lib/featureCenterEvents";
+import { MENU_BAR_HEIGHT_STYLE } from "@/lib/appChromeGeometry";
 
 const MenuBar = () => {
   const { t } = useLanguage();
@@ -270,8 +271,8 @@ const MenuBar = () => {
 
   return (
     <div
-      className="fixed z-50 flex h-12 w-full select-none items-center"
-      style={{ WebkitAppRegion: "drag" }}
+      className="fixed z-50 flex w-full select-none items-center"
+      style={{ ...MENU_BAR_HEIGHT_STYLE, WebkitAppRegion: "drag" }}
     >
       {/* data-boot-row / data-boot-pop: staggered pop-in as the boot logo lands (app.css) */}
       <div
