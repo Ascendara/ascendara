@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { loadModule } = require("./helpers/loadModule.cjs");
 
-test("window-control action order is invariant across style for both sides", async () => {
+test("close sits at the outer edge, and left-side traffic lights keep the macOS order", async () => {
   const { getWindowControlOrder } = await loadModule("src/lib/windowControlOrder.js");
 
   const cases = [
@@ -26,13 +26,13 @@ test("window-control action order is invariant across style for both sides", asy
     {
       variant: "traffic",
       mirrored: true,
-      expected: ["close", "fullscreen", "minimize"],
+      expected: ["close", "minimize", "fullscreen"],
     },
   ];
 
   for (const { variant, mirrored, expected } of cases) {
     assert.deepEqual(
-      getWindowControlOrder(mirrored),
+      getWindowControlOrder(mirrored, variant),
       expected,
       `${variant} controls should preserve the ${mirrored ? "left" : "right"}-side action policy`
     );
@@ -48,7 +48,7 @@ test("both WindowControls styles render from the shared action order", () => {
   const end = source.indexOf("/** A row of small option cards", start);
   const component = source.slice(start, end);
 
-  assert.match(component, /const controlOrder = getWindowControlOrder\(mirrored\);/);
+  assert.match(component, /const controlOrder = getWindowControlOrder\(mirrored, variant\);/);
   assert.equal(
     (component.match(/controlOrder\.map\(id =>/g) || []).length,
     2,
@@ -74,11 +74,10 @@ test("window-control style previews follow the selected menu-bar side", () => {
   const end = component.indexOf("// A sketch of the menu bar", start);
   const picker = component.slice(start, end);
 
-  assert.match(picker, /getWindowControlOrder\(side === "right"\)/);
-  assert.ok(
-    (picker.match(/controlOrder\.map\(id =>/g) || []).length >= 2,
-    "both preview styles should render from the shared action order"
-  );
+  assert.match(picker, /getWindowControlOrder\(side === "right", "icons"\)/);
+  assert.match(picker, /getWindowControlOrder\(side === "right", "traffic"\)/);
+  assert.match(picker, /iconOrder\.map\(id =>/);
+  assert.match(picker, /trafficOrder\.map\(id =>/);
   assert.match(settings, /side=\{settings\.menuBarSide\}/);
   assert.match(welcome, /side=\{appSettings\.menuBarSide\}/);
 });

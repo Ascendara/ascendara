@@ -96,9 +96,9 @@ function IconControl({ id, isFullscreen, onClick, fullscreenTitle }) {
 
 /**
  * The window's minimize / fullscreen / close buttons, drawn either as plain
- * icons or as macOS-style traffic lights. Both styles consume the same action
- * order so changing appearance never changes which action occupies a spatial
- * slot; mirroring keeps close at the outer window edge.
+ * icons or as macOS-style traffic lights. Close always sits at the outer window
+ * edge. On the right both styles share one order; on the left traffic lights
+ * keep the native macOS order (see windowControlOrder).
  */
 export function WindowControls({
   variant = "icons",
@@ -115,7 +115,7 @@ export function WindowControls({
   };
 
   const fullscreenTitle = isFullscreen ? t("exitFullscreen") : t("enterFullscreen");
-  const controlOrder = getWindowControlOrder(mirrored);
+  const controlOrder = getWindowControlOrder(mirrored, variant);
 
   if (variant === "traffic") {
     return (
@@ -195,7 +195,8 @@ function WindowControlPreviewIcon({ id }) {
 }
 
 export function WindowControlsStylePicker({ value = "icons", onChange, t, side = "left" }) {
-  const controlOrder = getWindowControlOrder(side === "right");
+  const iconOrder = getWindowControlOrder(side === "right", "icons");
+  const trafficOrder = getWindowControlOrder(side === "right", "traffic");
 
   return (
     <OptionCards
@@ -207,7 +208,7 @@ export function WindowControlsStylePicker({ value = "icons", onChange, t, side =
           label: t("settings.windowControlsIcons"),
           preview: (
             <span className="flex items-center gap-1.5">
-              {controlOrder.map(id => (
+              {iconOrder.map(id => (
                 <WindowControlPreviewIcon key={id} id={id} />
               ))}
             </span>
@@ -218,7 +219,7 @@ export function WindowControlsStylePicker({ value = "icons", onChange, t, side =
           label: t("settings.windowControlsTraffic"),
           preview: (
             <span className="flex items-center gap-1.5">
-              {controlOrder.map(id => {
+              {trafficOrder.map(id => {
                 const { color } = TRAFFIC_LIGHT_BY_ID[id];
                 return (
                   <span
