@@ -1,4 +1,5 @@
 import { Maximize, Minimize, Minus, X } from "lucide-react";
+import { getWindowControlOrder } from "@/lib/windowControlOrder";
 
 const TRAFFIC_LIGHTS = [
   { id: "close", color: "#FF5F57", ring: "#E0443E" },
@@ -41,16 +42,63 @@ function TrafficGlyph({ id, isFullscreen }) {
   );
 }
 
+const TRAFFIC_LIGHT_BY_ID = Object.fromEntries(
+  TRAFFIC_LIGHTS.map(light => [light.id, light])
+);
+
 const ICON_BUTTON =
   "flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors";
 const ICON_HOVER = "hover:bg-accent/60 hover:text-foreground";
 
+function IconControl({ id, isFullscreen, onClick, fullscreenTitle }) {
+  if (id === "minimize") {
+    return (
+      <button type="button" className={`${ICON_BUTTON} ${ICON_HOVER}`} onClick={onClick}>
+        <Minus className="h-4 w-4" strokeWidth={2} />
+      </button>
+    );
+  }
+
+  if (id === "fullscreen") {
+    return (
+      <button
+        type="button"
+        className={`relative ${ICON_BUTTON} ${ICON_HOVER}`}
+        onClick={onClick}
+        title={fullscreenTitle}
+      >
+        <Minimize
+          className={`absolute h-3.5 w-3.5 transition-opacity ${
+            isFullscreen ? "opacity-100" : "opacity-0"
+          }`}
+          strokeWidth={2}
+        />
+        <Maximize
+          className={`h-3.5 w-3.5 transition-opacity ${
+            isFullscreen ? "opacity-0" : "opacity-100"
+          }`}
+          strokeWidth={2}
+        />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={`${ICON_BUTTON} hover:bg-red-500/15 hover:text-red-500`}
+      onClick={onClick}
+    >
+      <X className="h-4 w-4" strokeWidth={2} />
+    </button>
+  );
+}
+
 /**
  * The window's minimize / fullscreen / close buttons, drawn either as plain
- * icons or as macOS-style traffic lights. Traffic lights always run close,
- * minimize, fullscreen like the native ones (glyphs show when the group is
- * hovered); mirrored reverses the icons so close stays at the window edge
- * when the menu bar is flipped.
+ * icons or as macOS-style traffic lights. Both styles consume the same action
+ * order so changing appearance never changes which action occupies a spatial
+ * slot; mirroring keeps close at the outer window edge.
  */
 export function WindowControls({
   variant = "icons",
@@ -67,64 +115,44 @@ export function WindowControls({
   };
 
   const fullscreenTitle = isFullscreen ? t("exitFullscreen") : t("enterFullscreen");
+  const controlOrder = getWindowControlOrder(mirrored);
 
   if (variant === "traffic") {
     return (
       <div
         className={`window-controls group/traffic flex items-center gap-2 ${className}`}
       >
-        {TRAFFIC_LIGHTS.map(({ id, color, ring }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={actions[id]}
-            title={id === "fullscreen" ? fullscreenTitle : undefined}
-            className="h-3 w-3 shrink-0 overflow-hidden rounded-full active:brightness-90"
-            style={{ backgroundColor: color, boxShadow: `inset 0 0 0 0.5px ${ring}` }}
-          >
-            <TrafficGlyph id={id} isFullscreen={isFullscreen} />
-          </button>
-        ))}
+        {controlOrder.map(id => {
+          const { color, ring } = TRAFFIC_LIGHT_BY_ID[id];
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={actions[id]}
+              title={id === "fullscreen" ? fullscreenTitle : undefined}
+              className="h-3 w-3 shrink-0 overflow-hidden rounded-full active:brightness-90"
+              style={{ backgroundColor: color, boxShadow: `inset 0 0 0 0.5px ${ring}` }}
+            >
+              <TrafficGlyph id={id} isFullscreen={isFullscreen} />
+            </button>
+          );
+        })}
       </div>
     );
   }
 
   return (
     <div className={`window-controls flex items-center ${className}`}>
-      <div className={`flex items-center gap-0.5 ${mirrored ? "flex-row-reverse" : ""}`}>
-        <button
-          type="button"
-          className={`${ICON_BUTTON} ${ICON_HOVER}`}
-          onClick={actions.minimize}
-        >
-          <Minus className="h-4 w-4" strokeWidth={2} />
-        </button>
-        <button
-          type="button"
-          className={`relative ${ICON_BUTTON} ${ICON_HOVER}`}
-          onClick={actions.fullscreen}
-          title={fullscreenTitle}
-        >
-          <Minimize
-            className={`absolute h-3.5 w-3.5 transition-opacity ${
-              isFullscreen ? "opacity-100" : "opacity-0"
-            }`}
-            strokeWidth={2}
+      <div className="flex items-center gap-0.5">
+        {controlOrder.map(id => (
+          <IconControl
+            key={id}
+            id={id}
+            isFullscreen={isFullscreen}
+            onClick={actions[id]}
+            fullscreenTitle={fullscreenTitle}
           />
-          <Maximize
-            className={`h-3.5 w-3.5 transition-opacity ${
-              isFullscreen ? "opacity-0" : "opacity-100"
-            }`}
-            strokeWidth={2}
-          />
-        </button>
-        <button
-          type="button"
-          className={`${ICON_BUTTON} hover:bg-red-500/15 hover:text-red-500`}
-          onClick={actions.close}
-        >
-          <X className="h-4 w-4" strokeWidth={2} />
-        </button>
+        ))}
       </div>
     </div>
   );
