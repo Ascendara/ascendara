@@ -81,8 +81,13 @@ import {
 } from "@/services/firebase/firebaseService";
 import gameService from "@/services/games/gameService";
 import {
+  UPDATE_PHASES,
   checkForUpdates,
+  getUpdateStatus,
+  markUpdateInstallFailed,
+  markUpdateInstalling,
   startBackgroundUpdateChecks,
+  subscribeToUpdateStatus,
 } from "@/services/app/updateCheckingService";
 import { startStatusCheck } from "@/services/app/serverStatus";
 import { motion } from "framer-motion";
@@ -1829,6 +1834,7 @@ const AppRoutes = () => {
   };
 
   const handleInstallAndRestart = async () => {
+    markUpdateInstalling();
     showInstallingOverlay();
     try {
       await window.electron.setTimestampValue("isUpdating", true);
@@ -1840,6 +1846,7 @@ const AppRoutes = () => {
         );
       }
     } catch (error) {
+      markUpdateInstallFailed();
       setIsUpdating(false);
       setIsInstalling(false);
       await window.electron.setTimestampValue("isUpdating", false);
@@ -1910,7 +1917,7 @@ const AppRoutes = () => {
       updateRequested = true;
       toast.dismiss("update-available");
       try {
-        if (await window.electron.isUpdateDownloaded()) {
+        if (getUpdateStatus().phase === UPDATE_PHASES.READY) {
           // A manual request must be able to reopen a dismissed install prompt.
           hasShownUpdateReadyNotification.current = false;
           await updateReadyHandler();
@@ -1928,7 +1935,7 @@ const AppRoutes = () => {
     const checkVersionAndSetupUpdates = async () => {
       try {
         const settings = await window.electron.getSettings();
-        const isLatestVersion = await checkForUpdates();
+        await checkForUpdates();
         const branch = await window.electron.getBranch();
         const liveOffer = await window.electron.getLiveUpdateOffer?.();
         if (isSubscribed && liveOffer && !isLiveUpdateOfferDismissed(liveOffer)) {
@@ -1938,7 +1945,7 @@ const AppRoutes = () => {
         const isPortable = await window.electron.isPortable();
 
         if (
-          !isLatestVersion &&
+          getUpdateStatus().phase === UPDATE_PHASES.AVAILABLE &&
           !hasShownUpdateNotification.current &&
           (!settings.autoUpdate || isPortable)
         ) {
@@ -2002,16 +2009,16 @@ const AppRoutes = () => {
       });
     };
 
+    const handleUpdateStatus = nextStatus => {
+      if (nextStatus.phase === UPDATE_PHASES.READY) {
+        void updateReadyHandler();
+      }
+    };
+    const unsubscribeUpdateStatus = subscribeToUpdateStatus(handleUpdateStatus);
+    handleUpdateStatus(getUpdateStatus());
+
     checkVersionAndSetupUpdates();
 
-    // Check if update is already downloaded
-    window.electron.isUpdateDownloaded().then(isDownloaded => {
-      if (isDownloaded) {
-        updateReadyHandler();
-      }
-    });
-
-    window.electron.onUpdateReady(updateReadyHandler);
     window.addEventListener("request-app-update", requestUpdate);
     const unsubscribeUpdateError = window.electron.onUpdateError?.((_event, message) => {
       if (!isSubscribed) return;
@@ -2023,7 +2030,7 @@ const AppRoutes = () => {
 
     return () => {
       isSubscribed = false;
-      window.electron.removeUpdateReadyListener(updateReadyHandler);
+      unsubscribeUpdateStatus();
       window.removeEventListener("request-app-update", requestUpdate);
       unsubscribeUpdateError?.();
     };
