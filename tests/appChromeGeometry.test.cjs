@@ -18,9 +18,18 @@ test("MenuBar and routed layout consume one vertical chrome geometry contract", 
   const menuBar = read("src/components/MenuBar.jsx");
   const layout = read("src/components/Layout.jsx");
 
-  assert.match(menuBar, /import \{ MENU_BAR_HEIGHT_STYLE \} from "@\/lib\/appChromeGeometry";/);
-  assert.match(layout, /import \{ MENU_BAR_HEIGHT_STYLE \} from "@\/lib\/appChromeGeometry";/);
-  assert.match(menuBar, /style=\{\{ \.\.\.MENU_BAR_HEIGHT_STYLE, WebkitAppRegion: "drag" \}\}/);
+  assert.match(
+    menuBar,
+    /import \{ MENU_BAR_HEIGHT_STYLE \} from "@\/lib\/appChromeGeometry";/
+  );
+  assert.match(
+    layout,
+    /import \{ MENU_BAR_HEIGHT_STYLE \} from "@\/lib\/appChromeGeometry";/
+  );
+  assert.match(
+    menuBar,
+    /style=\{\{ \.\.\.MENU_BAR_HEIGHT_STYLE, WebkitAppRegion: "drag" \}\}/
+  );
   assert.match(
     layout,
     /<div className="shrink-0" aria-hidden="true" style=\{MENU_BAR_HEIGHT_STYLE\} \/>/
