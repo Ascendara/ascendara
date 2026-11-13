@@ -75,9 +75,16 @@ test("MenuBar source protects one-row critical controls from flex shrink and wra
   assert.match(menuBar, /responsivePolicy\.showActivityLabels/);
   assert.match(menuBar, /responsivePolicy\.showSearchShortcut/);
   assert.match(menuBar, /className="[^"]*shrink-0[^"]*whitespace-nowrap[^"]*"/);
+  const searchStart = menuBar.indexOf('onClick={() => openSearch("global")}');
+  assert.notEqual(searchStart, -1, "global search control is missing");
+  const searchEnd = menuBar.indexOf("</button>", searchStart);
+  const searchControl = menuBar.slice(searchStart, searchEnd);
+  assert.match(searchControl, /shrink-0/);
+  assert.match(searchControl, /whitespace-nowrap/);
+  assert.match(searchControl, /layoutOrder\.search/);
   assert.match(
-    menuBar,
-    /className="[^"]*shrink-0[^"]*"[^>]*aria-label=\{t\("globalSearch\.placeholder\.global"\)\}/s
+    searchControl,
+    /aria-label=\{t\("globalSearch\.placeholder\.global"\)\}/
   );
   assert.match(controls, /window-controls[^\n"]*shrink-0/);
 });
