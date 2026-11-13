@@ -186,7 +186,9 @@ function isVersionLower(v1, v2) {
  */
 async function checkVersionAndUpdate() {
   try {
-    const settings = getSettingsManager().getSettings();
+    const settingsManager = getSettingsManager();
+    const settings = settingsManager.getSettings();
+    const settingsReadable = !settingsManager.hasSettingsLoadError();
     const currentBranch = appBranch;
 
     let latestVersion;
@@ -239,17 +241,16 @@ async function checkVersionAndUpdate() {
     );
     if (!isLatest) {
       const canAutoUpdate = !isPortable;
-      const hasAutoUpdateConsent =
-        settings.autoUpdateChosen === true && settings.autoUpdate === true;
+      const automaticUpdatesEnabled = settingsReadable && settings.autoUpdate === true;
       if (
-        hasAutoUpdateConsent &&
+        automaticUpdatesEnabled &&
         canAutoUpdate &&
         !updateDownloadInProgress &&
         !updateDownloaded
       ) {
         // Start background download
         downloadUpdatePromise = downloadUpdateInBackground();
-      } else if ((!hasAutoUpdateConsent || !canAutoUpdate) && !notificationShown) {
+      } else if ((!automaticUpdatesEnabled || !canAutoUpdate) && !notificationShown) {
         // Show update available notification
         notificationShown = true;
         BrowserWindow.getAllWindows().forEach(window => {

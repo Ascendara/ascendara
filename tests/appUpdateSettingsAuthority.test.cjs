@@ -9,10 +9,8 @@ const SETTINGS = require.resolve("../electron/modules/core/settings.js");
 const UPDATES = require.resolve("../electron/modules/system/updates.js");
 const ENCRYPTION = require.resolve("../electron/modules/core/encryption.js");
 
-const readJson = file => JSON.parse(fs.readFileSync(file, "utf8"));
-
 async function withSettings(run, initialContent) {
-  const userData = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-update-consent-"));
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-update-settings-"));
   const file = path.join(userData, "ascendarasettings.json");
   if (initialContent !== undefined) fs.writeFileSync(file, initialContent);
 
@@ -30,14 +28,11 @@ async function withSettings(run, initialContent) {
           isEncryptionAvailable: () => false,
           getSelectedStorageBackend: () => "basic_text",
         },
-        ipcMain: {
-          emit() {},
-          handle() {},
-        },
+        ipcMain: { emit() {}, handle() {} },
       };
     }
     if (request === "./machine-id") {
-      return { getMachineId: () => "update-consent-test-machine" };
+      return { getMachineId: () => "update-settings-test-machine" };
     }
     return realLoad.call(this, request, ...rest);
   };
@@ -50,8 +45,7 @@ async function withSettings(run, initialContent) {
   try {
     forget();
     const { SettingsManager } = require(SETTINGS);
-    const manager = new SettingsManager();
-    await run({ manager, file });
+    await run({ manager: new SettingsManager(), file });
   } finally {
     Module._load = realLoad;
     forget();
@@ -59,11 +53,10 @@ async function withSettings(run, initialContent) {
   }
 }
 
-function loadUpdates(settings, { settingsError = null, isWindows = false } = {}) {
+function loadUpdates(settings, { loadError = false, isWindows = false } = {}) {
   const timestampWrites = [];
   const notifications = [];
   const handlers = {};
-  let versionRequests = 0;
   let differentialDownloads = 0;
 
   const fsExtra = {
@@ -75,7 +68,6 @@ function loadUpdates(settings, { settingsError = null, isWindows = false } = {})
     throw new Error("unexpected update download request");
   };
   axios.get = async url => {
-    versionRequests += 1;
     assert.equal(url, "https://updates.test/");
     return { data: { appVer: "2.0.0" } };
   };
@@ -106,10 +98,7 @@ function loadUpdates(settings, { settingsError = null, isWindows = false } = {})
           ],
         },
         app: { getPath: () => os.tmpdir() },
-        powerSaveBlocker: {
-          start: () => 1,
-          stop() {},
-        },
+        powerSaveBlocker: { start: () => 1, stop() {} },
         shell: { openExternal: async () => {} },
       };
     }
@@ -136,18 +125,13 @@ function loadUpdates(settings, { settingsError = null, isWindows = false } = {})
     if (request === "../core/settings") {
       return {
         getSettingsManager: () => ({
-          getSettings() {
-            if (settingsError) throw settingsError;
-            return settings;
-          },
+          getSettings: () => settings,
+          hasSettingsLoadError: () => loadError,
         }),
       };
     }
     if (request === "../app/translations") {
-      return {
-        runTranslation: async () => {},
-        isTranslationRunning: () => false,
-      };
+      return { runTranslation: async () => {}, isTranslationRunning: () => false };
     }
     if (request === "./install-update") return installUpdate;
     if (request === "./differential-update") {
@@ -177,7 +161,6 @@ function loadUpdates(settings, { settingsError = null, isWindows = false } = {})
       timestampWrites,
       notifications,
       handlers,
-      getVersionRequests: () => versionRequests,
       getDifferentialDownloads: () => differentialDownloads,
       cleanup() {
         delete require.cache[UPDATES];
@@ -188,131 +171,82 @@ function loadUpdates(settings, { settingsError = null, isWindows = false } = {})
   }
 }
 
-test("fresh settings do not opt in to background app updates", async () => {
-  await withSettings(async ({ manager, file }) => {
-    const settings = manager.getSettings();
-    assert.equal(settings.autoUpdate, false);
-    assert.equal(settings.autoUpdateChosen, false);
-    assert.equal(manager.getSetting("autoUpdate"), false);
+async function waitForDownload(harness) {
+  for (let attempt = 0; attempt < 20 && !harness.updates.getUpdateDownloaded(); attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+}
 
-    const disk = readJson(file);
-    assert.equal(disk.autoUpdate, false);
-    assert.equal(disk.autoUpdateChosen, false);
+test("fresh settings preserve Ascendara's default-on automatic update policy", async () => {
+  await withSettings(async ({ manager }) => {
+    const settings = manager.getSettings();
+    assert.equal(settings.autoUpdate, true);
+    assert.equal("autoUpdateChosen" in settings, false);
+    assert.equal(manager.hasSettingsLoadError(), false);
   });
 });
 
-test("legacy default true without consent provenance fails closed", async () => {
-  await withSettings(
-    async ({ manager }) => {
-      const settings = manager.getSettings();
-      assert.equal(settings.autoUpdate, false);
-      assert.equal(settings.autoUpdateChosen, false);
-      assert.equal(manager.getSetting("autoUpdate"), false);
-    },
-    JSON.stringify({ autoUpdate: true })
-  );
+test("an explicit automatic-update opt-out remains authoritative", async () => {
+  await withSettings(async ({ manager }) => {
+    assert.equal(manager.updateSetting("autoUpdate", false), true);
+    assert.equal(manager.getSettings().autoUpdate, false);
+    assert.equal(manager.getSetting("autoUpdate"), false);
+    assert.equal("autoUpdateChosen" in manager.getSettings(), false);
+  });
 });
 
-test("corrupt settings fail closed for automatic app updates", async () => {
+test("corrupt settings are distinguishable from valid default settings", async () => {
   await withSettings(
     async ({ manager }) => {
-      const settings = manager.getSettings();
-      assert.equal(settings.autoUpdate, false);
-      assert.equal(settings.autoUpdateChosen, false);
-      assert.equal(manager.getSetting("autoUpdate"), false);
+      assert.equal(manager.getSettings().autoUpdate, true);
+      assert.equal(manager.hasSettingsLoadError(), true);
     },
     "{"
   );
 });
 
-test("an explicit auto-update choice is persisted as consent", async () => {
-  await withSettings(async ({ manager, file }) => {
-    assert.equal(manager.updateSetting("autoUpdate", true), true);
-
-    const settings = manager.getSettings();
-    assert.equal(settings.autoUpdate, true);
-    assert.equal(settings.autoUpdateChosen, true);
-
-    const disk = readJson(file);
-    assert.equal(disk.autoUpdate, true);
-    assert.equal(disk.autoUpdateChosen, true);
-  });
-});
-
-test("version checks do not download for default or unknown consent states", async () => {
-  for (const settings of [
-    { autoUpdate: false, autoUpdateChosen: false },
-    { autoUpdate: true },
-    { autoUpdate: true, autoUpdateChosen: false },
-  ]) {
-    const harness = loadUpdates(settings);
-    try {
-      assert.equal(await harness.updates.checkVersionAndUpdate(), false);
-      assert.equal(harness.getVersionRequests(), 1);
-      assert.equal(
-        harness.timestampWrites.some(write => write?.downloadingUpdate === true),
-        false
-      );
-      assert.deepEqual(harness.notifications, ["update-available"]);
-    } finally {
-      harness.cleanup();
-    }
-  }
-});
-
-test("explicit persisted consent allows automatic background downloads", async () => {
-  const harness = loadUpdates(
-    { autoUpdate: true, autoUpdateChosen: true },
-    { isWindows: true }
-  );
+test("readable default-on settings start the background update", async () => {
+  const harness = loadUpdates({ autoUpdate: true }, { isWindows: true });
   try {
     assert.equal(await harness.updates.checkVersionAndUpdate(), false);
-
-    for (
-      let attempt = 0;
-      attempt < 20 && !harness.updates.getUpdateDownloaded();
-      attempt++
-    ) {
-      await new Promise(resolve => setTimeout(resolve, 5));
-    }
-
+    await waitForDownload(harness);
     assert.equal(harness.getDifferentialDownloads(), 1);
     assert.equal(harness.updates.getUpdateDownloaded(), true);
-    assert.equal(
-      harness.timestampWrites.some(write => write?.downloadingUpdate === true),
-      true
-    );
+    assert.deepEqual(harness.notifications, ["update-ready"]);
   } finally {
     harness.cleanup();
   }
 });
 
-test("settings read errors fail closed before any update download can start", async () => {
-  const harness = loadUpdates(null, { settingsError: new Error("settings unreadable") });
+test("an explicit opt-out notifies without downloading", async () => {
+  const harness = loadUpdates({ autoUpdate: false }, { isWindows: true });
   try {
-    assert.equal(await harness.updates.checkVersionAndUpdate(), true);
-    assert.equal(harness.getVersionRequests(), 0);
-    assert.equal(
-      harness.timestampWrites.some(write => write?.downloadingUpdate === true),
-      false
-    );
+    assert.equal(await harness.updates.checkVersionAndUpdate(), false);
+    assert.equal(harness.getDifferentialDownloads(), 0);
+    assert.deepEqual(harness.notifications, ["update-available"]);
   } finally {
     harness.cleanup();
   }
 });
 
-test("manual update download still works when automatic updates are off", async () => {
-  const harness = loadUpdates(
-    { autoUpdate: false, autoUpdateChosen: true },
-    { isWindows: true }
-  );
+test("unreadable settings fail closed for background transfer but still report the update", async () => {
+  const harness = loadUpdates({ autoUpdate: true }, { loadError: true, isWindows: true });
+  try {
+    assert.equal(await harness.updates.checkVersionAndUpdate(), false);
+    assert.equal(harness.getDifferentialDownloads(), 0);
+    assert.deepEqual(harness.notifications, ["update-available"]);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test("manual update download still works after opting out", async () => {
+  const harness = loadUpdates({ autoUpdate: false }, { isWindows: true });
   try {
     assert.equal(await harness.updates.checkVersionAndUpdate(), false);
     harness.updates.registerUpdateHandlers();
-    assert.equal(typeof harness.handlers["download-update"], "function");
-
     await harness.handlers["download-update"]();
-
+    await waitForDownload(harness);
     assert.equal(harness.getDifferentialDownloads(), 1);
     assert.equal(harness.updates.getUpdateDownloaded(), true);
   } finally {
