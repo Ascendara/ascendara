@@ -68,10 +68,12 @@ export function DownloadsSurface({
       });
     }
   };
+  // With nothing queued, the start button resumes a paused download instead.
+  const paused = queue.length ? null : downloads.find(game => game.downloadingData?.stopped);
   const rows = remove
     ? [["keep", "remove"]]
     : [
-        ["browse", "start"],
+        ["browse", ...(queue.length || paused ? ["start"] : [])],
         ...downloads.map(game => {
           const data = game.downloadingData || {};
           const count =
@@ -98,8 +100,14 @@ export function DownloadsSurface({
   );
   const start = async () => {
     if (starting) return;
+    if (paused) {
+      if (!resuming.has(paused.game)) resume(paused);
+      return;
+    }
+    // One toast id so repeated presses replace the message instead of stacking it.
+    const id = "bp-start-queue";
     if (getQueueBlockReason(queue[0], settings) === TORRENT_DISABLED_CODE) {
-      toast.info(t("download.toast.torrentDisabled"));
+      toast.info(t("download.toast.torrentDisabled"), { id });
       return;
     }
     setStarting(true);
@@ -108,10 +116,13 @@ export function DownloadsSurface({
       toast.info(
         item
           ? `Starting ${item.gameName}`
-          : "Queue is empty, waiting for an active download, or could not start. Check Downloads for details."
+          : running.length
+            ? "The queue starts once the current download finishes."
+            : "Couldn't start the next download. Check Downloads for details.",
+        { id }
       );
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.message, { id });
     } finally {
       setStarting(false);
     }
@@ -185,10 +196,18 @@ export function DownloadsSurface({
               <Compass />
               Browse games
             </SurfaceButton>
-            <SurfaceButton {...focus("start")} onClick={start}>
-              <Play />
-              {starting ? "Starting…" : "Start next queued download"}
-            </SurfaceButton>
+            {(queue.length > 0 || paused) && (
+              <SurfaceButton {...focus("start")} onClick={start}>
+                <Play />
+                {paused
+                  ? resuming.has(paused.game)
+                    ? "Resuming…"
+                    : `Resume ${paused.game}`
+                  : starting
+                    ? "Starting…"
+                    : "Start next queued download"}
+              </SurfaceButton>
+            )}
           </BigPictureToolbar>
           {!downloads.length && !queue.length && (
             <BigPictureEmptyState title="Your download shelf is empty">
