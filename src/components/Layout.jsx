@@ -174,10 +174,8 @@ const Layout = memo(() => {
   const fixedClass = fixedPageClass(location.pathname);
   const isSearchPage = location.pathname === "/search";
   const isDownloadPage = location.pathname === "/download";
-  const navigationBottomSafeArea = getNavigationBottomSafeArea(
-    location.pathname,
-    settings?.compactDockOnScroll
-  );
+  const navigationBottomSafeArea = getNavigationBottomSafeArea(location.pathname);
+  const hasNavigationBottomSafeArea = navigationBottomSafeArea > 0;
   const searchScrollRef = useRef(null);
 
   useNaturalDownloadScroll(isDownloadPage);
@@ -217,7 +215,11 @@ const Layout = memo(() => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
+    <div
+      className={`flex flex-col bg-background text-foreground ${
+        hasNavigationBottomSafeArea ? "h-screen overflow-hidden" : "min-h-screen"
+      }`}
+    >
       <div className="shrink-0" aria-hidden="true" style={MENU_BAR_HEIGHT_STYLE} />
       {/* Search is rendered persistently so scroll position and loaded games survive navigation */}
       <motion.main
@@ -250,7 +252,10 @@ const Layout = memo(() => {
       </motion.main>
       {/* Other pages render normally via Outlet */}
       <main
-        className="flex-1 overflow-y-auto px-4 pb-24"
+        data-route-scroll-container
+        className={`flex-1 overflow-y-auto px-4 pb-24 ${
+          hasNavigationBottomSafeArea ? "min-h-0" : ""
+        }`}
         style={{
           display: isSearchPage ? "none" : "block",
           marginBottom: navigationBottomSafeArea || undefined,

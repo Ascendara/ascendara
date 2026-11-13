@@ -24,14 +24,17 @@ import {
   NAVIGATION_COMPACT_ITEM_HEIGHT_PX,
   NAVIGATION_COMPACT_SEPARATOR_HEIGHT_PX,
   NAVIGATION_COMPACT_PADDING_Y_PX,
+  NAVIGATION_EXPANDED_ITEM_HEIGHT_PX,
+  NAVIGATION_EXPANDED_SEPARATOR_HEIGHT_PX,
+  NAVIGATION_EXPANDED_PADDING_Y_PX,
 } from "@/lib/navigationGeometry";
 
 // A dock item collapses to no width, and the negative margin cancels the dock's
 // 8px gap, so its neighbours close up fully while it is hidden
 const DOCK_ITEM_HIDDEN = { width: 0, marginLeft: -8, opacity: 0, scale: 0.3, y: 8 };
 const DOCK_ITEM_SHOWN = {
-  width: 48,
-  height: 48,
+  width: NAVIGATION_EXPANDED_ITEM_HEIGHT_PX,
+  height: NAVIGATION_EXPANDED_ITEM_HEIGHT_PX,
   marginLeft: 0,
   opacity: 1,
   scale: 1,
@@ -52,8 +55,8 @@ const DOCK_ITEM_TRANSITION = { ...DOCK_SPRING, opacity: { duration: 0.2 } };
 // radius stays put: the compact dock is short enough that 18px already rounds it into a
 // pill, and a fixed radius can't snap the way a jump to rounded-full does
 const DOCK_SHELL_EXPANDED = {
-  paddingTop: 12,
-  paddingBottom: 12,
+  paddingTop: NAVIGATION_EXPANDED_PADDING_Y_PX,
+  paddingBottom: NAVIGATION_EXPANDED_PADDING_Y_PX,
   paddingLeft: 12,
   paddingRight: 12,
   gap: 8,
@@ -452,7 +455,11 @@ const Navigation = memo(({ items }) => {
                             marginLeft: 2,
                             marginRight: 2,
                           }
-                        : { height: 32, marginLeft: 0, marginRight: 0 }
+                        : {
+                            height: NAVIGATION_EXPANDED_SEPARATOR_HEIGHT_PX,
+                            marginLeft: 0,
+                            marginRight: 0,
+                          }
                     }
                     transition={DOCK_SPRING}
                   />
@@ -462,14 +469,18 @@ const Navigation = memo(({ items }) => {
                     className="relative flex shrink-0 items-center justify-center"
                     initial={{
                       ...DOCK_ITEM_HIDDEN,
-                      height: compact ? NAVIGATION_COMPACT_ITEM_HEIGHT_PX : 48,
+                      height: compact
+                        ? NAVIGATION_COMPACT_ITEM_HEIGHT_PX
+                        : NAVIGATION_EXPANDED_ITEM_HEIGHT_PX,
                     }}
                     animate={
                       compact ? dockItemCompact(isActive(item.path)) : DOCK_ITEM_SHOWN
                     }
                     exit={{
                       ...DOCK_ITEM_HIDDEN,
-                      height: compact ? NAVIGATION_COMPACT_ITEM_HEIGHT_PX : 48,
+                      height: compact
+                        ? NAVIGATION_COMPACT_ITEM_HEIGHT_PX
+                        : NAVIGATION_EXPANDED_ITEM_HEIGHT_PX,
                     }}
                     transition={DOCK_ITEM_TRANSITION}
                   >

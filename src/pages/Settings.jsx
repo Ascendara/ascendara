@@ -839,6 +839,10 @@ function Settings() {
 
   const activeCategoryRef = useRef(activeCategory);
   activeCategoryRef.current = activeCategory;
+  const settingsRootRef = useRef(null);
+
+  const getSettingsScrollContainer = () =>
+    settingsRootRef.current?.closest("[data-route-scroll-container]") || null;
 
   const openCategory = id => {
     setActiveCategory(id);
@@ -851,7 +855,7 @@ function Settings() {
 
   const selectCategory = id => {
     openCategory(id);
-    window.scrollTo({ top: 0 });
+    getSettingsScrollContainer()?.scrollTo({ top: 0 });
   };
 
   // Fall back to General if the remembered category isn't available here
@@ -876,7 +880,6 @@ function Settings() {
   // away so a re-render doesn't jump again, and the jump itself runs from its
   // own state so clearing the location doesn't cancel it.
   const [jumpTarget, setJumpTarget] = useState(null);
-  const settingsRootRef = useRef(null);
 
   useEffect(() => {
     const targetId = location.state?.scrollTo;
@@ -909,51 +912,60 @@ function Settings() {
       timers.push(setTimeout(() => element.classList.remove("highlight-setting"), 2800));
     };
 
-    const scrollToElement = element => {
+    const scrollToElement = (element, scrollContainer) => {
       const isCategory = element.hasAttribute("data-category");
       const behavior =
         document.documentElement.dataset.motion === "reduced" ? "auto" : "smooth";
 
-      // A whole category only needs opening, from the top
+      // Settings owns a bounded route scrollport while the fixed dock is active.
+      // Every programmatic jump must target that same scroll owner.
       if (isCategory) {
-        window.scrollTo({ top: 0, behavior });
+        scrollContainer.scrollTo({ top: 0, behavior });
         return;
       }
 
-      // Keep clear of the menu bar on top and the dock at the bottom: center
-      // the setting in what is left, or line up its top if it is taller
-      const topInset = 72;
-      const bottomInset = 120;
-      const usable = window.innerHeight - topInset - bottomInset;
+      // The scrollport itself ends above the fixed dock, so centering inside
+      // its client height creates a real viewport-safe placement at any scroll
+      // position instead of relying on trailing document padding.
+      const topInset = 24;
+      const bottomInset = 24;
+      const usable = scrollContainer.clientHeight - topInset - bottomInset;
+      const containerRect = scrollContainer.getBoundingClientRect();
       const rect = element.getBoundingClientRect();
+      const elementTop =
+        scrollContainer.scrollTop + rect.top - containerRect.top;
       const offset =
         rect.height < usable ? topInset + (usable - rect.height) / 2 : topInset + 16;
-      const maxTop = document.documentElement.scrollHeight - window.innerHeight;
-      const top = Math.max(0, Math.min(maxTop, window.scrollY + rect.top - offset));
+      const maxTop = Math.max(
+        0,
+        scrollContainer.scrollHeight - scrollContainer.clientHeight
+      );
+      const top = Math.max(0, Math.min(maxTop, elementTop - offset));
 
-      if (Math.abs(top - window.scrollY) < 2) {
+      if (Math.abs(top - scrollContainer.scrollTop) < 2) {
         highlight(element);
         return;
       }
 
-      // Highlight once the scroll lands so the pulse is actually seen
+      // Highlight once the scrollport lands so the pulse is actually seen.
       let done = false;
       const onArrive = () => {
         if (done || cancelled) return;
         done = true;
-        window.removeEventListener("scrollend", onArrive);
+        scrollContainer.removeEventListener("scrollend", onArrive);
         highlight(element);
       };
-      window.addEventListener("scrollend", onArrive);
-      cleanups.push(() => window.removeEventListener("scrollend", onArrive));
+      scrollContainer.addEventListener("scrollend", onArrive);
+      cleanups.push(() => scrollContainer.removeEventListener("scrollend", onArrive));
       timers.push(setTimeout(onArrive, behavior === "smooth" ? 900 : 50));
-      window.scrollTo({ top, behavior });
+      scrollContainer.scrollTo({ top, behavior });
     };
 
     const step = () => {
       if (cancelled) return;
       const root = settingsRootRef.current;
-      if (!root) {
+      const scrollContainer = root?.closest("[data-route-scroll-container]");
+      if (!root || !scrollContainer) {
         if (performance.now() - startedAt < 2000) frame = requestAnimationFrame(step);
         return;
       }
@@ -983,8 +995,12 @@ function Settings() {
       }
 
       // Wait for the page's enter transition to settle so the measured
-      // position is where the setting will actually end up
-      const top = element.getBoundingClientRect().top + window.scrollY;
+      // position is where the setting will actually end up inside the route scrollport.
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const top =
+        scrollContainer.scrollTop +
+        element.getBoundingClientRect().top -
+        containerRect.top;
       const visible = element.getClientRects().length > 0;
       if (
         (!visible || lastTop === null || Math.abs(top - lastTop) > 0.5) &&
@@ -995,7 +1011,7 @@ function Settings() {
         return;
       }
 
-      scrollToElement(element);
+      scrollToElement(element, scrollContainer);
     };
 
     frame = requestAnimationFrame(step);
@@ -1144,7 +1160,7 @@ function Settings() {
         </div>
 
         <div className="grid items-start gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-12">
-          <aside className="space-y-6 lg:sticky lg:top-[84px]">
+          <aside className="space-y-6 lg:sticky lg:top-[36px]">
             <SettingsNav
               categories={visibleCategories}
               activeId={activeCategory}
