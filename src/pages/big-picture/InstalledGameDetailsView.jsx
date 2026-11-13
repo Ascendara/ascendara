@@ -50,6 +50,7 @@ import { useInstalledGameDetails } from "./useInstalledGameDetails";
 import { ExecutableManagerDialog } from "./ExecutableManagerDialog";
 import { VirtualKeyboard } from "./VirtualKeyboard";
 import { DetailBackButton } from "./DetailBackButton";
+import { useMediaSwipe } from "./useMediaSwipe";
 import { formatSessionTime } from "@/hooks/useGameSession";
 
 function InstalledGameDetailsView({
@@ -66,6 +67,7 @@ function InstalledGameDetailsView({
     hasHeroImage,
     bgImage,
     showMedia,
+    setShowMedia,
     gameName,
     logoSrc,
     playTime,
@@ -162,6 +164,11 @@ function InstalledGameDetailsView({
     assetSearchOpen,
     autoLaunch,
   });
+  const mediaSwipe = useMediaSwipe({
+    showMedia,
+    open: () => setShowMedia(true),
+    close: () => setShowMedia(false),
+  });
   const menuRef = useRef(null);
   useEffect(() => {
     if (showManagementMenu) {
@@ -231,6 +238,7 @@ function InstalledGameDetailsView({
       )}
 
       <div
+        {...mediaSwipe}
         className={`relative z-20 h-full w-full transition-transform duration-500 ease-smooth-out ${
           showMedia ? "-translate-y-full" : "translate-y-0"
         }`}

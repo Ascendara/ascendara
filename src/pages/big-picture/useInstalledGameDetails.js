@@ -1215,6 +1215,7 @@ function useInstalledGameDetails({
     hasHeroImage,
     bgImage,
     showMedia,
+    setShowMedia,
     gameName,
     logoSrc,
     playTime,

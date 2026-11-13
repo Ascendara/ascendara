@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { checkSeamlessAvailable, getInAppProviders } from "./utils";
 import { getControllerButtons } from "./controller";
+import { useMediaSwipe } from "./useMediaSwipe";
 import { useControllerInput } from "./useControllerInput";
 import { DetailBackButton } from "./DetailBackButton";
 import { TimemachineDialog } from "./TimemachineDialog";
@@ -479,6 +480,18 @@ const GameDetailsView = ({
   );
 
   const hasScreenshots = steamData?.screenshots && steamData.screenshots.length > 0;
+  const mediaSwipe = useMediaSwipe({
+    showMedia,
+    enabled: !!hasScreenshots && !dialogOpen && !showTimemachine,
+    open: () => {
+      setShowMedia(true);
+      setFocusedSection("screenshots");
+    },
+    close: () => {
+      setShowMedia(false);
+      setFocusedSection("description");
+    },
+  });
 
   return (
     <div className="bp-detail fixed inset-0 z-[10000] flex flex-col overflow-hidden bg-background text-primary">
@@ -517,6 +530,7 @@ const GameDetailsView = ({
       </div>
 
       <div
+        {...mediaSwipe}
         className={`relative z-20 h-full w-full transition-transform duration-500 ease-smooth-out ${
           showMedia ? "-translate-y-full" : "translate-y-0"
         }`}
