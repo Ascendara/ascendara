@@ -16,6 +16,7 @@ import {
 } from "./ui/alert-dialog";
 import {
   AlertTriangle,
+  CheckCircle2,
   WifiOff,
   Hammer,
   X,
@@ -30,7 +31,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSearch } from "@/context/SearchContext";
-import { checkForUpdates } from "@/services/app/updateCheckingService";
+import { UPDATE_PHASES, useVersionStatus } from "@/services/app/updateCheckingService";
 import { exportToSvg } from "@/lib/exportToSvg";
 import { useAppIcon } from "@/hooks/useAppIcon";
 import { useSettings } from "@/context/SettingsContext";
@@ -63,11 +64,9 @@ const MenuBar = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const iconData = useAppIcon();
   const [showTorrentWarning, setShowTorrentWarning] = useState(false);
-  const [isLatest, setIsLatest] = useState(true);
   const [appBranch, setAppBranch] = useState("live");
-  const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [isDev, setIsDev] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
+  const { phase: updatePhase, downloadProgress } = useVersionStatus();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasController, setHasController] = useState(false);
   const [audioDownloadCount, setAudioDownloadCount] = useState(0);
@@ -111,58 +110,6 @@ const MenuBar = () => {
       setAppBranch(branch);
     };
     checkBranch();
-  }, []);
-
-  useEffect(() => {
-    const checkLatestVersion = async () => {
-      const isLatestVersion = await checkForUpdates();
-      setIsLatest(isLatestVersion);
-    };
-    checkLatestVersion();
-
-    let initialTimeout;
-    let interval;
-
-    // Only set up the update checking if the app is outdated
-    if (!isLatest) {
-      // Check timestamp file for downloading status (for both auto and manual updates)
-      const checkDownloadStatus = async () => {
-        try {
-          const timestamp = await window.electron.getTimestampValue("downloadingUpdate");
-          setIsDownloadingUpdate(timestamp || false);
-        } catch (error) {
-          console.error("Failed to read timestamp file:", error);
-        }
-      };
-
-      // Initial delay before first check
-      initialTimeout = setTimeout(checkDownloadStatus, 1000);
-
-      // Progress and ready events update the state right away, so this is
-      // only a slow fallback (e.g. for a failed download).
-      interval = setInterval(checkDownloadStatus, 10000);
-    }
-
-    return () => {
-      if (initialTimeout) clearTimeout(initialTimeout);
-      if (interval) clearInterval(interval);
-    };
-  }, [isLatest]);
-
-  useEffect(() => {
-    const handleDownloadProgress = progress => {
-      setDownloadProgress(progress);
-      setIsDownloadingUpdate(true);
-    };
-    const handleUpdateReady = () => setIsDownloadingUpdate(false);
-
-    const unsubscribe = window.electron.onUpdateDownloadProgress(handleDownloadProgress);
-    const unsubscribeReady = window.electron.onUpdateReady?.(handleUpdateReady);
-
-    return () => {
-      unsubscribe();
-      if (typeof unsubscribeReady === "function") unsubscribeReady();
-    };
   }, []);
 
   useEffect(() => {
@@ -401,7 +348,7 @@ const MenuBar = () => {
         )}
 
         {/* Show downloading update badge when downloading */}
-        {isDownloadingUpdate && (
+        {updatePhase === UPDATE_PHASES.DOWNLOADING && (
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1 rounded border border-green-500/20 bg-green-500/10 px-1 py-0.5 text-[14px] text-green-500">
               <div className="relative h-5 w-5 flex-shrink-0">
@@ -471,8 +418,8 @@ const MenuBar = () => {
           </span>
         )}
 
-        {/* Show outdated badge only when not downloading */}
-        {!isLatest && !isDownloadingUpdate && (
+        {/* Show outdated badge only while an update still needs downloading */}
+        {updatePhase === UPDATE_PHASES.AVAILABLE && (
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1 rounded border border-yellow-500/20 bg-yellow-500/10 px-1 py-0.5 text-[14px] text-yellow-500">
               <AlertTriangle className="h-3 w-3" />
@@ -489,6 +436,20 @@ const MenuBar = () => {
               <Download className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
+        )}
+
+        {updatePhase === UPDATE_PHASES.READY && (
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("request-app-update"))}
+            className="flex items-center gap-1 rounded border border-green-500/20 bg-green-500/10 px-1.5 py-0.5 text-[14px] text-green-500 transition-colors hover:bg-green-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+            style={{ WebkitAppRegion: "no-drag" }}
+            title={t("app.toasts.installAndRestart")}
+            aria-label={t("app.toasts.installAndRestart")}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {t("app.toasts.updateReady")}
+          </button>
         )}
         <div className="flex-1" />
         {isDev && (

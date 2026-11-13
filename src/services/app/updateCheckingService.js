@@ -1,17 +1,54 @@
 import { useSyncExternalStore } from "react";
+import {
+  INITIAL_UPDATE_STATUS,
+  UPDATE_PHASES,
+  reduceUpdateStatus,
+} from "./updateLifecycle";
 
 // How often the background check re-asks the main process for the latest version.
 const BACKGROUND_CHECK_INTERVAL = 30 * 60 * 1000;
 
-// `isLatest` is null until the first check finishes.
-let status = { isLatest: null, updateRequired: false };
+let status = { ...INITIAL_UPDATE_STATUS };
 let inFlight = null;
 let backgroundTimer = null;
+let lifecycleEventsBound = false;
 const listeners = new Set();
 
-const setStatus = patch => {
-  status = { ...status, ...patch };
-  listeners.forEach(listener => listener());
+const dispatch = event => {
+  const nextStatus = reduceUpdateStatus(status, event);
+  if (nextStatus === status) return;
+  status = nextStatus;
+  listeners.forEach(listener => listener(status));
+};
+
+const readDownloadSnapshot = async isLatest => {
+  if (isLatest) return { downloaded: false, downloading: false };
+  try {
+    const [downloaded, downloading] = await Promise.all([
+      window.electron.isUpdateDownloaded(),
+      window.electron.getTimestampValue("downloadingUpdate"),
+    ]);
+    return { downloaded: Boolean(downloaded), downloading: Boolean(downloading) };
+  } catch (error) {
+    console.error("Error reading update download status:", error);
+    return { downloaded: false, downloading: false };
+  }
+};
+
+const bindLifecycleEvents = () => {
+  if (lifecycleEventsBound) return;
+  lifecycleEventsBound = true;
+
+  window.electron.onUpdateDownloadProgress?.(progress =>
+    dispatch({ type: "DOWNLOAD_PROGRESS", progress })
+  );
+  window.electron.onUpdateReady?.(() => dispatch({ type: "READY" }));
+  window.electron.onUpdateError?.(() => dispatch({ type: "DOWNLOAD_ERROR" }));
+
+  // The API answers 426 when this build is too old to talk to it.
+  window.addEventListener("ascendara:update-required", () =>
+    dispatch({ type: "UPDATE_REQUIRED" })
+  );
 };
 
 /**
@@ -25,12 +62,20 @@ export const checkForUpdates = () => {
   inFlight = (async () => {
     try {
       const isLatest = await window.electron.checkForUpdates();
-      setStatus({ isLatest });
+      const downloadSnapshot = await readDownloadSnapshot(isLatest);
+      dispatch({ type: "SNAPSHOT", isLatest, ...downloadSnapshot });
       return isLatest;
     } catch (error) {
       console.error("Error checking for updates:", error);
       // Keep the last known answer; on a first-run failure don't lock anyone out.
-      if (status.isLatest === null) setStatus({ isLatest: true });
+      if (status.isLatest === null) {
+        dispatch({
+          type: "SNAPSHOT",
+          isLatest: true,
+          downloaded: false,
+          downloading: false,
+        });
+      }
       return status.isLatest;
     } finally {
       inFlight = null;
@@ -39,19 +84,18 @@ export const checkForUpdates = () => {
   return inFlight;
 };
 
-export const isUpdateAvailable = () => status.isLatest === false;
+export { UPDATE_PHASES };
+
+export const isUpdateAvailable = () => status.phase === UPDATE_PHASES.AVAILABLE;
 
 /**
  * Starts the periodic background version check. Safe to call more than once.
  */
 export const startBackgroundUpdateChecks = () => {
+  bindLifecycleEvents();
   if (backgroundTimer) return;
   checkForUpdates();
   backgroundTimer = setInterval(checkForUpdates, BACKGROUND_CHECK_INTERVAL);
-  // The API answers 426 when this build is too old to talk to it.
-  window.addEventListener("ascendara:update-required", () =>
-    setStatus({ updateRequired: true })
-  );
 };
 
 const subscribe = listener => {
@@ -61,14 +105,25 @@ const subscribe = listener => {
 
 const getSnapshot = () => status;
 
+export const subscribeToUpdateStatus = listener => subscribe(listener);
+export const getUpdateStatus = () => getSnapshot();
+export const markUpdateInstalling = () => dispatch({ type: "INSTALLING" });
+export const markUpdateInstallFailed = () => dispatch({ type: "INSTALL_FAILED" });
+
 /**
- * Live version status for components.
- * @returns {{ checking: boolean, isOutdated: boolean }}
+ * Live update lifecycle for components.
+ * @returns {{
+ *   checking: boolean,
+ *   isOutdated: boolean,
+ *   phase: string,
+ *   downloadProgress: number
+ * }}
  */
 export const useVersionStatus = () => {
-  const { isLatest, updateRequired } = useSyncExternalStore(subscribe, getSnapshot);
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
   return {
-    checking: isLatest === null && !updateRequired,
-    isOutdated: updateRequired || isLatest === false,
+    ...snapshot,
+    checking: snapshot.phase === UPDATE_PHASES.CHECKING,
+    isOutdated: snapshot.updateRequired || snapshot.isLatest === false,
   };
 };
