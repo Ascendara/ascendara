@@ -1320,7 +1320,7 @@ function Settings() {
 
                   <div
                     id="window-controls"
-                    className="flex items-center justify-between gap-4"
+                    className="flex flex-col items-start gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-4"
                   >
                     <div className="space-y-0.5">
                       <Label>{t("settings.windowControls")}</Label>
@@ -1340,7 +1340,7 @@ function Settings() {
 
                   <div
                     id="menu-bar-side"
-                    className="flex items-center justify-between gap-4"
+                    className="flex flex-col items-start gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-4"
                   >
                     <div className="space-y-0.5">
                       <Label>{t("settings.menuBarSide")}</Label>
