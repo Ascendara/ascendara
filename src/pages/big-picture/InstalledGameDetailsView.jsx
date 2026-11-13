@@ -50,6 +50,8 @@ import { useInstalledGameDetails } from "./useInstalledGameDetails";
 import { ExecutableManagerDialog } from "./ExecutableManagerDialog";
 import { VirtualKeyboard } from "./VirtualKeyboard";
 import { DetailBackButton } from "./DetailBackButton";
+import { ScreenshotGallery } from "./ScreenshotGallery";
+import { getButtonBadgeClass } from "./controller";
 import { formatSessionTime } from "@/hooks/useGameSession";
 
 function InstalledGameDetailsView({
@@ -66,6 +68,11 @@ function InstalledGameDetailsView({
     hasHeroImage,
     bgImage,
     showMedia,
+    screenshotIndex,
+    setScreenshotIndex,
+    screenshotLightboxOpen,
+    setScreenshotLightboxOpen,
+    screenshots,
     gameName,
     logoSrc,
     playTime,
@@ -95,7 +102,6 @@ function InstalledGameDetailsView({
     setShowManagementMenu,
     setSelectedMenuItem,
     hasScreenshots,
-    steamData,
     showManagementMenu,
     setBackupDialogOpen,
     selectedMenuItem,
@@ -523,45 +529,45 @@ function InstalledGameDetailsView({
             <h2 className="text-4xl font-light tracking-wider text-primary">
               {t("bigPicture.screenshots").toUpperCase()}
             </h2>
+            {hasScreenshots && (
+              <div className="ml-auto flex items-center gap-8 text-xs font-bold uppercase tracking-widest text-white/60">
+                <span>← / → {t("bigPicture.navigate")}</span>
+                <span>
+                  <span
+                    className={`mr-2 ${getButtonBadgeClass(controllerType)} bg-primary px-2.5 py-1 text-secondary`}
+                  >
+                    {buttons.confirm}
+                  </span>
+                  {t("bigPicture.openSelect")}
+                </span>
+                <span>
+                  <span
+                    className={`mr-2 ${getButtonBadgeClass(controllerType)} border border-border bg-muted px-2.5 py-1 text-muted-foreground`}
+                  >
+                    {buttons.cancel}
+                  </span>
+                  {t("bigPicture.cancel")}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="no-scrollbar flex-1 overflow-y-auto p-12 px-24 pb-32">
-            {steamData?.formatted_screenshots &&
-            steamData.formatted_screenshots.length > 0 ? (
-              <div className="grid grid-cols-2 gap-6 lg:grid-cols-3">
-                {steamData.formatted_screenshots.map((screen, idx) => {
-                  const imageUrl =
-                    typeof screen === "string"
-                      ? screen
-                      : screen.path_full || screen.path_thumbnail || screen.url;
-                  return (
-                    <div
-                      key={idx}
-                      className="group relative aspect-video overflow-hidden rounded-xl border-2 border-transparent bg-muted transition-all hover:scale-[1.02] hover:border-primary"
-                    >
-                      <img
-                        src={imageUrl}
-                        alt={`Screenshot ${idx + 1}`}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        onError={e => {
-                          console.log("[Screenshot] Failed to load:", imageUrl);
-                          e.target.style.display = "none";
-                        }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : loadingMedia ? (
-              <div className="flex h-full items-center justify-center text-muted-foreground">
-                <Loader className="h-8 w-8 animate-spin" />
-              </div>
-            ) : (
-              <div className="flex h-full items-center justify-center text-muted-foreground">
-                <p>{t("bigPicture.noScreenshotsAvailable")}</p>
-              </div>
-            )}
+            <ScreenshotGallery
+              screenshots={screenshots}
+              index={screenshotIndex}
+              lightboxOpen={screenshotLightboxOpen}
+              focused={showMedia && !screenshotLightboxOpen}
+              onFocus={setScreenshotIndex}
+              onOpen={() => setScreenshotLightboxOpen(true)}
+              onClose={() => setScreenshotLightboxOpen(false)}
+              onNavigate={setScreenshotIndex}
+              loading={loadingMedia}
+              emptyLabel={t("bigPicture.noScreenshotsAvailable")}
+              t={t}
+              controllerType={controllerType}
+              buttons={buttons}
+            />
           </div>
         </div>
       </div>

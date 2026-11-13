@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import steamService from "@/services/games/gameInfoService";
 import { toast } from "sonner";
 import gameUpdateService from "@/services/library/gameUpdateService";
@@ -17,6 +17,7 @@ import { readStoredList } from "./surfaceNavigation";
 import { useGameSession } from "@/hooks/useGameSession";
 import { getControllerButtons } from "./controller";
 import { useControllerInput } from "./useControllerInput";
+import { getScreenshotColumns } from "./ScreenshotGallery";
 import {
   hasActiveSubscription,
   uploadBackupToCloud,
@@ -47,6 +48,8 @@ function useInstalledGameDetails({
   const [steamData, setSteamData] = useState(null);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [showMedia, setShowMedia] = useState(false);
+  const [screenshotIndex, setScreenshotIndex] = useState(0);
+  const [screenshotLightboxOpen, setScreenshotLightboxOpen] = useState(false);
   const [showManagementMenu, setShowManagementMenu] = useState(false);
   const [canInput, setCanInput] = useState(false);
   const [playTime, setPlayTime] = useState(0);
@@ -60,6 +63,23 @@ function useInstalledGameDetails({
   const [achievementsToggleFocused, setAchievementsToggleFocused] = useState(false);
   const buttons = getControllerButtons(controllerType);
   const gameName = game.game || game.name;
+
+  // The gallery and the input handler must always agree on how many images exist.
+  const screenshots = useMemo(() => {
+    return (steamData?.formatted_screenshots || []).map((screen, idx) => ({
+      id: screen?.id ?? idx,
+      url:
+        typeof screen === "string"
+          ? screen
+          : screen?.formatted_url ||
+            screen?.path_full ||
+            screen?.path_thumbnail ||
+            screen?.url,
+      alt: `Screenshot ${idx + 1}`,
+    }));
+  }, [steamData]);
+  const screenshotCount = screenshots.length;
+
   const gameSession = useGameSession(gameName);
   const [showStopGameDialog, setShowStopGameDialog] = useState(false);
   const [showDirectoryBrowser, setShowDirectoryBrowser] = useState(false);
@@ -338,6 +358,11 @@ function useInstalledGameDetails({
     }, 400);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    setScreenshotIndex(0);
+    setScreenshotLightboxOpen(false);
+  }, [gameName]);
 
   // Handle play game
   const handlePlayGame = async (forcePlay = false, specificExecutable = null) => {
@@ -776,6 +801,21 @@ function useInstalledGameDetails({
     action => {
       if (!canInput) return;
 
+      if (screenshotLightboxOpen) {
+        if (action === "LEFT" || action === "UP") {
+          setScreenshotIndex(prev =>
+            screenshotCount ? (prev - 1 + screenshotCount) % screenshotCount : 0
+          );
+        } else if (action === "RIGHT" || action === "DOWN") {
+          setScreenshotIndex(prev =>
+            screenshotCount ? (prev + 1) % screenshotCount : 0
+          );
+        } else if (action === "BACK" || action === "MENU") {
+          setScreenshotLightboxOpen(false);
+        }
+        return;
+      }
+
       // Handle achievements view navigation
       if (showAchievements) {
         if (action === "LEFT") {
@@ -979,6 +1019,11 @@ function useInstalledGameDetails({
         } else if (!showMedia && selectedButton) {
           // Only go to media if we're on a button (not focused on toggles)
           setShowMedia(true);
+          setScreenshotIndex(0);
+        } else if (showMedia && screenshotCount > 0) {
+          setScreenshotIndex(prev =>
+            Math.min(screenshotCount - 1, prev + getScreenshotColumns())
+          );
         }
       } else if (action === "UP") {
         const hasAchievements =
@@ -986,7 +1031,11 @@ function useInstalledGameDetails({
           achievements.achievements &&
           achievements.achievements.length > 0;
         if (showMedia) {
-          setShowMedia(false);
+          if (screenshotIndex >= getScreenshotColumns()) {
+            setScreenshotIndex(prev => Math.max(0, prev - getScreenshotColumns()));
+          } else {
+            setShowMedia(false);
+          }
         } else if (trainerToggleFocused && hasAchievements) {
           setTrainerToggleFocused(false);
           setAchievementsToggleFocused(true);
@@ -1004,7 +1053,9 @@ function useInstalledGameDetails({
           setSelectedButton("");
         }
       } else if (action === "LEFT") {
-        if (achievementsToggleFocused) {
+        if (showMedia) {
+          setScreenshotIndex(prev => Math.max(0, prev - 1));
+        } else if (achievementsToggleFocused) {
           // Do nothing on achievements toggle
         } else if (trainerToggleFocused) {
           // Do nothing on trainer toggle
@@ -1015,7 +1066,11 @@ function useInstalledGameDetails({
           else if (selectedButton === "backups") setSelectedButton("assets");
         }
       } else if (action === "RIGHT") {
-        if (achievementsToggleFocused) {
+        if (showMedia) {
+          if (screenshotCount > 0) {
+            setScreenshotIndex(prev => Math.min(screenshotCount - 1, prev + 1));
+          }
+        } else if (achievementsToggleFocused) {
           // Do nothing on achievements toggle
         } else if (trainerToggleFocused) {
           // Do nothing on trainer toggle
@@ -1048,6 +1103,8 @@ function useInstalledGameDetails({
               ? t("gameScreen.trainerEnabledToast")
               : t("gameScreen.trainerDisabledToast")
           );
+        } else if (showMedia) {
+          if (screenshotCount > 0) setScreenshotLightboxOpen(true);
         } else if (!showMedia) {
           if (selectedButton === "play" && isRunning && !isLaunching) {
             openStopGameDialog();
@@ -1086,6 +1143,9 @@ function useInstalledGameDetails({
     },
     [
       showMedia,
+      screenshotIndex,
+      screenshotLightboxOpen,
+      screenshotCount,
       showManagementMenu,
       backupDialogOpen,
       backupScreen,
@@ -1183,8 +1243,7 @@ function useInstalledGameDetails({
     return `${Math.floor(time / 3600)} ${t("library.hours")}`;
   };
 
-  const hasScreenshots =
-    steamData?.formatted_screenshots && steamData.formatted_screenshots.length > 0;
+  const hasScreenshots = screenshots.length > 0;
   const bgImage = imageSrc;
   const gameDescription = (
     steamData?.summary ||
@@ -1215,6 +1274,11 @@ function useInstalledGameDetails({
     hasHeroImage,
     bgImage,
     showMedia,
+    screenshotIndex,
+    setScreenshotIndex,
+    screenshotLightboxOpen,
+    setScreenshotLightboxOpen,
+    screenshots,
     gameName,
     logoSrc,
     playTime,
