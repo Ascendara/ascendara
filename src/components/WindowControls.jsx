@@ -120,7 +120,7 @@ export function WindowControls({
   if (variant === "traffic") {
     return (
       <div
-        className={`window-controls group/traffic flex items-center gap-2 ${className}`}
+        className={`window-controls group/traffic flex shrink-0 items-center gap-2 ${className}`}
       >
         {controlOrder.map(id => {
           const { color, ring } = TRAFFIC_LIGHT_BY_ID[id];
@@ -142,7 +142,7 @@ export function WindowControls({
   }
 
   return (
-    <div className={`window-controls flex items-center ${className}`}>
+    <div className={`window-controls flex shrink-0 items-center ${className}`}>
       <div className="flex items-center gap-0.5">
         {controlOrder.map(id => (
           <IconControl
