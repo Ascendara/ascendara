@@ -4993,6 +4993,8 @@
     "ascendaraTimechine": "Ascendara Timemachine",
     "ascendaraUpdates": "Ascendara Updates",
     "ascendaraUpdatesDescription2": "Automatically install new version of Ascendara for you.",
+    "ascendaraUpdatesPortableDescription": "Portable copies do not update automatically. Download new versions from the release page.",
+    "ascendaraUpdatesUnavailableDescription": "Automatic updates are unavailable for this build. Install a supported Ascendara build to manage this preference.",
     "ascendaraWorkshopDownloader": "Workshop Downloader",
     "ascendaraWorkshopDownloaderDescription": "The Workshop Downloader allows you to download items from the Steam Workshop without needing to have an account.",
     "ascendaraWorkshopDownloaderEnable": "Show in Navigation Bar",
