@@ -42,6 +42,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { API_URL } from "@/config/api";
+import { persistThemeSelection } from "@/lib/themePersistence";
 
 // Starting point for a new theme, and the fill for colors an older saved theme
 // doesn't have yet
@@ -637,16 +638,19 @@ function ThemeStudio() {
         toast.error(t("settings.themeStudio.saveFailed"));
         return;
       }
-      await window.electron.updateSetting("theme", "custom");
-      setTheme("custom");
-      applyCustomTheme(colors);
-      try {
-        localStorage.setItem("ascendara-theme", "custom");
-        localStorage.setItem("custom-theme-colors", JSON.stringify(colors));
-      } catch {
-        // The saved settings are the source of truth
+      const themeSaved = await persistThemeSelection("custom", {
+        persist: value => window.electron.updateSetting("theme", value),
+        applyTheme: value => {
+          setTheme(value);
+          applyCustomTheme(colors);
+        },
+        syncSettings: value =>
+          setSettingsLocal(prev => ({ ...prev, theme: value, customTheme: [colors] })),
+      });
+      if (!themeSaved) {
+        toast.error(t("settings.themeStudio.saveFailed"));
+        return;
       }
-      setSettingsLocal(prev => ({ ...prev, theme: "custom", customTheme: [colors] }));
       setSaved(colors);
       setThemeVersion(null);
       toast.success(t("settings.customColorsSaved") || "Custom colors saved!");

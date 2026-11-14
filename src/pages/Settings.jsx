@@ -105,6 +105,7 @@ import LibraryTransferSettings from "@/components/LibraryTransferSettings";
 import AppBranchPicker, { getAppBranch } from "@/components/AppBranchPicker";
 import { API_URL } from "@/config/api";
 import { clearLegacySideScrollbarPreference } from "@/lib/sideScrollbarPreference";
+import { persistThemeSelection } from "@/lib/themePersistence";
 
 const themes = [
   // Light themes
@@ -656,27 +657,23 @@ function Settings() {
   // Theme handling
   const handleThemeChange = useCallback(
     async newTheme => {
-      // Apply
-      if (newTheme !== "custom") {
-        clearCustomTheme();
-      }
-      setTheme(newTheme);
-      localStorage.setItem("ascendara-theme", newTheme);
-
-      // Try to save
       try {
         console.log("Saving theme:", newTheme);
-        const success = await window.electron.updateSetting("theme", newTheme);
+        const success = await persistThemeSelection(newTheme, {
+          persist: value => window.electron.updateSetting("theme", value),
+          clearCustomTheme,
+          applyTheme: setTheme,
+          syncSettings: value =>
+            setSettingsLocal(prev => ({ ...prev, theme: value })),
+        });
         console.log("Save successful ?", success);
 
-        if (success) {
-          // Updating context locally
-          setSettingsLocal(prev => ({ ...prev, theme: newTheme }));
-        } else {
+        if (!success) {
           toast.error("Failed to save theme preference");
         }
       } catch (e) {
         console.error("Error saving theme:", e);
+        toast.error("Failed to save theme preference");
       }
     },
     [setSettingsLocal, setTheme]
