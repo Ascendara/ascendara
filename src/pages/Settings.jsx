@@ -104,6 +104,7 @@ import NotificationSoundSettings from "@/components/NotificationSoundSettings";
 import LibraryTransferSettings from "@/components/LibraryTransferSettings";
 import AppBranchPicker, { getAppBranch } from "@/components/AppBranchPicker";
 import { API_URL } from "@/config/api";
+import { clearLegacySideScrollbarPreference } from "@/lib/sideScrollbarPreference";
 
 const themes = [
   // Light themes
@@ -518,20 +519,6 @@ function Settings() {
 
   const handleSettingChange = useCallback(
     async (key, value, ludusavi = false) => {
-      if (key === "sideScrollBar") {
-        setSettingsLocal(prev => ({
-          ...prev,
-          [key]: value,
-        }));
-        // Update scrollbar styles directly
-        if (value) {
-          document.documentElement.classList.add("custom-scrollbar");
-        } else {
-          document.documentElement.classList.remove("custom-scrollbar");
-        }
-        return;
-      }
-
       // Handle Ludusavi settings
       if (ludusavi) {
         // Only update the nested ludusavi object
@@ -584,6 +571,9 @@ function Settings() {
       window.electron.updateSetting(key, value).then(success => {
         console.log(`Update result ${key}:`, success);
         if (success) {
+          if (key === "sideScrollBar") {
+            clearLegacySideScrollbarPreference(window.localStorage);
+          }
           setSettingsLocal(prev => ({
             ...prev,
             [key]: value,

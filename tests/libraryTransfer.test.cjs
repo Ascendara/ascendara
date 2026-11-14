@@ -57,6 +57,7 @@ function seedSource() {
     localIndex: index,
     theme: "royal-night",
     customTheme: [],
+    sideScrollBar: true,
     language: "fr",
     threadCount: 20,
     torboxApiKey: "secret-key",
@@ -83,6 +84,7 @@ function seedTarget() {
     downloadDirectory: downloads,
     localIndex: path.join(root, "index"),
     theme: "light",
+    sideScrollBar: false,
     language: "en",
     torboxApiKey: "mine",
     ludusavi: { enabled: false, backupLocation: "D:/Mine" },
@@ -125,6 +127,11 @@ test("full export then import restores every category", async () => {
   }
   assert.equal("downloadDirectory" in exportedSettings, false);
   assert.equal("theme" in exportedSettings, false);
+  assert.equal("sideScrollBar" in exportedSettings, false);
+  const exportedAppearance = JSON.parse(
+    await archive.file("appearance-settings.json").async("string")
+  );
+  assert.equal(exportedAppearance.sideScrollBar, true);
   assert.equal(exportedSettings.ludusavi.backupLocation, undefined);
   assert.equal(archive.file("storage/library.json"), null);
 
@@ -175,6 +182,7 @@ test("full export then import restores every category", async () => {
 
   assert.equal(saved.language, "fr");
   assert.equal(saved.theme, "royal-night");
+  assert.equal(saved.sideScrollBar, true);
   assert.equal("torboxApiKey" in saved, false);
   assert.equal("runningGames" in saved, false);
   // Folder locations from the backup exist here, so they apply
@@ -229,6 +237,42 @@ test("import applies only the chosen categories and is safe to repeat", async ()
   assert.equal(saved.language, "fr");
   assert.equal(saved.ludusavi.backupLocation, "D:/Mine", "local backup folder kept");
   assert.equal("downloadDirectory" in saved, false);
+});
+
+test("old Appearance backups migrate side scrollbar storage into settings", async () => {
+  const target = seedTarget();
+  const zip = new JSZip();
+  zip.file(
+    "manifest.json",
+    JSON.stringify({
+      format: "ascendara-export",
+      version: 1,
+      categories: ["appearance"],
+    })
+  );
+  zip.file("appearance-settings.json", JSON.stringify({ theme: "royal-night" }));
+  zip.file(
+    "storage/appearance.json",
+    JSON.stringify({ sideScrollBar: "true", "ascendara-theme": "royal-night" })
+  );
+
+  let saved = null;
+  const result = await applyLibraryArchive(
+    {
+      settings: target.settings,
+      userData: target.userData,
+      saveSettings: changes => {
+        saved = changes;
+        return true;
+      },
+    },
+    await zip.generateAsync({ type: "nodebuffer" }),
+    ["appearance"]
+  );
+
+  assert.equal(saved.theme, "royal-night");
+  assert.equal(saved.sideScrollBar, true);
+  assert.equal(result.storage.appearance.sideScrollBar, "true");
 });
 
 test("missing folders are skipped and an existing game index is kept", async () => {
