@@ -2534,8 +2534,13 @@ function registerGameHandlers() {
   });
 }
 
+// Library game sessions live only in this process, so quitting mid-game would
+// orphan the helper and lose the live session and Stop control.
+const hasRunningGames = () => runGameProcesses.size > 0;
+
 module.exports = {
   registerGameHandlers,
+  hasRunningGames,
   createGameShortcut,
   createStartMenuShortcut,
   validateGameExecutable,

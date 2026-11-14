@@ -568,7 +568,10 @@ function registerWindowHandlers() {
       const settingsManager = getSettingsManager();
       const settings = settingsManager.getSettings();
 
-      if (forceQuit === true || settings.endOnClose) {
+      // A plain close while a game is running hides instead of quitting, so
+      // the session keeps being tracked and can still be stopped on reopen.
+      const gameRunning = require("../library/games").hasRunningGames();
+      if (forceQuit === true || (settings.endOnClose && !gameRunning)) {
         // Set quitting flag to allow app to quit
         app.isQuitting = true;
         console.log("Closing app completely...");
