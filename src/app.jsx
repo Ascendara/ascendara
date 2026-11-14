@@ -118,6 +118,7 @@ import "./index.css";
 import "./styles/scrollbar.css";
 import "@/services/app/notificationSoundService";
 import { usesOfficialIndex } from "@/lib/combinedSources";
+import { GLOBAL_TOAST_SAFE_AREA_OFFSET } from "@/lib/toastSafeArea";
 import { AlertTriangle, RefreshCwIcon, X, Circle, Square, Triangle } from "lucide-react";
 import {
   AlertDialog,
@@ -2311,6 +2312,8 @@ function ToasterWithTheme() {
       key={theme}
       theme={sonnerTheme}
       position="top-right"
+      offset={GLOBAL_TOAST_SAFE_AREA_OFFSET}
+      mobileOffset={GLOBAL_TOAST_SAFE_AREA_OFFSET}
       toastOptions={{
         style: {
           background: "rgb(var(--color-background) / 0.8)",
