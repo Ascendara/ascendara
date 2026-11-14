@@ -1932,46 +1932,54 @@ const AppRoutes = () => {
       }
     };
 
+    const showUpdateAvailableNotification = async () => {
+      if (!isSubscribed || hasShownUpdateNotification.current) return;
+
+      const branch = await window.electron.getBranch();
+      if (!isSubscribed || hasShownUpdateNotification.current) return;
+
+      hasShownUpdateNotification.current = true;
+
+      let title, description;
+      if (branch === "public-testing") {
+        title = t("app.toasts.outOfDatePublicTesting");
+        description = t("app.toasts.outOfDatePublicTestingDesc");
+      } else if (branch === "experimental") {
+        title = t("app.toasts.outOfDateExperimental");
+        description = t("app.toasts.outOfDateExperimentalDesc");
+      } else {
+        title = t("app.toasts.outOfDate");
+        description = t("app.toasts.outOfDateDesc");
+      }
+
+      toast(title, {
+        description: description,
+        action: {
+          label: t("app.toasts.updateNow"),
+          onClick: requestUpdate,
+        },
+        duration: 10000,
+        id: "update-available",
+      });
+    };
+
     const checkVersionAndSetupUpdates = async () => {
       try {
         const settings = await window.electron.getSettings();
         await checkForUpdates();
-        const branch = await window.electron.getBranch();
         const liveOffer = await window.electron.getLiveUpdateOffer?.();
         if (isSubscribed && liveOffer && !isLiveUpdateOfferDismissed(liveOffer)) {
           setLiveUpdateOffer(liveOffer);
         }
-        // Portable copies never auto-update, so they always get the prompt.
-        const isPortable = await window.electron.isPortable();
+        // Builds that cannot auto-update always get the manual update prompt.
+        const automaticUpdateCapability =
+          await window.electron.getAutomaticUpdateCapability();
 
         if (
           getUpdateStatus().phase === UPDATE_PHASES.AVAILABLE &&
-          !hasShownUpdateNotification.current &&
-          (!settings.autoUpdate || isPortable)
+          (!settings.autoUpdate || !automaticUpdateCapability.supported)
         ) {
-          hasShownUpdateNotification.current = true;
-
-          let title, description;
-          if (branch === "public-testing") {
-            title = t("app.toasts.outOfDatePublicTesting");
-            description = t("app.toasts.outOfDatePublicTestingDesc");
-          } else if (branch === "experimental") {
-            title = t("app.toasts.outOfDateExperimental");
-            description = t("app.toasts.outOfDateExperimentalDesc");
-          } else {
-            title = t("app.toasts.outOfDate");
-            description = t("app.toasts.outOfDateDesc");
-          }
-
-          toast(title, {
-            description: description,
-            action: {
-              label: t("app.toasts.updateNow"),
-              onClick: requestUpdate,
-            },
-            duration: 10000,
-            id: "update-available",
-          });
+          await showUpdateAvailableNotification();
         }
       } catch (error) {
         console.error("Error checking version:", error);
@@ -2017,6 +2025,13 @@ const AppRoutes = () => {
     const unsubscribeUpdateStatus = subscribeToUpdateStatus(handleUpdateStatus);
     handleUpdateStatus(getUpdateStatus());
 
+    // The main process emits this when an update exists but background transfer
+    // is not allowed or possible (including unreadable settings). Subscribe
+    // before the version check so that decision cannot be missed.
+    const unsubscribeUpdateAvailable = window.electron.onUpdateAvailable?.(() => {
+      void showUpdateAvailableNotification();
+    });
+
     checkVersionAndSetupUpdates();
 
     window.addEventListener("request-app-update", requestUpdate);
@@ -2032,6 +2047,7 @@ const AppRoutes = () => {
       isSubscribed = false;
       unsubscribeUpdateStatus();
       window.removeEventListener("request-app-update", requestUpdate);
+      unsubscribeUpdateAvailable?.();
       unsubscribeUpdateError?.();
     };
   }, [showWelcome]);

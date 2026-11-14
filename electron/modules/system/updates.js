@@ -9,6 +9,7 @@ const os = require("os");
 const axios = require("axios");
 const { pipeline } = require("stream/promises");
 const installUpdate = require("./install-update");
+const { getAutomaticUpdateCapability } = require("./update-capability");
 const { downloadDifferentialUpdate } = require("./differential-update");
 const {
   resolveMacUpdate,
@@ -76,7 +77,18 @@ const testingReleaseUrl = branch =>
 const UPDATE_STALL_TIMEOUT = 30000;
 const UPDATE_DOWNLOAD_ATTEMPTS = 5;
 
-const isMac = process.platform === "darwin";
+const runtimePlatform = process.platform;
+const isMac = runtimePlatform === "darwin";
+
+function automaticUpdateCapability() {
+  return getAutomaticUpdateCapability({
+    platform: runtimePlatform,
+    isPortable,
+    isDev,
+    isAppImage: Boolean(process.env.APPIMAGE),
+    execPath: process.execPath,
+  });
+}
 
 // The helper programs package.json ships in resources on Windows
 const BUNDLED_WINDOWS_BINARIES = [
@@ -240,7 +252,7 @@ async function checkVersionAndUpdate() {
       `Version check [${currentBranch}]: Current=${currentVersion}, Latest=${latestVersion}, Is Latest=${isLatest}`
     );
     if (!isLatest) {
-      const canAutoUpdate = !isPortable;
+      const canAutoUpdate = automaticUpdateCapability().supported;
       const automaticUpdatesEnabled = settingsReadable && settings.autoUpdate === true;
       if (
         automaticUpdatesEnabled &&
@@ -588,13 +600,14 @@ function registerUpdateHandlers() {
   });
 
   ipcMain.handle("is-portable", () => isPortable);
+  ipcMain.handle("get-automatic-update-capability", () => automaticUpdateCapability());
 
   // Branch switching needs the installed version, so portable copies get no offer
   ipcMain.handle("get-live-update-offer", () => (isPortable ? null : liveUpdateOffer));
 
   ipcMain.handle("download-update", async () => {
     if (isLatest) return;
-    if (isPortable) {
+    if (!automaticUpdateCapability().supported) {
       await shell.openExternal(PORTABLE_RELEASES_URL);
       return;
     }

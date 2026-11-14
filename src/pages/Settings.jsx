@@ -282,6 +282,7 @@ function Settings() {
   const [isExperiment, setIsExperiment] = useState(false);
   const [isPublicTesting, setIsPublicTesting] = useState(false);
   const [isDev, setIsDev] = useState(false);
+  const [automaticUpdateCapability, setAutomaticUpdateCapability] = useState(null);
   const [testingVersion, setTestingVersion] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [exclusionLoading, setExclusionLoading] = useState(false);
@@ -428,6 +429,27 @@ function Settings() {
       }
     };
     checkPlatform();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAutomaticUpdateCapability = async () => {
+      try {
+        const capability = await window.electron.getAutomaticUpdateCapability();
+        if (!cancelled) setAutomaticUpdateCapability(capability);
+      } catch (error) {
+        console.error("Failed to determine automatic update capability:", error);
+        if (!cancelled) {
+          setAutomaticUpdateCapability({ supported: false, reason: "unavailable" });
+        }
+      }
+    };
+
+    loadAutomaticUpdateCapability();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Check for controller connection
@@ -1428,23 +1450,34 @@ function Settings() {
                     </Select>
                   </div>
 
-                  {/* Only Windows exposes the automatic update preference. */}
-                  {window.electron.getPlatform() === "win32" && (
-                    <div id="auto-update" className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>{t("settings.ascendaraUpdates")}</Label>
-                        <p className="text-sm text-muted-foreground">
-                          {t("settings.ascendaraUpdatesDescription2")}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={settings.autoUpdate}
-                        onCheckedChange={() =>
-                          handleSettingChange("autoUpdate", !settings.autoUpdate)
-                        }
-                      />
+                  <div id="auto-update" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.ascendaraUpdates")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {automaticUpdateCapability?.reason === "portable"
+                          ? t("settings.ascendaraUpdatesPortableDescription", {
+                              defaultValue:
+                                "Portable copies do not update automatically. Download new versions from the release page.",
+                            })
+                          : automaticUpdateCapability &&
+                              !automaticUpdateCapability.supported
+                            ? t("settings.ascendaraUpdatesUnavailableDescription", {
+                                defaultValue:
+                                  "Automatic updates are unavailable for this build. Install a supported Ascendara build to manage this preference.",
+                              })
+                            : t("settings.ascendaraUpdatesDescription2")}
+                      </p>
                     </div>
-                  )}
+                    <Switch
+                      checked={Boolean(
+                        automaticUpdateCapability?.supported && settings.autoUpdate
+                      )}
+                      disabled={!automaticUpdateCapability?.supported}
+                      onCheckedChange={() =>
+                        handleSettingChange("autoUpdate", !settings.autoUpdate)
+                      }
+                    />
+                  </div>
 
                   <div id="notifications" className="flex items-center justify-between">
                     <div className="space-y-0.5">
