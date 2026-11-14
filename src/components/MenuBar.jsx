@@ -39,6 +39,14 @@ import { WindowControls } from "@/components/WindowControls";
 import { FEATURE_CENTER_EVENTS, openFeatureCenter } from "@/lib/featureCenterEvents";
 import { MENU_BAR_HEIGHT_STYLE } from "@/lib/appChromeGeometry";
 import { getMenuBarLayoutOrder } from "@/lib/menuBarLayout";
+import {
+  MENU_BAR_MIN_WIDTH_PX,
+  getMenuBarMode,
+  getMenuBarResponsivePolicyForMode,
+} from "@/lib/menuBarResponsivePolicy";
+
+const getViewportWidth = () =>
+  typeof window === "undefined" ? MENU_BAR_MIN_WIDTH_PX : window.innerWidth;
 
 const MenuBar = () => {
   const { t } = useLanguage();
@@ -73,12 +81,26 @@ const MenuBar = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasController, setHasController] = useState(false);
   const [audioDownloadCount, setAudioDownloadCount] = useState(0);
+  const [menuBarMode, setMenuBarMode] = useState(() =>
+    getMenuBarMode(getViewportWidth())
+  );
   const mainContentRef = useRef(null);
 
+  const responsivePolicy = getMenuBarResponsivePolicyForMode(menuBarMode);
   const platform = navigator.userAgentData?.platform || navigator.platform || "";
   const modifierKey = platform.toUpperCase().includes("MAC") ? "⌘" : "Ctrl";
   const showSearchPill =
     !location.pathname.startsWith("/welcome") && location.pathname !== "/bigpicture";
+
+  useEffect(() => {
+    const updateMenuBarMode = () => {
+      const nextMode = getMenuBarMode(getViewportWidth());
+      setMenuBarMode(currentMode => (currentMode === nextMode ? currentMode : nextMode));
+    };
+
+    window.addEventListener("resize", updateMenuBarMode);
+    return () => window.removeEventListener("resize", updateMenuBarMode);
+  }, []);
 
   // Check for dev mode
   useEffect(() => {
@@ -224,7 +246,7 @@ const MenuBar = () => {
       style={{ ...MENU_BAR_HEIGHT_STYLE, WebkitAppRegion: "drag" }}
     >
       {/* data-boot-row / data-boot-pop: staggered pop-in as the boot logo lands (app.css) */}
-      <div className="flex h-full flex-1 items-center gap-2 px-3" data-boot-row>
+      <div className="flex h-full min-w-0 flex-1 items-center gap-2 px-3" data-boot-row>
         <div className={`flex items-center ${layoutOrder.brand}`}>
           <div
             className={`flex items-center gap-2 ${mirrored ? "flex-row-reverse" : ""}`}
@@ -253,17 +275,21 @@ const MenuBar = () => {
                 />
               </button>
             )}
-            <span className="text-sm font-medium text-foreground" data-boot-pop>
+            <span
+              className={`${responsivePolicy.showBrandLabel ? "" : "sr-only"} text-sm font-medium text-foreground`}
+              data-boot-pop
+            >
               Ascendara
             </span>
           </div>
         </div>
 
         <div
-          className="flex cursor-pointer items-center gap-1"
+          className="flex shrink-0 cursor-pointer items-center gap-1"
           onClick={handleStatusClick}
           title={t("server-status.title")}
           data-tour="server-status"
+          data-menubar-priority="critical"
           style={{ WebkitAppRegion: "no-drag" }}
         >
           {serverStatus.noInternet ? (
@@ -283,44 +309,81 @@ const MenuBar = () => {
         </div>
 
         {/* Branch badges */}
-        {appBranch === "public-testing" && (
-          <span className="flex items-center gap-1 rounded border border-yellow-500/20 bg-yellow-500/10 px-1 py-0.5 text-[14px] text-yellow-500">
-            <TestTube2 className="h-4 w-4" />
-            <span className="font-semibold">{t("app.publicTesting")}</span>
+        {responsivePolicy.showBranchIdentity && appBranch === "public-testing" && (
+          <span
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-yellow-500/20 bg-yellow-500/10 px-1 py-0.5 text-[14px] text-yellow-500"
+            title={t("app.publicTesting")}
+            data-menubar-priority="secondary"
+          >
+            <TestTube2 className="h-4 w-4 shrink-0" />
+            <span
+              className={
+                responsivePolicy.showSecondaryLabels ? "font-semibold" : "sr-only"
+              }
+            >
+              {t("app.publicTesting")}
+            </span>
           </span>
         )}
-        {appBranch === "experimental" && (
-          <span className="flex items-center gap-1 rounded border border-red-400/20 bg-red-400/10 px-1 py-0.5 text-[14px] text-red-400">
-            <FlaskConical className="h-4 w-4" />
-            <span className="font-semibold">{t("app.experiment")}</span>
+        {responsivePolicy.showBranchIdentity && appBranch === "experimental" && (
+          <span
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-red-400/20 bg-red-400/10 px-1 py-0.5 text-[14px] text-red-400"
+            title={t("app.experiment")}
+            data-menubar-priority="secondary"
+          >
+            <FlaskConical className="h-4 w-4 shrink-0" />
+            <span
+              className={
+                responsivePolicy.showSecondaryLabels ? "font-semibold" : "sr-only"
+              }
+            >
+              {t("app.experiment")}
+            </span>
           </span>
         )}
 
         {showTorrentWarning && (
-          <span className="flex items-center gap-1 rounded border border-red-500/20 bg-red-500/10 px-1 py-0.5 text-[14px] text-red-500">
-            <Flag className="h-3 w-3" />
-            {t("app.torrentWarning")}
-          </span>
-        )}
-
-        {isDev && (
-          <span className="flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1 py-0.5 text-[14px] text-blue-500">
-            <Hammer className="h-3 w-3" />
-            {t("app.runningInDev")}
-          </span>
-        )}
-
-        {hasController && location.pathname !== "/bigpicture" && (
-          <button
-            onClick={() => navigate("/bigpicture")}
-            className="flex cursor-pointer items-center gap-1 rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[14px] text-primary transition-colors hover:bg-primary/20"
-            style={{ WebkitAppRegion: "no-drag" }}
-            title={t("bigPicture.enterBigPicture")}
+          <span
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-red-500/20 bg-red-500/10 px-1 py-0.5 text-[14px] text-red-500"
+            title={t("app.torrentWarning")}
+            data-menubar-priority="critical"
           >
-            <Gamepad2 className="h-3 w-3" />
-            {t("bigPicture.enterBigPicture")}
-          </button>
+            <Flag className="h-3 w-3 shrink-0" />
+            <span className={responsivePolicy.showCriticalLabels ? "" : "sr-only"}>
+              {t("app.torrentWarning")}
+            </span>
+          </span>
         )}
+
+        {isDev && responsivePolicy.showSecondary && (
+          <span
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-blue-500/20 bg-blue-500/10 px-1 py-0.5 text-[14px] text-blue-500"
+            title={t("app.runningInDev")}
+            data-menubar-priority="secondary"
+          >
+            <Hammer className="h-3 w-3 shrink-0" />
+            <span className={responsivePolicy.showSecondaryLabels ? "" : "sr-only"}>
+              {t("app.runningInDev")}
+            </span>
+          </span>
+        )}
+
+        {hasController &&
+          location.pathname !== "/bigpicture" &&
+          responsivePolicy.showSecondary && (
+            <button
+              onClick={() => navigate("/bigpicture")}
+              className="flex shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[14px] text-primary transition-colors hover:bg-primary/20"
+              style={{ WebkitAppRegion: "no-drag" }}
+              title={t("bigPicture.enterBigPicture")}
+              data-menubar-priority="secondary"
+            >
+              <Gamepad2 className="h-3 w-3 shrink-0" />
+              <span className={responsivePolicy.showSecondaryLabels ? "" : "sr-only"}>
+                {t("bigPicture.enterBigPicture")}
+              </span>
+            </button>
+          )}
 
         {libraryBackupBusy && (
           <button
@@ -329,14 +392,15 @@ const MenuBar = () => {
               openLibraryBackups(true);
               navigate("/library");
             }}
-            className="flex shrink-0 items-center gap-1.5 rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[14px] text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[14px] text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ WebkitAppRegion: "no-drag" }}
             title={t("library.libraryBackups.backgroundDetails", {
               game: libraryBackupProgress?.game || "",
             })}
+            data-menubar-priority="activity"
           >
             <Loader className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
-            <span>
+            <span className={responsivePolicy.showActivityLabels ? "" : "sr-only"}>
               {t(`library.libraryBackups.background.${libraryBackupScreen}`, {
                 completed: libraryBackupCompleted,
                 total: libraryBackupProgress?.total || 0,
@@ -347,8 +411,14 @@ const MenuBar = () => {
 
         {/* Show downloading update badge when downloading */}
         {updatePhase === UPDATE_PHASES.DOWNLOADING && (
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1 rounded border border-green-500/20 bg-green-500/10 px-1 py-0.5 text-[14px] text-green-500">
+          <div
+            className="flex shrink-0 items-center gap-2"
+            data-menubar-priority="critical"
+          >
+            <span
+              className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-green-500/20 bg-green-500/10 px-1 py-0.5 text-[14px] text-green-500"
+              title={t("app.downloading-update")}
+            >
               <div className="relative h-5 w-5 flex-shrink-0">
                 {/* Track circle */}
                 <svg
@@ -377,14 +447,20 @@ const MenuBar = () => {
                   />
                 </svg>
               </div>
-              {t("app.downloading-update")}
+              <span className={responsivePolicy.showCriticalLabels ? "" : "sr-only"}>
+                {t("app.downloading-update")}
+              </span>
             </span>
           </div>
         )}
 
         {/* Show audio downloading badge when downloading audio files */}
         {audioDownloadCount > 0 && (
-          <span className="flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[14px] text-blue-500">
+          <span
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[14px] text-blue-500"
+            title={t("app.loading-audio", { count: audioDownloadCount })}
+            data-menubar-priority="activity"
+          >
             <div className="relative h-4 w-4 flex-shrink-0">
               {/* Spinning loader circle */}
               <svg
@@ -412,21 +488,31 @@ const MenuBar = () => {
                 />
               </svg>
             </div>
-            {t("app.loading-audio", { count: audioDownloadCount })}
+            <span className={responsivePolicy.showActivityLabels ? "" : "sr-only"}>
+              {t("app.loading-audio", { count: audioDownloadCount })}
+            </span>
           </span>
         )}
 
         {/* Show outdated badge only while an update still needs downloading */}
         {updatePhase === UPDATE_PHASES.AVAILABLE && (
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1 rounded border border-yellow-500/20 bg-yellow-500/10 px-1 py-0.5 text-[14px] text-yellow-500">
-              <AlertTriangle className="h-3 w-3" />
-              {t("app.outdated")}
+          <div
+            className="flex shrink-0 items-center gap-2"
+            data-menubar-priority="critical"
+          >
+            <span
+              className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-yellow-500/20 bg-yellow-500/10 px-1 py-0.5 text-[14px] text-yellow-500"
+              title={t("app.outdated")}
+            >
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              <span className={responsivePolicy.showCriticalLabels ? "" : "sr-only"}>
+                {t("app.outdated")}
+              </span>
             </span>
             <button
               type="button"
               onClick={() => window.dispatchEvent(new Event("request-app-update"))}
-              className="rounded border border-yellow-500/20 bg-yellow-500/10 p-1 text-yellow-500 transition-colors hover:bg-yellow-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500"
+              className="shrink-0 rounded border border-yellow-500/20 bg-yellow-500/10 p-1 text-yellow-500 transition-colors hover:bg-yellow-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500"
               style={{ WebkitAppRegion: "no-drag" }}
               title={t("app.toasts.updateNow")}
               aria-label={t("app.toasts.updateNow")}
@@ -440,25 +526,32 @@ const MenuBar = () => {
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event("request-app-update"))}
-            className="flex items-center gap-1 rounded border border-green-500/20 bg-green-500/10 px-1.5 py-0.5 text-[14px] text-green-500 transition-colors hover:bg-green-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-green-500/20 bg-green-500/10 px-1.5 py-0.5 text-[14px] text-green-500 transition-colors hover:bg-green-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
             style={{ WebkitAppRegion: "no-drag" }}
             title={t("app.toasts.installAndRestart")}
             aria-label={t("app.toasts.installAndRestart")}
+            data-menubar-priority="critical"
           >
-            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-            {t("app.toasts.updateReady")}
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className={responsivePolicy.showCriticalLabels ? "" : "sr-only"}>
+              {t("app.toasts.updateReady")}
+            </span>
           </button>
         )}
         <div className={`flex-1 ${layoutOrder.spacer}`} />
-        {isDev && (
-          <div className={`flex items-center ${layoutOrder.devAction}`}>
+        {isDev && responsivePolicy.showSecondary && (
+          <div className={`flex shrink-0 items-center ${layoutOrder.devAction}`}>
             <button
               onClick={handleExportSvg}
-              className="flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[14px] text-blue-500 transition-colors hover:bg-blue-500/20"
+              className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[14px] text-blue-500 transition-colors hover:bg-blue-500/20"
               style={{ WebkitAppRegion: "no-drag" }}
+              title={t("app.exportSvg", "Export SVG")}
+              data-menubar-priority="secondary"
             >
-              <Download className="h-3 w-3" />
-              {t("app.exportSvg", "Export SVG")}
+              <Download className="h-3 w-3 shrink-0" />
+              <span className={responsivePolicy.showSecondaryLabels ? "" : "sr-only"}>
+                {t("app.exportSvg", "Export SVG")}
+              </span>
             </button>
           </div>
         )}
@@ -466,17 +559,19 @@ const MenuBar = () => {
           <button
             type="button"
             onClick={() => openSearch("global")}
-            className={`flex h-7 items-center gap-2 rounded-full border border-border bg-muted/50 pl-2.5 pr-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${layoutOrder.search}`}
+            className={`flex h-7 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-muted/50 pl-2.5 pr-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${layoutOrder.search}`}
             style={{ WebkitAppRegion: "no-drag" }}
             aria-label={t("globalSearch.placeholder.global")}
           >
             <Search className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span className="hidden pr-4 sm:inline">
+            <span className={responsivePolicy.showSearchLabel ? "pr-4" : "sr-only"}>
               {t("globalSearch.placeholder.global")}
             </span>
-            <kbd className="inline-flex h-5 select-none items-center rounded-full border border-border bg-background px-2 font-mono text-[10px] font-medium">
-              {modifierKey}+K
-            </kbd>
+            {responsivePolicy.showSearchShortcut && (
+              <kbd className="inline-flex h-5 select-none items-center rounded-full border border-border bg-background px-2 font-mono text-[10px] font-medium">
+                {modifierKey}+K
+              </kbd>
+            )}
           </button>
         )}
       </div>
