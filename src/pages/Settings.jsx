@@ -1402,7 +1402,7 @@ function Settings() {
                 <div className="space-y-6">
                   <div
                     id="default-landing-page"
-                    className="flex items-center justify-between"
+                    className="flex flex-col items-start gap-3 xl:flex-row xl:items-center xl:justify-between"
                   >
                     <div className="space-y-0.5">
                       <Label>{t("settings.defaultLandingPage")}</Label>
@@ -1416,7 +1416,7 @@ function Settings() {
                         handleSettingChange("defaultOpenPage", value)
                       }
                     >
-                      <SelectTrigger className="w-[180px] bg-background">
+                      <SelectTrigger className="w-full bg-background xl:w-[180px]">
                         <SelectValue placeholder="Home" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1872,7 +1872,7 @@ function Settings() {
                 </div>
 
                 <div id="post-download-behavior" className="space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col items-start gap-3 xl:flex-row xl:items-center xl:justify-between">
                     <div className="space-y-2">
                       <Label>{t("settings.behaviorAfterDownload")}</Label>
                       <p className="text-sm text-muted-foreground">
@@ -1885,7 +1885,7 @@ function Settings() {
                         handleSettingChange("behaviorAfterDownload", value)
                       }
                     >
-                      <SelectTrigger className="w-[180px] bg-background">
+                      <SelectTrigger className="w-full bg-background xl:w-[180px]">
                         <SelectValue placeholder="None" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2236,7 +2236,7 @@ function Settings() {
 
                 <div
                   id="controller-type"
-                  className="flex items-center justify-between gap-4"
+                  className="flex flex-col items-start gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-4"
                 >
                   <div className="min-w-0 space-y-0.5">
                     <Label>{t("settings.controllerType")}</Label>
@@ -2248,7 +2248,7 @@ function Settings() {
                     value={settings.controllerType || "xbox"}
                     onValueChange={value => handleSettingChange("controllerType", value)}
                   >
-                    <SelectTrigger className="w-[150px] shrink-0 bg-background">
+                    <SelectTrigger className="w-full bg-background xl:w-[150px] xl:shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -2283,7 +2283,7 @@ function Settings() {
 
                 <div
                   id="keyboard-layout"
-                  className="flex items-center justify-between gap-4"
+                  className="flex flex-col items-start gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-4"
                 >
                   <div className="min-w-0 space-y-0.5">
                     <Label>{t("settings.keyboardLayout")}</Label>
@@ -2297,7 +2297,7 @@ function Settings() {
                       handleSettingChange("bigPictureKeyboardLayout", value)
                     }
                   >
-                    <SelectTrigger className="w-[150px] shrink-0 bg-background">
+                    <SelectTrigger className="w-full bg-background xl:w-[150px] xl:shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
