@@ -30,6 +30,7 @@ import {
   Languages,
   Loader,
   Hand,
+  GitCommitHorizontal,
   RefreshCw,
   CircleAlert,
   Plus,
@@ -106,6 +107,7 @@ import AppBranchPicker, { getAppBranch } from "@/components/AppBranchPicker";
 import { API_URL } from "@/config/api";
 import { clearLegacySideScrollbarPreference } from "@/lib/sideScrollbarPreference";
 import { persistThemeSelection } from "@/lib/themePersistence";
+import v12Art from "@/assets/v12.png";
 
 const themes = [
   // Light themes
@@ -705,8 +707,7 @@ function Settings() {
           persist: value => window.electron.updateSetting("theme", value),
           clearCustomTheme,
           applyTheme: setTheme,
-          syncSettings: value =>
-            setSettingsLocal(prev => ({ ...prev, theme: value })),
+          syncSettings: value => setSettingsLocal(prev => ({ ...prev, theme: value })),
         });
         console.log("Save successful ?", success);
 
@@ -882,9 +883,40 @@ function Settings() {
   const activeCategoryRef = useRef(activeCategory);
   activeCategoryRef.current = activeCategory;
   const settingsRootRef = useRef(null);
+  const settingsHeaderRef = useRef(null);
+  const [headerScrolled, setHeaderScrolled] = useState(false);
 
   const getSettingsScrollContainer = () =>
     settingsRootRef.current?.closest("[data-route-scroll-container]") || null;
+
+  // The header and sidebar stay pinned while only the settings content
+  // scrolls. The sidebar sits below the header and is capped to the space the
+  // route scrollport leaves it, scrolling on its own if it ever runs longer.
+  useEffect(() => {
+    const root = settingsRootRef.current;
+    const header = settingsHeaderRef.current;
+    const scroller = getSettingsScrollContainer();
+    if (!root || !header || !scroller) return undefined;
+    const update = () => {
+      const headerHeight = header.offsetHeight;
+      root.style.setProperty("--settings-aside-top", `${headerHeight + 16}px`);
+      root.style.setProperty(
+        "--settings-aside-max-h",
+        `${Math.max(160, scroller.clientHeight - headerHeight - 32)}px`
+      );
+    };
+    const onScroll = () => setHeaderScrolled(scroller.scrollTop > 4);
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    observer.observe(scroller);
+    update();
+    onScroll();
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      observer.disconnect();
+      scroller.removeEventListener("scroll", onScroll);
+    };
+  }, []);
 
   const openCategory = id => {
     setActiveCategory(id);
@@ -969,13 +1001,13 @@ function Settings() {
       // The scrollport itself ends above the fixed dock, so centering inside
       // its client height creates a real viewport-safe placement at any scroll
       // position instead of relying on trailing document padding.
-      const topInset = 24;
+      // The pinned header covers the top of the scrollport
+      const topInset = 24 + (settingsHeaderRef.current?.offsetHeight || 0);
       const bottomInset = 24;
       const usable = scrollContainer.clientHeight - topInset - bottomInset;
       const containerRect = scrollContainer.getBoundingClientRect();
       const rect = element.getBoundingClientRect();
-      const elementTop =
-        scrollContainer.scrollTop + rect.top - containerRect.top;
+      const elementTop = scrollContainer.scrollTop + rect.top - containerRect.top;
       const offset =
         rect.height < usable ? topInset + (usable - rect.height) / 2 : topInset + 16;
       const maxTop = Math.max(
@@ -1100,12 +1132,12 @@ function Settings() {
 
   const localTorrentRequiredBySource = Boolean(
     settings.customSourcesMode &&
-      settings.customSource?.torrentOnly &&
-      settings.torrentEnabled &&
-      !canUseTorrentOnlySource(settings.customSource, {
-        ...settings,
-        torrentEnabled: false,
-      })
+    settings.customSource?.torrentOnly &&
+    settings.torrentEnabled &&
+    !canUseTorrentOnlySource(settings.customSource, {
+      ...settings,
+      torrentEnabled: false,
+    })
   );
 
   const handleTorrentToggle = () => {
@@ -1138,71 +1170,26 @@ function Settings() {
 
   return (
     <div ref={settingsRootRef} className="min-h-screen bg-background">
-      <div className="container mx-auto max-w-7xl p-4 md:p-8">
-        <div className="mb-6 flex items-center gap-4">
+      <div className="container mx-auto max-w-7xl px-4 pb-4 md:px-8 md:pb-8">
+        <header
+          ref={settingsHeaderRef}
+          className={`sticky top-0 z-20 -mx-4 mb-6 flex flex-wrap items-center gap-4 border-b bg-background/90 px-4 pb-4 pt-4 backdrop-blur-md transition-colors md:-mx-8 md:px-8 md:pt-6 ${
+            headerScrolled ? "border-border/60" : "border-transparent"
+          }`}
+        >
           <h1 className="text-3xl font-bold tracking-tight">{t("settings.title")}</h1>
-
-          {isExperiment ? (
-            <div className="group relative ml-auto flex items-center text-sm text-muted-foreground">
-              <div className="px-2 font-medium">
-                <span>Experiment Build {testingVersion}</span>
-              </div>
-            </div>
-          ) : isPublicTesting ? (
-            <div className="group relative ml-auto flex items-center text-sm text-muted-foreground">
-              <div className="px-2 font-medium">
-                <span>Public Testing Build {testingVersion}</span>
-              </div>
-            </div>
-          ) : isDev ? (
-            <div className="group relative ml-auto flex items-center text-sm text-muted-foreground">
-              <div className="cursor-pointer px-2">
-                <span>Latest Development Commit:</span>
-              </div>
-              {latestDevCommit ? (
-                <div
-                  onClick={() => window.electron.openURL(latestDevCommit.url)}
-                  className="cursor-pointer hover:underline"
-                  title={latestDevCommit.message}
-                >
-                  <span className="text-primary-foreground/60">
-                    {latestDevCommit.sha.substring(0, 8)}
-                  </span>
-                </div>
-              ) : (
-                <div className="cursor-pointer">
-                  <span className="text-primary-foreground/60">Loading...</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="group relative ml-auto flex items-center text-sm text-muted-foreground">
-              <div
-                onClick={() =>
-                  window.electron.openURL(
-                    `https://github.com/ascendara/ascendara/commit/${__APP_REVISION__}`
-                  )
-                }
-                className="mr-2 -translate-x-8 transform cursor-pointer opacity-0 transition-all duration-300 hover:underline group-hover:translate-x-0 group-hover:opacity-100"
-              >
-                <span className="text-primary-foreground/60">
-                  (rev: {__APP_REVISION__?.substring(0, 7) || "dev"})
-                </span>
-              </div>
-              <div
-                onClick={() =>
-                  window.electron.openURL("https://ascendara.app/changelog?individual")
-                }
-                className="cursor-pointer px-2 hover:underline"
-              >
-                <span>v{__APP_VERSION__}</span>
-              </div>
-            </div>
-          )}
-        </div>
+          <SettingsVersionInfo
+            t={t}
+            isExperiment={isExperiment}
+            isPublicTesting={isPublicTesting}
+            testingVersion={testingVersion}
+            isDev={isDev}
+            latestDevCommit={latestDevCommit}
+          />
+        </header>
 
         <div className="grid items-start gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-12">
-          <aside className="space-y-6 lg:sticky lg:top-[36px]">
+          <aside className="space-y-6 lg:sticky lg:top-[var(--settings-aside-top)] lg:max-h-[var(--settings-aside-max-h)] lg:overflow-y-auto lg:pb-2">
             <SettingsNav
               categories={visibleCategories}
               activeId={activeCategory}
@@ -4381,6 +4368,214 @@ function SettingsNav({ categories, activeId, onSelect }) {
         );
       })}
     </nav>
+  );
+}
+
+const DEV_VERSION_VIEW_KEY = "ascendara.settings.devVersionView";
+
+// iOS-style grouped surface shared by the version cards: frosted fill, a
+// hairline ring and a soft, wide shadow instead of a hard border.
+const VERSION_CARD_CLASS =
+  "flex items-center rounded-[22px] bg-card/70 p-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_8px_28px_-6px_rgba(0,0,0,0.18)] ring-1 ring-black/5 backdrop-blur-xl dark:shadow-[0_1px_2px_rgba(0,0,0,0.4),0_10px_32px_-8px_rgba(0,0,0,0.6)] dark:ring-white/10";
+
+// Where the Settings header says which build this is. Live shows the release
+// card; development can flip between the latest commit and that card.
+function SettingsVersionInfo({
+  t,
+  isExperiment,
+  isPublicTesting,
+  testingVersion,
+  isDev,
+  latestDevCommit,
+}) {
+  const [devView, setDevView] = useState(() => {
+    try {
+      return localStorage.getItem(DEV_VERSION_VIEW_KEY) === "release"
+        ? "release"
+        : "commit";
+    } catch {
+      return "commit";
+    }
+  });
+
+  const chooseDevView = view => {
+    setDevView(view);
+    try {
+      localStorage.setItem(DEV_VERSION_VIEW_KEY, view);
+    } catch {}
+  };
+
+  if (isExperiment || isPublicTesting) {
+    return (
+      <div className={`ml-auto ${VERSION_CARD_CLASS} px-4 py-2.5`}>
+        <span className="text-sm font-medium text-muted-foreground">
+          {isExperiment ? "Experiment Build" : "Public Testing Build"} {testingVersion}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+      {isDev && (
+        <IosSegmentedControl
+          label={t("settings.versionBadge.viewSwitch")}
+          value={devView}
+          onChange={chooseDevView}
+          options={[
+            { id: "commit", label: t("settings.versionBadge.commitView") },
+            { id: "release", label: t("settings.versionBadge.releaseView") },
+          ]}
+        />
+      )}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={isDev ? devView : "release"}
+          initial={{ opacity: 0, y: 4, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -4, scale: 0.98 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {isDev && devView === "commit" ? (
+            <DevCommitCard t={t} commit={latestDevCommit} />
+          ) : (
+            <ReleaseCard t={t} />
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function IosSegmentedControl({ label, value, onChange, options }) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className="flex rounded-[10px] bg-muted/70 p-[3px] ring-1 ring-black/5 dark:ring-white/5"
+    >
+      {options.map(option => {
+        const selected = value === option.id;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => onChange(option.id)}
+            aria-pressed={selected}
+            className={`relative min-w-[72px] rounded-[8px] px-3 py-1 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
+              selected ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {selected && (
+              <motion.span
+                layoutId="settings-version-segment"
+                className="absolute inset-0 rounded-[8px] bg-background shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_1px_rgba(0,0,0,0.04)] dark:bg-muted-foreground/25"
+                transition={{ type: "spring", stiffness: 500, damping: 38 }}
+              />
+            )}
+            <span className="relative">{option.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ReleaseCard({ t }) {
+  const version = __APP_VERSION__ || "";
+  const major = version.split(".")[0];
+  const revision = __APP_REVISION__?.trim();
+
+  return (
+    <div className={VERSION_CARD_CLASS}>
+      <button
+        type="button"
+        onClick={() =>
+          window.electron.openURL("https://ascendara.app/changelog?individual")
+        }
+        title={t("settings.versionBadge.viewChangelog")}
+        className="group flex items-center gap-3 rounded-[16px] py-1 pl-1 pr-2 text-left outline-none transition-colors hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        {/* App-icon tile: squircle, top sheen, inner hairline */}
+        <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[13px] bg-gradient-to-b from-[#2a1b4d] to-[#120a24] shadow-[0_4px_12px_-2px_rgba(109,40,217,0.55)] ring-1 ring-inset ring-white/10">
+          <span className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/15 to-transparent" />
+          {major === "12" ? (
+            <img
+              src={v12Art}
+              alt=""
+              draggable={false}
+              className="relative w-9 drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] transition-transform duration-300 ease-out group-hover:scale-110"
+            />
+          ) : (
+            <span className="relative text-lg font-black text-violet-300">{major}</span>
+          )}
+        </span>
+        <span className="flex flex-col leading-tight">
+          <span className="text-[15px] font-semibold tracking-tight text-foreground">
+            {t("settings.versionBadge.title", { major })}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {t("settings.versionBadge.version", { version })}
+          </span>
+        </span>
+        <ChevronRight className="ml-1 h-4 w-4 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
+      </button>
+      {revision && (
+        <>
+          <span className="mx-1 h-8 w-px bg-border/70" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={() =>
+              window.electron.openURL(
+                `https://github.com/ascendara/ascendara/commit/${revision}`
+              )
+            }
+            title={t("settings.versionBadge.viewCommit")}
+            className="mr-0.5 rounded-full bg-muted/70 px-2.5 py-1 font-mono text-[11px] font-medium text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {revision.substring(0, 7)}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DevCommitCard({ t, commit }) {
+  return (
+    <div className={VERSION_CARD_CLASS}>
+      <button
+        type="button"
+        disabled={!commit}
+        onClick={() => commit && window.electron.openURL(commit.url)}
+        title={commit?.message}
+        className="group flex max-w-xs items-center gap-3 rounded-[16px] py-1 pl-1 pr-2 text-left outline-none transition-colors hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default disabled:hover:bg-transparent"
+      >
+        <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[13px] bg-gradient-to-b from-primary/90 to-primary shadow-[0_4px_12px_-2px_hsl(var(--primary)/0.5)] ring-1 ring-inset ring-white/15">
+          <span className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent" />
+          <GitCommitHorizontal className="text-primary-foreground relative h-5 w-5" />
+        </span>
+        <span className="flex min-w-0 flex-col leading-tight">
+          <span className="text-[15px] font-semibold tracking-tight text-foreground">
+            {t("settings.versionBadge.latestCommit")}
+          </span>
+          <span className="truncate text-xs text-muted-foreground">
+            {commit ? (
+              <>
+                <span className="font-mono">{commit.sha.substring(0, 8)}</span>
+                {" · "}
+                {commit.message}
+              </>
+            ) : (
+              t("settings.versionBadge.loading")
+            )}
+          </span>
+        </span>
+        {commit && (
+          <ChevronRight className="ml-1 h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
+        )}
+      </button>
+    </div>
   );
 }
 

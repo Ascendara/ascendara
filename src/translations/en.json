@@ -5754,6 +5754,17 @@
       "useForGoldberg": "Use this name for Goldberg cracks",
       "usernameError": "Failed to save username"
     },
+    "versionBadge": {
+      "commitView": "Commit",
+      "latestCommit": "Latest development commit",
+      "loading": "Loading…",
+      "releaseView": "Release",
+      "title": "Ascendara {{major}}",
+      "version": "Version {{version}}",
+      "viewChangelog": "View the changelog for this release",
+      "viewCommit": "View this build's commit on GitHub",
+      "viewSwitch": "Version display"
+    },
     "viewComponentsPage": "View Components Page",
     "warningDescription": "Ascendara is designed as a testing platform for video games, allowing users to evaluate gameplay, performance, and compatibility before making a purchase decision. Ascendara strongly encourages users to support game developers by purchasing games they enjoy.",
     "warningReadMore": "Read more",

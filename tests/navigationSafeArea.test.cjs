@@ -124,9 +124,10 @@ test("Settings treats the bounded route scrollport as its scroll authority", () 
   assert.match(settingsSource, /scrollContainer\.scrollHeight - scrollContainer\.clientHeight/);
   assert.match(settingsSource, /scrollContainer\.addEventListener\("scrollend", onArrive\)/);
   assert.match(settingsSource, /scrollToElement\(element, scrollContainer\)/);
-  // The route scrollport begins below the 48px MenuBar. A 36px sticky
-  // inset preserves the sidebar's former 84px absolute viewport position.
-  assert.match(settingsSource, /space-y-6 lg:sticky lg:top-\[36px\]/);
+  // The header is pinned to the top of the route scrollport and the sidebar
+  // is pinned just below it, so only the settings content scrolls.
+  assert.match(settingsSource, /sticky top-0 z-20/);
+  assert.match(settingsSource, /lg:sticky lg:top-\[var\(--settings-aside-top\)\]/);
 
   assert.doesNotMatch(settingsSource, /window\.scrollTo\(/);
   assert.doesNotMatch(settingsSource, /window\.scrollY/);
