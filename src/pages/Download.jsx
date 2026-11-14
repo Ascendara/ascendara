@@ -31,6 +31,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { sanitizeText } from "@/lib/utils";
+import { gameSource } from "@/lib/combinedSources";
 import { useGameViews } from "@/hooks/useGameViews";
 import imageCacheService from "@/services/images/imageCacheService";
 import steamGridImageService from "@/services/images/steamGridImageService";
@@ -2020,6 +2021,7 @@ function PublicDownloadPage() {
                 (!!gameData.hasHistory || !gameService.indexTracksHistory())
               }
               onOpenTimemachine={() => setShowTimemachineSelection(true)}
+              source={gameSource(gameData, settings)}
             />
           </div>
 

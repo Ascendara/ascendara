@@ -2575,6 +2575,7 @@
     "reportGame": "Report Game",
     "reportGameDescription": "Broken links, wrong details and more",
     "showLess": "Show Less",
+    "sourceTooltip": "From {{source}}, one of your external sources. It is not part of the Ascendara index.",
     "specs": {
       "installSize": "Install",
       "size": "Download",

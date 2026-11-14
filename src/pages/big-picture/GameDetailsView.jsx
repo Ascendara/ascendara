@@ -10,6 +10,8 @@ import artworkOverrideService from "@/services/images/artworkOverrideService";
 import steamGridImageService from "@/services/images/steamGridImageService";
 import { findGameDetails } from "@/lib/steamMatch";
 import { catalogSizeText } from "@/lib/installSpace";
+import { gameSource } from "@/lib/combinedSources";
+import { useSettings } from "@/context/SettingsContext";
 import {
   Download,
   Info,
@@ -27,6 +29,8 @@ import {
   History,
   TriangleAlert,
   Image as ImageIcon,
+  Database,
+  Globe,
 } from "lucide-react";
 import { checkSeamlessAvailable, getInAppProviders } from "./utils";
 import { getControllerButtons, getButtonBadgeClass } from "./controller";
@@ -64,6 +68,8 @@ const GameDetailsView = ({
   const [infoState, setInfoState] = useState("loading");
   const [infoAttempt, setInfoAttempt] = useState(0);
   const buttons = getControllerButtons(controllerType);
+  const { settings } = useSettings();
+  const source = gameSource(game, settings);
   const [focusedSection, setFocusedSection] = useState("button"); // 'button', 'description', 'screenshots', 'provider'
   const [selectedButton, setSelectedButton] = useState(0); // 0 = Download, 1 = Play Later
   const [supportsModManaging, setSupportsModManaging] = useState(false);
@@ -623,6 +629,25 @@ const GameDetailsView = ({
                 <div className="flex items-center gap-2">
                   <Info className="h-5 w-5" />
                   <span className="font-medium">v{shown.version}</span>
+                </div>
+              )}
+              {source && (
+                <div
+                  className="flex min-w-0 items-center gap-2"
+                  title={
+                    source.official
+                      ? t("gameCard.officialTooltip")
+                      : t("gameCard.sourceTooltip", { source: source.name })
+                  }
+                >
+                  {source.official ? (
+                    <Database className="h-5 w-5 shrink-0" />
+                  ) : (
+                    <Globe className="h-5 w-5 shrink-0" />
+                  )}
+                  <span className="truncate font-medium">
+                    {source.official ? t("gameCard.official") : source.name}
+                  </span>
                 </div>
               )}
               {release && (

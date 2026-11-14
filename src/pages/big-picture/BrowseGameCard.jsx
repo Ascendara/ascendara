@@ -4,6 +4,7 @@ import {
   Database,
   Gamepad2,
   Gift,
+  Globe,
   HardDrive,
   Headset,
   Star,
@@ -14,6 +15,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import ratingQueueService from "@/services/games/ratingQueueService";
 import { catalogSizeText } from "@/lib/installSpace";
+import { gameSource } from "@/lib/combinedSources";
 import { gameName } from "./surfaceNavigation";
 import "./browse-game-card.css";
 
@@ -25,9 +27,8 @@ const validRating = value => {
 export const BrowseGameCard = memo(function BrowseGameCard({ game, focus, onOpen }) {
   const { t } = useLanguage();
   const { settings } = useSettings();
-  // Mixed in with other sources, official games are marked so they stand out
-  const official =
-    !!settings?.combineSources && !!settings?.customSourcesMode && !game.customSource;
+  // Mixed in with other sources, every game is marked with where it comes from
+  const source = settings?.combineSources ? gameSource(game, settings) : null;
   const ref = useRef(null);
   const id = useId();
   const name = gameName(game);
@@ -128,10 +129,21 @@ export const BrowseGameCard = memo(function BrowseGameCard({ game, focus, onOpen
             <span>{Math.round(rating)}</span>
           </span>
         )}
-        {official && (
-          <span className="bp-browse-official" title={t("gameCard.officialTooltip")}>
-            <Database aria-hidden="true" />
-            {t("gameCard.official")}
+        {source && (
+          <span
+            className="bp-browse-official"
+            title={
+              source.official
+                ? t("gameCard.officialTooltip")
+                : t("gameCard.sourceTooltip", { source: source.name })
+            }
+          >
+            {source.official ? (
+              <Database aria-hidden="true" />
+            ) : (
+              <Globe aria-hidden="true" />
+            )}
+            <span>{source.official ? t("gameCard.official") : source.name}</span>
           </span>
         )}
         <span className="bp-browse-open" aria-hidden="true">

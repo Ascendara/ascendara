@@ -14,8 +14,10 @@ import {
   Apple,
   CircleSlash,
   Clock,
+  Database,
   ExternalLink,
   Eye,
+  Globe,
   History,
   ShieldCheck,
   Star,
@@ -93,6 +95,7 @@ export default function DownloadHero({
   hltbData,
   showTimemachine,
   onOpenTimemachine,
+  source,
 }) {
   const { t } = useLanguage();
   const isVr = gameData.category?.includes("Virtual Reality");
@@ -161,6 +164,25 @@ export default function DownloadHero({
                 ) : (
                   <Chip className="bg-primary/15 text-primary">{gameData.version}</Chip>
                 ))}
+              {source && (
+                <Chip
+                  className="max-w-[16rem] bg-muted text-foreground"
+                  tooltip={
+                    source.official
+                      ? t("gameCard.officialTooltip")
+                      : t("gameCard.sourceTooltip", { source: source.name })
+                  }
+                >
+                  {source.official ? (
+                    <Database className="h-3 w-3 shrink-0 text-primary" />
+                  ) : (
+                    <Globe className="h-3 w-3 shrink-0 text-primary" />
+                  )}
+                  <span className="truncate">
+                    {source.official ? t("gameCard.official") : source.name}
+                  </span>
+                </Chip>
+              )}
               {gameRating > 0 && (
                 <Chip
                   className="bg-yellow-400/15 text-yellow-600 dark:text-yellow-400"

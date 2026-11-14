@@ -27,6 +27,7 @@ import {
   Tag,
   Sparkles,
   Database,
+  Globe,
 } from "lucide-react";
 import { formatBytes } from "@/services/app/systemHealthService";
 import {
@@ -58,6 +59,7 @@ import { useImageLoader } from "@/hooks/useImageLoader";
 import usePrivateArtwork from "@/hooks/usePrivateArtwork";
 import verifiedGamesService from "@/services/games/verifiedGamesService";
 import gamePagePreparer from "@/services/games/gamePagePreparer";
+import { gameSource } from "@/lib/combinedSources";
 
 const MAX_VISIBLE_TAGS = 3;
 const RECENT_UPDATE_DAYS = 14;
@@ -438,9 +440,8 @@ function GameCardContent({ game, compact, viewCount }) {
     },
   ].filter(Boolean);
 
-  // Mixed in with other sources, official games are marked so they stand out
-  const showOfficialBadge =
-    !!settings?.combineSources && !!settings?.customSourcesMode && !game.customSource;
+  // Mixed in with other sources, every game is marked with where it comes from
+  const source = settings?.combineSources ? gameSource(game, settings) : null;
 
   const hasStats =
     gameRating > 0 || viewCount > 0 || game.dlc || game.online || game.storyOnly;
@@ -492,16 +493,26 @@ function GameCardContent({ game, compact, viewCount }) {
             {/* Top: verified + install status */}
             <div className="absolute left-0 right-0 top-0 flex items-start justify-between gap-2 p-2.5">
               <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                {showOfficialBadge && (
+                {source && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="flex cursor-default items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm animate-in fade-in-50">
-                        <Database className="h-3 w-3 text-primary" />
-                        {t("gameCard.official")}
+                      <span className="flex min-w-0 max-w-[10rem] cursor-default items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm animate-in fade-in-50">
+                        {source.official ? (
+                          <Database className="h-3 w-3 shrink-0 text-primary" />
+                        ) : (
+                          <Globe className="h-3 w-3 shrink-0 text-primary" />
+                        )}
+                        <span className="truncate">
+                          {source.official ? t("gameCard.official") : source.name}
+                        </span>
                       </span>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
-                      <p className="text-secondary">{t("gameCard.officialTooltip")}</p>
+                      <p className="text-secondary">
+                        {source.official
+                          ? t("gameCard.officialTooltip")
+                          : t("gameCard.sourceTooltip", { source: source.name })}
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                 )}

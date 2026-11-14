@@ -270,6 +270,13 @@
   font-weight: 700;
   line-height: 1;
   color: #fff;
+  max-width: 55%;
+}
+.bp-browse-official > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .bp-browse-official > svg {
   width: 1rem;

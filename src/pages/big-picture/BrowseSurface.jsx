@@ -4,6 +4,7 @@ import {
   RefreshCw,
   ChevronDown,
   Database,
+  Globe,
   HardDrive,
   Tag,
   Users,
@@ -19,6 +20,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SurfaceButton, useSurface } from "./Surface";
 import { BrowseGameCard } from "./BrowseGameCard";
+import { gameSource } from "@/lib/combinedSources";
 import { gameName, gameEntries, readStoredList } from "./surfaceNavigation";
 import { useHomeArtwork } from "./useHomeArtwork";
 import gamePagePreparer from "@/services/games/gamePagePreparer";
@@ -173,6 +175,9 @@ export function BrowseSurface({
   const spotlight =
     displayed.find(({ key }) => key === spotlightKey)?.game || displayed[0]?.game;
   const artwork = useHomeArtwork(spotlight);
+  const spotlightSource = settings.combineSources
+    ? gameSource(spotlight, settings)
+    : null;
   const sorts = {
     weight: ["Popular", "latest_update-desc"],
     "latest_update-desc": ["Recently updated", "name"],
@@ -205,9 +210,12 @@ export function BrowseSurface({
             <BigPictureSpotlight
               title={gameName(spotlight)}
               chips={[
-                settings.combineSources &&
-                  settings.customSourcesMode &&
-                  !spotlight.customSource && { icon: Database, label: t("gameCard.official") },
+                spotlightSource && {
+                  icon: spotlightSource.official ? Database : Globe,
+                  label: spotlightSource.official
+                    ? t("gameCard.official")
+                    : spotlightSource.name,
+                },
                 genresFor(spotlight)[0] && { icon: Tag, label: genresFor(spotlight)[0] },
                 spotlight.size && { icon: HardDrive, label: catalogSizeText(spotlight, t) },
                 spotlight.online && { icon: Users, label: "Online" },

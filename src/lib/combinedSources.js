@@ -84,3 +84,17 @@ export function replaceSource(settings, previous, next) {
 export function combinedSourceKey(sources) {
   return `combined:${sources.map(keyOf).join("|")}`;
 }
+
+/**
+ * Where a catalogue game comes from. External games name their source; games
+ * from the Ascendara index are only called official when mixed with others.
+ * @returns {{ official: boolean, name?: string }|null}
+ */
+export function gameSource(game, settings) {
+  if (!game || !settings?.customSourcesMode) return null;
+  if (typeof game.customSource === "string" && game.customSource.trim()) {
+    return { official: false, name: game.customSource.trim() };
+  }
+  if (!game.customSource && settings.combineSources) return { official: true };
+  return null;
+}
