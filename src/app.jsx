@@ -2386,20 +2386,6 @@ function App() {
     document.head.appendChild(style);
   }, []);
 
-  useEffect(() => {
-    const updateScrollbarStyle = () => {
-      const sideScrollBar = localStorage.getItem("sideScrollBar") === "true";
-      if (sideScrollBar) {
-        document.documentElement.classList.add("custom-scrollbar");
-      } else {
-        document.documentElement.classList.remove("custom-scrollbar");
-      }
-    };
-
-    // Initial setup
-    updateScrollbarStyle();
-  }, []);
-
   return (
     <ErrorBoundary>
       <ThemeProvider>

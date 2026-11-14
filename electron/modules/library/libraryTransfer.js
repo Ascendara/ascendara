@@ -50,7 +50,7 @@ const PATH_KEYS = [
   "wine",
   "proton",
 ];
-const APPEARANCE_KEYS = ["theme", "customTheme"];
+const APPEARANCE_KEYS = ["theme", "customTheme", "sideScrollBar"];
 // Runtime state that means nothing on another start
 const TRANSIENT_KEYS = ["runningGames"];
 const SECRET_PATTERN = /(secret|token|password|apikey|api_key|clientid|client_id)/i;
@@ -590,6 +590,19 @@ async function collectSettingChanges(zip, categories, settings, sensitiveKeys) {
     for (const key of APPEARANCE_KEYS) {
       if (isPlainObject(appearance) && appearance[key] !== undefined)
         changes[key] = appearance[key];
+    }
+
+    // Older exports stored this Appearance preference only in renderer storage.
+    // Migrate that value into authoritative settings when the structured
+    // appearance payload does not already contain it.
+    if (changes.sideScrollBar === undefined) {
+      const legacyStorage = (await readJsonEntry(zip, "storage/appearance.json")) || {};
+      const legacySideScrollBar = isPlainObject(legacyStorage)
+        ? legacyStorage.sideScrollBar
+        : undefined;
+      if (legacySideScrollBar === "true" || legacySideScrollBar === "false") {
+        changes.sideScrollBar = legacySideScrollBar === "true";
+      }
     }
   }
 
