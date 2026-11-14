@@ -262,6 +262,7 @@ export function HomeDashboard({
                 game={game}
                 focus={focus(`${section.id}-${key}`)}
                 onOpen={section.open}
+                showSource={section.destination === "store"}
               />
             ))}
           </div>

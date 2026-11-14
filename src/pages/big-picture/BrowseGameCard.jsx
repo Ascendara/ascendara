@@ -27,8 +27,8 @@ const validRating = value => {
 export const BrowseGameCard = memo(function BrowseGameCard({ game, focus, onOpen }) {
   const { t } = useLanguage();
   const { settings } = useSettings();
-  // Mixed in with other sources, every game is marked with where it comes from
-  const source = settings?.combineSources ? gameSource(game, settings) : null;
+  // With a source picked, every game is marked with where it comes from
+  const source = gameSource(game, settings);
   const ref = useRef(null);
   const id = useId();
   const name = gameName(game);

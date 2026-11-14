@@ -95,6 +95,10 @@ export function gameSource(game, settings) {
   if (typeof game.customSource === "string" && game.customSource.trim()) {
     return { official: false, name: game.customSource.trim() };
   }
+  if (game.customSource === true) {
+    const name = settings.customSource?.name?.trim();
+    return name ? { official: false, name } : null;
+  }
   if (!game.customSource && settings.combineSources) return { official: true };
   return null;
 }

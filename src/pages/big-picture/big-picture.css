@@ -164,6 +164,7 @@
   font-size: 0.85em;
 }
 .bp-cover {
+  position: relative;
   aspect-ratio: 3 / 4;
   border-radius: 0.5rem;
   background: rgb(var(--color-muted));
@@ -177,10 +178,40 @@
   height: 100%;
   object-fit: cover;
 }
-.bp-cover svg {
+.bp-cover > svg {
   width: 35%;
   height: 35%;
   color: rgb(var(--color-muted-foreground));
+}
+.bp-cover-source {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: calc(100% - 1rem);
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.55rem;
+  background: rgb(9 12 18 / 0.82);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  backdrop-filter: blur(10px);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+}
+.bp-cover-source > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-game .bp-cover .bp-cover-source > svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex-shrink: 0;
+  color: rgb(var(--color-primary));
 }
 .bp-grid {
   display: grid;

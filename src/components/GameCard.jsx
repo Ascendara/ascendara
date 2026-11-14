@@ -440,8 +440,8 @@ function GameCardContent({ game, compact, viewCount }) {
     },
   ].filter(Boolean);
 
-  // Mixed in with other sources, every game is marked with where it comes from
-  const source = settings?.combineSources ? gameSource(game, settings) : null;
+  // With a source picked, every game is marked with where it comes from
+  const source = gameSource(game, settings);
 
   const hasStats =
     gameRating > 0 || viewCount > 0 || game.dlc || game.online || game.storyOnly;

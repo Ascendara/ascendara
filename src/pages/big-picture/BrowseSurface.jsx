@@ -175,9 +175,7 @@ export function BrowseSurface({
   const spotlight =
     displayed.find(({ key }) => key === spotlightKey)?.game || displayed[0]?.game;
   const artwork = useHomeArtwork(spotlight);
-  const spotlightSource = settings.combineSources
-    ? gameSource(spotlight, settings)
-    : null;
+  const spotlightSource = gameSource(spotlight, settings);
   const sorts = {
     weight: ["Popular", "latest_update-desc"],
     "latest_update-desc": ["Recently updated", "name"],

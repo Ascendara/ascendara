@@ -1,7 +1,10 @@
 import { memo, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { PageNavigationContext, pageFocusIds } from "./PageHeader";
-import { Gamepad2 } from "lucide-react";
+import { Database, Gamepad2, Globe } from "lucide-react";
 import { useImageLoader } from "@/hooks/useImageLoader";
+import { useLanguage } from "@/context/LanguageContext";
+import { useSettings } from "@/context/SettingsContext";
+import { gameSource } from "@/lib/combinedSources";
 import { moveFocus, gameName } from "./surfaceNavigation";
 import { scrollSurfaceFocus, cancelSurfaceScroll } from "./controllerNavigation";
 import { CrossfadeImage } from "./CrossfadeImage";
@@ -104,7 +107,11 @@ export const SurfaceGame = memo(function SurfaceGame({
   subtitle,
   artworkOnly = false,
   landscapeArtwork = null,
+  showSource = false,
 }) {
+  const { t } = useLanguage();
+  const { settings } = useSettings();
+  const source = showSource ? gameSource(game, settings) : null;
   const [image, setImage] = useState(game.cover || game.image || null);
   const [visible, setVisible] = useState(false);
   const [failed, setFailed] = useState(null);
@@ -161,6 +168,19 @@ export const SurfaceGame = memo(function SurfaceGame({
         )}
         {artworkOnly && (
           <CrossfadeImage src={landscapeArtwork} className="bp-cover-landscape" />
+        )}
+        {source && (
+          <span
+            className="bp-cover-source"
+            title={
+              source.official
+                ? t("gameCard.officialTooltip")
+                : t("gameCard.sourceTooltip", { source: source.name })
+            }
+          >
+            {source.official ? <Database aria-hidden="true" /> : <Globe aria-hidden="true" />}
+            <span>{source.official ? t("gameCard.official") : source.name}</span>
+          </span>
         )}
       </div>
       <strong>{name}</strong>
