@@ -88,7 +88,7 @@ test("Layout reserves a persistent Settings viewport exclusion zone", () => {
     /hasNavigationBottomSafeArea \? "h-screen overflow-hidden" : "min-h-screen"/
   );
   assert.match(layoutSource, /data-route-scroll-container/);
-  assert.match(layoutSource, /style=\{MENU_BAR_HEIGHT_STYLE\}/);
+  assert.match(layoutSource, /style=\{PAGE_CONTENT_TOP_OFFSET_STYLE\}/);
   assert.match(layoutSource, /hasNavigationBottomSafeArea \? "min-h-0" : ""/);
   assert.match(layoutSource, /marginBottom: navigationBottomSafeArea \|\| undefined/);
 
