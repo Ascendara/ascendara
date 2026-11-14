@@ -8,6 +8,10 @@ import {
   useRef,
 } from "react";
 import { keepRenewedTokens, noteRenewedTokens } from "./renewedTokens";
+import {
+  applySideScrollbarPreference,
+  migrateLegacySideScrollbarPreference,
+} from "@/lib/sideScrollbarPreference";
 
 export const SettingsContext = createContext();
 
@@ -187,6 +191,10 @@ export function SettingsProvider({ children }) {
     [settings, setSettings, setSettingsLocal, updateSetting]
   );
 
+  useEffect(() => {
+    applySideScrollbarPreference(document.documentElement, settings.sideScrollBar);
+  }, [settings.sideScrollBar]);
+
   // Effect to toggle Discord RPC when rpcEnabled setting changes
   useEffect(() => {
     const toggleDiscordRPC = async () => {
@@ -209,7 +217,14 @@ export function SettingsProvider({ children }) {
       try {
         const savedSettings = await window.electron.getSettings();
         if (savedSettings) {
-          setSettingsState(savedSettings);
+          const migration = await migrateLegacySideScrollbarPreference(
+            window.localStorage,
+            value => window.electron.updateSetting("sideScrollBar", value)
+          );
+          const loadedSettings = migration?.persisted
+            ? { ...savedSettings, sideScrollBar: migration.value }
+            : savedSettings;
+          setSettingsState(loadedSettings);
         }
       } catch (error) {
         console.error("Error loading settings:", error);

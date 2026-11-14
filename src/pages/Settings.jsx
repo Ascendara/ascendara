@@ -104,6 +104,8 @@ import NotificationSoundSettings from "@/components/NotificationSoundSettings";
 import LibraryTransferSettings from "@/components/LibraryTransferSettings";
 import AppBranchPicker, { getAppBranch } from "@/components/AppBranchPicker";
 import { API_URL } from "@/config/api";
+import { clearLegacySideScrollbarPreference } from "@/lib/sideScrollbarPreference";
+import { persistThemeSelection } from "@/lib/themePersistence";
 
 const themes = [
   // Light themes
@@ -518,20 +520,6 @@ function Settings() {
 
   const handleSettingChange = useCallback(
     async (key, value, ludusavi = false) => {
-      if (key === "sideScrollBar") {
-        setSettingsLocal(prev => ({
-          ...prev,
-          [key]: value,
-        }));
-        // Update scrollbar styles directly
-        if (value) {
-          document.documentElement.classList.add("custom-scrollbar");
-        } else {
-          document.documentElement.classList.remove("custom-scrollbar");
-        }
-        return;
-      }
-
       // Handle Ludusavi settings
       if (ludusavi) {
         // Only update the nested ludusavi object
@@ -584,6 +572,9 @@ function Settings() {
       window.electron.updateSetting(key, value).then(success => {
         console.log(`Update result ${key}:`, success);
         if (success) {
+          if (key === "sideScrollBar") {
+            clearLegacySideScrollbarPreference(window.localStorage);
+          }
           setSettingsLocal(prev => ({
             ...prev,
             [key]: value,
@@ -666,27 +657,23 @@ function Settings() {
   // Theme handling
   const handleThemeChange = useCallback(
     async newTheme => {
-      // Apply
-      if (newTheme !== "custom") {
-        clearCustomTheme();
-      }
-      setTheme(newTheme);
-      localStorage.setItem("ascendara-theme", newTheme);
-
-      // Try to save
       try {
         console.log("Saving theme:", newTheme);
-        const success = await window.electron.updateSetting("theme", newTheme);
+        const success = await persistThemeSelection(newTheme, {
+          persist: value => window.electron.updateSetting("theme", value),
+          clearCustomTheme,
+          applyTheme: setTheme,
+          syncSettings: value =>
+            setSettingsLocal(prev => ({ ...prev, theme: value })),
+        });
         console.log("Save successful ?", success);
 
-        if (success) {
-          // Updating context locally
-          setSettingsLocal(prev => ({ ...prev, theme: newTheme }));
-        } else {
+        if (!success) {
           toast.error("Failed to save theme preference");
         }
       } catch (e) {
         console.error("Error saving theme:", e);
+        toast.error("Failed to save theme preference");
       }
     },
     [setSettingsLocal, setTheme]
@@ -1320,7 +1307,7 @@ function Settings() {
 
                   <div
                     id="window-controls"
-                    className="flex items-center justify-between gap-4"
+                    className="flex flex-col items-start gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-4"
                   >
                     <div className="space-y-0.5">
                       <Label>{t("settings.windowControls")}</Label>
@@ -1340,7 +1327,7 @@ function Settings() {
 
                   <div
                     id="menu-bar-side"
-                    className="flex items-center justify-between gap-4"
+                    className="flex flex-col items-start gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-4"
                   >
                     <div className="space-y-0.5">
                       <Label>{t("settings.menuBarSide")}</Label>
@@ -1415,7 +1402,7 @@ function Settings() {
                 <div className="space-y-6">
                   <div
                     id="default-landing-page"
-                    className="flex items-center justify-between"
+                    className="flex flex-col items-start gap-3 xl:flex-row xl:items-center xl:justify-between"
                   >
                     <div className="space-y-0.5">
                       <Label>{t("settings.defaultLandingPage")}</Label>
@@ -1429,7 +1416,7 @@ function Settings() {
                         handleSettingChange("defaultOpenPage", value)
                       }
                     >
-                      <SelectTrigger className="w-[180px] bg-background">
+                      <SelectTrigger className="w-full bg-background xl:w-[180px]">
                         <SelectValue placeholder="Home" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1885,7 +1872,7 @@ function Settings() {
                 </div>
 
                 <div id="post-download-behavior" className="space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col items-start gap-3 xl:flex-row xl:items-center xl:justify-between">
                     <div className="space-y-2">
                       <Label>{t("settings.behaviorAfterDownload")}</Label>
                       <p className="text-sm text-muted-foreground">
@@ -1898,7 +1885,7 @@ function Settings() {
                         handleSettingChange("behaviorAfterDownload", value)
                       }
                     >
-                      <SelectTrigger className="w-[180px] bg-background">
+                      <SelectTrigger className="w-full bg-background xl:w-[180px]">
                         <SelectValue placeholder="None" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2249,7 +2236,7 @@ function Settings() {
 
                 <div
                   id="controller-type"
-                  className="flex items-center justify-between gap-4"
+                  className="flex flex-col items-start gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-4"
                 >
                   <div className="min-w-0 space-y-0.5">
                     <Label>{t("settings.controllerType")}</Label>
@@ -2261,7 +2248,7 @@ function Settings() {
                     value={settings.controllerType || "xbox"}
                     onValueChange={value => handleSettingChange("controllerType", value)}
                   >
-                    <SelectTrigger className="w-[150px] shrink-0 bg-background">
+                    <SelectTrigger className="w-full bg-background xl:w-[150px] xl:shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -2296,7 +2283,7 @@ function Settings() {
 
                 <div
                   id="keyboard-layout"
-                  className="flex items-center justify-between gap-4"
+                  className="flex flex-col items-start gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-4"
                 >
                   <div className="min-w-0 space-y-0.5">
                     <Label>{t("settings.keyboardLayout")}</Label>
@@ -2310,7 +2297,7 @@ function Settings() {
                       handleSettingChange("bigPictureKeyboardLayout", value)
                     }
                   >
-                    <SelectTrigger className="w-[150px] shrink-0 bg-background">
+                    <SelectTrigger className="w-full bg-background xl:w-[150px] xl:shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

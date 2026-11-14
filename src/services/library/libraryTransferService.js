@@ -42,7 +42,6 @@ export const TRANSFER_CATEGORIES = [
       "ascendara-boot-colors",
       "ascendara-logo",
       "navSize",
-      "sideScrollBar",
     ],
   },
   {

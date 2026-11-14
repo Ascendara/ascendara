@@ -153,6 +153,11 @@ function loadUpdates(settings, { loadError = false, isWindows = false } = {}) {
     return realLoad.call(this, request, ...rest);
   };
 
+  // updates.js reads process.platform at load for its macOS path, so match the
+  // mocked config instead of the machine running the tests
+  const realPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+  Object.defineProperty(process, "platform", { value: isWindows ? "win32" : "linux" });
+
   try {
     delete require.cache[UPDATES];
     const updates = require(UPDATES);
@@ -168,6 +173,7 @@ function loadUpdates(settings, { loadError = false, isWindows = false } = {}) {
     };
   } finally {
     Module._load = realLoad;
+    Object.defineProperty(process, "platform", realPlatform);
   }
 }
 
