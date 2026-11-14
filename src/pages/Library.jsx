@@ -1805,34 +1805,41 @@ const Library = () => {
       {/* ── Left Sidebar ─────────────────────────────────────────── */}
       <aside className="flex w-60 shrink-0 flex-col border-r border-border/30 shadow-[1px_0_0_0_hsl(var(--border)/0.15)]">
         {/* ── User profile strip ── */}
-        <div className="rounded-none bg-muted/30">
-          <div className="flex items-center gap-3 px-4 pb-3 pt-3">
+        <div className="mx-3 mt-3 overflow-hidden rounded-xl border border-border/40 bg-gradient-to-br from-primary/10 via-muted/30 to-muted/10">
+          <div className="flex items-center gap-1 p-1.5">
             <button
-              className="flex min-w-0 flex-1 items-center gap-3 rounded-lg transition-colors hover:opacity-80"
+              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-foreground/5"
               onClick={() => navigate("/profile")}
             >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 ring-1 ring-primary/30">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/15 ring-2 ring-primary/25">
                 <ProfileImage
                   src={userData?.photoURL}
-                  className="h-8 w-8 rounded-full object-cover"
+                  className="h-10 w-10 rounded-full object-cover"
                   fallback={
-                    <span className="text-xs font-semibold text-primary">
+                    <span className="text-sm font-semibold text-primary">
                       {getInitial(userData?.displayName, user?.displayName, username)}
                     </span>
                   }
                 />
               </div>
-              <div className="min-w-0 flex-1 text-left">
-                <p className="truncate text-sm font-semibold leading-none text-foreground">
+              <div className="min-w-0 flex-1">
+                {/* leading-5, not leading-none: truncate clips descenders otherwise */}
+                <p className="truncate text-sm font-semibold leading-5 text-foreground">
                   {(user?.uid && (userData?.displayName || user?.displayName)) ||
                     username ||
                     "Guest"}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {games.filter(g => !g.isFolder).length +
-                    getGamesInFolders().length +
-                    ownedStoreGames.length}{" "}
-                  {t("library.gamesInLibrary") || "games"}
+                {/* Wraps rather than truncating so the label is never cut to "…" */}
+                <p className="flex items-start gap-1 text-xs leading-4 text-muted-foreground">
+                  <Gamepad2 className="mt-0.5 h-3 w-3 shrink-0" />
+                  <span>
+                    <span className="font-semibold text-foreground/90">
+                      {games.filter(g => !g.isFolder).length +
+                        getGamesInFolders().length +
+                        ownedStoreGames.length}
+                    </span>{" "}
+                    {t("library.gamesInLibrary") || "games"}
+                  </span>
                 </p>
               </div>
             </button>
@@ -1849,7 +1856,7 @@ const Library = () => {
                   }
                 }}
                 className={cn(
-                  "shrink-0 rounded-md p-1.5 transition-colors",
+                  "shrink-0 self-stretch rounded-lg px-2 transition-colors",
                   showAscendPanel
                     ? "bg-primary/15 text-primary"
                     : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -1873,7 +1880,7 @@ const Library = () => {
                 f => f.status === "online" || f.status === "busy"
               );
               return (
-                <div className="px-4 pb-3 pt-1">
+                <div className="border-t border-border/30 px-3 pb-3 pt-2.5">
                   {/* Level + XP */}
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-primary">
