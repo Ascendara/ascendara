@@ -38,13 +38,15 @@ import { useSettings } from "@/context/SettingsContext";
 import { WindowControls } from "@/components/WindowControls";
 import { FEATURE_CENTER_EVENTS, openFeatureCenter } from "@/lib/featureCenterEvents";
 import { MENU_BAR_HEIGHT_STYLE } from "@/lib/appChromeGeometry";
+import { getMenuBarLayoutOrder } from "@/lib/menuBarLayout";
 
 const MenuBar = () => {
   const { t } = useLanguage();
   const { settings } = useSettings();
   const controlsStyle = settings.windowControlsStyle;
-  // Mirrors the bar: logo at the right edge, window controls on the left
+  // The side setting moves the brand to one edge and window controls to the opposite edge.
   const mirrored = settings.menuBarSide === "right";
+  const layoutOrder = getMenuBarLayoutOrder(settings.menuBarSide);
   const navigate = useNavigate();
   const location = useLocation();
   const { openSearch } = useSearch();
@@ -222,13 +224,8 @@ const MenuBar = () => {
       style={{ ...MENU_BAR_HEIGHT_STYLE, WebkitAppRegion: "drag" }}
     >
       {/* data-boot-row / data-boot-pop: staggered pop-in as the boot logo lands (app.css) */}
-      <div
-        className={`flex h-full flex-1 items-center gap-2 px-3 ${
-          mirrored ? "flex-row-reverse" : ""
-        }`}
-        data-boot-row
-      >
-        <div className="flex items-center">
+      <div className="flex h-full flex-1 items-center gap-2 px-3" data-boot-row>
+        <div className={`flex items-center ${layoutOrder.brand}`}>
           <div
             className={`flex items-center gap-2 ${mirrored ? "flex-row-reverse" : ""}`}
           >
@@ -452,9 +449,9 @@ const MenuBar = () => {
             {t("app.toasts.updateReady")}
           </button>
         )}
-        <div className="flex-1" />
+        <div className={`flex-1 ${layoutOrder.spacer}`} />
         {isDev && (
-          <div className="flex items-center">
+          <div className={`flex items-center ${layoutOrder.devAction}`}>
             <button
               onClick={handleExportSvg}
               className="flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[14px] text-blue-500 transition-colors hover:bg-blue-500/20"
@@ -469,7 +466,7 @@ const MenuBar = () => {
           <button
             type="button"
             onClick={() => openSearch("global")}
-            className="flex h-7 items-center gap-2 rounded-full border border-border bg-muted/50 pl-2.5 pr-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={`flex h-7 items-center gap-2 rounded-full border border-border bg-muted/50 pl-2.5 pr-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${layoutOrder.search}`}
             style={{ WebkitAppRegion: "no-drag" }}
             aria-label={t("globalSearch.placeholder.global")}
           >
