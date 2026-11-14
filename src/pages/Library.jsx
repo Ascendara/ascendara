@@ -159,6 +159,7 @@ import {
   getGamesInFolders,
 } from "@/lib/folderManager";
 import { API_URL } from "@/config/api";
+import { MENU_BAR_HEIGHT_PX } from "@/lib/appChromeGeometry";
 
 const Retro = React.lazy(() => import("./Retro"));
 
@@ -1783,7 +1784,8 @@ const Library = () => {
 
   return (
     <div
-      className="fixed inset-0 top-[60px] flex overflow-hidden bg-background"
+      className="fixed inset-0 flex overflow-hidden bg-background"
+      style={{ top: MENU_BAR_HEIGHT_PX }}
       // The wishlist only lists Steam games, so dropping a game there means nothing
       {...(activeTab !== "wishlist" && {
         onDragEnter: handleLibraryDragEnter,

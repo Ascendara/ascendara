@@ -42,6 +42,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { MENU_BAR_HEIGHT_PX } from "@/lib/appChromeGeometry";
 
 // Shared with Library/GameScreen so covers already loaded there appear instantly
 const imageCache = {
@@ -605,7 +606,10 @@ const FolderView = () => {
   const decodedName = decodeURIComponent(lastFolderNameRef.current || "");
 
   return (
-    <div className="fixed inset-0 top-[60px] flex overflow-hidden bg-background">
+    <div
+      className="fixed inset-0 flex overflow-hidden bg-background"
+      style={{ top: MENU_BAR_HEIGHT_PX }}
+    >
       {/* ── Sidebar ── */}
       <aside className="flex w-60 shrink-0 flex-col border-r border-border/60">
         <button
