@@ -4504,7 +4504,7 @@ function ReleaseCard({ t }) {
               src={v12Art}
               alt=""
               draggable={false}
-              className="relative w-9 drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] transition-transform duration-300 ease-out group-hover:scale-110"
+              className="relative w-7 drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] transition-transform duration-300 ease-out group-hover:scale-110"
             />
           ) : (
             <span className="relative text-lg font-black text-violet-300">{major}</span>
