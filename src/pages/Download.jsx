@@ -105,17 +105,24 @@ const LOCAL_FALLBACK_PATTERNS = {
   megadb: /^https?:\/\/(?:[a-z0-9-]+\.)?megadb\.(?:net|xyz)\/.+$/i,
 };
 
-// Async validation using API patterns
-const isValidURL = async (url, provider, patterns) => {
+// Any http(s) link is accepted; hosts move their files between domains too often
+// to hold links to a fixed shape
+const isValidURL = url => {
   const trimmedUrl = url.trim();
-  if (trimmedUrl === "") {
-    return true;
+  if (trimmedUrl === "") return true;
+  try {
+    return /^https?:$/.test(new URL(trimmedUrl).protocol);
+  } catch {
+    return false;
   }
+};
+
+// The provider a link belongs to, used only to pick one automatically
+const matchesProvider = (url, provider, patterns) => {
+  const trimmedUrl = url.trim();
   const apiPattern = patterns ? getProviderPattern(provider, patterns) : null;
   const fallbackPattern = LOCAL_FALLBACK_PATTERNS[provider] || null;
-  if (apiPattern?.test(trimmedUrl)) return true;
-  if (fallbackPattern?.test(trimmedUrl)) return true;
-  return false;
+  return Boolean(apiPattern?.test(trimmedUrl) || fallbackPattern?.test(trimmedUrl));
 };
 
 const sanitizeGameName = name => {
@@ -342,23 +349,6 @@ function PublicDownloadPage() {
   // When the provider's countdown (MegaDB) finishes, for the button label
   const [countdownEndsAt, setCountdownEndsAt] = useState(null);
 
-  // When provider changes, re-validate the input link
-  useEffect(() => {
-    const validate = async () => {
-      if (!inputLink.trim()) {
-        setIsValidLink(true);
-        return;
-      }
-      if (providerPatterns) {
-        const valid = await isValidURL(inputLink, selectedProvider, providerPatterns);
-        setIsValidLink(valid);
-      } else {
-        setIsValidLink(false);
-      }
-    };
-    validate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProvider, providerPatterns]);
   const [useAscendara, setUseAscendara] = useState(false);
   const [showBrowserDownloadTip, setShowBrowserDownloadTip] = useState(
     () => localStorage.getItem("browser-download-tip-dismissed") !== "true"
@@ -1480,21 +1470,20 @@ function PublicDownloadPage() {
         setLastProcessedUrl(cleanUrl);
 
         console.log("Handling intercepted download URL:", cleanUrl);
-        for (const provider of VERIFIED_PROVIDERS) {
-          const patternsToUse = providerPatterns || LOCAL_FALLBACK_PATTERNS;
-          const valid = await isValidURL(cleanUrl, provider, patternsToUse);
-          if (valid) {
-            console.log("Intercepted URL matched provider:", provider);
-            setSelectedProvider(provider);
-            setInputLink(cleanUrl);
-            setIsValidLink(true);
-            setLinkStage(stage => (stage ? "starting" : stage));
-            await whereToDownloadRef.current(cleanUrl);
-            return;
-          }
+        if (!isValidURL(cleanUrl)) {
+          toast.error(t("download.toast.invalidLink"));
+          return;
         }
-        console.log("No provider matched intercepted URL:", cleanUrl);
-        toast.error(t("download.toast.invalidLink"));
+        // Hosts like FileDitch hand the file out from rotating domains, so a link
+        // that matches no provider still downloads under the selected one
+        const provider = VERIFIED_PROVIDERS.find(p =>
+          matchesProvider(cleanUrl, p, providerPatterns)
+        );
+        if (provider) setSelectedProvider(provider);
+        setInputLink(cleanUrl);
+        setIsValidLink(true);
+        setLinkStage(stage => (stage ? "starting" : stage));
+        await whereToDownloadRef.current(cleanUrl);
       } catch (error) {
         console.error("Error handling intercepted download URL:", error);
         toast.error(t("download.toast.invalidProtocolUrl"));
@@ -1658,24 +1647,13 @@ function PublicDownloadPage() {
 
     // Try to detect provider from URL if none selected
     if (!selectedProvider) {
-      for (const provider of VERIFIED_PROVIDERS) {
-        if (providerPatterns) {
-          const valid = await isValidURL(newLink, provider, providerPatterns);
-          if (valid) {
-            setSelectedProvider(provider);
-            setIsValidLink(true);
-            return;
-          }
-        }
-      }
+      const provider = VERIFIED_PROVIDERS.find(p =>
+        matchesProvider(newLink, p, providerPatterns)
+      );
+      if (provider) setSelectedProvider(provider);
     }
 
-    if (providerPatterns) {
-      const valid = await isValidURL(newLink, selectedProvider, providerPatterns);
-      setIsValidLink(valid);
-    } else {
-      setIsValidLink(false);
-    }
+    setIsValidLink(isValidURL(newLink));
   };
 
   useEffect(() => {
