@@ -61,6 +61,7 @@ contextBridge.exposeInMainWorld("electron", {
   setFullscreen: value => ipcRenderer.invoke("set-fullscreen", value),
   clearCache: () => ipcRenderer.invoke("clear-cache"),
   openDevTools: () => ipcRenderer.invoke("open-devtools"),
+  isDevToolsAllowed: () => ipcRenderer.invoke("is-devtools-allowed"),
   reload: () => ipcRenderer.invoke("reload"),
   onWindowStateChange: callback =>
     preloadIpc.subscribe("window-state-changed", callback, {

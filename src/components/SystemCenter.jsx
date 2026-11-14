@@ -156,6 +156,19 @@ const SystemCenter = () => {
   const [recoveryLoading, setRecoveryLoading] = useState(false);
   const [rollbackVersions, setRollbackVersions] = useState([]);
   const [rollbackLoading, setRollbackLoading] = useState(false);
+  const [devToolsAllowed, setDevToolsAllowed] = useState(false);
+
+  // Live builds disable DevTools, so the diagnostics button is hidden there
+  useEffect(() => {
+    let active = true;
+    window.electron
+      ?.isDevToolsAllowed?.()
+      .then(allowed => active && setDevToolsAllowed(Boolean(allowed)))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     initializeRecoveryMode();
@@ -720,26 +733,28 @@ const SystemCenter = () => {
               )}
             </FeatureSection>
 
-            <FeatureSection
-              title={t("featureCenters.system.recovery.developerDiagnostics")}
-              description={t(
-                "featureCenters.system.recovery.developerDiagnosticsDescription"
-              )}
-            >
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    await window.electron.openDevTools();
-                  } catch {
-                    toast.info(t("featureCenters.system.recovery.devToolsUnavailable"));
-                  }
-                }}
+            {devToolsAllowed && (
+              <FeatureSection
+                title={t("featureCenters.system.recovery.developerDiagnostics")}
+                description={t(
+                  "featureCenters.system.recovery.developerDiagnosticsDescription"
+                )}
               >
-                <Terminal className="mr-2 h-4 w-4" />
-                {t("featureCenters.system.recovery.openDevTools")}
-              </Button>
-            </FeatureSection>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await window.electron.openDevTools();
+                    } catch {
+                      toast.info(t("featureCenters.system.recovery.devToolsUnavailable"));
+                    }
+                  }}
+                >
+                  <Terminal className="mr-2 h-4 w-4" />
+                  {t("featureCenters.system.recovery.openDevTools")}
+                </Button>
+              </FeatureSection>
+            )}
           </div>
         )}
       </FeatureTabs>

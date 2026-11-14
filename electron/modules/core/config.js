@@ -231,6 +231,10 @@ function readTestingBranch() {
 
 const runningBranch = appBranch === "public-testing" ? readTestingBranch() : appBranch;
 
+// DevTools are for development and the testing branches only. On Live the
+// console would let anyone talked into pasting code reach the preload APIs.
+const devToolsAllowed = isDev || runningBranch !== "live";
+
 // The GitHub prerelease each testing branch installs from. Experimental follows
 // "testing", which CI replaces on every development push; public-testing
 // follows "public-testing", a copy of a testing build made only when one is
@@ -253,6 +257,7 @@ module.exports = {
   TESTING_BRANCH_FILE,
   testingReleaseTag,
   isDev,
+  devToolsAllowed,
   isWindows,
   isPortable,
   TIMESTAMP_FILE,

@@ -5,7 +5,7 @@
 
 const { BrowserWindow, screen, ipcMain, dialog, app } = require("electron");
 const path = require("path");
-const { isDev } = require("../core/config");
+const { isDev, devToolsAllowed } = require("../core/config");
 const { initializeDiscordRPC } = require("./discord-rpc");
 const { getSettingsManager } = require("../core/settings");
 const {
@@ -159,8 +159,9 @@ function createWindow() {
       sandbox: false,
       // Disable web security to allow CORS requests to external APIs
       webSecurity: false,
-      // Must be explicitly true for openDevTools() to work in packaged builds
-      devTools: true,
+      // Live builds disable DevTools entirely, which also disables the
+      // default menu's Ctrl+Shift+I / F12 shortcut
+      devTools: devToolsAllowed,
       // Keep rendering at full rate while visible to avoid idle black screens.
       // Throttling is switched on while hidden or minimized (see setIdle below).
       backgroundThrottling: false,
@@ -471,8 +472,20 @@ async function showErrorDialog(title, message) {
  */
 function registerWindowHandlers() {
   ipcMain.handle("shutdown-system", () => require("./system-power").shutdownSystem());
-  // Open DevTools (available in production on Linux for debugging)
+  // Other windows (store logins, the index relay) keep Electron's default
+  // devTools setting, so close DevTools on any of them that opens it on Live.
+  if (!devToolsAllowed) {
+    app.on("web-contents-created", (_, contents) => {
+      contents.on("devtools-opened", () => contents.closeDevTools());
+    });
+  }
+
+  ipcMain.handle("is-devtools-allowed", () => devToolsAllowed);
+
   ipcMain.handle("open-devtools", () => {
+    if (!devToolsAllowed) {
+      throw new Error("DevTools are only available on testing branches.");
+    }
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) {
       if (mainWindow.webContents.isDevToolsOpened()) {
