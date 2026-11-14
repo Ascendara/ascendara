@@ -443,14 +443,23 @@ function registerMiscHandlers() {
         "megadb.net",
         "megadb.xyz",
       ];
+      // FileDitch posts its browser check back to its own page, then sends the
+      // user on to a file host whose domain keeps changing, so its window can
+      // go anywhere. Ads stay blocked by host, popups are denied, and the
+      // window closes once the file link is caught.
+      let followsAnyHost = false;
+      try {
+        followsAnyHost = /fileditch/i.test(new URL(url).hostname);
+      } catch {}
       externalWindow.webContents.on("will-navigate", (event, navUrl) => {
         try {
           const host = new URL(navUrl).hostname.toLowerCase();
           const isAllowed =
             isSafeExternalUrl(navUrl) &&
-            allowedHosts.some(
-              allowed => host === allowed || host.endsWith(`.${allowed}`)
-            );
+            (followsAnyHost ||
+              allowedHosts.some(
+                allowed => host === allowed || host.endsWith(`.${allowed}`)
+              ));
           if (!isAllowed) {
             console.log("Blocked navigation in external window:", navUrl);
             event.preventDefault();

@@ -22,6 +22,17 @@ export function isMagicLink(provider, url) {
   );
 }
 
+// Providers whose page the user clicks through in Ascendara's own window, with
+// ads blocked; the window closes once the file link is caught
+export const APP_WINDOW_PROVIDERS = ["fileditch", "fileditchfiles"];
+
+export function opensInAppWindow(provider, url) {
+  return (
+    APP_WINDOW_PROVIDERS.includes(String(provider || "").toLowerCase()) ||
+    /fileditch/i.test(url || "")
+  );
+}
+
 // Providers whose downloads are considered "verified" / trusted.
 export const VERIFIED_PROVIDERS = ["megadb", "gofile", "buzzheavier", "pixeldrain"];
 

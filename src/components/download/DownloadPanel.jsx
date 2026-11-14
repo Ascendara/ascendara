@@ -11,7 +11,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import DebridIcon from "@/components/DebridIcon";
 import { useLanguage } from "@/context/LanguageContext";
-import { VERIFIED_PROVIDERS } from "@/config/providers";
+import { MAGIC_LINK_PROVIDERS, VERIFIED_PROVIDERS } from "@/config/providers";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import {
@@ -297,8 +297,7 @@ export default function DownloadPanel({
   if (filesUnavailable) return <FilesUnavailable />;
 
   const usingDebrid = debridAvailable && debridPick !== "none";
-  const opensInBrowser =
-    !usingDebrid && (selectedProvider === "buzzheavier" || selectedProvider === "megadb");
+  const opensInBrowser = !usingDebrid && MAGIC_LINK_PROVIDERS.includes(selectedProvider);
   const isTorrentMode = mode === "fitgirl" || mode === "torrent";
   const isMagic = mode === "seamless" && !usingDebrid;
   const openMagicInfo = () => setShowMagicInfo(true);

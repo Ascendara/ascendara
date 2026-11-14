@@ -91,6 +91,9 @@ import gameService from "@/services/games/gameService";
 import installedGamesService from "@/services/library/installedGamesService";
 import {
   SEAMLESS_PROVIDERS,
+  MAGIC_LINK_PROVIDERS,
+  isMagicLink,
+  opensInAppWindow,
   VERIFIED_PROVIDERS as CENTRAL_VERIFIED_PROVIDERS,
 } from "@/config/providers";
 import { API_URL } from "@/config/api";
@@ -1709,12 +1712,10 @@ function PublicDownloadPage() {
       ? `https:${downloadLinks[selectedProvider][0]}`
       : downloadLinks[selectedProvider][0];
 
-    const autoDownload =
-      ["buzzheavier", "megadb"].includes(selectedProvider.toLowerCase()) ||
-      /bzzhr\.(?:to|co)|buzzheavier|fafda\.to|fuckingfast\.(?:net|co)|megadb\.net/i.test(
-        link
-      );
-    const needsReferrerSpoofing = autoDownload;
+    const autoDownload = isMagicLink(selectedProvider, link);
+    // The referrer opens the page in Ascendara's own window, which blocks ads
+    // and hands the file to Ascendara
+    const needsReferrerSpoofing = autoDownload || opensInAppWindow(selectedProvider, link);
 
     const browserLink = { link, needsReferrerSpoofing, autoDownload };
 
@@ -1866,8 +1867,7 @@ function PublicDownloadPage() {
         ? "torrent"
         : debridAvailable ||
             seamlessProviders.includes(selectedProvider) ||
-            selectedProvider === "buzzheavier" ||
-            selectedProvider === "megadb"
+            MAGIC_LINK_PROVIDERS.includes(selectedProvider)
           ? "seamless"
           : "manual";
   const activeTorrentLinks =
