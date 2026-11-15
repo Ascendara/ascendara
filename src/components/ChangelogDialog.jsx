@@ -21,10 +21,10 @@ import {
 } from "lucide-react";
 import { API_URL } from "@/config/api";
 
-const CHANGELOG_API_URL = `${API_URL}/json/changelog/v2`;
+export const CHANGELOG_API_URL = `${API_URL}/json/changelog/v2`;
 
 // Order matters: this is how categories are listed in each section
-const CATEGORIES = {
+export const CATEGORIES = {
   additions: {
     icon: Plus,
     text: "text-emerald-500",
@@ -50,7 +50,7 @@ const CATEGORIES = {
     ring: "ring-muted-foreground/40",
   },
 };
-const CATEGORY_KEYS = Object.keys(CATEGORIES);
+export const CATEGORY_KEYS = Object.keys(CATEGORIES);
 
 const resolveImageUrl = path => {
   if (!path) return null;
@@ -60,7 +60,7 @@ const resolveImageUrl = path => {
 
 // Prefer the entry for the running version, otherwise the newest released one.
 // Drafts are only considered when previewing a specific version.
-const pickEntry = (entries, currentVersion, includeDrafts = false) => {
+export const pickEntry = (entries, currentVersion, includeDrafts = false) => {
   if (!Array.isArray(entries) || entries.length === 0) return null;
   if (includeDrafts) {
     const exact = entries.find(e => e?.version === currentVersion);
@@ -72,7 +72,7 @@ const pickEntry = (entries, currentVersion, includeDrafts = false) => {
   );
 };
 
-const formatDate = (date, language) => {
+export const formatDate = (date, language) => {
   if (!date) return null;
   const parsed = new Date(`${date}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return date;
@@ -133,7 +133,7 @@ const Banner = ({ entry }) => {
   );
 };
 
-const ChangeItem = ({ item, category }) => {
+export const ChangeItem = ({ item, category }) => {
   const meta = CATEGORIES[category];
   const Icon = meta.icon;
   const text = typeof item === "string" ? item : item?.change;

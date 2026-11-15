@@ -5758,6 +5758,7 @@
       "commitView": "Commit",
       "latestCommit": "Latest development commit",
       "loading": "Loading…",
+      "openVersion": "See what's new in this version",
       "releaseView": "Release",
       "title": "Ascendara {{major}}",
       "version": "Version {{version}}",

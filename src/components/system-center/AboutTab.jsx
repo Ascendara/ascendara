@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useState } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import {
   BookOpen,
   CheckCircle2,
@@ -13,7 +13,6 @@ import {
   Monitor,
   RefreshCw,
   Rocket,
-  ScrollText,
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,7 +23,7 @@ import {
   FeatureStat,
 } from "@/components/feature-centers/FeatureCenterPrimitives";
 import { useAppIcon } from "@/hooks/useAppIcon";
-import { checkForUpdates, useVersionStatus } from "@/services/app/updateCheckingService";
+import { useVersionStatus } from "@/services/app/updateCheckingService";
 
 const REVISION = (typeof __APP_REVISION__ !== "undefined" ? __APP_REVISION__ : "")
   .toString()
@@ -33,11 +32,6 @@ const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "
 
 const LINKS = [
   { id: "website", icon: Globe, url: "https://ascendara.app/" },
-  {
-    id: "changelog",
-    icon: ScrollText,
-    url: "https://ascendara.app/changelog?individual",
-  },
   { id: "docs", icon: BookOpen, url: "https://ascendara.app/docs" },
   { id: "discord", icon: MessageCircle, url: "https://ascendara.app/discord" },
   { id: "github", icon: Github, url: "https://github.com/ascendara/ascendara" },
@@ -115,13 +109,12 @@ function DetailList({ rows }) {
   );
 }
 
-const AboutTab = forwardRef(function AboutTab({ t, hideLogo }, logoRef) {
+const AboutTab = forwardRef(function AboutTab({ t, hideLogo, onOpenVersion }, logoRef) {
   const iconData = useAppIcon();
   const { checking, isOutdated } = useVersionStatus();
   const [info, setInfo] = useState(cachedInfo);
   const [specs, setSpecs] = useState(cachedSpecs);
   const [specsFailed, setSpecsFailed] = useState(false);
-  const [checkingNow, setCheckingNow] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -193,15 +186,6 @@ const AboutTab = forwardRef(function AboutTab({ t, hideLogo }, logoRef) {
       ]
     : [];
 
-  const runUpdateCheck = useCallback(async () => {
-    setCheckingNow(true);
-    try {
-      await checkForUpdates();
-    } finally {
-      setCheckingNow(false);
-    }
-  }, []);
-
   const copyDetails = async () => {
     const lines = [
       "Ascendara",
@@ -220,8 +204,7 @@ const AboutTab = forwardRef(function AboutTab({ t, hideLogo }, logoRef) {
     }
   };
 
-  const updateState =
-    checking || checkingNow ? "checking" : isOutdated ? "available" : "latest";
+  const updateState = checking ? "checking" : isOutdated ? "available" : "latest";
 
   return (
     <div className="space-y-5">
@@ -251,7 +234,12 @@ const AboutTab = forwardRef(function AboutTab({ t, hideLogo }, logoRef) {
             <p className="mt-1 text-sm text-muted-foreground">
               {t("featureCenters.system.about.tagline")}
             </p>
-            <div className="mt-2 flex items-center gap-1.5 text-sm">
+            {/* Update checks and release notes live on the Version tab */}
+            <button
+              type="button"
+              onClick={onOpenVersion}
+              className="mt-2 flex items-center gap-1.5 text-sm hover:underline"
+            >
               {updateState === "checking" ? (
                 <>
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
@@ -274,33 +262,17 @@ const AboutTab = forwardRef(function AboutTab({ t, hideLogo }, logoRef) {
                   </span>
                 </>
               )}
-            </div>
+            </button>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2 sm:flex-col">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={runUpdateCheck}
-              disabled={updateState === "checking"}
-              className="gap-2"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${updateState === "checking" ? "animate-spin" : ""}`}
-              />
-              {t("featureCenters.system.about.checkUpdates")}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-2"
-              onClick={() =>
-                window.electron.openURL("https://ascendara.app/changelog?individual")
-              }
-            >
-              <ScrollText className="h-4 w-4" />
-              {t("featureCenters.system.about.changelog")}
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onOpenVersion}
+            className="shrink-0 gap-2 self-start sm:self-center"
+          >
+            <Sparkles className="h-4 w-4" />
+            {t("featureCenters.system.about.whatsNew")}
+          </Button>
         </div>
       </section>
 
