@@ -4,6 +4,7 @@ import { retryExtraction } from "@/services/downloads/extractionRetryService";
 import { Toaster, toast } from "sonner";
 import { Search, Coffee, ListEnd, X, Gamepad2 } from "lucide-react";
 import { removeFromQueue, addToQueue } from "@/services/downloads/downloadQueueService";
+import { getConfiguredProviders } from "@/services/downloads/debridService";
 import { GameAssetSearchDialog } from "@/components/GameAssetSearchDialog";
 import { useBigPicturePage } from "./big-picture/useBigPicturePage";
 import { VirtualKeyboard } from "./big-picture/VirtualKeyboard";
@@ -217,6 +218,14 @@ function BigPicture() {
         <ExitDialog
           isOpen={showExitDialog}
           onClose={() => setShowExitDialog(false)}
+          message={
+            downloadingGame &&
+            t(
+              getConfiguredProviders(settings).length
+                ? "bigPicture.exitToDownloadHostMessage"
+                : "bigPicture.exitToDownloadNoDebridMessage"
+            )
+          }
           onConfirm={() => {
             setShowExitDialog(false);
             if (downloadingGame) {
@@ -413,6 +422,7 @@ function BigPicture() {
                 onBack={() => changeView("carousel")}
                 openController={() => setShowControllerSettings(true)}
                 openIndexes={() => changeView("indexes")}
+                openDesktop={() => setShowExitBigPictureDialog(true)}
               />
             )}
 

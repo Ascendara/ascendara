@@ -4,7 +4,7 @@ import { getControllerButtons, getButtonBadgeClass } from "./controller";
 import { useControllerInput } from "./useControllerInput";
 
 // Exit Dialog Component (for exiting to download)
-const ExitDialog = ({ isOpen, onClose, onConfirm, t, controllerType }) => {
+const ExitDialog = ({ isOpen, onClose, onConfirm, t, controllerType, message }) => {
   const [selectedButton, setSelectedButton] = useState(0);
   const buttons = getControllerButtons(controllerType);
 
@@ -62,7 +62,7 @@ const ExitDialog = ({ isOpen, onClose, onConfirm, t, controllerType }) => {
           </h2>
         </div>
         <p className="mb-8 text-lg leading-relaxed text-muted-foreground">
-          {t("bigPicture.exitToDownloadMessage")}
+          {message || t("bigPicture.exitToDownloadMessage")}
         </p>
         <div className="flex gap-4">
           <button

@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bell,
+  Languages,
+  MonitorCog,
   Download,
   Gamepad2,
   HardDrive,
@@ -14,6 +16,8 @@ import {
 } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
+import { baseLanguages, getAvailableLanguages } from "@/services/app/languageService";
 import { SurfaceButton, useSurface } from "./Surface";
 import { BigPictureShell } from "./BigPictureShell";
 
@@ -29,6 +33,16 @@ const categories = [
         "Refresh local and cloud indexes, manage sources and automatic updates.",
       ],
       ["notifications", "Notifications", "Show app and download notifications."],
+      [
+        "notificationSounds",
+        "Notification sounds",
+        "Play a sound with each notification.",
+      ],
+      [
+        "autoUpdate",
+        "Ascendara updates",
+        "Download and install new versions of Ascendara automatically.",
+      ],
       [
         "hideOnGameLaunch",
         "Hide on launch",
@@ -96,12 +110,33 @@ const categories = [
     ],
   },
   {
+    name: "Language",
+    icon: Languages,
+    description: "The language Ascendara uses",
+    options: [],
+  },
+  {
     name: "Storage",
     icon: HardDrive,
     description: "Where your games are stored",
     options: [],
   },
+  {
+    name: "Accounts & setup",
+    icon: MonitorCog,
+    description:
+      "Debrid accounts, torrents, Proton and Wine, download speed and download locations are set up in the regular Ascendara view. It works in Steam Deck Game Mode too, no need to switch to Desktop Mode.",
+    options: [
+      [
+        "openDesktop",
+        "Open the regular view",
+        "Leave Big Picture to change these. Come back any time from the menu.",
+      ],
+    ],
+  },
 ];
+
+const LINKS = ["controller", "indexes", "openDesktop"];
 
 export function PreferencesSurface({
   navigation,
@@ -109,13 +144,39 @@ export function PreferencesSurface({
   onBack,
   openController,
   openIndexes,
+  openDesktop,
   profile = false,
 }) {
   const { settings, updateSetting } = useSettings();
+  const { language, changeLanguage } = useLanguage();
   const { user, userData, isAuthenticated, loading } = useAuth();
   const [category, setCategory] = useState("General");
+  const [languages, setLanguages] = useState(() =>
+    Object.entries(baseLanguages).map(([id, info]) => ({ id, ...info }))
+  );
+  // Unknown until asked: portable and some Linux builds can not update themselves
+  const [canAutoUpdate, setCanAutoUpdate] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    getAvailableLanguages()
+      .then(list => !cancelled && setLanguages(list))
+      .catch(() => {});
+    Promise.resolve(window.electron?.getAutomaticUpdateCapability?.())
+      .then(capability => !cancelled && setCanAutoUpdate(capability || null))
+      .catch(() => !cancelled && setCanAutoUpdate({ supported: false }));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const selected = categories.find(item => item.name === category);
-  const options = selected.options;
+  const options =
+    category === "Language"
+      ? languages.map(lang => [
+          `lang-${lang.id}`,
+          lang.name,
+          lang.nativeName !== lang.name ? lang.nativeName : "",
+        ])
+      : selected.options;
   const rows = profile
     ? []
     : Array.from({ length: Math.max(categories.length, options.length) }, (_, i) =>
@@ -126,23 +187,38 @@ export function PreferencesSurface({
   const { root, focus } = useSurface(navigation, rows, onBack, active);
   // Reduce Effects already turns page transitions off, so the saved
   // Smooth transitions value is kept but shown off and locked
-  const locked = key => key === "smoothTransitions" && settings.reduceEffects === true;
+  const locked = key =>
+    (key === "smoothTransitions" && settings.reduceEffects === true) ||
+    (key === "autoUpdate" && canAutoUpdate !== null && !canAutoUpdate.supported);
+  const lockedReason = key =>
+    key === "autoUpdate"
+      ? canAutoUpdate?.reason === "portable"
+        ? "Portable copies do not update automatically. Download new versions from the release page."
+        : "Automatic updates are not available for this build."
+      : "Turned off by Reduce effects. Your choice comes back when it is turned off.";
+  const isLanguage = key => key.startsWith("lang-");
   const enabled = key =>
-    key === "startup"
-      ? settings.defaultOpenPage === "bigpicture"
-      : !locked(key) && !!settings[key];
+    isLanguage(key)
+      ? language === key.slice(5)
+      : key === "startup"
+        ? settings.defaultOpenPage === "bigpicture"
+        : !locked(key) && !!settings[key];
   const toggle = key =>
     locked(key)
       ? undefined
-      : key === "bigPictureHomeStyle"
-        ? updateSetting(key, settings[key] === "classic" ? "ascendara" : "classic")
-        : key === "indexes"
-          ? openIndexes()
-          : key === "controller"
-            ? openController()
-            : key === "startup"
-              ? updateSetting("defaultOpenPage", enabled(key) ? "home" : "bigpicture")
-              : updateSetting(key, !settings[key]);
+      : isLanguage(key)
+        ? changeLanguage(key.slice(5)).catch(() => {})
+        : key === "bigPictureHomeStyle"
+          ? updateSetting(key, settings[key] === "classic" ? "ascendara" : "classic")
+          : key === "indexes"
+            ? openIndexes()
+            : key === "controller"
+              ? openController()
+              : key === "openDesktop"
+                ? openDesktop?.()
+                : key === "startup"
+                  ? updateSetting("defaultOpenPage", enabled(key) ? "home" : "bigpicture")
+                  : updateSetting(key, !settings[key]);
   return (
     <BigPictureShell
       ref={root}
@@ -233,19 +309,17 @@ export function PreferencesSurface({
                   className="bp-setting-row"
                   key={key}
                   {...focus(key)}
-                  {...(!["controller", "indexes", "bigPictureHomeStyle"].includes(key)
-                    ? { role: "switch", "aria-checked": enabled(key) }
-                    : {})}
+                  {...(isLanguage(key)
+                    ? { role: "radio", "aria-checked": enabled(key) }
+                    : ![...LINKS, "bigPictureHomeStyle"].includes(key)
+                      ? { role: "switch", "aria-checked": enabled(key) }
+                      : {})}
                   aria-disabled={locked(key) || undefined}
                   onClick={() => toggle(key)}
                 >
                   <span>
                     <strong>{label}</strong>
-                    <small>
-                      {locked(key)
-                        ? "Turned off by Reduce effects. Your choice comes back when it is turned off."
-                        : description}
-                    </small>
+                    <small>{locked(key) ? lockedReason(key) : description}</small>
                   </span>
                   {key === "bigPictureHomeStyle" ? (
                     <span>
@@ -253,8 +327,10 @@ export function PreferencesSurface({
                         ? "Classic"
                         : "Ascendara"}
                     </span>
-                  ) : ["controller", "indexes"].includes(key) ? (
+                  ) : LINKS.includes(key) ? (
                     <ChevronRight />
+                  ) : isLanguage(key) ? (
+                    <span aria-hidden="true">{enabled(key) && <Check />}</span>
                   ) : (
                     <span
                       className="bp-toggle"
@@ -287,7 +363,9 @@ export function PreferencesSurface({
                     </div>
                   </article>
                 ))}
-                <p className="bp-muted">Manage download locations in desktop Settings.</p>
+                <p className="bp-muted">
+                  Manage download locations in the regular Ascendara view.
+                </p>
               </div>
             )}
           </div>
