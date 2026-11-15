@@ -22,6 +22,7 @@ import ArtworkCorrectionDialog, {
   hasCorrectedArtwork,
 } from "@/components/download/ArtworkCorrectionDialog";
 import SystemRequirements from "@/components/download/SystemRequirements";
+import SourceSwitcher from "@/components/download/SourceSwitcher";
 import {
   canRetryExtraction,
   retryExtraction,
@@ -420,6 +421,7 @@ function PublicDownloadPage() {
     setDebridPick("default");
   }, [gameData?.gameID, gameData?.game]);
   const [isExternalSourcesMode, setIsExternalSourcesMode] = useState(false);
+  const [sourceEntries, setSourceEntries] = useState([]);
   const [antivirusWarningDismissed, setAntivirusWarningDismissed] = useState(false);
   const [isGameInstalled, setIsGameInstalled] = useState(false);
   const [showProviderBlockedDialog, setShowProviderBlockedDialog] = useState(false);
@@ -587,6 +589,27 @@ function PublicDownloadPage() {
 
     checkExternalSourcesMode();
   }, [gameData?.customSource]);
+
+  // The same game from the user's other sources, to switch between on this page
+  useEffect(() => {
+    if (!gameData?.game || !settings.customSourcesMode) {
+      setSourceEntries([]);
+      return;
+    }
+    let cancelled = false;
+    gameService
+      .findSourceEntries(gameData.game)
+      .then(entries => !cancelled && setSourceEntries(entries))
+      .catch(error => console.error("Error finding other sources:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [gameData?.game, settings.customSourcesMode]);
+
+  const handleSourceSelect = entry => {
+    setLatestGameData(null);
+    setGameData(entry);
+  };
 
   // Keep the whereToDownload ref in sync with the latest function
   useEffect(() => {
@@ -1075,9 +1098,7 @@ function PublicDownloadPage() {
         navigate(result.downloadsPath);
         return true;
       } catch (error) {
-        if (
-          debrid.allowsTorrentFallback(settings, pickedTorrent.provider?.id)
-        ) {
+        if (debrid.allowsTorrentFallback(settings, pickedTorrent.provider?.id)) {
           toast.info(t("debrid.torrentFallback"));
           return false;
         }
@@ -1187,10 +1208,7 @@ function PublicDownloadPage() {
     };
 
     if (isTorrentRequest) {
-      if (
-        cloudTorrentRequest &&
-        (await queueTorrentInDebrid(resolvedTorrentLink))
-      )
+      if (cloudTorrentRequest && (await queueTorrentInDebrid(resolvedTorrentLink)))
         return;
 
       await startOrQueueLocalTorrent(resolvedTorrentLink);
@@ -1715,7 +1733,8 @@ function PublicDownloadPage() {
     const autoDownload = isMagicLink(selectedProvider, link);
     // The referrer opens the page in Ascendara's own window, which blocks ads
     // and hands the file to Ascendara
-    const needsReferrerSpoofing = autoDownload || opensInAppWindow(selectedProvider, link);
+    const needsReferrerSpoofing =
+      autoDownload || opensInAppWindow(selectedProvider, link);
 
     const browserLink = { link, needsReferrerSpoofing, autoDownload };
 
@@ -1806,9 +1825,7 @@ function PublicDownloadPage() {
         setSelectedProvider(supportedDebridProvider);
       } else if (ddlProviders.length > 0) {
         setSelectedProvider(ddlProviders[0]);
-      } else if (
-        canDownloadTorrentLinks(gameData.download_links.torrent, settings)
-      ) {
+      } else if (canDownloadTorrentLinks(gameData.download_links.torrent, settings)) {
         setSelectedProvider("torrent");
       } else {
         setSelectedProvider("");
@@ -2017,6 +2034,11 @@ function PublicDownloadPage() {
                 <HighballCompatibility compat={macCompat} />
               </section>
             )}
+            <SourceSwitcher
+              entries={sourceEntries}
+              current={gameData}
+              onSelect={handleSourceSelect}
+            />
             <DownloadPanel
               mode={downloadMode}
               gameData={gameData}

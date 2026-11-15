@@ -860,6 +860,20 @@ const gameService = {
     );
   },
 
+  /**
+   * Every entry for this game across the sources in use, so the details page
+   * can switch between them. Empty unless more than one source carries it.
+   */
+  async findSourceEntries(name) {
+    const target = this.normalizeForMatch(name);
+    if (!target) return [];
+    const { games } = await this.getCachedData();
+    if (!Array.isArray(games)) return [];
+    const entries = games.filter(game => this.normalizeForMatch(game.game) === target);
+    const sources = new Set(entries.map(game => game.customSource || ""));
+    return sources.size > 1 ? entries : [];
+  },
+
   async getGamesByCategory(category) {
     const { games } = await this.getCachedData();
     return games.filter(
