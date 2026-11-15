@@ -10,6 +10,7 @@ const { SAFE_PREFIX } = require("../electron/modules/core/secret-store.js");
 const SETTINGS = require.resolve("../electron/modules/core/settings.js");
 const ENCRYPTION = require.resolve("../electron/modules/core/encryption.js");
 const RECOVERY = require.resolve("../electron/modules/app/recovery.js");
+const passwordStore = require("../electron/modules/core/password-store.js");
 
 const fakeSafeStorage = (overrides = {}) => ({
   decrypts: 0,
@@ -31,7 +32,7 @@ const readDisk = file => JSON.parse(fs.readFileSync(file, "utf8"));
 // The real settings, encryption and recovery modules over a fake Electron.
 const withSettings = async (
   run,
-  { safeStorage, ready = true, machineId = "machine-a" } = {}
+  { safeStorage, ready = true, machineId = "machine-a", steamOS = false } = {}
 ) => {
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-secrets-"));
   const env = { ready, machineId };
@@ -56,6 +57,8 @@ const withSettings = async (
       };
     }
     if (request === "./machine-id") return { getMachineId: () => env.machineId };
+    if (request === "./password-store")
+      return { ...passwordStore, keyringVariesBySession: () => steamOS };
     return realLoad.call(this, request, ...rest);
   };
   const forgetModules = () => {
@@ -480,5 +483,30 @@ test("logins from removed features stay out of recovery points", async () => {
       );
     },
     { safeStorage: fakeSafeStorage() }
+  );
+});
+
+test("on SteamOS saved keys leave the keyring so Game Mode can open them", async () => {
+  // Desktop Mode has KWallet; Game Mode falls back to basic_text.
+  let session = "desktop";
+  const safeStorage = fakeSafeStorage({
+    getSelectedStorageBackend: () => (session === "desktop" ? "kwallet6" : "basic_text"),
+  });
+  await withSettings(
+    async ({ boot, file }) => {
+      fs.writeFileSync(file, JSON.stringify({ torboxApiKey: sealedForm("tb-key") }));
+      assert.equal(boot().migrateSecretStorage(), true);
+      assert.notEqual(readDisk(file).torboxApiKey, sealedForm("tb-key"));
+
+      const desktop = boot();
+      assert.equal(desktop.updateSetting("realDebridApiKey", "rd-key"), true);
+      assert.notEqual(readDisk(file).realDebridApiKey, sealedForm("rd-key"));
+
+      session = "game";
+      const game = boot();
+      assert.equal(game.getSetting("torboxApiKey"), "tb-key");
+      assert.equal(game.getSetting("realDebridApiKey"), "rd-key");
+    },
+    { safeStorage, steamOS: true }
   );
 });

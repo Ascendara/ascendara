@@ -44,8 +44,11 @@ const isPlausibleSecret = value =>
  * @param {Function} options.isAppReady - safeStorage works only after app ready
  * @param {Object} options.legacy - { encrypt, decrypt } from encryption.js, both
  *   answering null on failure
+ * @param {boolean} [options.preferLegacy] - Seal with the machine key even when
+ *   safeStorage works: its keyring is not there in every session. Sealed values
+ *   still open while it is, so they can move.
  */
-function createSecretStore({ safeStorage, isAppReady, legacy }) {
+function createSecretStore({ safeStorage, isAppReady, legacy, preferLegacy = false }) {
   // Fixed for the run once the app is ready. On Linux "basic_text" is a hard-coded
   // password: no real protection.
   let safeAvailable;
@@ -98,7 +101,8 @@ function createSecretStore({ safeStorage, isAppReady, legacy }) {
   };
 
   /** The form a value should be in right now. */
-  const targetKind = () => (isSafeAvailable() ? SECRET_KINDS.SAFE : SECRET_KINDS.LEGACY);
+  const targetKind = () =>
+    !preferLegacy && isSafeAvailable() ? SECRET_KINDS.SAFE : SECRET_KINDS.LEGACY;
 
   /**
    * A stored form of a secret, read back and compared before it is returned:

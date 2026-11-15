@@ -15,6 +15,7 @@ const {
   writeFileAtomic,
 } = require("./secret-store");
 const { mergeNestedSettingValue } = require("./nested-setting");
+const { keyringVariesBySession } = require("./password-store");
 
 // The copy made before secrets moved to safeStorage holds every old value, so it only
 // stays as long as it is useful for recovering from a failed move.
@@ -51,6 +52,8 @@ class SettingsManager {
       safeStorage,
       isAppReady: () => app.isReady?.(),
       legacy: { encrypt, decrypt },
+      // Debrid keys must open in Steam Deck Game Mode too
+      preferLegacy: keyringVariesBySession(),
     });
     this.defaultSettings = {
       downloadDirectory: "",
@@ -239,6 +242,8 @@ class SettingsManager {
       return false;
     }
 
+    // On SteamOS this moves keyring-sealed values back to the machine key, in a session
+    // where the keyring still opens them.
     const target = this.secrets.targetKind();
     const changes = {};
     let unreadable = 0;

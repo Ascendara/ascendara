@@ -5,6 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const {
+  keyringVariesBySession,
   pinPasswordStore,
   rememberPasswordStore,
   readPinnedStore,
@@ -55,7 +56,10 @@ test("falling back to basic_text keeps the remembered keyring", () => {
 
 test("a keyring given on the command line wins", () => {
   const dir = tempDir();
-  fs.writeFileSync(path.join(dir, "password-store.json"), JSON.stringify({ store: "kwallet6" }));
+  fs.writeFileSync(
+    path.join(dir, "password-store.json"),
+    JSON.stringify({ store: "kwallet6" })
+  );
   const app = fakeApp(dir, { "password-store": "basic" });
   assert.equal(pinPasswordStore({ app, platform: "linux" }), null);
   assert.equal(app.switches["password-store"], "basic");
@@ -63,7 +67,10 @@ test("a keyring given on the command line wins", () => {
 
 test("nothing changes outside Linux or with an unknown value", () => {
   const dir = tempDir();
-  fs.writeFileSync(path.join(dir, "password-store.json"), JSON.stringify({ store: "nope" }));
+  fs.writeFileSync(
+    path.join(dir, "password-store.json"),
+    JSON.stringify({ store: "nope" })
+  );
   assert.equal(pinPasswordStore({ app: fakeApp(dir), platform: "linux" }), null);
   assert.equal(
     rememberPasswordStore({
@@ -74,4 +81,33 @@ test("nothing changes outside Linux or with an unknown value", () => {
     null
   );
   assert.equal(readPinnedStore(dir), null);
+});
+
+test("only SteamOS counts as a system whose keyring varies by session", () => {
+  const dir = tempDir();
+  const osRelease = (name, text) => {
+    const file = path.join(dir, name);
+    fs.writeFileSync(file, text);
+    return file;
+  };
+  const steamos = osRelease("steamos", 'NAME="SteamOS"\nID=steamos\nID_LIKE=arch\n');
+  const quoted = osRelease("quoted", 'ID="steamos"\n');
+  const arch = osRelease("arch", "NAME=Arch Linux\nID=arch\nVARIANT_ID=steamos-like\n");
+  assert.equal(
+    keyringVariesBySession({ platform: "linux", osReleasePath: steamos }),
+    true
+  );
+  assert.equal(
+    keyringVariesBySession({ platform: "linux", osReleasePath: quoted }),
+    true
+  );
+  assert.equal(keyringVariesBySession({ platform: "linux", osReleasePath: arch }), false);
+  assert.equal(
+    keyringVariesBySession({ platform: "win32", osReleasePath: steamos }),
+    false
+  );
+  assert.equal(
+    keyringVariesBySession({ platform: "linux", osReleasePath: path.join(dir, "none") }),
+    false
+  );
 });

@@ -57,4 +57,26 @@ function rememberPasswordStore({ app, safeStorage, platform = process.platform }
   return store;
 }
 
-module.exports = { pinPasswordStore, rememberPasswordStore, readPinnedStore };
+/**
+ * Whether the keyring can be missing in some sessions of this system. SteamOS Game Mode
+ * runs without the KWallet that Desktop Mode unlocks at login, and pinning the keyring
+ * does not unlock it there.
+ */
+function keyringVariesBySession({
+  platform = process.platform,
+  osReleasePath = "/etc/os-release",
+} = {}) {
+  if (platform !== "linux") return false;
+  try {
+    return /^ID="?steamos"?$/m.test(fs.readFileSync(osReleasePath, "utf8"));
+  } catch {
+    return false;
+  }
+}
+
+module.exports = {
+  keyringVariesBySession,
+  pinPasswordStore,
+  rememberPasswordStore,
+  readPinnedStore,
+};
