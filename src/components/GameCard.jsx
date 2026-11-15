@@ -60,6 +60,7 @@ import usePrivateArtwork from "@/hooks/usePrivateArtwork";
 import verifiedGamesService from "@/services/games/verifiedGamesService";
 import gamePagePreparer from "@/services/games/gamePagePreparer";
 import { gameSource } from "@/lib/combinedSources";
+import { steamBuildStatus } from "@/lib/steamBuild";
 
 const MAX_VISIBLE_TAGS = 3;
 const RECENT_UPDATE_DAYS = 14;
@@ -429,6 +430,10 @@ function GameCardContent({ game, compact, viewCount }) {
       icon: Tag,
       label: t("gameCard.specs.version"),
       value: game.version,
+      ...(steamBuildStatus(game) === "latest" && {
+        title: t("download.steamBuild.latestTooltip", { build: game.sourceBuildId }),
+        highlight: true,
+      }),
     },
     updateInfo && {
       key: "updated",
