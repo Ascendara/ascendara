@@ -78,6 +78,7 @@
       "catalogue": "Sega CD",
       "extensions": [
         "cue",
+        "chd",
         "iso"
       ],
       "ascend": true
@@ -103,6 +104,7 @@
       "extensions": [
         "cue",
         "ccd",
+        "chd",
         "m3u"
       ],
       "ascend": true
