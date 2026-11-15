@@ -6,6 +6,7 @@
  * app for good. The ID never changes, so it is read once, with a timeout.
  */
 
+const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 const { machineIdSync } = require("node-machine-id");
@@ -50,8 +51,37 @@ function getMachineId() {
       console.warn("[machine-id] Direct registry read failed:", error.message);
     }
   }
+  if (process.platform === "linux") {
+    const id = readLinuxMachineId();
+    if (id) {
+      cached = id;
+      return cached;
+    }
+  }
   cached = machineIdSync(true);
   return cached;
 }
 
-module.exports = { getMachineId };
+/**
+ * Same value as node-machine-id's `cat /var/lib/dbus/machine-id /etc/machine-id |
+ * head -n 1`, read without a shell. A shell that fails under Steam's Game Mode
+ * environment made node-machine-id answer the hostname instead, a different key, so
+ * saved logins did not open there.
+ */
+function readLinuxMachineId(files = ["/var/lib/dbus/machine-id", "/etc/machine-id"]) {
+  for (const file of files) {
+    try {
+      const id = fs
+        .readFileSync(file, "utf8")
+        .split("\n")[0]
+        .replace(/\s+/g, "")
+        .toLowerCase();
+      if (id) return id;
+    } catch {
+      // Not there: the next file, as `cat` would
+    }
+  }
+  return null;
+}
+
+module.exports = { getMachineId, readLinuxMachineId };
