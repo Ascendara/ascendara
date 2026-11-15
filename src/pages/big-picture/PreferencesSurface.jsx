@@ -177,12 +177,17 @@ export function PreferencesSurface({
           lang.nativeName !== lang.name ? lang.nativeName : "",
         ])
       : selected.options;
+  // Options start on the selected category's row, so Right always lands on the first
+  const offset = categories.indexOf(selected);
   const rows = profile
     ? []
-    : Array.from({ length: Math.max(categories.length, options.length) }, (_, i) =>
-        [categories[i] && `category-${categories[i].name}`, options[i]?.[0]].filter(
-          Boolean
-        )
+    : Array.from(
+        { length: Math.max(categories.length, offset + options.length) },
+        (_, i) =>
+          [
+            categories[i] && `category-${categories[i].name}`,
+            options[i - offset]?.[0],
+          ].filter(Boolean)
       );
   const { root, focus } = useSurface(navigation, rows, onBack, active);
   // Reduce Effects already turns page transitions off, so the saved

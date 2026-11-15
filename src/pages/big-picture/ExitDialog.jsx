@@ -69,7 +69,7 @@ const ExitDialog = ({ isOpen, onClose, onConfirm, t, controllerType, message }) 
             onClick={onConfirm}
             className={`flex flex-1 items-center justify-center gap-3 rounded-xl px-6 py-4 text-lg font-bold transition-all duration-150 ${
               selectedButton === 0
-                ? "scale-105 bg-primary text-foreground shadow-lg shadow-primary/30"
+                ? "scale-105 bg-primary text-secondary shadow-lg shadow-primary/30"
                 : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >

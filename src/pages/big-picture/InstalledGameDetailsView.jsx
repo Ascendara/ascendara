@@ -296,6 +296,15 @@ function InstalledGameDetailsView({
                   <span className="font-medium">v{game.version}</span>
                 </div>
               )}
+              {updateInfo && (
+                // The update itself is in the game menu, behind the gear button
+                <div className="flex items-center gap-2 rounded-full bg-primary px-3 py-0.5 text-sm font-semibold text-secondary">
+                  <ArrowUpFromLine className="h-4 w-4" />
+                  <span>
+                    {t("gameScreen.updateAvailable")} · v{updateInfo.latestVersion}
+                  </span>
+                </div>
+              )}
               {playTime > 0 && (
                 <div className="flex items-center gap-2">
                   <Clock className="h-5 w-5" />

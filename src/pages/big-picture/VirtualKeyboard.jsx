@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Search, X, Delete } from "lucide-react";
 import { getControllerButtons } from "./controller";
 import { KEYBOARD_LAYOUTS } from "./keyboardLayouts";
@@ -30,8 +30,6 @@ const VirtualKeyboard = ({
   const baseLayout = KEYBOARD_LAYOUTS[layout] || KEYBOARD_LAYOUTS.qwerty;
   const gridLayout = symbols ? [...baseLayout, SYMBOL_ROW] : baseLayout;
 
-
-
   const getKeyAt = (rowIndex, colIndex) => {
     if (!gridLayout[rowIndex]) return null;
     return gridLayout[rowIndex][Math.min(colIndex, gridLayout[rowIndex].length - 1)];
@@ -39,8 +37,13 @@ const VirtualKeyboard = ({
 
   const visibleSuggestions = suggestions.slice(0, 8);
 
+  // After typing on a real keyboard (or Steam's), Enter runs the search instead of
+  // pressing whichever on-screen key happens to be highlighted
+  const typedLast = useRef(false);
+
   const handleInput = useCallback(
     action => {
+      if (["UP", "DOWN", "LEFT", "RIGHT"].includes(action)) typedLast.current = false;
 
       if (inSuggestions) {
         if (action === "RIGHT")
@@ -120,20 +123,24 @@ const VirtualKeyboard = ({
         Backspace: "BACKSPACE",
       };
 
-      if (keyMap[e.key]) handleInput(keyMap[e.key]);
+      if (e.key === "Enter" && typedLast.current && !inSuggestions) onConfirm();
+      else if (keyMap[e.key]) handleInput(keyMap[e.key]);
       else if (e.key.length === 1 && (symbols || /[a-zA-Z0-9 ]/.test(e.key))) {
+        typedLast.current = true;
         onChange(value + e.key);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleInput, onChange, value, symbols]);
+  }, [handleInput, onChange, value, symbols, inSuggestions, onConfirm]);
 
   // Gamepad Polling for Virtual Keyboard
-  useControllerInput(action => handleInput(
-    action === "CONFIRM" ? "A" : action === "SEARCH" ? "Y" : action
-  ), { priority: 20 });
+  useControllerInput(
+    action =>
+      handleInput(action === "CONFIRM" ? "A" : action === "SEARCH" ? "Y" : action),
+    { priority: 20 }
+  );
 
   const handleKeyAction = key => {
     if (key === "SPACE") onChange(value + " ");

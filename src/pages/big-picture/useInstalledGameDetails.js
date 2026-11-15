@@ -756,6 +756,7 @@ function useInstalledGameDetails({
   const startUpdate = () => {
     if (!canAutoUpdateGame) {
       toast.info(t("gameScreen.updateAvailableDescriptionNoAuth"), {
+        id: `bp-update-${gameName}`,
         description: t("gameScreen.updateManualHint"),
       });
       return;
