@@ -13,6 +13,7 @@ import { isImageReady, markImageReady } from "@/services/games/gamePagePreparer"
 import { useState } from "react";
 import {
   Apple,
+  BookOpen,
   CircleCheck,
   CircleSlash,
   Clock,
@@ -21,8 +22,10 @@ import {
   Eye,
   Globe,
   History,
+  Package,
   ShieldCheck,
   Star,
+  Wifi,
 } from "lucide-react";
 
 // Shown at once when the image is already loaded (usually preloaded before the
@@ -67,6 +70,53 @@ function Chip({ className, tooltip, children, onClick, ...props }) {
   );
 }
 
+// Plain inline stat (rating, views, source) without a pill around it
+function Meta({ className = "", tooltip, children, onClick }) {
+  const Element = onClick ? "button" : "span";
+  const item = (
+    <Element
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`group inline-flex items-center gap-1.5 ${onClick ? "cursor-pointer rounded transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" : tooltip ? "cursor-help" : ""} ${className}`}
+    >
+      {children}
+    </Element>
+  );
+  if (!tooltip) return item;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{item}</TooltipTrigger>
+      <TooltipContent side="bottom">
+        <p className="max-w-[300px] text-secondary">{tooltip}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+// Small outlined label for what a release includes or requires
+function Tag({ className = "", ...props }) {
+  return (
+    <Chip
+      className={`gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-foreground/80 [&_svg]:text-primary ${className}`}
+      {...props}
+    />
+  );
+}
+
+// Puts a faint dot between each item
+function interleave(items) {
+  return items.flatMap((item, i) =>
+    i === 0
+      ? [item]
+      : [
+          <span key={`sep-${i}`} aria-hidden="true" className="text-muted-foreground/40">
+            •
+          </span>,
+          item,
+        ]
+  );
+}
+
 function Stat({ label, children }) {
   return (
     <div className="min-w-0 px-4 py-3">
@@ -102,6 +152,28 @@ export default function DownloadHero({
   const { t } = useLanguage();
   const isVr = gameData.category?.includes("Virtual Reality");
   const buildStatus = steamBuildStatus(gameData);
+  const hasTags =
+    gameData.online || gameData.storyOnly || gameData.dlc || gameData.emulator || isVr;
+  const buildNote =
+    buildStatus === "latest"
+      ? t("download.steamBuild.latestTooltip", { build: gameData.sourceBuildId })
+      : buildStatus === "behind"
+        ? t("download.steamBuild.behindTooltip", {
+            build: gameData.sourceBuildId,
+            latest: gameData.latestBuildId,
+          })
+        : null;
+  const timemachineNote = showTimemachine ? t("download.timemachine.openTooltip") : null;
+  const buildTooltip =
+    buildNote && timemachineNote ? (
+      <>
+        {buildNote}
+        <br />
+        {timemachineNote}
+      </>
+    ) : (
+      buildNote || timemachineNote
+    );
 
   return (
     <TooltipProvider>
@@ -153,156 +225,146 @@ export default function DownloadHero({
               )}
             </h1>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {gameData.version &&
-                (showTimemachine ? (
-                  <Chip
-                    className="bg-primary/15 text-primary transition-colors hover:bg-primary/25"
-                    tooltip={t("download.timemachine.openTooltip")}
-                    onClick={onOpenTimemachine}
-                  >
-                    {gameData.version}
-                    <History className="h-3.5 w-3.5" />
-                  </Chip>
-                ) : (
-                  <Chip className="bg-primary/15 text-primary">{gameData.version}</Chip>
-                ))}
-              {buildStatus === "latest" && (
+            {/* Version, community stats and source */}
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+              {gameData.version && (
                 <Chip
-                  className="bg-emerald-500/15 text-emerald-500"
-                  tooltip={t("download.steamBuild.latestTooltip", {
-                    build: gameData.sourceBuildId,
-                  })}
+                  className={`bg-primary/15 text-primary ${showTimemachine ? "transition-colors hover:bg-primary/25" : ""}`}
+                  tooltip={buildTooltip}
+                  onClick={showTimemachine ? onOpenTimemachine : undefined}
                 >
-                  <CircleCheck className="h-3 w-3" />
-                  {t("download.steamBuild.latest")}
-                </Chip>
-              )}
-              {buildStatus === "behind" && (
-                <Chip
-                  className="bg-muted text-muted-foreground"
-                  tooltip={t("download.steamBuild.behindTooltip", {
-                    build: gameData.sourceBuildId,
-                    latest: gameData.latestBuildId,
-                  })}
-                >
-                  {t("download.steamBuild.behind")}
-                </Chip>
-              )}
-              {source && (
-                <Chip
-                  className="max-w-[16rem] bg-muted text-foreground"
-                  tooltip={
-                    source.official
-                      ? t("gameCard.officialTooltip")
-                      : t("gameCard.sourceTooltip", { source: source.name })
-                  }
-                >
-                  {source.official ? (
-                    <Database className="h-3 w-3 shrink-0 text-primary" />
-                  ) : (
-                    <Globe className="h-3 w-3 shrink-0 text-primary" />
+                  <span className="tabular-nums">{gameData.version}</span>
+                  {showTimemachine && <History className="h-3.5 w-3.5" />}
+                  {buildStatus === "latest" && (
+                    <span className="ml-1 flex items-center gap-1 border-l border-primary/30 pl-2 font-semibold">
+                      <CircleCheck className="h-3 w-3" />
+                      {t("download.steamBuild.latest")}
+                    </span>
                   )}
-                  <span className="truncate">
-                    {source.official ? t("gameCard.official") : source.name}
-                  </span>
-                </Chip>
-              )}
-              {gameRating > 0 && (
-                <Chip
-                  className="bg-yellow-400/15 text-yellow-600 dark:text-yellow-400"
-                  tooltip={t("download.ratingTooltip", { rating: gameRating })}
-                  onClick={hasWrittenReviews ? onReadReviews : undefined}
-                >
-                  <Star className="h-3 w-3 fill-current" />
-                  {gameRating}
-                  {hasWrittenReviews && (
-                    <span className="border-current/30 ml-1 border-l pl-2">
-                      {t("download.readReviews")}
+                  {buildStatus === "behind" && (
+                    <span className="ml-1 border-l border-primary/30 pl-2 text-primary/70">
+                      {t("download.steamBuild.behind")}
                     </span>
                   )}
                 </Chip>
               )}
-              {steamRating && (
-                <Chip
-                  className="bg-red-400/15 text-red-500 dark:text-red-400"
-                  tooltip={t("download.steamRating", { rating: steamRating })}
-                >
-                  <Apple className="h-3 w-3 fill-current" />
-                  {steamRating}
-                </Chip>
-              )}
-              {viewCount > 0 && (
-                <Chip
-                  className="bg-muted text-muted-foreground"
-                  tooltip={t("gameCard.viewsTooltip")}
-                >
-                  <Eye className="h-3 w-3" />
-                  <span className="tabular-nums">
-                    {t("gameCard.views", { views: formatCompactNumber(viewCount) })}
-                  </span>
-                </Chip>
-              )}
-              {gameData.online && (
-                <Chip
-                  className="bg-green-500/15 text-green-500"
-                  tooltip={t("download.onlineTooltip")}
-                >
-                  {t("download.online")}
-                </Chip>
-              )}
-              {gameData.storyOnly && (
-                <Chip
-                  className="bg-amber-500/15 text-amber-500"
-                  tooltip={t("download.storyOnlyTooltip")}
-                >
-                  {t("download.storyOnly")}
-                </Chip>
-              )}
-              {gameData.dlc && (
-                <Chip
-                  className="bg-blue-500/15 text-blue-500"
-                  tooltip={t("download.allDlcTooltip")}
-                >
-                  {t("download.allDlc")}
-                </Chip>
-              )}
-              {gameData.emulator && (
-                <button
-                  onClick={() =>
-                    window.electron.openURL(
-                      "https://ascendara.app/docs/troubleshooting/emulators"
-                    )
-                  }
-                >
-                  <Chip className="bg-yellow-500/15 text-yellow-500 transition-colors hover:bg-yellow-500/25">
-                    <CircleSlash className="h-3 w-3" />
-                    {t("download.gameNeedsEmulator")}
-                    <span className="underline">{t("common.learnMore")}</span>
-                    <ExternalLink className="h-3 w-3" />
-                  </Chip>
-                </button>
-              )}
-              {isVr && (
-                <Chip className="bg-purple-500/15 text-purple-400">
-                  <svg
-                    className="h-3 w-3"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M2 10C2 8.89543 2.89543 8 4 8H20C21.1046 8 22 8.89543 22 10V17C22 18.1046 21.1046 19 20 19H16.1324C15.4299 19 14.7788 18.6314 14.4174 18.029L12.8575 15.4292C12.4691 14.7818 11.5309 14.7818 11.1425 15.4292L9.58261 18.029C9.22116 18.6314 8.57014 19 7.86762 19H4C2.89543 19 2 18.1046 2 17V10Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  {t("download.gameNeedsVR")}
-                </Chip>
+              {interleave(
+                [
+                  gameRating > 0 && (
+                    <Meta
+                      key="rating"
+                      tooltip={t("download.ratingTooltip", { rating: gameRating })}
+                      onClick={hasWrittenReviews ? onReadReviews : undefined}
+                    >
+                      <Star className="h-3.5 w-3.5 fill-primary text-primary" />
+                      <span className="font-semibold text-foreground">{gameRating}</span>
+                      {hasWrittenReviews && (
+                        <span className="underline-offset-2 group-hover:underline">
+                          {t("download.readReviews")}
+                        </span>
+                      )}
+                    </Meta>
+                  ),
+                  steamRating && (
+                    <Meta
+                      key="steam"
+                      tooltip={t("download.steamRating", { rating: steamRating })}
+                    >
+                      <Apple className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="font-semibold text-foreground">{steamRating}</span>
+                    </Meta>
+                  ),
+                  viewCount > 0 && (
+                    <Meta key="views" tooltip={t("gameCard.viewsTooltip")}>
+                      <Eye className="h-3.5 w-3.5" />
+                      <span className="tabular-nums">
+                        {t("gameCard.views", { views: formatCompactNumber(viewCount) })}
+                      </span>
+                    </Meta>
+                  ),
+                  source && (
+                    <Meta
+                      key="source"
+                      className="max-w-[16rem]"
+                      tooltip={
+                        source.official
+                          ? t("gameCard.officialTooltip")
+                          : t("gameCard.sourceTooltip", { source: source.name })
+                      }
+                    >
+                      {source.official ? (
+                        <Database className="h-3.5 w-3.5 shrink-0" />
+                      ) : (
+                        <Globe className="h-3.5 w-3.5 shrink-0" />
+                      )}
+                      <span className="truncate">
+                        {source.official ? t("gameCard.official") : source.name}
+                      </span>
+                    </Meta>
+                  ),
+                ].filter(Boolean)
               )}
             </div>
+
+            {/* What the release includes or needs */}
+            {hasTags && (
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                {gameData.online && (
+                  <Tag tooltip={t("download.onlineTooltip")}>
+                    <Wifi className="h-3 w-3" />
+                    {t("download.online")}
+                  </Tag>
+                )}
+                {gameData.storyOnly && (
+                  <Tag tooltip={t("download.storyOnlyTooltip")}>
+                    <BookOpen className="h-3 w-3" />
+                    {t("download.storyOnly")}
+                  </Tag>
+                )}
+                {gameData.dlc && (
+                  <Tag tooltip={t("download.allDlcTooltip")}>
+                    <Package className="h-3 w-3" />
+                    {t("download.allDlc")}
+                  </Tag>
+                )}
+                {isVr && (
+                  <Tag>
+                    <svg
+                      className="h-3 w-3"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M2 10C2 8.89543 2.89543 8 4 8H20C21.1046 8 22 8.89543 22 10V17C22 18.1046 21.1046 19 20 19H16.1324C15.4299 19 14.7788 18.6314 14.4174 18.029L12.8575 15.4292C12.4691 14.7818 11.5309 14.7818 11.1425 15.4292L9.58261 18.029C9.22116 18.6314 8.57014 19 7.86762 19H4C2.89543 19 2 18.1046 2 17V10Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    {t("download.gameNeedsVR")}
+                  </Tag>
+                )}
+                {gameData.emulator && (
+                  <Tag
+                    className="transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={() =>
+                      window.electron.openURL(
+                        "https://ascendara.app/docs/troubleshooting/emulators"
+                      )
+                    }
+                  >
+                    <CircleSlash className="h-3 w-3" />
+                    {t("download.gameNeedsEmulator")}
+                    <span className="text-primary underline underline-offset-2">
+                      {t("common.learnMore")}
+                    </span>
+                    <ExternalLink className="h-3 w-3" />
+                  </Tag>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
