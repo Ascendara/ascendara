@@ -101,6 +101,7 @@ test("Big Picture respects host priority and starts debrid and torrent downloads
         SEAMLESS_PROVIDERS: ["gofile", "pixeldrain"],
         hasActiveDownloads: async () => false,
         sanitizeText: value => value,
+        cacheDownloadData: () => {},
         window: {
           electron: {
             downloadFile: async (...args) => {

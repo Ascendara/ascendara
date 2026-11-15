@@ -14,6 +14,11 @@ import * as debrid from "@/services/downloads/debridService";
 import { canDownloadTorrentLinks } from "@/services/downloads/torrentCapability";
 import { isMagnetLink, pickTorrentLink } from "@/services/downloads/torrentLink";
 import { freedByPause } from "@/services/downloads/downloadState";
+import {
+  cacheDownloadData,
+  clearCachedDownloadData,
+  getCachedDownloadData,
+} from "@/services/downloads/retryGameDownloadService";
 import * as torboxService from "@/services/downloads/torboxService";
 import {
   SEAMLESS_PROVIDERS,
@@ -362,6 +367,8 @@ function useBigPicturePage() {
       links = catalogGame?.download_links || {};
       if (catalogGame) game = { ...game, ...catalogGame };
     }
+    // Lets a failed download be retried, as from the Download page
+    cacheDownloadData(sanitizeText(game.game), game);
 
     const debridProvider = debrid.getPreferredProvider(settings);
     const debridHosts = await debrid.getSupportedHosts(settings);
@@ -831,6 +838,37 @@ function useBigPicturePage() {
         newSet.delete(game.game);
         return newSet;
       });
+    }
+  };
+
+  // Start a failed download over with the details it was started with
+  const handleRetryDownload = async game => {
+    const cached = getCachedDownloadData(game.game);
+    await window.electron.deleteGameDirectory(game.game);
+    setDownloadingGames(prev => prev.filter(g => g.game !== game.game));
+    if (!cached) {
+      toast.error(t("downloads.retryDataNotAvailable"));
+      return;
+    }
+    clearCachedDownloadData(game.game);
+    await handleStartDownload(cached, null, true);
+  };
+
+  const handleVerifyDownload = async game => {
+    const id = `bp-verify-${game.game}`;
+    toast.loading(t("downloads.verifying"), { id });
+    try {
+      const result = await window.electron.verifyGame(
+        game._folderName || game.game,
+        game._sourceDir
+      );
+      if (!result?.success) throw new Error(result?.error);
+      toast.success(t("downloads.verificationSuccess"), {
+        id,
+        description: t("downloads.verificationSuccessDesc"),
+      });
+    } catch (error) {
+      toast.error(t("downloads.verificationFailed"), { id, description: error.message });
     }
   };
 
@@ -1691,6 +1729,8 @@ function useBigPicturePage() {
     setView,
     setSelectedStoreGame,
     handleStartDownload,
+    handleRetryDownload,
+    handleVerifyDownload,
     launchDownload,
     setProviderDialogGame,
     setProviderDialogProviders,

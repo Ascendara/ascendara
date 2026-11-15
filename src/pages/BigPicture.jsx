@@ -145,6 +145,8 @@ function BigPicture() {
     setView,
     setSelectedStoreGame,
     handleStartDownload,
+    handleRetryDownload,
+    handleVerifyDownload,
     launchDownload,
     setProviderDialogGame,
     setProviderDialogProviders,
@@ -457,6 +459,8 @@ function BigPicture() {
                 pause={handlePauseDownload}
                 resume={handleResumeDownload}
                 retryExtraction={retryExtraction}
+                retryDownload={handleRetryDownload}
+                verifyDownload={handleVerifyDownload}
                 cancel={handleKillDownload}
                 openFolder={handleOpenFolder}
                 onBack={() => changeView("carousel")}

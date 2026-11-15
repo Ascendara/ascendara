@@ -42,6 +42,8 @@ export function DownloadsSurface({
   pause,
   resume,
   retryExtraction,
+  retryDownload,
+  verifyDownload,
   cancel,
   openFolder,
   onBack,
@@ -69,7 +71,9 @@ export function DownloadsSurface({
     }
   };
   // With nothing queued, the start button resumes a paused download instead.
-  const paused = queue.length ? null : downloads.find(game => game.downloadingData?.stopped);
+  const paused = queue.length
+    ? null
+    : downloads.find(game => game.downloadingData?.stopped);
   const rows = remove
     ? [["keep", "remove"]]
     : [
@@ -78,9 +82,10 @@ export function DownloadsSurface({
           const data = game.downloadingData || {};
           const count =
             canRetryExtraction(game) ||
-            (!data.error &&
-              !data.verifyError?.length &&
-              (data.stopped || data.downloading))
+            data.error ||
+            data.verifyError?.length ||
+            data.stopped ||
+            data.downloading
               ? 3
               : 2;
           return Array.from({ length: count }, (_, i) => `download-${game.game}-${i}`);
@@ -165,8 +170,7 @@ export function DownloadsSurface({
             meta={
               downloads.length || queue.length
                 ? [
-                    downloads.length &&
-                      `${downloads.length} in progress`,
+                    downloads.length && `${downloads.length} in progress`,
                     queue.length && `${queue.length} queued`,
                   ]
                     .filter(Boolean)
@@ -179,13 +183,17 @@ export function DownloadsSurface({
                   chips={[
                     running.length > 0 && {
                       icon: Gauge,
-                      label: running[0].downloadingData.progressDownloadSpeeds || "Starting",
+                      label:
+                        running[0].downloadingData.progressDownloadSpeeds || "Starting",
                     },
                     running.length > 0 && {
                       icon: Download,
                       label: `${running.length} active`,
                     },
-                    queue.length > 0 && { icon: ListOrdered, label: `${queue.length} up next` },
+                    queue.length > 0 && {
+                      icon: ListOrdered,
+                      label: `${queue.length} up next`,
+                    },
                   ]}
                 />
               )
@@ -228,6 +236,8 @@ export function DownloadsSurface({
                     onPause={() => pause(game)}
                     onResume={() => resume(game)}
                     onRetryExtraction={() => retry(game)}
+                    onRetry={() => retryDownload(game)}
+                    onVerify={() => verifyDownload(game)}
                     onKill={() => cancel(game)}
                     onOpenFolder={() => openFolder(game)}
                     isStopping={stopping.has(game.game)}

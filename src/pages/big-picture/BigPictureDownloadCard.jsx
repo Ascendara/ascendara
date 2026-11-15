@@ -1,4 +1,13 @@
-import { FolderOpen, Trash2, Play, Pause, Loader, RefreshCcw, Download } from "lucide-react";
+import {
+  FolderOpen,
+  Trash2,
+  Play,
+  Pause,
+  Loader,
+  RefreshCcw,
+  Download,
+  ShieldCheck,
+} from "lucide-react";
 import { useHomeArtwork } from "./useHomeArtwork";
 import { canRetryExtraction } from "@/services/downloads/extractionRetryService";
 
@@ -11,6 +20,8 @@ const BigPictureDownloadCard = ({
   onKill,
   onOpenFolder,
   onRetryExtraction,
+  onRetry,
+  onVerify,
   isStopping,
   isResuming,
   t,
@@ -70,8 +81,16 @@ const BigPictureDownloadCard = ({
         { label: t("downloads.kill"), icon: Trash2, action: onKill, danger: true },
       ];
     }
+    if (data.verifyError?.length) {
+      return [
+        { label: t("downloads.verifyAgain"), icon: ShieldCheck, action: onVerify },
+        { label: t("downloads.openFolder"), icon: FolderOpen, action: onOpenFolder },
+        { label: t("downloads.kill"), icon: Trash2, action: onKill, danger: true },
+      ];
+    }
     if (hasError) {
       return [
+        { label: t("common.retry"), icon: RefreshCcw, action: onRetry },
         { label: t("downloads.openFolder"), icon: FolderOpen, action: onOpenFolder },
         { label: t("downloads.kill"), icon: Trash2, action: onKill, danger: true },
       ];
@@ -183,7 +202,8 @@ const BigPictureDownloadCard = ({
 
         {data.awaitingRecoveryAction && (
           <p className="bp-dl-note" data-tone="warning">
-            {data.recoverableError?.message || t("downloads.extractionRecovery.description")}
+            {data.recoverableError?.message ||
+              t("downloads.extractionRecovery.description")}
           </p>
         )}
         {hasError && (
@@ -203,7 +223,7 @@ const BigPictureDownloadCard = ({
               key={idx}
               onClick={action.action}
               disabled={isStopping || isResuming}
-              className={`bp-action${action.danger ? " bp-action--danger" : idx === 0 ? " bp-dl-primary" : ""}`}
+              className={`bp-action${action.danger ? "bp-action--danger" : idx === 0 ? "bp-dl-primary" : ""}`}
             >
               <action.icon aria-hidden="true" />
               {action.label}
