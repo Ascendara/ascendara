@@ -2033,7 +2033,13 @@ function InstalledGameScreen() {
 
   // Check playtime and show purchase prompt after 3 hours (10800 seconds)
   useEffect(() => {
-    if (!game || !settings.promptPurchaseAfter3Hours || hasShownPurchasePrompt) return;
+    if (
+      !game ||
+      game.isCustom ||
+      !settings.promptPurchaseAfter3Hours ||
+      hasShownPurchasePrompt
+    )
+      return;
 
     const gameName = game.game || game.name;
     const playTime = game.playTime || 0;
