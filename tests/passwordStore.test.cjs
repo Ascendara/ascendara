@@ -93,21 +93,15 @@ test("only SteamOS counts as a system whose keyring varies by session", () => {
   const steamos = osRelease("steamos", 'NAME="SteamOS"\nID=steamos\nID_LIKE=arch\n');
   const quoted = osRelease("quoted", 'ID="steamos"\n');
   const arch = osRelease("arch", "NAME=Arch Linux\nID=arch\nVARIANT_ID=steamos-like\n");
-  assert.equal(
-    keyringVariesBySession({ platform: "linux", osReleasePath: steamos }),
-    true
-  );
-  assert.equal(
-    keyringVariesBySession({ platform: "linux", osReleasePath: quoted }),
-    true
-  );
-  assert.equal(keyringVariesBySession({ platform: "linux", osReleasePath: arch }), false);
-  assert.equal(
-    keyringVariesBySession({ platform: "win32", osReleasePath: steamos }),
-    false
-  );
-  assert.equal(
-    keyringVariesBySession({ platform: "linux", osReleasePath: path.join(dir, "none") }),
-    false
-  );
+  const varies = (paths, platform = "linux") =>
+    keyringVariesBySession({ platform, osReleasePaths: paths });
+  const none = path.join(dir, "none");
+  assert.equal(varies([steamos]), true);
+  assert.equal(varies([quoted]), true);
+  assert.equal(varies([arch]), false);
+  assert.equal(varies([steamos], "win32"), false);
+  assert.equal(varies([none]), false);
+  // In a container /etc is the container's, the host's file decides
+  assert.equal(varies([steamos, arch]), true);
+  assert.equal(varies([none, steamos]), true);
 });
