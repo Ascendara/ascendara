@@ -262,7 +262,10 @@ const Layout = memo(() => {
         }`}
         style={{
           display: isSearchPage ? "none" : "block",
-          marginBottom: navigationBottomSafeArea || undefined,
+          // Content scrolls on behind the dock to the window edge; the padding
+          // lets the last of it come to rest above the dock
+          paddingBottom: navigationBottomSafeArea || undefined,
+          scrollPaddingBottom: navigationBottomSafeArea || undefined,
         }}
       >
         {/* Skipped on /search so the outgoing page unmounts immediately instead of lingering in the hidden container with its listeners */}

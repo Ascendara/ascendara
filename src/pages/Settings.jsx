@@ -900,10 +900,12 @@ function Settings() {
     if (!root || !header || !scroller) return undefined;
     const update = () => {
       const headerHeight = header.offsetHeight;
+      // The scrollport runs behind the dock; its bottom padding is the dock's
+      const dockClearance = parseFloat(getComputedStyle(scroller).paddingBottom) || 0;
       root.style.setProperty("--settings-aside-top", `${headerHeight + 16}px`);
       root.style.setProperty(
         "--settings-aside-max-h",
-        `${Math.max(160, scroller.clientHeight - headerHeight - 32)}px`
+        `${Math.max(160, scroller.clientHeight - dockClearance - headerHeight - 32)}px`
       );
     };
     const onScroll = () => setHeaderScrolled(scroller.scrollTop > 4);
@@ -4509,9 +4511,25 @@ function ReleaseCard({ t }) {
             preserveAspectRatio="none"
             aria-hidden="true"
           >
-            <path d="M0 30 C 12 22, 26 34, 44 18 L 44 44 L 0 44 Z" fill="white" fillOpacity="0.35" />
-            <path d="M0 14 C 14 6, 24 22, 44 4" fill="none" stroke="white" strokeOpacity="0.7" strokeWidth="0.8" />
-            <path d="M0 24 C 16 14, 28 28, 44 12" fill="none" stroke="white" strokeOpacity="0.5" strokeWidth="0.6" />
+            <path
+              d="M0 30 C 12 22, 26 34, 44 18 L 44 44 L 0 44 Z"
+              fill="white"
+              fillOpacity="0.35"
+            />
+            <path
+              d="M0 14 C 14 6, 24 22, 44 4"
+              fill="none"
+              stroke="white"
+              strokeOpacity="0.7"
+              strokeWidth="0.8"
+            />
+            <path
+              d="M0 24 C 16 14, 28 28, 44 12"
+              fill="none"
+              stroke="white"
+              strokeOpacity="0.5"
+              strokeWidth="0.6"
+            />
           </svg>
           {major === "12" ? (
             <img
