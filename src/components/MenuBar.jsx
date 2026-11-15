@@ -246,7 +246,11 @@ const MenuBar = () => {
       style={{ ...MENU_BAR_HEIGHT_STYLE, WebkitAppRegion: "drag" }}
     >
       {/* data-boot-row / data-boot-pop: staggered pop-in as the boot logo lands (app.css) */}
-      <div className="flex h-full min-w-0 flex-1 items-center gap-2 px-3" data-boot-row>
+      {/* Brand edge gets extra inset: the window's corner radius makes an even 12px read as cramped */}
+      <div
+        className={`flex h-full min-w-0 flex-1 items-center gap-2 ${mirrored ? "pl-3 pr-4" : "pl-4 pr-3"}`}
+        data-boot-row
+      >
         <div className={`flex items-center ${layoutOrder.brand}`}>
           <div
             className={`flex items-center gap-2 ${mirrored ? "flex-row-reverse" : ""}`}
