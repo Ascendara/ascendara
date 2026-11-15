@@ -244,9 +244,14 @@ fn resolve_steam_overlay() -> Option<String> {
     None
 }
 
+/// Leaves a file that is already executable alone: a system runner such as
+/// /usr/bin/umu-run belongs to root, or sits on a read-only /usr (Bazzite).
 #[cfg(unix)]
 pub fn make_executable(path: &str) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
+    if std::fs::metadata(path)?.permissions().mode() & 0o111 == 0o111 {
+        return Ok(());
+    }
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))?;
     Ok(())
 }
@@ -696,6 +701,28 @@ mod tests {
         assert!(config.umu_use_steam);
         assert_eq!(config.steamappid.as_deref(), Some("480"));
         assert_eq!(config.compat_data, None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn executable_file_is_not_touched() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("ascendara-exec-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("runner");
+        std::fs::write(&file, "").unwrap();
+        let path = file.to_str().unwrap();
+        let mode = |p: &std::path::Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644)).unwrap();
+        make_executable(path).unwrap();
+        assert_eq!(mode(&file), 0o755);
+
+        // 0o555 would be rewritten to 0o755 if the chmod still ran.
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o555)).unwrap();
+        make_executable(path).unwrap();
+        assert_eq!(mode(&file), 0o555);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
