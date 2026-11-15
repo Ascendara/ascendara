@@ -1846,6 +1846,7 @@
     "ascendFeaturesLocked": "{{gameName}} offers these Ascend features:",
     "autoUpdates": "Auto Updates",
     "betaFeature": "Woah... this is still in beta!",
+    "browseModsTooltip": "Browse this game's mods on Nexus Mods",
     "by": "by",
     "canRun": {
       "close": "Close",

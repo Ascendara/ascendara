@@ -23,6 +23,10 @@ import ArtworkCorrectionDialog, {
 } from "@/components/download/ArtworkCorrectionDialog";
 import SystemRequirements from "@/components/download/SystemRequirements";
 import SourceSwitcher from "@/components/download/SourceSwitcher";
+import { ModsSection } from "@/components/gamescreen/ModsTrainersTab";
+import ModDetailsDialog from "@/components/gamescreen/ModDetailsDialog";
+import { useNexusMods } from "@/hooks/useNexusMods";
+import { verifyAscendAccess } from "@/services/firebase/firebaseService";
 import {
   canRetryExtraction,
   retryExtraction,
@@ -399,6 +403,10 @@ function PublicDownloadPage() {
   const reviewsRef = useRef(null);
   const [supportsModManaging, setSupportsModManaging] = useState(false);
   const [nexusGameData, setNexusGameData] = useState(null);
+  const [hasAscendAccess, setHasAscendAccess] = useState(false);
+  const [showModsBrowser, setShowModsBrowser] = useState(false);
+  // Loads once the browser is first opened
+  const nexusMods = useNexusMods(nexusGameData, showModsBrowser);
   const [supportsFlingTrainer, setSupportsFlingTrainer] = useState(false);
   const [flingTrainerData, setFlingTrainerData] = useState(null);
   const [isPlayLater, setIsPlayLater] = useState(() => {
@@ -534,6 +542,28 @@ function PublicDownloadPage() {
     };
 
     checkNexusModSupport();
+  }, [gameData?.game]);
+
+  // Mod browsing follows the same Ascend access as the library's Extras tab
+  useEffect(() => {
+    if (!isAuthenticated || !supportsModManaging) {
+      setHasAscendAccess(false);
+      return;
+    }
+    let cancelled = false;
+    verifyAscendAccess()
+      .then(result => !cancelled && setHasAscendAccess(!!result?.hasAccess))
+      .catch(error => {
+        console.error("Error verifying Ascend access:", error);
+        if (!cancelled) setHasAscendAccess(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, supportsModManaging]);
+
+  useEffect(() => {
+    setShowModsBrowser(false);
   }, [gameData?.game]);
 
   // Check FLiNG Trainer support for the game
@@ -1681,7 +1711,9 @@ function PublicDownloadPage() {
     const handleKeyDown = event => {
       // This page can stay mounted while hidden (e.g. behind the persistent
       // Search page), so only react to Escape while /download is the active route.
-      if (event.key === "Escape" && location.pathname === "/download") {
+      // An open dialog takes the Escape for itself
+      const dialogOpen = document.querySelector('[role="dialog"], [role="alertdialog"]');
+      if (event.key === "Escape" && location.pathname === "/download" && !dialogOpen) {
         handleBack();
       }
     };
@@ -2109,6 +2141,11 @@ function PublicDownloadPage() {
                 !isExternalSourcesMode
               }
               onGetAscend={() => navigate("/ascend")}
+              onBrowseMods={
+                hasAscendAccess && nexusGameData?.domainName
+                  ? () => setShowModsBrowser(true)
+                  : undefined
+              }
             />
           </aside>
 
@@ -2132,6 +2169,14 @@ function PublicDownloadPage() {
       </div>
 
       {/* Dialogs */}
+      <Dialog open={showModsBrowser} onOpenChange={setShowModsBrowser}>
+        <DialogContent className="max-h-[85vh] max-w-5xl overflow-y-auto bg-card p-0 pt-8">
+          <DialogTitle className="sr-only">{t("gameScreen.modsTitle")}</DialogTitle>
+          <ModsSection {...nexusMods.sectionProps} />
+        </DialogContent>
+      </Dialog>
+      <ModDetailsDialog {...nexusMods.detailsProps} />
+
       <ReportGameDialog
         open={showReportDialog}
         onOpenChange={setShowReportDialog}

@@ -21,7 +21,14 @@ import {
 } from "lucide-react";
 
 /** Shown instead of a feature when the user has no Ascend access. */
-function AscendPromo({ icon: Icon, title, subtitle, description, isAuthenticated, onGetAscend }) {
+function AscendPromo({
+  icon: Icon,
+  title,
+  subtitle,
+  description,
+  isAuthenticated,
+  onGetAscend,
+}) {
   const { t } = useLanguage();
   return (
     <section className="flex flex-wrap items-center gap-4 rounded-xl bg-card p-6 shadow">
@@ -175,7 +182,7 @@ function TrainerSection({
   );
 }
 
-function ModsSection({
+export function ModsSection({
   nexusGameData,
   loading,
   mods,

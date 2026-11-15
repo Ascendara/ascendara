@@ -6,8 +6,6 @@ import {
   ChevronLeft,
   Play,
   FolderOpen,
-  Tag,
-  Trash2,
   Pencil,
   Loader,
   StopCircle,
@@ -15,7 +13,6 @@ import {
   AlertTriangle,
   Info,
   Star,
-  Clock,
   ExternalLink,
   Download,
   Search,
@@ -23,7 +20,6 @@ import {
   ThumbsUp,
   Music2,
   Trophy,
-  BookX,
   ImageUp,
   ImageIcon,
   Bolt,
@@ -31,8 +27,6 @@ import {
   GripVertical,
   X,
   Puzzle,
-  ChevronDown,
-  ChevronUp,
   CheckCircle2,
   ArrowUpFromLine,
   WandSparkles,
@@ -67,7 +61,6 @@ import {
 } from "@/services/app/audioPlayerService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { getGameSoundtrack } from "@/services/integrations/khinsiderService";
 import { toast } from "sonner";
 import {
@@ -91,6 +84,8 @@ import { gameImageCache, heroImageCache, logoImageCache } from "@/lib/gameImageC
 import GameRate from "@/components/GameRate";
 import { GameAssetSearchDialog } from "@/components/GameAssetSearchDialog";
 import nexusModsService from "@/services/integrations/nexusModsService";
+import { useNexusMods } from "@/hooks/useNexusMods";
+import ModDetailsDialog from "@/components/gamescreen/ModDetailsDialog";
 import flingTrainerService from "@/services/integrations/flingTrainerService";
 import { useAuth } from "@/context/AuthContext";
 import { getCloudLibrary, verifyAscendAccess } from "@/services/firebase/firebaseService";
@@ -1394,19 +1389,10 @@ function InstalledGameScreen() {
   // Nexus Mods state
   const [supportsModManaging, setSupportsModManaging] = useState(false);
   const [nexusGameData, setNexusGameData] = useState(null);
-  const [popularMods, setPopularMods] = useState([]);
-  const [modsLoading, setModsLoading] = useState(false);
-  const [allMods, setAllMods] = useState([]);
-  const [modsTotalCount, setModsTotalCount] = useState(0);
-  const [modsPage, setModsPage] = useState(0);
-  const [modsSearchQuery, setModsSearchQuery] = useState("");
-  const [modsSortBy, setModsSortBy] = useState("endorsements");
-  const [selectedMod, setSelectedMod] = useState(null);
-  const [modFiles, setModFiles] = useState([]);
-  const [modFilesLoading, setModFilesLoading] = useState(false);
-  const [showModDetails, setShowModDetails] = useState(false);
-  const [showOldVersions, setShowOldVersions] = useState(false);
-  const modsPerPage = 12;
+  const nexusMods = useNexusMods(
+    nexusGameData,
+    supportsModManaging && isAuthenticated && ascendAccess.hasAccess
+  );
 
   // FLiNG Trainer state
   const [supportsFlingTrainer, setSupportsFlingTrainer] = useState(false);
@@ -2286,27 +2272,6 @@ function InstalledGameScreen() {
           const result = await nexusModsService.checkModSupport(gameName);
           setSupportsModManaging(result.supported);
           setNexusGameData(result.gameData);
-
-          // If supported and user has Ascend access, fetch mods with pagination
-          if (
-            result.supported &&
-            result.gameData?.domainName &&
-            isAuthenticated &&
-            ascendAccess.hasAccess
-          ) {
-            setModsLoading(true);
-            const modsResult = await nexusModsService.getMods(
-              result.gameData.domainName,
-              {
-                count: modsPerPage,
-                offset: 0,
-                sortBy: "endorsements",
-              }
-            );
-            setAllMods(modsResult.mods);
-            setModsTotalCount(modsResult.totalCount);
-            setModsLoading(false);
-          }
         } catch (error) {
           console.error("Error checking Nexus Mods support:", error);
           setSupportsModManaging(false);
@@ -2315,7 +2280,7 @@ function InstalledGameScreen() {
     };
 
     checkNexusModSupport();
-  }, [game?.game, game?.name, isAuthenticated, ascendAccess.hasAccess]);
+  }, [game?.game, game?.name]);
 
   // Check FLiNG Trainer support for the game
   useEffect(() => {
@@ -2418,73 +2383,6 @@ function InstalledGameScreen() {
 
     checkCloudLibrary();
   }, [game?.game, game?.name, isAuthenticated]);
-
-  // Fetch mods with pagination and search
-  const fetchMods = async (page = 0, search = "", sort = "endorsements") => {
-    if (!nexusGameData?.domainName) return;
-
-    setModsLoading(true);
-    try {
-      const result = await nexusModsService.getMods(nexusGameData.domainName, {
-        count: modsPerPage,
-        offset: page * modsPerPage,
-        sortBy: sort,
-        searchQuery: search || null,
-      });
-      setAllMods(result.mods);
-      setModsTotalCount(result.totalCount);
-    } catch (error) {
-      console.error("Error fetching mods:", error);
-    }
-    setModsLoading(false);
-  };
-
-  // Fetch mod files when a mod is selected
-  const fetchModFiles = async mod => {
-    if (!nexusGameData?.id || !mod?.modId) return;
-
-    setModFilesLoading(true);
-    setSelectedMod(mod);
-    setShowModDetails(true);
-    try {
-      const files = await nexusModsService.getModFiles(nexusGameData.id, mod.modId);
-      setModFiles(files);
-    } catch (error) {
-      console.error("Error fetching mod files:", error);
-      setModFiles([]);
-    }
-    setModFilesLoading(false);
-  };
-
-  // Handle mod search
-  const handleModSearch = e => {
-    e.preventDefault();
-    setModsPage(0);
-    fetchMods(0, modsSearchQuery, modsSortBy);
-  };
-
-  // Handle sort change
-  const handleSortChange = newSort => {
-    setModsSortBy(newSort);
-    setModsPage(0);
-    fetchMods(0, modsSearchQuery, newSort);
-  };
-
-  // Handle page change
-  const handleModsPageChange = newPage => {
-    setModsPage(newPage);
-    fetchMods(newPage, modsSearchQuery, modsSortBy);
-  };
-
-  // Download mod file - opens in browser since Nexus requires auth
-  const handleDownloadMod = (mod, fileId = null) => {
-    const url = nexusModsService.getModDownloadUrl(
-      nexusGameData?.domainName,
-      mod.modId,
-      fileId
-    );
-    window.electron.openURL(url);
-  };
 
   // Toggle favorite status
   const toggleFavorite = async () => {
@@ -3248,244 +3146,13 @@ function InstalledGameScreen() {
                 onOpenPage: () => flingTrainerService.openTrainerPage(flingTrainerData),
               }}
               showMods={supportsModManaging}
-              modsProps={{
-                nexusGameData,
-                loading: modsLoading,
-                mods: allMods,
-                popularMods,
-                totalCount: modsTotalCount,
-                page: modsPage,
-                perPage: modsPerPage,
-                searchQuery: modsSearchQuery,
-                onSearchQueryChange: setModsSearchQuery,
-                onSearch: handleModSearch,
-                sortBy: modsSortBy,
-                onSortChange: handleSortChange,
-                onPageChange: handleModsPageChange,
-                onSelectMod: fetchModFiles,
-                onBrowse: () => fetchMods(0, "", "endorsements"),
-              }}
+              modsProps={nexusMods.sectionProps}
             />
           )}
         </div>
       </div>
 
-      {/* Mod Details Dialog */}
-      <AlertDialog open={showModDetails} onOpenChange={setShowModDetails}>
-        <AlertDialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-          <AlertDialogHeader>
-            <AlertDialogTitle>{selectedMod?.name}</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm text-muted-foreground">
-              {selectedMod?.uploader?.name
-                ? `${t("gameScreen.modBy")} ${selectedMod.uploader.name}`
-                : t("gameScreen.modDetails")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <div className="space-y-4">
-            {selectedMod?.pictureUrl && (
-              <div className="aspect-video overflow-hidden rounded-lg bg-muted">
-                <img
-                  src={selectedMod.pictureUrl}
-                  alt={selectedMod.name}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            )}
-
-            {selectedMod?.summary && (
-              <p className="text-sm text-muted-foreground">{selectedMod.summary}</p>
-            )}
-
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              {selectedMod?.version && (
-                <span className="flex items-center gap-1">
-                  <Tag className="h-4 w-4" />v{selectedMod.version}
-                </span>
-              )}
-              {selectedMod?.modCategory?.name && (
-                <span className="rounded bg-muted px-2 py-0.5">
-                  {selectedMod.modCategory.name}
-                </span>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Mod Files Section */}
-            <div>
-              <h3 className="mb-3 font-semibold text-primary">
-                {t("gameScreen.modFiles")}
-              </h3>
-              {modFilesLoading ? (
-                <div className="flex items-center justify-center py-6">
-                  <Loader className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : modFiles.length > 0 ? (
-                <div className="space-y-2">
-                  {/* Current/Main files */}
-                  {[...modFiles]
-                    .filter(
-                      file =>
-                        !["OLD_VERSION", "REMOVED", "ARCHIVED"].includes(file.category)
-                    )
-                    .sort((a, b) => (b.primary || 0) - (a.primary || 0))
-                    .map((file, index) => (
-                      <div
-                        key={file.fileId || index}
-                        className={`flex items-center justify-between rounded-lg border p-3 ${
-                          file.primary === 1
-                            ? "border-primary/50 bg-primary/10"
-                            : "bg-card"
-                        }`}
-                      >
-                        <div className="flex-1 overflow-hidden">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate font-medium text-foreground">
-                              {file.name}
-                            </p>
-                            {file.primary === 1 && (
-                              <span className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-xs font-medium text-secondary">
-                                {t("gameScreen.mainFile")}
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-                            {file.version && <span>v{file.version}</span>}
-                            {file.sizeInBytes && (
-                              <span>
-                                {nexusModsService.formatFileSize(file.sizeInBytes)}
-                              </span>
-                            )}
-                            {file.category && <span>{file.category}</span>}
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          className="ml-3 gap-1 text-secondary"
-                          onClick={() => handleDownloadMod(selectedMod, file.fileId)}
-                        >
-                          <Download className="h-4 w-4" />
-                          {t("gameScreen.downloadFile")}
-                        </Button>
-                      </div>
-                    ))}
-
-                  {/* Hidden categories collapsible sections */}
-                  {["OLD_VERSION", "ARCHIVED", "REMOVED"].map(category => {
-                    const filesInCategory = modFiles.filter(
-                      file => file.category === category
-                    );
-                    if (filesInCategory.length === 0) return null;
-
-                    const isExpanded = showOldVersions;
-                    const categoryLabels = {
-                      OLD_VERSION: { key: "oldVersions", icon: Clock },
-                      ARCHIVED: { key: "archivedFiles", icon: BookX },
-                      REMOVED: { key: "removedFiles", icon: Trash2 },
-                    };
-                    const { key, icon: Icon } = categoryLabels[category];
-
-                    return (
-                      <div key={category} className="mt-4">
-                        <button
-                          onClick={() => setShowOldVersions(!showOldVersions)}
-                          className="flex w-full items-center justify-between rounded-lg border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
-                        >
-                          <span className="flex items-center gap-2">
-                            <Icon className="h-4 w-4" />
-                            {t(`gameScreen.${key}`, { count: filesInCategory.length })}
-                          </span>
-                          {isExpanded ? (
-                            <ChevronUp className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </button>
-
-                        {isExpanded && (
-                          <div className="mt-2 space-y-2">
-                            {filesInCategory.map((file, index) => (
-                              <div
-                                key={file.fileId || index}
-                                className="flex items-center justify-between rounded-lg border bg-card/50 p-3 opacity-75"
-                              >
-                                <div className="flex-1 overflow-hidden">
-                                  <div className="flex items-center gap-2">
-                                    <p className="truncate font-medium text-foreground">
-                                      {file.name}
-                                    </p>
-                                  </div>
-                                  <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-                                    {file.version && <span>v{file.version}</span>}
-                                    {file.sizeInBytes && (
-                                      <span>
-                                        {nexusModsService.formatFileSize(
-                                          file.sizeInBytes
-                                        )}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="ml-3 gap-1 text-primary"
-                                  onClick={() =>
-                                    handleDownloadMod(selectedMod, file.fileId)
-                                  }
-                                >
-                                  <Download className="h-4 w-4" />
-                                  {t("gameScreen.downloadFile")}
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed p-6 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    {t("gameScreen.noFilesFound")}
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="mt-3 gap-2"
-                    onClick={() => handleDownloadMod(selectedMod)}
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    {t("gameScreen.viewOnNexus")}
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <AlertDialogFooter className="mt-4">
-            <Button
-              className="text-primary"
-              variant="outline"
-              onClick={() => {
-                setShowModDetails(false);
-                setSelectedMod(null);
-                setModFiles([]);
-              }}
-            >
-              {t("common.close")}
-            </Button>
-            <Button
-              className="gap-2 text-secondary"
-              onClick={() => handleDownloadMod(selectedMod)}
-            >
-              <ExternalLink className="h-4 w-4" />
-              {t("gameScreen.viewOnNexus")}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ModDetailsDialog {...nexusMods.detailsProps} />
 
       {/* Dialogs */}
       <VerifyingGameDialog
