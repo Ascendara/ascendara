@@ -11,9 +11,16 @@ const source = fs.readFileSync(
   path.join(__dirname, "../src/pages/big-picture/useBigPicturePage.js"),
   "utf8"
 );
-// handleStartDownload and the helpers it calls to start a direct download
+// handleStartDownload and the helpers it calls to start a download
 const extracted = {};
-const wanted = ["handleStartDownload", "startResolvedDownload", "launchDownload"];
+const wanted = [
+  "handleStartDownload",
+  "downloadDataFor",
+  "startResolvedDownload",
+  "launchDownload",
+  "startDebridDownload",
+  "startTorrentDownload",
+];
 traverse(parse(source, { sourceType: "module", plugins: ["jsx"] }), {
   VariableDeclarator(nodePath) {
     const name = nodePath.node.id.name;
@@ -23,7 +30,7 @@ traverse(parse(source, { sourceType: "module", plugins: ["jsx"] }), {
   },
 });
 
-test("Big Picture respects normal host priority and hands any adapter's cloud downloads to desktop", async t => {
+test("Big Picture respects host priority and starts debrid and torrent downloads itself", async t => {
   const { createDebridService } = await loadModule(
     "src/services/downloads/debridService.js"
   );
@@ -35,45 +42,46 @@ test("Big Picture respects normal host priority and hands any adapter's cloud do
     seamlessHosts: ["gofile"],
     getSupportedHosts: async () => ["files.test", "gofile.io"],
     isSupportedUrl: (url, domains) => domains.includes(new URL(url).hostname),
-    resolveHost: async () => {},
-    submitMagnet: async () => {},
+    hostDownloadMode: "direct",
+    resolveHost: async () => ({ url: "https://cdn.test/resolved" }),
+    submitMagnet: async () => ({ id: 1 }),
   };
   const debrid = createDebridService([provider]);
-  const { isMagnetLink, isTorrentLink } = await loadModule(
+  const { isMagnetLink, isTorrentLink, pickTorrentLink } = await loadModule(
     "src/services/downloads/torrentLink.js"
   );
   const canDownloadTorrentLinks = (links, settings) =>
     (settings?.torrentEnabled === true && links.some(isTorrentLink)) ||
     (debrid.canUseCloudTorrents(settings) && links.some(isMagnetLink));
 
+  const hosted = {
+    custom: ["https://files.test/file"],
+    gofile: ["https://gofile.io/d/file"],
+  };
+  // expected: the URL handed to the downloader, "cloud", or "handoff" (exit dialog)
   for (const [name, extraSettings, preferredHost, links, expected] of [
-    [
-      "normal seamless priority",
-      {},
-      null,
-      { custom: ["https://files.test/file"], gofile: ["https://gofile.io/d/file"] },
-      "direct",
-    ],
+    ["normal seamless priority", {}, null, hosted, "https://gofile.io/d/file"],
     [
       "debrid priority",
       { thirdPriority: true },
       null,
-      { custom: ["https://files.test/file"], gofile: ["https://gofile.io/d/file"] },
-      "handoff",
+      hosted,
+      "https://cdn.test/resolved",
     ],
-    [
-      "explicit hosted selection",
-      {},
-      "custom",
-      { custom: ["https://files.test/file"], gofile: ["https://gofile.io/d/file"] },
-      "handoff",
-    ],
-    ["cloud torrent", {}, null, { torrent: ["magnet:?xt=test"] }, "handoff"],
+    ["explicit hosted selection", {}, "custom", hosted, "https://cdn.test/resolved"],
+    ["cloud torrent", {}, null, { torrent: ["magnet:?xt=test"] }, "cloud"],
     [
       "local raw torrent",
       { torrentEnabled: true, thirdTorrents: false },
       null,
       { torrent: ["https://example.test/game.torrent"] },
+      "https://example.test/game.torrent",
+    ],
+    [
+      "host without a debrid route",
+      {},
+      "other",
+      { other: ["https://other.test/file"] },
       "handoff",
     ],
   ]) {
@@ -84,6 +92,8 @@ test("Big Picture respects normal host priority and hands any adapter's cloud do
         settings: { debridEnabled: true, thirdKey: "key", ...extraSettings },
         debrid,
         canDownloadTorrentLinks,
+        isMagnetLink,
+        pickTorrentLink,
         isMagicLink: () => false,
         isAuthenticated: true,
         setPendingDownloadData: () => {},
@@ -106,7 +116,13 @@ test("Big Picture respects normal host priority and hands any adapter's cloud do
         changeView: () => {},
         t: key => key,
         console,
-        toast: { success: () => {}, error: message => assert.fail(message) },
+        toast: {
+          success: () => {},
+          info: () => {},
+          loading: () => {},
+          dismiss: () => {},
+          error: message => assert.fail(message),
+        },
       });
       vm.runInContext(
         wanted
@@ -118,8 +134,9 @@ test("Big Picture respects normal host priority and hands any adapter's cloud do
       const start = vm.runInContext(`(${extracted.handleStartDownload})`, context);
       await start({ game: "Example", download_links: links }, preferredHost);
       assert.equal(exited, expected === "handoff");
-      assert.equal(downloads.length, expected === "direct" ? 1 : 0);
-      if (downloads.length) assert.equal(downloads[0][0], "https://gofile.io/d/file");
+      const startsHere = !["cloud", "handoff"].includes(expected);
+      assert.equal(downloads.length, startsHere ? 1 : 0);
+      if (startsHere) assert.equal(downloads[0][0], expected);
     });
   }
 });

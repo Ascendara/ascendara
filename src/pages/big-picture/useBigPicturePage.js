@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import * as debrid from "@/services/downloads/debridService";
 import { canDownloadTorrentLinks } from "@/services/downloads/torrentCapability";
+import { isMagnetLink, pickTorrentLink } from "@/services/downloads/torrentLink";
 import { freedByPause } from "@/services/downloads/downloadState";
 import * as torboxService from "@/services/downloads/torboxService";
 import {
@@ -384,8 +385,7 @@ function useBigPicturePage() {
       torrentRouteAvailable &&
       (preferredProvider === "torrent" || (!preferredProvider && torrentOnly))
     ) {
-      setDownloadingGame(game);
-      setShowExitDialog(true);
+      await startTorrentDownload(game, torrentCandidates, forceStart);
       return;
     }
 
@@ -495,30 +495,155 @@ function useBigPicturePage() {
       await startResolvedDownload(game, downloadUrl, forceStart);
     } else if (!routeThroughDebrid && isMagicLink(selectedProvider, downloadUrl)) {
       await startMagicLinkDownload(game, downloadUrl, forceStart);
+    } else if (routeThroughDebrid) {
+      const provider = debrid.getHostProvider(
+        settings,
+        selectedProvider,
+        downloadUrl,
+        debridHosts
+      );
+      await startDebridDownload(
+        game,
+        selectedProvider,
+        downloadUrl,
+        provider,
+        forceStart
+      );
     } else {
-      // Debrid or cloud download - show exit dialog
+      // A host page that needs clicking through in a browser
       setDownloadingGame(game);
       setShowExitDialog(true);
     }
   };
 
+  // Stops a wait for a cloud file once Big Picture closes
+  const unmounted = useRef(false);
+  useEffect(() => {
+    unmounted.current = false;
+    return () => {
+      unmounted.current = true;
+    };
+  }, []);
+
+  // A debrid service turns the host link into a file link, as on the Download page
+  const startDebridDownload = async (game, host, link, provider, forceStart) => {
+    const cloud = provider.hostDownloadMode === "cloud";
+    // A file link can expire in the queue: queue the host link, the queue resolves it
+    if (!cloud && !forceStart && (await hasActiveDownloads())) {
+      if (!isAuthenticated) {
+        toast.error(t("download.toast.downloadQueueLimit"));
+        return;
+      }
+      setPendingDownloadData({
+        ...downloadDataFor(game, link),
+        debridProviderId: provider.id,
+        debridLink: link,
+      });
+      setShowQueuePrompt(true);
+      return;
+    }
+
+    const toastId = `bp-debrid-${game.game}`;
+    toast.loading(t("download.toast.processingLink"), { id: toastId });
+    try {
+      const result = await debrid.resolveHost(settings, link, host, game, 0, provider.id);
+      const url =
+        result.url || (cloud ? await waitForCloudFile(result, provider, toastId) : null);
+      toast.dismiss(toastId);
+      if (!url) return;
+      await launchDownload({ ...downloadDataFor(game, url), browserDirect: true });
+    } catch (error) {
+      toast.error(error.message || t("bigPicture.downloadError"), { id: toastId });
+    }
+  };
+
+  // TorBox fetches a hosted file into its cloud first. Wait for it there, then start
+  // the download here, so the file does not have to be sent from the TorBox page.
+  const waitForCloudFile = async (result, provider, toastId) => {
+    const apiKey = settings[provider.apiKeySetting];
+    const deadline = Date.now() + 30 * 60 * 1000;
+    let ready = result.status === "ready";
+    while (!ready) {
+      if (unmounted.current) return null;
+      if (Date.now() > deadline) throw new Error(t("bigPicture.debridTimedOut"));
+      toast.loading(t("bigPicture.debridPreparing", { provider: provider.name }), {
+        id: toastId,
+      });
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      const [item] = await torboxService.checkDownloadState(apiKey, result.id);
+      if (!item) throw new Error(t("bigPicture.debridTimedOut"));
+      if (item.download_state === "error" || item.download_state === "failed")
+        throw new Error(t("bigPicture.downloadError"));
+      ready =
+        item.download_state === "cached" ||
+        (item.download_finished && item.download_present);
+    }
+    const response = await torboxService.getDirectDownloadLink(
+      apiKey,
+      result.id,
+      "webdl"
+    );
+    const url =
+      typeof response === "string"
+        ? response
+        : response?.download_url ||
+          response?.url ||
+          (typeof response?.data === "string" ? response.data : null) ||
+          response?.data?.download_url ||
+          response?.data?.url;
+    if (!url) throw new Error(t("bigPicture.downloadError"));
+    return url.startsWith("http") ? url : `https://${url}`;
+  };
+
+  // Cloud torrents go to the debrid service, which hands them to this PC when done
+  const startTorrentDownload = async (game, links, forceStart) => {
+    const cloud = debrid.getTorrentProvider(settings);
+    const link = pickTorrentLink(links, { preferMagnet: Boolean(cloud) });
+    if (!link) {
+      toast.error(t("download.toast.invalidLink"));
+      return;
+    }
+    if (cloud && isMagnetLink(link)) {
+      try {
+        const result = await debrid.submitMagnet(settings, link, game, 0, cloud.id);
+        toast.success(
+          t("debrid.sentToCloud", {
+            provider: debrid.getProvider(result.providerId)?.name || cloud.name,
+          })
+        );
+        return;
+      } catch (error) {
+        if (!debrid.allowsTorrentFallback(settings, cloud.id)) {
+          toast.error(error.message);
+          return;
+        }
+        toast.info(t("debrid.torrentFallback"));
+      }
+    }
+    if (!settings.torrentEnabled) {
+      toast.error(t("download.toast.torrentDisabled"));
+      return;
+    }
+    await startResolvedDownload(game, link, forceStart);
+  };
+
+  const downloadDataFor = (game, url) => ({
+    url,
+    gameName: sanitizeText(game.game),
+    online: game.online || false,
+    dlc: game.dlc || false,
+    isVr: game.category?.includes("Virtual Reality") || false,
+    updateFlow: game.isUpdating || false,
+    version: game.version || "",
+    imgID: game.imgID,
+    size: game.size || "",
+    additionalDirIndex: 0,
+    gameID: game.gameID || "",
+  });
+
   // Starts (or offers to queue) a download whose file link is already known
   const startResolvedDownload = async (game, downloadUrl, forceStart = false) => {
-    const sanitizedGameName = sanitizeText(game.game);
-    const isVrGame = game.category?.includes("Virtual Reality");
-    const downloadData = {
-      url: downloadUrl,
-      gameName: sanitizedGameName,
-      online: game.online || false,
-      dlc: game.dlc || false,
-      isVr: isVrGame || false,
-      updateFlow: game.isUpdating || false,
-      version: game.version || "",
-      imgID: game.imgID,
-      size: game.size || "",
-      additionalDirIndex: 0,
-      gameID: game.gameID || "",
-    };
+    const downloadData = downloadDataFor(game, downloadUrl);
 
     if (!forceStart && (await hasActiveDownloads())) {
       // Non-Ascend users can only have 1 download at a time
@@ -536,8 +661,22 @@ function useBigPicturePage() {
 
   const launchDownload = async data => {
     try {
+      let url = data.url;
+      // Queued with its host link, then started right away from the queue prompt
+      if (data.debridLink) {
+        const resolved = await debrid.resolveHost(
+          settings,
+          data.debridLink,
+          null,
+          null,
+          0,
+          data.debridProviderId
+        );
+        if (!resolved.url) throw new Error(t("bigPicture.downloadError"));
+        url = resolved.url;
+      }
       const result = await window.electron.downloadFile(
-        data.url,
+        url,
         data.gameName,
         data.online,
         data.dlc,
@@ -547,7 +686,8 @@ function useBigPicturePage() {
         data.imgID,
         data.size,
         data.additionalDirIndex,
-        data.gameID
+        data.gameID,
+        data.browserDirect === true || Boolean(data.debridLink)
       );
       if (result?.success === false) {
         throw new Error(
