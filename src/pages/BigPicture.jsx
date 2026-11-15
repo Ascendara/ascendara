@@ -518,6 +518,7 @@ function BigPicture() {
                 setAssetSearchOpen(true);
               }}
               assetSearchOpen={assetSearchOpen}
+              onUpdate={handleStartDownload}
             />
           </div>
         )}

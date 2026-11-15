@@ -30,6 +30,7 @@ import {
   CloudUpload,
   X,
   Terminal,
+  ArrowUpFromLine,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Switch } from "@/components/ui/switch";
@@ -64,6 +65,7 @@ function InstalledGameDetailsView({
   onChangeAssets,
   assetSearchOpen,
   autoLaunch,
+  onUpdate,
 }) {
   const {
     hasHeroImage,
@@ -98,6 +100,8 @@ function InstalledGameDetailsView({
     openStopGameDialog,
     handleStopGame,
     stopMenuOffset,
+    menuOffset,
+    updateInfo,
     selectedButton,
     setShowBrowseExeWarning,
     handleOpenDirectory,
@@ -169,6 +173,7 @@ function InstalledGameDetailsView({
     onChangeAssets,
     assetSearchOpen,
     autoLaunch,
+    onUpdate,
   });
   const mediaSwipe = useMediaSwipe({
     showMedia,
@@ -624,11 +629,33 @@ function InstalledGameDetailsView({
                   <span className="text-lg font-semibold">{t("library.stopGame")}</span>
                 </button>
               )}
+              {menuOffset > stopMenuOffset && (
+                <button
+                  onClick={() => handleManagementAction(stopMenuOffset)}
+                  data-menu-selected={selectedMenuItem === stopMenuOffset}
+                  className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
+                    selectedMenuItem === stopMenuOffset
+                      ? "bg-primary text-secondary shadow-lg"
+                      : "bg-primary/15 text-primary hover:bg-primary/25"
+                  }`}
+                >
+                  <ArrowUpFromLine className="h-6 w-6" />
+                  <div className="flex flex-col">
+                    <span className="text-lg font-semibold">
+                      {t("gameScreen.downloadUpdate")}
+                    </span>
+                    <span className="font-mono text-sm opacity-80">
+                      {updateInfo?.localVersion || game.version || "-"} →{" "}
+                      {updateInfo?.latestVersion || "-"}
+                    </span>
+                  </div>
+                </button>
+              )}
               <button
-                onClick={() => handleManagementAction(stopMenuOffset)}
-                data-menu-selected={selectedMenuItem === stopMenuOffset}
+                onClick={() => handleManagementAction(menuOffset)}
+                data-menu-selected={selectedMenuItem === menuOffset}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === stopMenuOffset
+                  selectedMenuItem === menuOffset
                     ? "bg-primary text-secondary shadow-lg"
                     : "bg-muted hover:bg-muted/80"
                 }`}
@@ -639,10 +666,10 @@ function InstalledGameDetailsView({
                 </span>
               </button>
               <button
-                onClick={() => handleManagementAction(1 + stopMenuOffset)}
-                data-menu-selected={selectedMenuItem === 1 + stopMenuOffset}
+                onClick={() => handleManagementAction(1 + menuOffset)}
+                data-menu-selected={selectedMenuItem === 1 + menuOffset}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 1 + stopMenuOffset
+                  selectedMenuItem === 1 + menuOffset
                     ? "bg-primary text-secondary shadow-lg"
                     : "bg-muted hover:bg-muted/80"
                 }`}
@@ -658,10 +685,10 @@ function InstalledGameDetailsView({
                 </div>
               </button>
               <button
-                onClick={() => handleManagementAction(2 + stopMenuOffset)}
-                data-menu-selected={selectedMenuItem === 2 + stopMenuOffset}
+                onClick={() => handleManagementAction(2 + menuOffset)}
+                data-menu-selected={selectedMenuItem === 2 + menuOffset}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 2 + stopMenuOffset
+                  selectedMenuItem === 2 + menuOffset
                     ? "bg-primary text-secondary shadow-lg"
                     : "bg-muted hover:bg-muted/80"
                 }`}
@@ -672,10 +699,10 @@ function InstalledGameDetailsView({
                 </span>
               </button>
               <button
-                onClick={() => handleManagementAction(3 + stopMenuOffset)}
-                data-menu-selected={selectedMenuItem === 3 + stopMenuOffset}
+                onClick={() => handleManagementAction(3 + menuOffset)}
+                data-menu-selected={selectedMenuItem === 3 + menuOffset}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 3 + stopMenuOffset
+                  selectedMenuItem === 3 + menuOffset
                     ? "bg-primary text-secondary shadow-lg"
                     : "bg-muted hover:bg-muted/80"
                 }`}
@@ -692,10 +719,10 @@ function InstalledGameDetailsView({
                 return (
                   <button
                     key={folder.game}
-                    onClick={() => handleManagementAction(index + 4 + stopMenuOffset)}
-                    data-menu-selected={selectedMenuItem === index + 4 + stopMenuOffset}
+                    onClick={() => handleManagementAction(index + 4 + menuOffset)}
+                    data-menu-selected={selectedMenuItem === index + 4 + menuOffset}
                     className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                      selectedMenuItem === index + 4 + stopMenuOffset
+                      selectedMenuItem === index + 4 + menuOffset
                         ? "bg-primary text-secondary shadow-lg"
                         : "bg-muted hover:bg-muted/80"
                     }`}
@@ -708,14 +735,10 @@ function InstalledGameDetailsView({
                 );
               })}
               <button
-                onClick={() =>
-                  handleManagementAction(folders.length + 4 + stopMenuOffset)
-                }
-                data-menu-selected={
-                  selectedMenuItem === folders.length + 4 + stopMenuOffset
-                }
+                onClick={() => handleManagementAction(folders.length + 4 + menuOffset)}
+                data-menu-selected={selectedMenuItem === folders.length + 4 + menuOffset}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${isRunning ? "opacity-50" : ""} ${
-                  selectedMenuItem === folders.length + 4 + stopMenuOffset
+                  selectedMenuItem === folders.length + 4 + menuOffset
                     ? "bg-red-500 text-white shadow-lg"
                     : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                 }`}

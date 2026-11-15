@@ -22,7 +22,11 @@ import {
   hasActiveSubscription,
   uploadBackupToCloud,
 } from "@/services/cloud/cloudBackupService";
-import { listBackups as listCloudBackups } from "@/services/firebase/firebaseService";
+import {
+  listBackups as listCloudBackups,
+  verifyAscendAccess,
+} from "@/services/firebase/firebaseService";
+import gameService from "@/services/games/gameService";
 import { restoreCloudSave } from "@/services/cloud/restoreCloudSave";
 
 function useInstalledGameDetails({
@@ -33,6 +37,7 @@ function useInstalledGameDetails({
   onChangeAssets,
   assetSearchOpen,
   autoLaunch = false,
+  onUpdate,
 }) {
   const autoLaunchHandled = useRef(false);
   const [launchChecksReady, setLaunchChecksReady] = useState(false);
@@ -727,14 +732,61 @@ function useInstalledGameDetails({
     ]
   );
 
-  // While the game runs, the menu gains a "Stop game" entry at the top
+  // A catalog game with a newer version gets an "Update" entry in the menu
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [canAutoUpdateGame, setCanAutoUpdateGame] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (game.isCustom || !game.gameID) return undefined;
+    gameService
+      .checkGameUpdate(game.gameID, game.version)
+      .then(
+        result => !cancelled && setUpdateInfo(result?.updateAvailable ? result : null)
+      )
+      .catch(() => {});
+    if (user)
+      verifyAscendAccess()
+        .then(result => !cancelled && setCanAutoUpdateGame(Boolean(result?.hasAccess)))
+        .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [game.gameID, game.version, game.isCustom, user]);
+
+  const startUpdate = () => {
+    if (!canAutoUpdateGame) {
+      toast.info(t("gameScreen.updateAvailableDescriptionNoAuth"), {
+        description: t("gameScreen.updateManualHint"),
+      });
+      return;
+    }
+    setShowManagementMenu(false);
+    onUpdate?.({
+      ...game,
+      // The installed name, so the update lands in the existing folder
+      game: gameName,
+      gameID: updateInfo.gameID || game.gameID,
+      version: updateInfo.latestVersion || "",
+      download_links: updateInfo.downloadLinks || {},
+      size: updateInfo.size || game.size || "",
+      isUpdating: true,
+    });
+  };
+
+  // While the game runs, the menu gains a "Stop game" entry at the top,
+  // then "Update" when a newer version exists
   const stopMenuOffset = gameSession.canStop ? 1 : 0;
+  const menuOffset = stopMenuOffset + (updateInfo && !isRunning ? 1 : 0);
   const handleManagementAction = menuIndex => {
     if (stopMenuOffset && menuIndex === 0) {
       openStopGameDialog();
       return;
     }
-    const index = menuIndex - stopMenuOffset;
+    if (menuOffset > stopMenuOffset && menuIndex === stopMenuOffset) {
+      startUpdate();
+      return;
+    }
+    const index = menuIndex - menuOffset;
     const lastIndex = folders.length + 4;
     if (isRunning && (index === 1 || index === lastIndex)) {
       toast.error(t("library.unavailableWhileRunning"));
@@ -985,10 +1037,10 @@ function useInstalledGameDetails({
       if (showManagementMenu) {
         if (action === "DOWN") {
           // [Stop game], Shortcut, Executable, Launch options, Favorite, Folders, Delete
-          const menuItemCount = folders.length + 5 + stopMenuOffset;
+          const menuItemCount = folders.length + 5 + menuOffset;
           setSelectedMenuItem(prev => (prev + 1) % menuItemCount);
         } else if (action === "UP") {
-          const menuItemCount = folders.length + 5 + stopMenuOffset;
+          const menuItemCount = folders.length + 5 + menuOffset;
           setSelectedMenuItem(prev => (prev - 1 + menuItemCount) % menuItemCount);
         } else if (action === "CONFIRM") {
           // Execute selected menu item
@@ -1178,6 +1230,9 @@ function useInstalledGameDetails({
       trainerExists,
       showStopGameDialog,
       stopMenuOffset,
+      menuOffset,
+      updateInfo,
+      canAutoUpdateGame,
       gameSession,
     ]
   );
@@ -1303,6 +1358,8 @@ function useInstalledGameDetails({
     openStopGameDialog,
     handleStopGame,
     stopMenuOffset,
+    menuOffset,
+    updateInfo,
     selectedButton,
     setShowBrowseExeWarning,
     handleOpenDirectory,
