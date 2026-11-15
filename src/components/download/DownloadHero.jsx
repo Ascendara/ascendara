@@ -6,12 +6,14 @@ import {
 } from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatLatestUpdate, formatCompactNumber } from "@/lib/utils";
+import { steamBuildStatus } from "@/lib/steamBuild";
 import hltbService from "@/services/integrations/hltbService";
 import { formatBytes } from "@/services/app/systemHealthService";
 import { isImageReady, markImageReady } from "@/services/games/gamePagePreparer";
 import { useState } from "react";
 import {
   Apple,
+  CircleCheck,
   CircleSlash,
   Clock,
   Database,
@@ -99,6 +101,7 @@ export default function DownloadHero({
 }) {
   const { t } = useLanguage();
   const isVr = gameData.category?.includes("Virtual Reality");
+  const buildStatus = steamBuildStatus(gameData);
 
   return (
     <TooltipProvider>
@@ -164,6 +167,28 @@ export default function DownloadHero({
                 ) : (
                   <Chip className="bg-primary/15 text-primary">{gameData.version}</Chip>
                 ))}
+              {buildStatus === "latest" && (
+                <Chip
+                  className="bg-emerald-500/15 text-emerald-500"
+                  tooltip={t("download.steamBuild.latestTooltip", {
+                    build: gameData.sourceBuildId,
+                  })}
+                >
+                  <CircleCheck className="h-3 w-3" />
+                  {t("download.steamBuild.latest")}
+                </Chip>
+              )}
+              {buildStatus === "behind" && (
+                <Chip
+                  className="bg-muted text-muted-foreground"
+                  tooltip={t("download.steamBuild.behindTooltip", {
+                    build: gameData.sourceBuildId,
+                    latest: gameData.latestBuildId,
+                  })}
+                >
+                  {t("download.steamBuild.behind")}
+                </Chip>
+              )}
               {source && (
                 <Chip
                   className="max-w-[16rem] bg-muted text-foreground"
@@ -285,7 +310,9 @@ export default function DownloadHero({
         <dl className="grid grid-cols-2 divide-x divide-border/40 border-t border-border/40 bg-background/30 md:grid-cols-4">
           {gameData.size && <Stat label={t("download.gameSize")}>{gameData.size}</Stat>}
           {gameData.installSize > 0 && (
-            <Stat label={t("download.installSize")}>{formatBytes(gameData.installSize)}</Stat>
+            <Stat label={t("download.installSize")}>
+              {formatBytes(gameData.installSize)}
+            </Stat>
           )}
           <Stat label={t("download.latestUpdate")}>
             {formatLatestUpdate(gameData.latest_update)}

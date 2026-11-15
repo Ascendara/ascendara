@@ -2144,6 +2144,12 @@
       "ram": "RAM",
       "storage": "Storage"
     },
+    "steamBuild": {
+      "behind": "Newer build on Steam",
+      "behindTooltip": "This release is Steam build {{build}}. Steam has since moved to build {{latest}}, which may only be a small patch.",
+      "latest": "Latest build",
+      "latestTooltip": "Matches the current Steam build ({{build}})"
+    },
     "steamLoading": "Loading game information...",
     "steamLookupFailed": "Couldn't reach Steam right now. This game may still be on Steam.",
     "steamRating": "This game is rated {{rating}} apples. Apple ratings are different than Star ratings on Ascendara, and are more of a general rating of the game.",
@@ -5758,6 +5764,7 @@
       "commitView": "Commit",
       "latestCommit": "Latest development commit",
       "loading": "Loading…",
+      "openVersion": "See what's new in this version",
       "releaseView": "Release",
       "title": "Ascendara {{major}}",
       "version": "Version {{version}}",

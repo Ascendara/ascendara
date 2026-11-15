@@ -108,6 +108,7 @@ import { API_URL } from "@/config/api";
 import { clearLegacySideScrollbarPreference } from "@/lib/sideScrollbarPreference";
 import { persistThemeSelection } from "@/lib/themePersistence";
 import v12Art from "@/assets/v12.png";
+import { FEATURE_CENTER_EVENTS, openFeatureCenter } from "@/lib/featureCenterEvents";
 
 const themes = [
   // Light themes
@@ -899,10 +900,12 @@ function Settings() {
     if (!root || !header || !scroller) return undefined;
     const update = () => {
       const headerHeight = header.offsetHeight;
+      // The scrollport runs behind the dock; its bottom padding is the dock's
+      const dockClearance = parseFloat(getComputedStyle(scroller).paddingBottom) || 0;
       root.style.setProperty("--settings-aside-top", `${headerHeight + 16}px`);
       root.style.setProperty(
         "--settings-aside-max-h",
-        `${Math.max(160, scroller.clientHeight - headerHeight - 32)}px`
+        `${Math.max(160, scroller.clientHeight - dockClearance - headerHeight - 32)}px`
       );
     };
     const onScroll = () => setHeaderScrolled(scroller.scrollTop > 4);
@@ -4490,24 +4493,54 @@ function ReleaseCard({ t }) {
     <div className={VERSION_CARD_CLASS}>
       <button
         type="button"
-        onClick={() =>
-          window.electron.openURL("https://ascendara.app/changelog?individual")
+        // Opens the Version page in the System Center; the 12 badge flies into it
+        onClick={event =>
+          openFeatureCenter(FEATURE_CENTER_EVENTS.system, {
+            tab: "version",
+            origin: event.currentTarget.querySelector("[data-version-art]"),
+          })
         }
-        title={t("settings.versionBadge.viewChangelog")}
+        title={t("settings.versionBadge.openVersion")}
         className="group flex items-center gap-3 rounded-[16px] py-1 pl-1 pr-2 text-left outline-none transition-colors hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-primary"
       >
-        {/* App-icon tile: squircle, top sheen, inner hairline */}
-        <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[13px] bg-gradient-to-b from-[#2a1b4d] to-[#120a24] shadow-[0_4px_12px_-2px_rgba(109,40,217,0.55)] ring-1 ring-inset ring-white/10">
-          <span className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/15 to-transparent" />
+        {/* App-icon tile: soft lavender squircle with white silk waves */}
+        <span className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[13px] bg-gradient-to-br from-[#f4f0ff] via-[#e6defc] to-[#d3c6f5] shadow-[0_4px_12px_-4px_rgba(124,58,237,0.35)] ring-1 ring-inset ring-violet-300/40">
+          <svg
+            className="pointer-events-none absolute inset-0 h-full w-full"
+            viewBox="0 0 44 44"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M0 30 C 12 22, 26 34, 44 18 L 44 44 L 0 44 Z"
+              fill="white"
+              fillOpacity="0.35"
+            />
+            <path
+              d="M0 14 C 14 6, 24 22, 44 4"
+              fill="none"
+              stroke="white"
+              strokeOpacity="0.7"
+              strokeWidth="0.8"
+            />
+            <path
+              d="M0 24 C 16 14, 28 28, 44 12"
+              fill="none"
+              stroke="white"
+              strokeOpacity="0.5"
+              strokeWidth="0.6"
+            />
+          </svg>
           {major === "12" ? (
             <img
+              data-version-art
               src={v12Art}
               alt=""
               draggable={false}
-              className="relative w-7 drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] transition-transform duration-300 ease-out group-hover:scale-110"
+              className="relative w-7 drop-shadow-[0_1px_3px_rgba(124,58,237,0.35)] transition-transform duration-300 ease-out group-hover:scale-110"
             />
           ) : (
-            <span className="relative text-lg font-black text-violet-300">{major}</span>
+            <span className="relative text-lg font-black text-violet-600">{major}</span>
           )}
         </span>
         <span className="flex flex-col leading-tight">

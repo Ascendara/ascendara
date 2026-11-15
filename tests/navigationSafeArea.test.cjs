@@ -60,7 +60,7 @@ test("Settings safe area clears every dock presentation state", async () => {
   assert.ok(
     geometry.NAVIGATION_SETTINGS_SAFE_AREA_PX >
       geometry.NAVIGATION_EXPANDED_FOOTPRINT_PX,
-    "the Settings scrollport must stop above even an expanded/engaged fixed dock"
+    "Settings content must be able to rest above even an expanded/engaged fixed dock"
   );
 
   assert.equal(
@@ -90,16 +90,16 @@ test("Layout reserves a persistent Settings viewport exclusion zone", () => {
   assert.match(layoutSource, /data-route-scroll-container/);
   assert.match(layoutSource, /style=\{PAGE_CONTENT_TOP_OFFSET_STYLE\}/);
   assert.match(layoutSource, /hasNavigationBottomSafeArea \? "min-h-0" : ""/);
-  assert.match(layoutSource, /marginBottom: navigationBottomSafeArea \|\| undefined/);
+  assert.match(layoutSource, /paddingBottom: navigationBottomSafeArea \|\| undefined/);
+  assert.match(layoutSource, /scrollPaddingBottom: navigationBottomSafeArea \|\| undefined/);
 
-  // The safe-area value is applied to the bounded scrollport's layout box,
-  // not as trailing document content. That means its viewport ends above the
-  // dock for every scroll position.
+  // The bounded scrollport runs to the window edge behind the dock; the
+  // safe-area value is its bottom padding, so the last content rests above it.
   const mainIndex = layoutSource.indexOf("data-route-scroll-container");
   const navIndex = layoutSource.indexOf("<Navigation", mainIndex);
   const mainBlock = layoutSource.slice(mainIndex, navIndex);
   assert.match(mainBlock, /overflow-y-auto/);
-  assert.match(mainBlock, /marginBottom: navigationBottomSafeArea/);
+  assert.match(mainBlock, /paddingBottom: navigationBottomSafeArea/);
 
   for (const token of [
     "NAVIGATION_EDGE_PADDING_PX",

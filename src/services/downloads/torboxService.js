@@ -31,8 +31,24 @@ export const { getCachedSupportedHosts, getSupportedHosts } = createSupportedHos
   },
 });
 
+// TorBox only lists buzzheavier.com; its short domains serve the same file IDs.
+const HOST_ALIASES = { "bzzhr.to": "buzzheavier.com", "bzzhr.co": "buzzheavier.com" };
+
+const toTorboxLink = link => {
+  try {
+    const url = new URL(link.startsWith("//") ? `https:${link}` : link);
+    const alias = HOST_ALIASES[url.hostname.toLowerCase().replace(/^www\./, "")];
+    if (!alias) return link;
+    url.hostname = alias;
+    url.pathname = url.pathname.replace(/^\/{2,}/, "/");
+    return url.toString();
+  } catch {
+    return link;
+  }
+};
+
 export const isSupportedUrl = (link, domains = getCachedSupportedHosts()) =>
-  matchesSupportedUrl(link, domains);
+  matchesSupportedUrl(typeof link === "string" ? toTorboxLink(link) : link, domains);
 
 /**
  * Check if the Torbox service is enabled by verifying if an API key exists
@@ -214,6 +230,7 @@ export const createPremiumDownloadLink = async (link, apiKey) => {
     throw new Error("API key is required");
   }
 
+  link = toTorboxLink(link);
   if (!isSupportedUrl(link, await getSupportedHosts())) {
     const error = new Error("This URL is not in TorBox’s supported host list.");
     error.code = "UNSUPPORTED_SITE";
@@ -221,9 +238,8 @@ export const createPremiumDownloadLink = async (link, apiKey) => {
   }
 
   try {
-    // Create FormData object
-    const formData = new FormData();
-    formData.append("link", link);
+    // The API documents this endpoint as application/x-www-form-urlencoded.
+    const body = new URLSearchParams({ link });
     console.log(
       "[Torbox] Sending POST to",
       `${API_BASE_URL}/webdl/createwebdownload`,
@@ -235,9 +251,8 @@ export const createPremiumDownloadLink = async (link, apiKey) => {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        // No Content-Type header needed as it's automatically set with boundary for FormData
       },
-      body: formData,
+      body,
     });
     console.log("[Torbox] Response status:", response.status);
 
@@ -362,23 +377,10 @@ export const checkDownloadState = async (apiKey, webdlId) => {
   if (!apiKey) throw new Error("API key is required");
   if (!webdlId) throw new Error("Web download ID is required");
 
-  let base = API_BASE_URL;
-  if (base.startsWith("/")) {
-    base = window.location.origin + base;
-  }
-  const url = `${base}/webdl/mylist?d=${webdlId}`;
   try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-    });
-    const data = await response.json();
-    if (!data.success || !Array.isArray(data.data)) {
-      throw new Error(data.detail || "Failed to check download state");
-    }
-    return data.data;
+    // mylist filters by `id`; with it TorBox answers a single item instead of a list.
+    const items = await getDownloadList(apiKey, "webdl", { id: webdlId });
+    return items.filter(item => String(item.id) === String(webdlId));
   } catch (error) {
     console.error("[Torbox] Error checking download state:", error);
     throw error;
@@ -500,25 +502,10 @@ export const getDirectDownloadLinkFromUrl = async (
     }
     const createdWebdownloadId = createResult.data.webdownload_id;
     console.log("[Torbox] Premium download created with ID:", createdWebdownloadId);
-    // Step 2: Fetch the mylist (all downloads)
-    let base = API_BASE_URL;
-    if (base.startsWith("/")) {
-      base = window.location.origin + base;
-    }
-    const url = `${base}/webdl/mylist`;
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-    });
-    const data = await response.json();
-    if (!data.success || !Array.isArray(data.data)) {
-      throw new Error(data.detail || "Failed to fetch web downloads list");
-    }
-    // Optionally filter for the specific webdownloadId (either passed or just created)
+    // Step 2: Fetch the item live; the cached list can miss a download just created
     const idToCheck = webdownloadId || createdWebdownloadId;
-    const found = data.data.find(item => String(item.id) === String(idToCheck));
+    const items = await getDownloadList(apiKey, "webdl", { id: idToCheck });
+    const found = items.find(item => String(item.id) === String(idToCheck));
     if (!found) {
       throw new Error("Could not find created download in list");
     }

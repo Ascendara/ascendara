@@ -280,6 +280,7 @@ const featureCenterResources = {
           "Everything about this Ascendara install: app info, health, storage and recovery.",
         tabs: {
           about: "My Ascendara",
+          version: "Version",
           health: "Health",
           storage: "Storage",
           recovery: "Recovery",
@@ -299,6 +300,7 @@ const featureCenterResources = {
           checking: "Checking for updates…",
           checkUpdates: "Check for updates",
           changelog: "Changelog",
+          whatsNew: "What's new",
           stats: {
             games: "Games in library",
             custom: "{{count}} added manually",
@@ -326,6 +328,18 @@ const featureCenterResources = {
             feedback: "Feedback",
           },
           unknown: "Unknown",
+        },
+        version: {
+          eyebrow: "You're running",
+          latestChanges: "Latest changes",
+          showingVersion: "From the latest published release, v{{version}}.",
+          loadFailed: "Could not load the latest changes.",
+          showAll: "Show {{count}} more",
+          showLess: "Show less",
+          pastChanges: "Past changes",
+          pastChangesDescription: "Every release in the full changelog",
+          news: "News",
+          newsDescription: "Announcements and updates from the team",
         },
         status: {
           healthy: "Healthy",

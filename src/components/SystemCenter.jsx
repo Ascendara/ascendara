@@ -11,6 +11,7 @@ import {
   RefreshCw,
   RotateCcw,
   ShieldCheck,
+  Sparkles,
   Terminal,
   Wrench,
   XCircle,
@@ -19,6 +20,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import AboutTab from "@/components/system-center/AboutTab";
+import VersionTab from "@/components/system-center/VersionTab";
 import {
   FeatureCenterDialog,
   FeatureSection,
@@ -120,19 +122,23 @@ const SystemCenter = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("about");
-  // Opening from the menu bar logo flies that logo into the About hero
+  // Opening from the menu bar logo flies that logo into the About hero, and
+  // the Settings version badge flies into the Version hero the same way
   const flightOriginRef = useRef(null);
-  // The menu bar logo stays away until the dialog closes
+  // The flown logo stays away from its spot until the dialog closes
   const parkedLogoRef = useRef(null);
   const aboutLogoRef = useRef(null);
+  const versionBadgeRef = useRef(null);
   const [logoInFlight, setLogoInFlight] = useState(false);
   const handleOpenEvent = useCallback(detail => {
-    const tab = ["about", "health", "storage", "recovery"].includes(detail?.tab)
+    const tab = ["about", "version", "health", "storage", "recovery"].includes(
+      detail?.tab
+    )
       ? detail.tab
       : "about";
     setActiveTab(tab);
     if (
-      tab === "about" &&
+      (tab === "about" || tab === "version") &&
       detail?.origin instanceof HTMLElement &&
       !prefersReducedMotion()
     ) {
@@ -235,10 +241,10 @@ const SystemCenter = () => {
     // Closing or switching tabs mid-flight cancels it and shows the slot logo
     return flyLogo(
       origin,
-      () => aboutLogoRef.current,
+      () => (activeTab === "version" ? versionBadgeRef : aboutLogoRef).current,
       () => setLogoInFlight(false)
     );
-  }, [open, logoInFlight]);
+  }, [open, logoInFlight, activeTab]);
 
   useEffect(() => {
     if (open) return;
@@ -388,6 +394,7 @@ const SystemCenter = () => {
 
   const tabs = [
     { id: "about", label: t("featureCenters.system.tabs.about"), icon: Info },
+    { id: "version", label: t("featureCenters.system.tabs.version"), icon: Sparkles },
     { id: "health", label: t("featureCenters.system.tabs.health"), icon: Activity },
     { id: "storage", label: t("featureCenters.system.tabs.storage"), icon: HardDrive },
     { id: "recovery", label: t("featureCenters.system.tabs.recovery"), icon: Wrench },
@@ -405,7 +412,16 @@ const SystemCenter = () => {
     >
       <FeatureTabs items={tabs} activeId={activeTab} onChange={setActiveTab}>
         {activeTab === "about" && (
-          <AboutTab ref={aboutLogoRef} t={t} hideLogo={logoInFlight} />
+          <AboutTab
+            ref={aboutLogoRef}
+            t={t}
+            hideLogo={logoInFlight}
+            onOpenVersion={() => setActiveTab("version")}
+          />
+        )}
+
+        {activeTab === "version" && (
+          <VersionTab ref={versionBadgeRef} t={t} hideBadge={logoInFlight} />
         )}
 
         {activeTab === "health" && (
