@@ -22,6 +22,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Dragging a link would show its localhost URL; links here are app buttons */
+a {
+  -webkit-user-drag: none;
+}
+
 button {
   border: none;
   outline: none;
