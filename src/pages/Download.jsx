@@ -544,9 +544,10 @@ function PublicDownloadPage() {
     checkNexusModSupport();
   }, [gameData?.game]);
 
-  // Mod browsing follows the same Ascend access as the library's Extras tab
+  // Ascend perks and mod browsing follow the same access as the library's
+  // Extras tab, which also covers the free trial
   useEffect(() => {
-    if (!isAuthenticated || !supportsModManaging) {
+    if (!isAuthenticated) {
       setHasAscendAccess(false);
       return;
     }
@@ -560,7 +561,7 @@ function PublicDownloadPage() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, supportsModManaging]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     setShowModsBrowser(false);
@@ -2153,7 +2154,7 @@ function PublicDownloadPage() {
             <AscendPerks
               gameName={gameData.game}
               isAuthenticated={isAuthenticated}
-              hasSubscription={!!userData?.ascendSubscription?.active}
+              hasAccess={!!userData?.ascendSubscription?.active || hasAscendAccess}
               supportsModManaging={supportsModManaging}
               supportsFlingTrainer={supportsFlingTrainer}
               supportsAutoUpdates={

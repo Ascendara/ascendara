@@ -1876,7 +1876,6 @@
     "ascendFeaturesLocked": "{{gameName}} offers these Ascend features:",
     "autoUpdates": "Auto Updates",
     "betaFeature": "Woah... this is still in beta!",
-    "browseModsTooltip": "Browse this game's mods on Nexus Mods",
     "by": "by",
     "canRun": {
       "close": "Close",
@@ -2060,6 +2059,69 @@
       "viewing": "Viewing"
     },
     "outdatedIndexWarning": "This game's index is outdated. Please refresh the page to see the latest information.",
+    "perkDialog": {
+      "autoUpdates": {
+        "body": "Stay on the latest version of {{gameName}} without downloading the whole game again by hand.",
+        "note": "Works for games downloaded from the Ascendara index, not from external sources.",
+        "point1": "Ascendara checks for new versions of your installed games in the background.",
+        "point2": "You get a notification as soon as an update is out.",
+        "point3": "Install the update with a single click.",
+        "short": "Update in one click when a new version is out",
+        "title": "Auto Updates"
+      },
+      "browseMods": "Browse mods",
+      "close": "Close",
+      "cloudSaves": {
+        "body": "Keep your {{gameName}} progress safe in your Ascend account and pick up where you left off on any PC.",
+        "point1": "Back up save data whenever you want, or let Ascendara back it up every time the game closes.",
+        "point2": "Restore a local or cloud backup, even on a new PC after a fresh install.",
+        "point3": "Playtime and achievements sync to your account too, so your history follows you.",
+        "short": "Back up your saves and restore them anywhere",
+        "title": "Cloud Saves"
+      },
+      "gotIt": "Got it",
+      "howItWorks": "How it works",
+      "included": "Included with Ascend",
+      "learnAbout": "Learn about {{name}}",
+      "mods": {
+        "body": "Browse the mods made for {{gameName}} on Nexus Mods without leaving Ascendara, even before the game is installed.",
+        "note": "Mod files download from Nexus Mods in your browser, so you need to be signed in to Nexus Mods there.",
+        "point1": "Search mods and sort them by popularity, downloads or recent updates.",
+        "point2": "Open a mod to read its description and see every file it offers.",
+        "point3": "Once the game is in your library, its mods are in the Mods & Trainers tab too.",
+        "short": "Browse Nexus mods before you install",
+        "title": "Nexus Mods"
+      },
+      "notNow": "Not now",
+      "partOfAscend": "Part of Ascend",
+      "queue": {
+        "body": "Line up {{gameName}} behind your other downloads instead of waiting for them to finish.",
+        "note": "Without Ascend, one download can wait in the queue at a time.",
+        "point1": "Add as many games to the queue as you want.",
+        "point2": "Ascendara starts the next download as soon as the current one finishes.",
+        "point3": "Reorder or remove queued games anytime from the Downloads page.",
+        "short": "Line up downloads to run back to back",
+        "title": "Queue Downloads"
+      },
+      "remote": {
+        "body": "Keep track of {{gameName}} from your phone with Ascendara Companion, right in your phone's browser.",
+        "point1": "Follow the download live and pause or resume it while you're away from your PC.",
+        "point2": "Launch installed games on your PC from your phone.",
+        "point3": "Browse the Ascendara index and see what your friends are up to.",
+        "short": "Manage downloads from your phone",
+        "title": "Remote Control"
+      },
+      "thisGame": "this game",
+      "trainer": {
+        "body": "Get the FLiNG trainer for {{gameName}} without searching for it or setting it up yourself.",
+        "point1": "Ascendara finds the right FLiNG trainer and installs it in the game folder.",
+        "point2": "Turn on Launch with Trainer to start it alongside the game.",
+        "point3": "Find it in the game's Mods & Trainers tab once the game is installed.",
+        "short": "FLiNG trainer found and installed for you",
+        "title": "Trainer Menu"
+      }
+    },
+    "perksHint": "Pick a feature to see how it works with {{gameName}}.",
     "platforms": "Platforms",
     "preparingGame": "Fetching game information...",
     "pressEscToGoBack": "Click Me or ESC key to go back",
