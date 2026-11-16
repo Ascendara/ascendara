@@ -14,7 +14,18 @@ let supportsHeartbeat = false;
 let failures = 0;
 let retryAt = 0;
 let syncFailures = 0;
+// The monitor tells us how soon to check for launch/stop commands: quickly
+// while a companion is open, slowly otherwise. Older servers send no hint.
+const DEFAULT_COMMAND_POLL_MS = 3000;
+let nextCommandPoll = 0;
 const handled = new Map();
+
+function scheduleCommandPoll(pollAfterMs) {
+  const delay = Number.isFinite(pollAfterMs)
+    ? Math.min(60000, Math.max(2000, pollAfterMs))
+    : DEFAULT_COMMAND_POLL_MS;
+  nextCommandPoll = Date.now() + delay;
+}
 
 async function gameId(game, isCustom) {
   const identity = JSON.stringify([
@@ -170,6 +181,10 @@ async function tick() {
       });
       if (currentUser !== user) return;
       supportsHeartbeat = activity.libraryHeartbeat === true;
+      // A faster hint (a companion just opened) applies right away
+      if (Number.isFinite(activity.pollAfterMs)) {
+        nextCommandPoll = Math.min(nextCommandPoll, Date.now() + activity.pollAfterMs);
+      }
       if (activity.syncRequired) {
         lastLibrarySignature = null;
         lastSync = 0;
@@ -178,10 +193,16 @@ async function tick() {
       lastActivitySignature = activityBody;
       lastActivityAt = Date.now();
     }
-    const { commands } = await authorizedFetch(
+    if (Date.now() < nextCommandPoll) {
+      failures = 0;
+      retryAt = 0;
+      return;
+    }
+    const { commands, pollAfterMs } = await authorizedFetch(
       `/library/commands/${encodeURIComponent(user.uid)}?actions=launch,stop`
     );
     if (currentUser !== user) return;
+    scheduleCommandPoll(pollAfterMs);
     failures = 0;
     retryAt = 0;
     if (commands.length && !games) games = await localGames();
@@ -302,5 +323,6 @@ export function stopDesktopLibrarySync() {
   failures = 0;
   retryAt = 0;
   syncFailures = 0;
+  nextCommandPoll = 0;
   handled.clear();
 }
