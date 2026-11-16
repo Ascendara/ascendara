@@ -240,9 +240,9 @@ const computeOverviewStats = async ({ uid, hasCloudAccess, getCloud }) => {
   // never derives these numbers when online.
   const localFallback = calculateProfileStats(mergedRegular, mergedCustom);
 
-  // Level/XP must never decrease (e.g. after uninstalling a game or a
-  // stale/lower cloud snapshot). Always take the higher of the
-  // freshly-computed local XP vs. the last persisted local value.
+  // Offline, level/XP must never decrease (e.g. after uninstalling a game).
+  // Take the higher of the freshly-computed local XP and the last persisted
+  // value, which is the server's whenever it was last reachable.
   let persistedLocalStats = null;
   try {
     persistedLocalStats =
@@ -251,7 +251,7 @@ const computeOverviewStats = async ({ uid, hasCloudAccess, getCloud }) => {
     persistedLocalStats = null;
   }
 
-  let bestXP = Math.max(localFallback.xp || 0, persistedLocalStats?.xp || 0);
+  const bestXP = Math.max(localFallback.xp || 0, persistedLocalStats?.xp || 0);
   let finalStats = {
     ...calculateProfileStats(mergedRegular, mergedCustom),
     totalPlaytime: Math.max(
@@ -273,23 +273,18 @@ const computeOverviewStats = async ({ uid, hasCloudAccess, getCloud }) => {
 
   if (hasCloudAccess && uid) {
     try {
-      // Ask the server to reconcile from cloudLibrary and write fresh
-      // profileStats. Fire-and-forget its own recomputation is fine;
-      // we still read back whichever is newest.
-      recomputeProfileStats().catch(() => {});
-      const cloudProfile = await getProfileStats();
-      const cs = cloudProfile?.data;
+      // The server's profileStats are shown as-is so the dashboard matches
+      // the leaderboard and Profile. Recompute first so they reflect the
+      // latest cloudLibrary; fall back to the stored stats if that fails.
+      const recomputed = await recomputeProfileStats().catch(() => null);
+      const cs = recomputed?.stats ?? (await getProfileStats())?.data ?? null;
       if (cs && typeof cs.xp === "number") {
-        // Never let a lower cloud value pull the displayed level/XP down.
-        bestXP = Math.max(cs.xp || 0, bestXP);
-        const progress = calculateLevelFromXP(bestXP);
-
         finalStats = {
           ...finalStats,
-          ...progress,
-          totalPlaytime: Math.max(cs.totalPlaytime || 0, finalStats.totalPlaytime),
-          gamesPlayed: Math.max(cs.gamesPlayed || 0, finalStats.gamesPlayed),
-          totalGames: Math.max(cs.totalGames || 0, finalStats.totalGames),
+          ...calculateLevelFromXP(cs.xp),
+          totalPlaytime: cs.totalPlaytime || 0,
+          gamesPlayed: cs.gamesPlayed || 0,
+          totalGames: cs.totalGames || 0,
         };
       }
     } catch (e) {
@@ -300,8 +295,9 @@ const computeOverviewStats = async ({ uid, hasCloudAccess, getCloud }) => {
     }
   }
 
-  // Persist the resolved (never-decreasing) stats locally so future
-  // loads — and Profile.jsx's own persisted-stats check — see the peak.
+  // Persist the resolved stats locally as the offline fallback for future
+  // loads and Profile.jsx. Online, this replaces any stale local peak with
+  // the server's numbers.
   if (window.electron?.setTimestampValue) {
     try {
       await window.electron.setTimestampValue("profileStats", {

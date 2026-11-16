@@ -679,40 +679,22 @@ const Profile = () => {
         };
       }
 
-      // Cloud-first override: when the user is signed in, the server at
-      // api.ascendara.app is the source of truth for level / XP / totals.
-      // We fetch the persisted profileStats and, if present, use those values
-      // for display instead of the freshly computed local ones. The local
-      // `BuildProfileStatsFromGames` call above remains as an offline fallback
-      // and to build `allGames` / downloadHistory-adjacent UI state.
+      // When signed in, the server's profileStats are shown as-is so Profile
+      // matches the leaderboard and every other user-facing surface. The
+      // local numbers above are only the offline fallback.
       if (User?.uid) {
-        // Fire-and-forget recompute so the server reconciles against the
-        // latest cloudLibrary (important after a fresh sign-in or cloud
-        // library sync on a new device).
-        RecomputeProfileStats().catch(() => {});
         try {
-          const CloudProfile = await GetProfileStats();
-          const CloudStats = CloudProfile?.data;
+          // Recompute first so the server has reconciled the latest
+          // cloudLibrary; fall back to the stored stats if that fails.
+          const Recomputed = await RecomputeProfileStats().catch(() => null);
+          const CloudStats = Recomputed?.stats ?? (await GetProfileStats())?.data ?? null;
           if (CloudStats && typeof CloudStats.xp === "number") {
-            // Never let a lower cloud value pull the displayed level/XP down.
-            const BestXP = Math.max(CloudStats.xp || 0, CalculatedStats.xp || 0);
-            const Progress = CalculateLevelProgressFromXP(BestXP);
-
             CalculatedStats = {
               ...CalculatedStats,
-              ...Progress,
-              totalPlaytime: Math.max(
-                CloudStats.totalPlaytime || 0,
-                CalculatedStats.totalPlaytime || 0
-              ),
-              gamesPlayed: Math.max(
-                CloudStats.gamesPlayed || 0,
-                CalculatedStats.gamesPlayed || 0
-              ),
-              totalGames: Math.max(
-                CloudStats.totalGames || 0,
-                CalculatedStats.totalGames || 0
-              ),
+              ...CalculateLevelProgressFromXP(CloudStats.xp),
+              totalPlaytime: CloudStats.totalPlaytime || 0,
+              gamesPlayed: CloudStats.gamesPlayed || 0,
+              totalGames: CloudStats.totalGames || 0,
             };
           }
         } catch (e) {
