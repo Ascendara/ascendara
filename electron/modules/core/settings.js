@@ -180,6 +180,8 @@ class SettingsManager {
       // Keep the official index and several external sources in use together
       combineSources: false,
       extraSources: [],
+      // Keys ("official" or a source url) in the order combined sources are shown
+      sourceOrder: [],
       customSourcesLibrary: [],
       customLists: [],
       activeCustomList: null,

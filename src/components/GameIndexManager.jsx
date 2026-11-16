@@ -64,11 +64,13 @@ import { useAuth } from "@/context/AuthContext";
 import imageCacheService from "@/services/images/imageCacheService";
 import gameService from "@/services/games/gameService";
 import PrivateSources from "@/components/PrivateSources";
+import SourceOrderList from "@/components/SourceOrderList";
 import { cn } from "@/lib/utils";
 import { API_URL } from "@/config/api";
 import {
   activeExternalSources,
   dropSource,
+  orderedSources,
   pickSource,
   usesOfficialIndex,
 } from "@/lib/combinedSources";
@@ -1559,9 +1561,11 @@ const GameIndexManager = ({
     activeKindId === "official"
       ? t("localRefresh.ascendaraIndex") || "Ascendara Index"
       : activeKindId === "combined"
-        ? [t("localRefresh.ascendaraIndex"), ...activeSources.map(s => s.name)].join(
-            " + "
-          )
+        ? orderedSources(settings)
+            .map(entry =>
+              entry.official ? t("localRefresh.ascendaraIndex") : entry.source.name
+            )
+            .join(" + ")
         : activeCustomList?.name ||
           customSource?.name ||
           t("localRefresh.noSourceSelected") ||
@@ -1812,6 +1816,14 @@ const GameIndexManager = ({
                 onCheckedChange={requestCombineSources}
               />
             </section>
+
+            {/* Which sources show first in search and on download pages */}
+            {combining && (
+              <SourceOrderList
+                disabled={modeLocked || isSyncingCustomSource}
+                onChange={clearGameCaches}
+              />
+            )}
 
             {/* One tab per kind of source, each laid out the same way */}
             <Tabs value={sourcesTab} onValueChange={setSourcesTab}>

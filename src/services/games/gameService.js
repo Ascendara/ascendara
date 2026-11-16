@@ -2,7 +2,11 @@ import { sanitizeText } from "@/lib/utils";
 import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { API_URL } from "@/config/api";
 import { activePrivateSourceIds } from "@/lib/activePrivateSources";
-import { activeExternalSources, combinedSourceKey } from "@/lib/combinedSources";
+import {
+  activeExternalSources,
+  combinedSourceKey,
+  orderedSources,
+} from "@/lib/combinedSources";
 import { hydraHostKey } from "./hydraSource";
 
 const CACHE_KEY = "ascendara_games_cache";
@@ -306,7 +310,7 @@ const gameService = {
       ? activeExternalSources(settings)
       : [];
     const activeCustomUrl = combinedSources.length
-      ? combinedSourceKey(combinedSources)
+      ? combinedSourceKey(settings)
       : customMode && customSource?.url
         ? customSource.url
         : null;
@@ -337,7 +341,10 @@ const gameService = {
     }
 
     if (combined) {
-      const data = await this._loadCombinedData(settings?.localIndex, combinedSources);
+      const data = await this._loadCombinedData(
+        settings?.localIndex,
+        orderedSources(settings)
+      );
       await this.updateCache(data, true, settings?.localIndex || null, activeCustomUrl);
       return data;
     }
@@ -478,29 +485,40 @@ const gameService = {
   },
 
   /**
-   * The official index plus every external source in the set, as one catalog.
-   * A source that fails to load is left out so the rest still show.
+   * The official index plus every external source in the set, as one catalog
+   * in the order the user arranged them. Each game carries its source's place
+   * in that order as sourceRank. A source that fails to load is left out so
+   * the rest still show.
+   * @param {{ official: boolean, source: object|null }[]} entries from orderedSources
    */
-  async _loadCombinedData(localIndexPath, sources) {
-    const [official, ...external] = await Promise.allSettled([
-      localIndexPath
-        ? this.fetchDataFromLocalIndex(localIndexPath)
-        : Promise.resolve(null),
-      ...sources.map(source => this._loadCustomSourceData(source)),
-    ]);
+  async _loadCombinedData(localIndexPath, entries) {
+    const results = await Promise.allSettled(
+      entries.map(entry =>
+        entry.official
+          ? localIndexPath
+            ? this.fetchDataFromLocalIndex(localIndexPath)
+            : Promise.resolve(null)
+          : this._loadCustomSourceData(entry.source)
+      )
+    );
     const failed = [];
-    const officialData = official.status === "fulfilled" ? official.value : null;
-    if (official.status === "rejected") {
-      console.warn("[GameService] Official index failed to load:", official.reason);
-    }
-    const externalGames = external.flatMap((result, i) => {
-      if (result.status === "fulfilled") return result.value?.games || [];
-      console.warn("[GameService] Source failed to load:", result.reason);
-      failed.push(sources[i].name || sources[i].url);
-      return [];
-    });
+    let officialData = null;
     // Official games keep the index's categories, covers and ranking
-    const games = [...(officialData?.games || []), ...externalGames];
+    const games = results.flatMap((result, rank) => {
+      const entry = entries[rank];
+      if (result.status === "rejected") {
+        if (entry.official) {
+          console.warn("[GameService] Official index failed to load:", result.reason);
+        } else {
+          console.warn("[GameService] Source failed to load:", result.reason);
+          failed.push(entry.source.name || entry.source.url);
+        }
+        return [];
+      }
+      if (entry.official) officialData = result.value;
+      return (result.value?.games || []).map(game => ({ ...game, sourceRank: rank }));
+    });
+    const sources = entries.filter(e => !e.official).map(e => e.source);
     return {
       games,
       metadata: {

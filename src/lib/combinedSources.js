@@ -77,12 +77,56 @@ export function replaceSource(settings, previous, next) {
   };
 }
 
+// Stands for the Ascendara index in settings.sourceOrder
+export const OFFICIAL_SOURCE_KEY = "official";
+
 /**
- * Stable key for the set, used to tell cached catalogs apart.
- * @param {object[]} sources
+ * The official index and every external source in use, in the order the user
+ * arranged them. Sources missing from settings.sourceOrder go last, newest
+ * last; the official index goes first until it is moved.
+ * @returns {{ key: string, official: boolean, source: object|null }[]}
  */
-export function combinedSourceKey(sources) {
-  return `combined:${sources.map(keyOf).join("|")}`;
+export function orderedSources(settings) {
+  const entries = [
+    ...(usesOfficialIndex(settings)
+      ? [{ key: OFFICIAL_SOURCE_KEY, official: true, source: null }]
+      : []),
+    ...activeExternalSources(settings).map(source => ({
+      key: keyOf(source),
+      official: false,
+      source,
+    })),
+  ];
+  const saved = Array.isArray(settings?.sourceOrder) ? settings.sourceOrder : [];
+  const rank = key => {
+    const i = saved.indexOf(key);
+    if (i !== -1) return i;
+    return key === OFFICIAL_SOURCE_KEY ? -1 : saved.length;
+  };
+  // Array sort is stable, so unranked sources keep the order they were added in
+  return entries.sort((a, b) => rank(a.key) - rank(b.key));
+}
+
+/**
+ * The settings.sourceOrder value with `key` moved to `toIndex`.
+ * @returns {string[]}
+ */
+export function moveSource(settings, key, toIndex) {
+  const keys = orderedSources(settings).map(entry => entry.key);
+  const from = keys.indexOf(key);
+  if (from === -1) return keys;
+  keys.splice(from, 1);
+  keys.splice(Math.max(0, Math.min(toIndex, keys.length)), 0, key);
+  return keys;
+}
+
+/**
+ * Stable key for the set and its order, used to tell cached catalogs apart.
+ */
+export function combinedSourceKey(settings) {
+  return `combined:${orderedSources(settings)
+    .map(entry => entry.key)
+    .join("|")}`;
 }
 
 /**

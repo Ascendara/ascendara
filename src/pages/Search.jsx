@@ -716,7 +716,9 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
   function getSortFunction(sortType) {
     switch (sortType) {
       case "weight":
-        return (a, b) => (b.weight || 0) - (a.weight || 0);
+        // Combined catalogs show the user's preferred sources first
+        return (a, b) =>
+          (a.sourceRank ?? 0) - (b.sourceRank ?? 0) || (b.weight || 0) - (a.weight || 0);
       case "weight-asc":
         return (a, b) => (a.weight || 0) - (b.weight || 0);
       case "name":

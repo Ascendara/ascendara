@@ -48,7 +48,7 @@ import { useImageLoader } from "@/hooks/useImageLoader";
 import gameService from "@/services/games/gameService";
 import imageCacheService from "@/services/images/imageCacheService";
 import { holdLoad, releaseWhenDecoded } from "@/lib/loadGate";
-import { activeExternalSources } from "@/lib/combinedSources";
+import { orderedSources } from "@/lib/combinedSources";
 import steamGridImageService from "@/services/images/steamGridImageService";
 import recentGamesService from "@/services/library/recentGamesService";
 import { pullCloudGameDataBeforeLaunch } from "@/services/cloud/gameLaunchCloudSync";
@@ -93,8 +93,8 @@ const computeSourceKey = settings => {
   if (!settings) return "none";
   const customMode = !!settings.customSourcesMode;
   if (customMode && settings.combineSources) {
-    const urls = activeExternalSources(settings).map(s => s.url);
-    return `combined:${settings.localIndex || "default"}:${urls.join("|")}`;
+    const keys = orderedSources(settings).map(entry => entry.key);
+    return `combined:${settings.localIndex || "default"}:${keys.join("|")}`;
   }
   if (customMode) {
     const list = settings.activeCustomList;
