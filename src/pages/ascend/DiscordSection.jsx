@@ -46,7 +46,7 @@ export default function DiscordSection({
   const isConnected = Boolean(linkedDiscord);
   const isTrial = !ascendAccess?.isSubscribed && !ascendAccess?.isVerified;
   const verifyCode = user?.uid?.substring(0, 10) || "";
-  const command = `=verifyascend ${verifyCode}`;
+  const command = `/verifyascend ${verifyCode}`;
 
   const planLabel = ascendAccess?.isVerified
     ? t("ascend.subscription.verified")
@@ -223,7 +223,7 @@ export default function DiscordSection({
                       <p className="text-sm">{t("ascend.settings.verifyStep2")}</p>
                       <div className="flex items-center gap-2 rounded-lg bg-muted/50 py-1.5 pl-3 pr-1.5">
                         <code className="min-w-0 flex-1 truncate font-mono text-sm">
-                          =verifyascend {verifyCode || "XXXXXXXXXX"}
+                          /verifyascend {verifyCode || "XXXXXXXXXX"}
                         </code>
                         <Button
                           size="sm"
