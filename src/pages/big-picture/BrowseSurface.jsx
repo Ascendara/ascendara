@@ -26,6 +26,7 @@ import { useHomeArtwork } from "./useHomeArtwork";
 import gamePagePreparer from "@/services/games/gamePagePreparer";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
+import { isMatureCategory } from "@/lib/matureContent";
 import { catalogSizeText } from "@/lib/installSpace";
 import "./browse-controls.css";
 
@@ -69,7 +70,7 @@ export function BrowseSurface({
     setPage(0);
   }
   const genres = useMemo(() => [...new Set(games.flatMap(genresFor))]
-    .filter(item => settings.seeInappropriateContent || item !== "Nudity")
+    .filter(item => settings.seeInappropriateContent || !isMatureCategory(item))
     .sort(), [games, settings.seeInappropriateContent]);
   // A genre picked from another index (or a hidden mature one) no longer applies.
   const genre = genres.includes(selectedGenre) ? selectedGenre : "";

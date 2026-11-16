@@ -1,6 +1,7 @@
 import { useMemo, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { isMatureCategory } from "@/lib/matureContent";
 
 function CategoryFilter({
   selectedCategories = [],
@@ -12,7 +13,7 @@ function CategoryFilter({
     const allCategories = new Set();
     games.forEach(game => {
       game.category?.forEach(category => {
-        if (showMatureCategories || category !== "Nudity") {
+        if (showMatureCategories || !isMatureCategory(category)) {
           allCategories.add(category);
         }
       });
@@ -22,7 +23,10 @@ function CategoryFilter({
 
   useEffect(() => {
     if (!showMatureCategories) {
-      setSelectedCategories(prev => prev.filter(cat => cat !== "Nudity"));
+      setSelectedCategories(prev => {
+        const kept = prev.filter(cat => !isMatureCategory(cat));
+        return kept.length === prev.length ? prev : kept;
+      });
     }
   }, [showMatureCategories, setSelectedCategories]);
 

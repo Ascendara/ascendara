@@ -53,6 +53,8 @@ import {
 import useStableNavigate from "@/hooks/useStableNavigate";
 import imageCacheService from "@/services/images/imageCacheService";
 import { formatLatestUpdate, sanitizeText, formatCompactNumber } from "@/lib/utils";
+import { filterMatureGames } from "@/lib/matureContent";
+import { useSettings } from "@/context/SettingsContext";
 import verifiedGamesService from "@/services/games/verifiedGamesService";
 import ratingQueueService from "@/services/games/ratingQueueService";
 import installedGamesService from "@/services/library/installedGamesService";
@@ -247,6 +249,15 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
     return savedSize ? parseFloat(savedSize) : 100;
   });
   const [settings, setSettings] = useState({ seeInappropriateContent: false });
+  const { settings: liveSettings } = useSettings();
+  // Mature games only show when the setting allows them; read live so the
+  // toggle applies while this page stays mounted
+  const showMature = Boolean(liveSettings?.seeInappropriateContent);
+  const shownGames = useMemo(
+    () => filterMatureGames(games, showMature),
+    [games, showMature]
+  );
+
   const catalogRequestRef = useRef(0);
   const [displayedGames, setDisplayedGames] = useState([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -330,15 +341,15 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
     const query = searchQuery.toLowerCase().trim();
     // Early exit optimization - stop after finding 5 results
     const results = [];
-    for (let i = 0; i < games.length && results.length < 5; i++) {
-      const title = games[i].game.toLowerCase();
+    for (let i = 0; i < shownGames.length && results.length < 5; i++) {
+      const title = shownGames[i].game.toLowerCase();
       if (title.includes(query)) {
-        results.push(games[i]);
+        results.push(shownGames[i]);
       }
     }
 
     setQuickSearchResults(results);
-  }, [searchQuery, games]);
+  }, [searchQuery, shownGames]);
 
   // Handle scroll to show/hide sticky search bar with throttling
   useEffect(() => {
@@ -600,6 +611,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
   ]);
 
   const filteredGames = useMemo(() => {
+    const games = shownGames;
     if (!games?.length) return [];
 
     // Early return if no filters applied
@@ -689,7 +701,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
     const sortFn = getSortFunction(selectedSort);
     return sortFn ? filtered.sort(sortFn) : filtered;
   }, [
-    games,
+    shownGames,
     debouncedSearchQuery,
     selectedCategories,
     onlineFilter,
@@ -1270,8 +1282,8 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                       <CategoryFilter
                         selectedCategories={selectedCategories}
                         setSelectedCategories={setSelectedCategories}
-                        games={games}
-                        showMatureCategories={settings.seeInappropriateContent}
+                        games={shownGames}
+                        showMatureCategories={showMature}
                       />
                     </div>
                   </div>

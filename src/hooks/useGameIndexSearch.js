@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { useSearch } from "@/context/SearchContext";
 import gameService from "@/services/games/gameService";
+import { useSettings } from "@/context/SettingsContext";
+import { filterMatureGames } from "@/lib/matureContent";
 
 export const useGameIndexSearch = () => {
   const { registerSearchable, unregisterSearchable } = useSearch();
   const [isLoading, setIsLoading] = useState(false);
+  const { settings } = useSettings();
+  const showMature = Boolean(settings?.seeInappropriateContent);
 
   useEffect(() => {
     let isMounted = true;
@@ -16,7 +20,8 @@ export const useGameIndexSearch = () => {
 
         if (!isMounted) return;
 
-        const games = gamesData?.games || [];
+        // Mature games only show when the setting allows them
+        const games = filterMatureGames(gamesData?.games || [], showMature);
 
         const searchableGames = games.map(game => ({
           id: game.gameID || game.game,
@@ -65,7 +70,7 @@ export const useGameIndexSearch = () => {
       window.removeEventListener("index-refreshed", handleIndexRefreshed);
       unregisterSearchable("index");
     };
-  }, [registerSearchable, unregisterSearchable]);
+  }, [registerSearchable, unregisterSearchable, showMature]);
 
   return { isLoading };
 };

@@ -1,6 +1,7 @@
 import { useLibraryConflicts } from "@/hooks/useLibraryConflicts";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
+import { filterMatureGames } from "@/lib/matureContent";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -996,7 +997,7 @@ function useBigPicturePage() {
   const debouncedSearchQuery = useDebouncedValue(storeSearchQuery, 300);
 
   const filteredStoreGames = useMemo(() => {
-    let filtered = storeGames;
+    let filtered = filterMatureGames(storeGames, settings.seeInappropriateContent);
 
     // Apply search filter
     if (debouncedSearchQuery.trim()) {
@@ -1045,7 +1046,15 @@ function useBigPicturePage() {
     })();
 
     return sortFn ? [...filtered].sort(sortFn) : filtered;
-  }, [storeGames, debouncedSearchQuery, fuzzyMatch, showDLC, showOnline, selectedSort]);
+  }, [
+    storeGames,
+    settings.seeInappropriateContent,
+    debouncedSearchQuery,
+    fuzzyMatch,
+    showDLC,
+    showOnline,
+    selectedSort,
+  ]);
 
   const displayedStoreGames = useMemo(() => {
     return filteredStoreGames.slice(0, displayedCount);

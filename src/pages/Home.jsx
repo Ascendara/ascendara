@@ -1,4 +1,4 @@
-import { useState, useEffect, memo, useCallback, useRef } from "react";
+import { useState, useEffect, memo, useCallback, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import GameContextMenu from "@/components/GameContextMenu";
 import SteamNotRunningDialog from "@/components/SteamNotRunningDialog";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
+import { filterMatureGames } from "@/lib/matureContent";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -563,10 +564,10 @@ const HorizontalSection = ({
 
 const Home = memo(() => {
   const navigate = useNavigate();
-  const [apiGames, setApiGames] = useState(() => gamesCache || []);
+  const [allApiGames, setApiGames] = useState(() => gamesCache || []);
   const [installedGames, setInstalledGames] = useState(() => installedGamesCache || []);
   const [loading, setLoading] = useState(() => !hasWarmCache());
-  const [carouselGames, setCarouselGames] = useState(() => carouselGamesCache || []);
+  const [allCarouselGames, setCarouselGames] = useState(() => carouselGamesCache || []);
   const [topGames, setTopGames] = useState(() => cachedSections()?.topGames || []);
   const [recentlyUpdatedGames, setRecentlyUpdatedGames] = useState(
     () => cachedSections()?.recentlyUpdatedGames || []
@@ -582,6 +583,16 @@ const Home = memo(() => {
   );
   const { t } = useLanguage();
   const { settings } = useSettings();
+  // Mature games stay out of Home unless the setting allows them
+  const showMature = Boolean(settings?.seeInappropriateContent);
+  const apiGames = useMemo(
+    () => filterMatureGames(allApiGames, showMature),
+    [allApiGames, showMature]
+  );
+  const carouselGames = useMemo(
+    () => filterMatureGames(allCarouselGames, showMature),
+    [allCarouselGames, showMature]
+  );
   const [currentSlide, setCurrentSlide] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();

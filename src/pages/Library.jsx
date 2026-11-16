@@ -109,6 +109,7 @@ import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
 import steamService from "@/services/games/gameInfoService";
 import { useSettings } from "@/context/SettingsContext";
+import { visibleCategories } from "@/lib/matureContent";
 import { useAuth } from "@/context/AuthContext";
 import {
   getCloudLibrary,
@@ -3317,7 +3318,13 @@ const Library = () => {
                 const cats = Array.isArray(g.category) ? g.category : [];
                 cats.forEach(c => genreSet.add(c));
               });
-              const allGenres = ["all", ...Array.from(genreSet).sort()];
+              const allGenres = [
+                "all",
+                ...visibleCategories(
+                  Array.from(genreSet),
+                  settings.seeInappropriateContent
+                ).sort(),
+              ];
 
               // Filter by genre
               const genreFiltered =
