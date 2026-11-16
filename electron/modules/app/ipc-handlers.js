@@ -365,11 +365,14 @@ function registerMiscHandlers() {
       // The returned promise settles with what happened so the renderer can
       // stop its loading state.
       const autoDownload = !!options.autoDownload;
+      // returnUrl hands the caught file URL back to the caller (e.g. to send it
+      // to a debrid service) instead of starting a download in the main window.
+      const returnUrl = autoDownload && !!options.returnUrl;
       let settle = () => {};
       const outcome = new Promise(resolve => {
-        settle = status => {
+        settle = (status, extra) => {
           settle = () => {};
-          resolve({ status });
+          resolve({ status, ...extra });
         };
       });
       const externalWindow = new BrowserWindow({
@@ -603,7 +606,8 @@ function registerMiscHandlers() {
         console.log("Showing external provider window:", reason);
         externalWindow.show();
         externalWindow.focus();
-        settle("shown");
+        // The caller waiting for a URL keeps waiting while the user clicks through
+        if (!returnUrl) settle("shown");
       };
 
       // MegaDB's ad scripts swallow clicks on its download button, so the
@@ -713,28 +717,29 @@ function registerMiscHandlers() {
         if (webContents !== externalWindow.webContents) return;
         event.preventDefault();
         clearTimeout(revealTimeout);
-        settle("intercepted");
         const downloadUrl = item.getURL();
         console.log("Intercepted download in external window:", downloadUrl);
+        settle("intercepted", returnUrl ? { url: downloadUrl } : undefined);
 
-        try {
-          // ipcEvent.sender is the main window's webContents that invoked open-url.
-          // Use it directly so the message always reaches the right renderer.
-          const sender = ipcEvent.sender;
-          if (sender && !sender.isDestroyed()) {
-            sender.send(
-              "intercepted-download-url",
-              `ascendara://${encodeURIComponent(downloadUrl)}`
-            );
-            console.log("Forwarded intercepted download URL to main window");
-            const senderWindow = BrowserWindow.fromWebContents(sender);
-            if (senderWindow && !senderWindow.isDestroyed()) {
-              senderWindow.focus();
+        if (!returnUrl)
+          try {
+            // ipcEvent.sender is the main window's webContents that invoked open-url.
+            // Use it directly so the message always reaches the right renderer.
+            const sender = ipcEvent.sender;
+            if (sender && !sender.isDestroyed()) {
+              sender.send(
+                "intercepted-download-url",
+                `ascendara://${encodeURIComponent(downloadUrl)}`
+              );
+              console.log("Forwarded intercepted download URL to main window");
+              const senderWindow = BrowserWindow.fromWebContents(sender);
+              if (senderWindow && !senderWindow.isDestroyed()) {
+                senderWindow.focus();
+              }
             }
+          } catch (error) {
+            console.error("Failed to forward intercepted download URL:", error);
           }
-        } catch (error) {
-          console.error("Failed to forward intercepted download URL:", error);
-        }
 
         externalWindow.webContents.session.removeListener(
           "will-download",

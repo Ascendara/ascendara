@@ -31,7 +31,7 @@ export const { getCachedSupportedHosts, getSupportedHosts } = createSupportedHos
   },
 });
 
-// TorBox only lists buzzheavier.com; its short domains serve the same file IDs.
+// Older TorBox host lists only had buzzheavier.com; its short domains serve the same file IDs.
 const HOST_ALIASES = { "bzzhr.to": "buzzheavier.com", "bzzhr.co": "buzzheavier.com" };
 
 const toTorboxLink = link => {
@@ -230,8 +230,10 @@ export const createPremiumDownloadLink = async (link, apiKey) => {
     throw new Error("API key is required");
   }
 
-  link = toTorboxLink(link);
-  if (!isSupportedUrl(link, await getSupportedHosts())) {
+  // Send the link as-is when TorBox lists its domain; rewrite only as a fallback.
+  const hosts = await getSupportedHosts();
+  if (!matchesSupportedUrl(link, hosts)) link = toTorboxLink(link);
+  if (!matchesSupportedUrl(link, hosts)) {
     const error = new Error("This URL is not in TorBox’s supported host list.");
     error.code = "UNSUPPORTED_SITE";
     throw error;

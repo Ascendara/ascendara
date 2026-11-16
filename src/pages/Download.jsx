@@ -1317,9 +1317,29 @@ function PublicDownloadPage() {
       if (isStartingDownload) return;
       setIsStartingDownload(true);
       try {
+        // Buzzheavier puts its pages behind a bot check debrid services can't pass,
+        // so open the page like Magic Link does and send them the file link instead.
+        let debridLink = hostSourceLink;
+        if (!directUrl && /bzzhr\.(?:to|co)|buzzheavier\.com/i.test(hostSourceLink)) {
+          setLinkStage("resolving");
+          const resolved = await window.electron
+            .openURL(hostSourceLink.replace(/^(?:https?:)?\/\//, "https://"), {
+              referrer: "https://steamrip.com/",
+              autoDownload: true,
+              returnUrl: true,
+            })
+            .catch(error => console.warn("[DL] Buzzheavier link not resolved:", error))
+            .finally(() => setLinkStage(null));
+          if (resolved?.url) debridLink = resolved.url;
+          else if (resolved?.status === "closed") {
+            // The user closed the page without downloading
+            clearDownloadLock();
+            return;
+          }
+        }
         const result = await debrid.resolveHost(
           settings,
-          hostSourceLink,
+          debridLink,
           downloadProvider,
           gameData,
           dir ?? 0,
