@@ -112,22 +112,22 @@ import { FEATURE_CENTER_EVENTS, openFeatureCenter } from "@/lib/featureCenterEve
 
 const themes = [
   // Light themes
-  { id: "coral", name: "Coral", group: "light", isNew: true },
+  { id: "coral", name: "Coral", group: "light" },
   { id: "blue", name: "Ocean Blue", group: "light" },
   { id: "purple", name: "Ascendara Purple", group: "light" },
   { id: "emerald", name: "Emerald", group: "light" },
   { id: "rose", name: "Rose", group: "light" },
-  { id: "lagoon", name: "Lagoon", group: "light", isNew: true },
-  { id: "royal-pearl", name: "Royal Pearl", group: "light", isNew: true },
+  { id: "lagoon", name: "Lagoon", group: "light" },
+  { id: "royal-pearl", name: "Royal Pearl", group: "light" },
 
   // Dark themes
-  { id: "aurora", name: "Aurora", group: "dark", isNew: true },
+  { id: "aurora", name: "Aurora", group: "dark" },
   { id: "midnight", name: "Midnight", group: "dark" },
   { id: "cyberpunk", name: "Cyberpunk", group: "dark" },
   { id: "sunset", name: "Sunset", group: "dark" },
   { id: "forest", name: "Forest", group: "dark" },
-  { id: "crimson", name: "Crimson", group: "dark", isNew: true },
-  { id: "royal-night", name: "Royal Night", group: "dark", isNew: true },
+  { id: "crimson", name: "Crimson", group: "dark" },
+  { id: "royal-night", name: "Royal Night", group: "dark" },
 
   // Classics: earlier themes, kept for anyone who still uses them
   { id: "light", name: "Arctic Sky", group: "classic" },
@@ -4724,11 +4724,6 @@ function ThemeButton({ theme, currentTheme, onSelect, t }) {
       <div className="mt-2 flex items-center gap-1.5">
         <span className={`h-2 w-2 shrink-0 rounded-full ${colors.primary}`} />
         <span className="truncate text-sm font-medium text-foreground">{theme.name}</span>
-        {theme.isNew && !isActive && (
-          <span className="ml-auto shrink-0 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-primary">
-            {t("settings.newTheme")}
-          </span>
-        )}
         {isActive && <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />}
       </div>
     </button>
