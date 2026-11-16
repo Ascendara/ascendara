@@ -12,8 +12,11 @@ import {
   Check,
   Trash2,
   Infinity as InfinityIcon,
+  KeyRound,
 } from "lucide-react";
+import { getCurrentUser } from "@/services/firebase/firebaseService";
 import { FocusHero, FocusLine } from "./SettingsLayout";
+import ChangePasswordDialog from "./ChangePasswordDialog";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -46,6 +49,11 @@ export default function AccountActionsCard({
   setDeleteHoldProgress,
 }) {
   const [departureReason, setDepartureReason] = useState("");
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  // Google-only accounts have no password to change
+  const hasPassword = !!getCurrentUser()?.providerData?.some(
+    provider => provider.providerId === "password"
+  );
   useEffect(() => {
     if (!showDepartureDialog) setDepartureReason("");
   }, [showDepartureDialog]);
@@ -75,6 +83,24 @@ export default function AccountActionsCard({
           {t("account.signOut")}
         </Button>
       </FocusHero>
+
+      {hasPassword && (
+        <FocusLine
+          icon={KeyRound}
+          label={t("account.changePassword.title")}
+          description={t("account.changePassword.lineDescription")}
+        >
+          <Button variant="outline" onClick={() => setShowChangePassword(true)}>
+            {t("account.changePassword.button")}
+          </Button>
+        </FocusLine>
+      )}
+      <ChangePasswordDialog
+        open={showChangePassword}
+        onOpenChange={setShowChangePassword}
+        email={email}
+        t={t}
+      />
 
       {/* Request Account Deletion */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

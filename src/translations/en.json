@@ -10,6 +10,22 @@
       "signupAccent": "Better together.",
       "signupHeadline": "Good games."
     },
+    "changePassword": {
+      "button": "Change password",
+      "changed": "Password changed",
+      "confirm": "Confirm new password",
+      "current": "Current password",
+      "description": "Enter your current password, then choose a new one.",
+      "failed": "Couldn't change your password. Try again.",
+      "forgotCurrent": "Forgot your current password?",
+      "hide": "Hide passwords",
+      "lineDescription": "Choose a new password for signing in to Ascend.",
+      "new": "New password",
+      "samePassword": "Your new password must be different from your current one",
+      "save": "Change password",
+      "show": "Show passwords",
+      "title": "Password"
+    },
     "chooseDisplayName": "Choose a display name for your account",
     "confirmEmail": {
       "confirm": "Yes, Create Account",
