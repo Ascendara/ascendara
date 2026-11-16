@@ -512,48 +512,46 @@ const hasDiscordLinked = user =>
 const hasLifetime = user =>
   Boolean(user?.lifetimeMember || user?.ascendSubscription?.lifetime === true);
 
-// The special badges the catalog lists. Owner stays out since nobody can earn it.
+// The special badges the catalog lists. Owner stays out since nobody can earn
+// it, and verified has its own dialog since it's given to people, not earned.
 const CATALOG_BADGES = [
-  VERIFIED_BADGE,
   CONTRIBUTOR_BADGE,
   LIFETIME_BADGE,
   DISCORD_BADGE,
   ...EARNED_BADGES,
 ];
 
-// One special badge as a wide card: the emblem on a tinted tile, its name and
-// what earns it, washed in the badge's own colors
+// One badge as a tile: the emblem on a tinted disc, its name and what earns
+// it, washed in the badge's own colors. Tiles stretch to fill their grid cell.
 function CatalogBadgeCard({ badge, highlighted }) {
   const { t } = useLanguage();
   const [from, to] = badge.colors;
   return (
     <motion.div
       variants={listItem}
-      className={`relative flex min-w-0 items-center gap-3 overflow-hidden rounded-xl border p-3 transition-colors ${highlighted ? "border-primary/60 ring-1 ring-primary/40" : "border-border/60"}`}
+      className={`relative flex h-full min-w-0 flex-col items-center justify-center gap-3 overflow-hidden rounded-xl border px-3 py-5 text-center transition-colors ${highlighted ? "border-primary/60 ring-1 ring-primary/40" : "border-border/60"}`}
       style={{
-        background: `linear-gradient(120deg, ${from}26, ${to}0d 55%, transparent)`,
+        background: `linear-gradient(160deg, ${from}2b, ${to}0d 60%, transparent)`,
       }}
     >
       <span
         aria-hidden
-        className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-20 blur-2xl"
+        className="pointer-events-none absolute -top-10 left-1/2 h-28 w-28 -translate-x-1/2 rounded-full opacity-25 blur-2xl"
         style={{ background: to }}
       />
       <span
-        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border"
+        className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border"
         style={{ background: `${from}1f`, borderColor: `${to}33` }}
       >
         {badge.emblem ? (
-          <badge.emblem className="h-7 w-7" />
+          <badge.emblem className="h-10 w-10" />
         ) : (
-          <BadgeEmblem icon={badge.icon} colors={badge.colors} className="h-7 w-7" />
+          <BadgeEmblem icon={badge.icon} colors={badge.colors} className="h-10 w-10" />
         )}
       </span>
-      <div className="relative min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">
-          {t(`ascend.badges.${badge.field}`)}
-        </p>
-        <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
+      <div className="relative min-w-0 space-y-1">
+        <p className="text-sm font-semibold">{t(`ascend.badges.${badge.field}`)}</p>
+        <p className="text-xs leading-snug text-muted-foreground">
           {t(`ascend.badges.${badge.field}Description`)}
         </p>
       </div>
@@ -562,11 +560,18 @@ function CatalogBadgeCard({ badge, highlighted }) {
 }
 
 // A titled panel the catalog's columns are built from
-function CatalogPanel({ title, description, aside, highlighted, children }) {
+function CatalogPanel({
+  title,
+  description,
+  aside,
+  highlighted,
+  className = "",
+  children,
+}) {
   return (
     <motion.section
       variants={listItem}
-      className={`rounded-2xl border p-4 transition-colors ${highlighted ? "border-primary/50 bg-primary/5" : "border-border/60 bg-muted/30"}`}
+      className={`rounded-2xl border p-4 transition-colors ${highlighted ? "border-primary/50 bg-primary/5" : "border-border/60 bg-muted/30"} ${className}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -754,18 +759,23 @@ function BadgeCatalogDialog({ open, onOpenChange, highlight, user }) {
           </div>
         </div>
 
-        {/* Special badges on the left, the milestone ladders on the right */}
+        {/* Ascend badges on the left, stretched to the height of the
+            milestone ladders on the right */}
         <motion.div
-          className="grid min-h-0 flex-1 items-start gap-4 overflow-y-auto px-6 py-5 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+          className="grid min-h-0 flex-1 items-stretch gap-4 overflow-y-auto px-6 py-5 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
           variants={listContainer}
           initial={reduceMotion ? false : "hidden"}
           animate="show"
         >
           <CatalogPanel
-            title={t("ascend.badges.catalog.special")}
-            description={t("ascend.badges.catalog.specialDescription")}
+            className="flex flex-col"
+            title={t("ascend.badges.catalog.ascendBadges")}
+            description={t("ascend.badges.catalog.ascendBadgesDescription")}
           >
-            <motion.div className="mt-3 space-y-2" variants={listContainer}>
+            <motion.div
+              className="mt-3 grid flex-1 auto-rows-fr grid-cols-2 gap-2"
+              variants={listContainer}
+            >
               {CATALOG_BADGES.map(badge => (
                 <CatalogBadgeCard
                   key={badge.field}
@@ -832,8 +842,50 @@ function BadgeCatalogDialog({ open, onOpenChange, highlight, user }) {
   );
 }
 
+// The verified badge's own dialog: who verified members are and why they
+// carry the badge
+function VerifiedBadgeDialog({ open, onOpenChange }) {
+  const { t } = useLanguage();
+  const [from, to] = VERIFIED_BADGE.colors;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md overflow-hidden p-0">
+        <div
+          className="relative flex flex-col items-center gap-3 px-6 pb-5 pt-8 text-center"
+          style={{
+            background: `linear-gradient(160deg, ${from}2e, ${to}0d 60%, transparent)`,
+          }}
+        >
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -top-10 left-1/2 h-32 w-32 -translate-x-1/2 rounded-full opacity-30 blur-3xl"
+            style={{ background: to }}
+          />
+          <BadgeEmblem
+            icon={VERIFIED_BADGE.icon}
+            colors={VERIFIED_BADGE.colors}
+            className="relative h-16 w-16"
+          />
+          <div className="relative space-y-1">
+            <DialogTitle className="mb-0 text-xl">
+              {t("ascend.badges.verifiedDialog.title")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("ascend.badges.verifiedDialog.description")}
+            </DialogDescription>
+          </div>
+        </div>
+        <div className="space-y-3 border-t border-border/60 px-6 py-5 text-sm leading-relaxed text-muted-foreground">
+          <p>{t("ascend.badges.verifiedDialog.body")}</p>
+          <p>{t("ascend.badges.verifiedDialog.note")}</p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // A badge emblem that explains itself on hover and, unless it's the owner
-// badge, opens the badge catalog on click. Label and description default to
+// badge, opens a dialog on click: the verified badge's own, or the catalog. Label and description default to
 // the badge's translation keys, and renderEmblem replaces the icon hexagon.
 function BadgeWithTooltip({
   field,
@@ -910,12 +962,16 @@ function BadgeWithTooltip({
         </TooltipTrigger>
         {tooltip}
       </Tooltip>
-      <BadgeCatalogDialog
-        open={open}
-        onOpenChange={setOpen}
-        highlight={field}
-        user={user}
-      />
+      {field === "verified" ? (
+        <VerifiedBadgeDialog open={open} onOpenChange={setOpen} />
+      ) : (
+        <BadgeCatalogDialog
+          open={open}
+          onOpenChange={setOpen}
+          highlight={field}
+          user={user}
+        />
+      )}
     </span>
   );
 }

@@ -409,6 +409,8 @@
       "bugCatcherDescription": "Reported a bug that got fixed",
       "catalog": {
         "allUnlocked": "Every milestone unlocked",
+        "ascendBadges": "Ascend badges",
+        "ascendBadgesDescription": "Unlocked by helping out and getting involved with Ascend",
         "description": "Earned by playing, reviewing and helping out across Ascend.",
         "levelProgress": "Level {{level}}",
         "levels": "Level milestones",
@@ -420,8 +422,6 @@
         "reviewProgress": "{{count}} reviewed",
         "reviews": "Review milestones",
         "reviewsDescription": "Review different games to climb the ranks",
-        "special": "Special badges",
-        "specialDescription": "Given for supporting and helping build Ascendara",
         "title": "Badges"
       },
       "contributor": "Contributor",
@@ -449,7 +449,13 @@
       "reviewMilestone": "{{count}} Reviews",
       "reviewMilestoneDescription": "Reviewed {{count}} different games",
       "verified": "Verified",
-      "verifiedDescription": "A verified Ascend member"
+      "verifiedDescription": "A verified Ascend member",
+      "verifiedDialog": {
+        "body": "Verified members are people close to tago who helped out in Ascendara's early development, and who have kept helping shape Ascendara and Ascend since.",
+        "description": "A thank-you from Ascendara",
+        "note": "The badge can't be earned. tago gives it by hand to the people who helped get Ascendara where it is today.",
+        "title": "Verified Member"
+      }
     },
     "checkingVersion": "Checking version...",
     "cloudBackups": {
