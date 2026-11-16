@@ -453,6 +453,115 @@ const ErrorDialog = ({
   </AlertDialog>
 );
 
+const RenameGameDialog = ({ open, onClose, currentName, onRename, t }) => {
+  const [name, setName] = useState(currentName || "");
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) setName(currentName || "");
+  }, [open, currentName]);
+
+  const trimmed = name.trim();
+  const canSave = !!trimmed && trimmed !== currentName && !isSaving;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setIsSaving(true);
+    try {
+      if (await onRename(trimmed)) onClose();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={value => !value && !isSaving && onClose()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-2xl font-bold text-foreground">
+            {t("library.renameGame.title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-muted-foreground">
+            {t("library.renameGame.description")}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <Input
+          autoFocus
+          value={name}
+          maxLength={128}
+          placeholder={t("library.renameGame.placeholder")}
+          onChange={event => setName(event.target.value)}
+          onKeyDown={event => event.key === "Enter" && handleSave()}
+          className="text-foreground"
+        />
+        <AlertDialogFooter className="flex gap-2">
+          <Button
+            variant="outline"
+            className="text-primary"
+            onClick={onClose}
+            disabled={isSaving}
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button className="text-secondary" onClick={handleSave} disabled={!canSave}>
+            {isSaving && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+            {t("library.renameGame.save")}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
+// Settings Ascendara keeps in the renderer under the game's title
+const TITLE_KEYED_STORAGE = [
+  "launch-with-trainer-",
+  "game-show-logo-",
+  "purchase-prompt-shown-",
+  "cloudBackup_",
+  "cloudBackupPromptDismissed_",
+];
+
+const moveTitleKeyedData = (oldName, newName) => {
+  try {
+    for (const prefix of TITLE_KEYED_STORAGE) {
+      const value = localStorage.getItem(prefix + oldName);
+      if (value === null) continue;
+      localStorage.setItem(prefix + newName, value);
+      localStorage.removeItem(prefix + oldName);
+    }
+    const favorites = JSON.parse(localStorage.getItem("game-favorites") || "[]");
+    if (favorites.includes(oldName)) {
+      localStorage.setItem(
+        "game-favorites",
+        JSON.stringify(favorites.map(fav => (fav === oldName ? newName : fav)))
+      );
+      window.dispatchEvent(new CustomEvent("favorites-updated"));
+    }
+    const folderFavorites = JSON.parse(localStorage.getItem("folder-favorites") || "{}");
+    for (const key of Object.keys(folderFavorites)) {
+      folderFavorites[key] = folderFavorites[key].map(id =>
+        id === oldName ? newName : id
+      );
+    }
+    localStorage.setItem("folder-favorites", JSON.stringify(folderFavorites));
+  } catch (error) {
+    console.error("Error moving renamed game's settings:", error);
+  }
+  saveFolders(
+    loadFolders().map(folder => ({
+      ...folder,
+      items: (folder.items || []).map(item =>
+        (item.game || item.name) === oldName ? { ...item, game: newName } : item
+      ),
+    }))
+  );
+  for (const cache of [gameImageCache, heroImageCache, logoImageCache]) {
+    if (cache.get(oldName)) cache.set(newName, cache.get(oldName));
+    cache.delete(oldName);
+  }
+};
+
 const UninstallConfirmationDialog = ({
   open,
   onClose,
@@ -1322,6 +1431,7 @@ function InstalledGameScreen() {
   const [missingAppFiles, setMissingAppFiles] = useState([]);
   const [showExecutableManager, setShowExecutableManager] = useState(false);
   const [showEditGameEntry, setShowEditGameEntry] = useState(false);
+  const [showRenameGame, setShowRenameGame] = useState(false);
   const [showEditGameInfo, setShowEditGameInfo] = useState(false);
   const [showExecutableSelect, setShowExecutableSelect] = useState(false);
   const [availableExecutables, setAvailableExecutables] = useState([]);
@@ -2614,6 +2724,34 @@ function InstalledGameScreen() {
     }
   };
 
+  const handleRenameGame = async newName => {
+    const oldName = game.game || game.name;
+    try {
+      const result = await window.electron.renameCustomGame(oldName, newName, game);
+      if (!result?.success) {
+        const reason = ["exists", "invalid"].includes(result?.error)
+          ? result.error
+          : "failed";
+        toast.error(t(`library.renameGame.${reason}`));
+        return false;
+      }
+      moveTitleKeyedData(oldName, result.name);
+      const renamed = { ...game, game: result.name };
+      setGame(renamed);
+      navigate(location.pathname, {
+        replace: true,
+        state: { ...location.state, gameData: renamed },
+      });
+      window.dispatchEvent(new CustomEvent("ascendara:game-updated-in-folders"));
+      toast.success(t("library.renameGame.success", { name: result.name }));
+      return true;
+    } catch (error) {
+      console.error("Error renaming game:", error);
+      toast.error(t("library.renameGame.failed"));
+      return false;
+    }
+  };
+
   // Handle saving edited Steam info
   const handleEditSteamInfoSave = async (appId, gameName) => {
     const currentGameName = game?.game || game?.name;
@@ -2877,6 +3015,7 @@ function InstalledGameScreen() {
             isFavorite={isFavorite}
             onToggleFavorite={toggleFavorite}
             onOpenDirectory={handleOpenDirectory}
+            onRename={() => setShowRenameGame(true)}
             backupEnabled={settings.ludusavi.enabled}
             onBackupSaves={() => setBackupDialogOpen(true)}
             onVerifyFiles={() => setIsVerifyingOpen(true)}
@@ -3285,6 +3424,14 @@ function InstalledGameScreen() {
         onClose={() => setShowExecutableManager(false)}
         gameName={game?.game || game?.name}
         isCustom={game?.isCustom}
+        t={t}
+      />
+
+      <RenameGameDialog
+        open={showRenameGame}
+        onClose={() => setShowRenameGame(false)}
+        currentName={game?.game || game?.name}
+        onRename={handleRenameGame}
         t={t}
       />
 

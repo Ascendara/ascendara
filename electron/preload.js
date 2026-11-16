@@ -336,6 +336,8 @@ contextBridge.exposeInMainWorld("electron", {
     ),
   removeCustomGame: (game, installation) =>
     ipcRenderer.invoke("remove-game", game, installation),
+  renameCustomGame: (game, newName, installation) =>
+    ipcRenderer.invoke("rename-custom-game", game, newName, installation),
   deleteGame: (game, installation) =>
     ipcRenderer.invoke("delete-game", game, installation),
   saveDeletedGameData: (game, installation) =>

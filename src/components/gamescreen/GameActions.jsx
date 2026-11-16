@@ -32,6 +32,7 @@ import {
   Play,
   Settings2,
   StopCircle,
+  TextCursorInput,
   Trash2,
 } from "lucide-react";
 
@@ -64,6 +65,7 @@ export default function GameActions({
   isFavorite,
   onToggleFavorite,
   onOpenDirectory,
+  onRename,
   backupEnabled,
   onBackupSaves,
   onVerifyFiles,
@@ -239,6 +241,16 @@ export default function GameActions({
                 />
               )}
             </DropdownMenuItem>
+            {game.isCustom && onRename && (
+              <DropdownMenuItem
+                className="gap-2"
+                disabled={isRunning}
+                onSelect={onRename}
+              >
+                <TextCursorInput className="h-4 w-4" />
+                {t("library.renameGame.menuItem")}
+              </DropdownMenuItem>
+            )}
             {showEditEntry && (
               <DropdownMenuItem className="gap-2" onSelect={onEditEntry}>
                 <Settings2 className="h-4 w-4" />

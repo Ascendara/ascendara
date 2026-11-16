@@ -1558,6 +1558,98 @@ function registerGameHandlers() {
     throw new Error(`Custom game not found for ${game}`);
   });
 
+  // Rename a game the user added by hand. The title is the record's key, so
+  // its cover and Linux prefix move with it.
+  ipcMain.handle("rename-custom-game", async (_, game, newName, installation) => {
+    const name = typeof newName === "string" ? newName.trim() : "";
+    if (
+      !name ||
+      name.length > 128 ||
+      /[<>:"/\\|?*\x00-\x1f]/.test(name) ||
+      /^\.+$/.test(name)
+    ) {
+      return { success: false, error: "invalid" };
+    }
+    if (name === game) return { success: true, name };
+
+    const settings = settingsManager.getSettings();
+    const directories = getGameDirectories(settings);
+    const sameTitle = title => title?.toLowerCase() === name.toLowerCase();
+    const caseOnly = sameTitle(game);
+    for (const directory of directories) {
+      const gamesFilePath = path.join(directory, "games.json");
+      if (fs.existsSync(gamesFilePath)) {
+        const { games = [] } = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+        if (
+          !caseOnly &&
+          games.some(entry => !entry._isDeleted && sameTitle(entry.game))
+        ) {
+          return { success: false, error: "exists" };
+        }
+      }
+      if (
+        !caseOnly &&
+        fs.existsSync(path.join(directory, name, `${name}.ascendara.json`))
+      ) {
+        return { success: false, error: "exists" };
+      }
+    }
+
+    for (const directory of getSelectedGameDirectories(settings, installation)) {
+      const gamesFilePath = path.join(directory, "games.json");
+      if (!fs.existsSync(gamesFilePath)) continue;
+      const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+      const entry = gamesData.games.find(
+        candidate =>
+          candidate.game === game &&
+          !candidate._isDeleted &&
+          (!installation || candidate.executable === installation.executable)
+      );
+      if (!entry) continue;
+      entry.game = name;
+      const temporary = `${gamesFilePath}.${require("crypto").randomUUID()}.tmp`;
+      try {
+        fs.writeFileSync(temporary, JSON.stringify(gamesData, null, 2));
+        fs.renameSync(temporary, gamesFilePath);
+      } finally {
+        if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+      }
+
+      // Other installs may still use the old title; leave its cover for them
+      const titleStillUsed = gamesData.games.some(
+        other => other.game === game && !other._isDeleted
+      );
+      for (const root of directories) {
+        const gamesDirectory = path.resolve(root, "games");
+        for (const ext of [".jpg", ".jpeg", ".png"]) {
+          const from = path.join(gamesDirectory, `${game}.ascendara${ext}`);
+          const to = path.join(gamesDirectory, `${name}.ascendara${ext}`);
+          if (!fs.existsSync(from)) continue;
+          try {
+            if (titleStillUsed) fs.copyFileSync(from, to);
+            else await fs.move(from, to, { overwrite: caseOnly });
+          } catch (error) {
+            console.warn(`Could not carry cover over to ${name}:`, error.message);
+          }
+        }
+      }
+      if (!titleStillUsed) {
+        if (isWindows) {
+          deleteGameShortcut(game);
+          deleteStartMenuShortcut(game);
+        }
+        if (isLinux && proton) {
+          await proton
+            .renameGamePrefix(game, name)
+            .catch(error => console.warn("Could not move prefix:", error.message));
+        }
+      }
+      console.log(`Renamed custom game: ${game} -> ${name}`);
+      return { success: true, name };
+    }
+    return { success: false, error: "notFound" };
+  });
+
   // Open game directory
   ipcMain.handle("open-game-directory", (_, game, isCustom, installation) => {
     if (game === "local") {

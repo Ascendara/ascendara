@@ -1339,6 +1339,16 @@ async function deleteGamePrefix(gameName) {
 }
 
 /**
+ * Carry a game's prefix over to a new name so saves inside it survive a rename
+ */
+async function renameGamePrefix(oldName, newName) {
+  const from = path.join(linuxCompatDataDir, sanitizeGameSlug(oldName));
+  const to = path.join(linuxCompatDataDir, sanitizeGameSlug(newName));
+  if (from === to || !fs.existsSync(from) || fs.existsSync(to)) return;
+  await fs.move(from, to);
+}
+
+/**
  * Get the size of a game's prefix directory
  */
 async function getPrefixSize(gameName) {
@@ -1702,6 +1712,7 @@ module.exports = {
   buildLaunchConfig,
   getCompatDataPath,
   deleteGamePrefix,
+  renameGamePrefix,
   getPrefixSize,
   sanitizeGameSlug,
   isWindowsExecutable,

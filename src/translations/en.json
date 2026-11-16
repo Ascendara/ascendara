@@ -3191,6 +3191,17 @@
     "emptyFolderTitle": "This Folder is Empty",
     "enterMoreChars": "Image results will appear here as you type",
     "executable": "Primary Executable",
+    "renameGame": {
+      "menuItem": "Rename Game",
+      "title": "Rename Game",
+      "description": "Change the title this game shows in your library.",
+      "placeholder": "Game title",
+      "save": "Rename",
+      "success": "Renamed to {{name}}",
+      "exists": "A game with this title is already in your library",
+      "invalid": "Titles can't contain < > : \" / \\ | ? *",
+      "failed": "Couldn't rename this game"
+    },
     "executableManager": {
       "addExecutable": "Add Executable",
       "atLeastOne": "At least one executable is required",
