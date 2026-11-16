@@ -285,7 +285,12 @@ test("real adapters retain their API contracts and existing download metadata", 
       return Response.json({ success: true, data: { torrent_id: 42 } });
     if (route === "/api/torbox/webdl/createwebdownload")
       return Response.json({ success: true, data: { webdownload_id: 10 } });
-    if (route === "https://app.test/api/torbox/webdl/mylist")
+    const { origin, pathname, searchParams } = new URL(route, "https://app.test");
+    if (
+      origin === "https://app.test" &&
+      pathname === "/api/torbox/webdl/mylist" &&
+      searchParams.get("id") === "10"
+    )
       return Response.json({
         success: true,
         data: [{ id: 10, download_state: "cached" }],

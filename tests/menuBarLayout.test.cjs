@@ -71,7 +71,7 @@ test("MenuBar uses explicit region ordering instead of reversing its primary row
   assert.match(source, /const layoutOrder = getMenuBarLayoutOrder\(settings\.menuBarSide\)/);
   assert.match(
     source,
-    /<div className="flex h-full min-w-0 flex-1 items-center gap-2 px-3" data-boot-row>/
+    /className=\{`flex h-full min-w-0 flex-1 items-center gap-2 \$\{mirrored \? "pl-3 pr-4" : "pl-4 pr-3"\}`\}\s+data-boot-row/
   );
   assert.match(source, /layoutOrder\.brand/);
   assert.match(source, /layoutOrder\.spacer/);
