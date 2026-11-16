@@ -2024,6 +2024,12 @@ const DownloadCard = ({
     /\[WinError 22[56]\]|Windows error 22[56]|os error 22[56]\b|Security software blocked/.test(
       downloadingData?.message || ""
     );
+  // A freshly extracted file vanished before it could be moved into place,
+  // almost always because antivirus quarantined it mid-install.
+  const isFileRemoved =
+    /^Could not move [\s\S]*(os error 2\b|cannot find the file specified)/i.test(
+      downloadingData?.message || ""
+    );
 
   // Get error message based on type
   const getErrorMessage = () => {
@@ -2052,6 +2058,7 @@ const DownloadCard = ({
       );
     if (isOnlineFixBlock) return msg;
     if (isSecurityBlock) return t("downloads.securityBlockedError");
+    if (isFileRemoved) return t("downloads.fileRemovedError");
     if (/crc|corrupt data|bad archive data|unrar error 12/i.test(msg))
       return `${t("downloads.extractionRecovery.reasons.damaged.body")} ${t(
         "downloads.extractionRecovery.reasons.damaged.next"
@@ -2067,7 +2074,7 @@ const DownloadCard = ({
   };
   const errorMessage = getErrorMessage();
   const offerProtection =
-    (isSecurityBlock || isSourceMissing) &&
+    (isSecurityBlock || isSourceMissing || isFileRemoved) &&
     window.electron.getPlatform() === "win32" &&
     !settings.excludeFolders;
 
