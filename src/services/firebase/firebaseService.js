@@ -462,7 +462,11 @@ export const resetPassword = async email => {
       const result = await response.json().catch(() => ({}));
       if (response.ok) return { success: true, error: null };
       if (response.status === 400 || response.status === 429) {
-        return { success: false, error: result.error || "An unexpected error occurred" };
+        return {
+          success: false,
+          error: result.error || "An unexpected error occurred",
+          retryAfter: result.retryAfter || null,
+        };
       }
     } catch (error) {
       console.warn("Branded password reset email failed, using Firebase:", error);

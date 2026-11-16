@@ -1,5 +1,5 @@
 import { motion, AnimatePresence, MotionConfig, useReducedMotion } from "framer-motion";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { suggestEmail } from "@/utils/emailSuggestion";
 import GoogleIcon from "./GoogleIcon";
+import ForgotPasswordDialog from "./ForgotPasswordDialog";
 import "./auth.css";
 
 // The smaller features scroll past in two rows so they all fit in the space
@@ -122,6 +123,7 @@ export default function AuthSection({
   handleConfirmSignup,
 }) {
   const modeIndicatorId = useId();
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const reduceMotion = useReducedMotion();
   const emailSuggestion = suggestEmail(formData.email);
   const pendingSuggestion = pendingSignupData
@@ -731,12 +733,11 @@ export default function AuthSection({
                     <p>
                       <button
                         type="button"
-                        onClick={() =>
-                          window.electron?.openURL("https://ascendara.app/discord")
-                        }
+                        onClick={() => setShowForgotPassword(true)}
+                        disabled={isSubmitting || isGoogleLoading}
                         className="text-xs text-muted-foreground transition-colors hover:text-primary"
                       >
-                        {t("account.forgotPassword")}
+                        {t("account.resetPassword.link")}
                       </button>
                     </p>
                   )}
@@ -745,6 +746,13 @@ export default function AuthSection({
             </div>
           </motion.section>
         </div>
+
+        <ForgotPasswordDialog
+          open={showForgotPassword}
+          onOpenChange={setShowForgotPassword}
+          initialEmail={formData.email}
+          t={t}
+        />
 
         {/* Email Confirmation Dialog */}
         <AlertDialog
