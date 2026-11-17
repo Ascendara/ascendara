@@ -103,6 +103,7 @@ export default function SettingsSection({
   isDev,
   devSubscriptionState,
   setDevSubscriptionState,
+  purchaseView,
   handleViewInvoices,
   handleManageSubscription,
   deletedAccountWarning,
@@ -219,6 +220,7 @@ export default function SettingsSection({
         isDev={isDev}
         devSubscriptionState={devSubscriptionState}
         setDevSubscriptionState={setDevSubscriptionState}
+        purchaseView={purchaseView}
         userData={userData}
         handleViewInvoices={handleViewInvoices}
         handleManageSubscription={handleManageSubscription}

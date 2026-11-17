@@ -41,6 +41,7 @@ export default function SubscriptionSettingsCard({
   isDev,
   devSubscriptionState,
   setDevSubscriptionState,
+  purchaseView,
   userData,
   handleViewInvoices,
   handleManageSubscription,
@@ -152,7 +153,7 @@ export default function SubscriptionSettingsCard({
           (!isDev && ascendAccess.isSubscribed) ? (
           // Active Subscription - Premium Design
           <div className="space-y-6">
-            {!userData?.ascendSubscription?.lifetime && (
+            {!purchaseView?.isLifetime && (
               <div className="rounded-xl bg-primary/5 p-4">
                 <p className="mb-3 text-sm text-muted-foreground">
                   {t("ascend.settings.lifetimeUpgradeDescription", {

@@ -2079,9 +2079,16 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     setEditSteam("");
   };
 
+  // In dev, the simulated subscription state drives the purchase flow, so an
+  // owner account with lifetime sees the same plan dialog customers do.
+  const ownsLifetime = Boolean(userData?.ascendSubscription?.lifetime);
+  const purchaseView = isDev
+    ? { isSubscribed: devSubscriptionState === "subscribed", isLifetime: false }
+    : { isSubscribed: ascendAccess.isSubscribed, isLifetime: ownsLifetime };
+
   // Subscribe to Ascend via Stripe Checkout
   const handleSubscribe = async () => {
-    if (userData?.ascendSubscription?.lifetime) return;
+    if (purchaseView.isLifetime) return;
     try {
       // Validate account exists and is not deleted
       if (!user || !user.uid) {
@@ -2142,7 +2149,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         product.prices
           ?.filter(
             price =>
-              !ascendAccess.isSubscribed &&
+              !purchaseView.isSubscribed &&
               price.interval === "month" &&
               price.id !== "price_1ScUAMCfu5zjwIKZd4FezEnW" &&
               price.id !== "price_1SrPMrCfu5zjwIKZTIRsRAZG"
@@ -2184,12 +2191,22 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   };
 
   // Process subscription checkout with selected plan
-  const handlePlanSelection = async priceId => {
-    if (userData?.ascendSubscription?.lifetime) return false;
+  const handlePlanSelection = async (priceId, promoCode) => {
+    if (purchaseView.isLifetime) return false;
+    if (isDev && ownsLifetime) {
+      // The API refuses checkout for lifetime accounts, so the preview stops here.
+      const plan = availablePlans.find(p => p.id === priceId);
+      const planName =
+        plan?.intervalCount === 0 ? "Lifetime" : `${plan?.intervalCount ?? "?"}-month`;
+      toast.info(
+        `Dev preview: ${planName} checkout${promoCode ? ` with code ${promoCode}` : ""}. Not opened because this account has lifetime.`
+      );
+      return false;
+    }
     try {
       setShowPlanDialog(false);
 
-      return await openAscendCheckout(user, priceId);
+      return await openAscendCheckout(user, priceId, promoCode);
     } catch (error) {
       console.error("Error creating checkout session:", error);
       toast.error(error.message || t("ascend.settings.checkoutError"));
@@ -3118,6 +3135,7 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
     updateData,
     isDev,
     devSubscriptionState,
+    purchaseView,
     setDevSubscriptionState,
     handleViewInvoices,
     handleManageSubscription,

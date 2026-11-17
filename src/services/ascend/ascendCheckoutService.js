@@ -4,7 +4,7 @@ import { API_URL } from "@/config/api";
 const pendingUsers = new Set();
 
 // Shared by every purchase entry point, including the lifetime offer dialog.
-export async function openAscendCheckout(user, priceId) {
+export async function openAscendCheckout(user, priceId, promoCode) {
   if (!user?.uid) throw new Error("Please sign in before purchasing Ascend.");
   if (pendingUsers.has(user.uid)) {
     throw new Error("Checkout is already opening. Please wait.");
@@ -17,7 +17,11 @@ export async function openAscendCheckout(user, priceId) {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.uid, priceId }),
+        body: JSON.stringify({
+          userId: user.uid,
+          priceId,
+          ...(promoCode?.trim() && { promoCode: promoCode.trim() }),
+        }),
       }
     );
     const result = await response.json();

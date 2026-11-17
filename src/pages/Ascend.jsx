@@ -162,6 +162,7 @@ const Ascend = () => {
     isDev,
     devSubscriptionState,
     setDevSubscriptionState,
+    purchaseView,
     handleViewInvoices,
     handleManageSubscription,
     showWelcomeTour,
@@ -759,6 +760,7 @@ const Ascend = () => {
               isDev={isDev}
               devSubscriptionState={devSubscriptionState}
               setDevSubscriptionState={setDevSubscriptionState}
+              purchaseView={purchaseView}
               handleViewInvoices={handleViewInvoices}
               handleManageSubscription={handleManageSubscription}
               deletedAccountWarning={deletedAccountWarning}
@@ -944,9 +946,7 @@ const Ascend = () => {
 
         {/* Subscription Plan Selection Dialog */}
         <SubscriptionPlanDialog
-          isLifetimeUpgrade={
-            ascendAccess.isSubscribed && !userData?.ascendSubscription?.lifetime
-          }
+          isLifetimeUpgrade={purchaseView.isSubscribed && !purchaseView.isLifetime}
           open={showPlanDialog}
           onOpenChange={setShowPlanDialog}
           availablePlans={availablePlans}
