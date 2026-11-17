@@ -141,7 +141,9 @@
       "catalogue": "Nintendo 3DS",
       "extensions": [
         "cci",
-        "cxi"
+        "cxi",
+        "3ds",
+        "3dsx"
       ],
       "ascend": true
     },
@@ -152,7 +154,9 @@
       "catalogue": "Nintendo Wii U",
       "extensions": [
         "wua",
-        "rpx"
+        "rpx",
+        "wud",
+        "wux"
       ],
       "ascend": true
     },
@@ -164,7 +168,9 @@
       "extensions": [
         "nsp",
         "xci",
-        "nro"
+        "nro",
+        "nsz",
+        "xcz"
       ],
       "ascend": true
     }

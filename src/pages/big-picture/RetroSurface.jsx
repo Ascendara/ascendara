@@ -95,6 +95,7 @@ export function RetroSurface({ navigation, active, onBack }) {
       saveFolder: "",
       fullscreen: true,
       ...profiles[id],
+      extensions: (profiles[id]?.extensions || []).join(", "),
     });
     setSetupId(id);
   };
@@ -144,6 +145,7 @@ export function RetroSurface({ navigation, active, onBack }) {
           "add-folder",
           ...(draft?.romFolders || []).map((_, index) => `remove-folder-${index}`),
         ],
+        ["extra-extensions"],
         ["pick-save-folder", "fullscreen"],
         ["save-setup", "save-scan"],
       ]

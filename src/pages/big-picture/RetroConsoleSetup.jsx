@@ -83,6 +83,12 @@ export function RetroConsoleSetup({
         <SurfaceButton variant="icon" {...focus(`remove-folder-${index}`)} aria-label={`Remove ${folder}`}
           onClick={() => set("romFolders", draft.romFolders.filter(path => path !== folder))}><X /></SurfaceButton>
       </div>)}
+      <label className="bp-retro-custom-args">
+        <strong>Extra file types</strong>
+        <input {...focus("extra-extensions")} value={draft.extensions} onChange={event => set("extensions", event.target.value)} onKeyDown={event => event.stopPropagation()}
+          placeholder="e.g. nsp, xci" />
+        <small>Scan more file types for this console, separated by commas.</small>
+      </label>
       <div className="bp-retro-setting">
         <div><strong>Save folder</strong><small>{draft.saveFolder || "Optional: choose a location for save backups"}</small></div>
         <SurfaceButton {...focus("pick-save-folder")} onClick={() => onPick("saveFolder", path => set("saveFolder", path))}><FolderOpen /> Browse</SurfaceButton>

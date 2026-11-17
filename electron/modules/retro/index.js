@@ -4,9 +4,9 @@ const { spawn, execFile } = require("child_process");
 const { promisify } = require("util");
 const { Worker } = require("worker_threads");
 const { app, ipcMain, dialog, BrowserWindow, shell } = require("electron");
-const { platforms, launchArguments, resolveAdapter, customArguments } = require("./platforms");
+const { platforms, launchArguments, resolveAdapter, customArguments, extraExtensions } = require("./platforms");
 const expanded = require("./expanded-catalogue.json");
-const { scan, mergeScan, normalizeTitle, pathKey } = require("./scanner");
+const { scan, mergeScan, emptyScanHint, normalizeTitle, pathKey } = require("./scanner");
 const saves = require("./saves");
 const { setPlayingActivity, updateDiscordRPCToLibrary } = require("../app/discord-rpc");
 
@@ -94,6 +94,7 @@ function registerRetroHandlers() {
     if (!input || !Array.isArray(input.romFolders) || input.romFolders.length > 32) throw new Error("Invalid emulator configuration");
     const adapter = resolveAdapter(id, input);
     customArguments(input.arguments);
+    const extensions = extraExtensions(input.extensions);
     if (input.executable) {
       await validateFile(input.executable, "Emulator executable");
       if (process.platform === "win32" && path.extname(input.executable).toLowerCase() !== ".exe") throw new Error("Select the emulator's .exe file");
@@ -105,7 +106,7 @@ function registerRetroHandlers() {
     if (input.saveFolder) await saves.checkRoot(input.saveFolder);
     requireIdle(); requireClosed(id);
     const old = state.profiles[id];
-    state.profiles[id] = { adapter, arguments: input.arguments || "", executable: input.executable || "", core: input.core || "", romFolders: [...new Set(input.romFolders)], saveFolder: input.saveFolder || "", fullscreen: input.fullscreen !== false };
+    state.profiles[id] = { adapter, arguments: input.arguments || "", executable: input.executable || "", core: input.core || "", romFolders: [...new Set(input.romFolders)], extensions, saveFolder: input.saveFolder || "", fullscreen: input.fullscreen !== false };
     try { persist(); } catch (error) { if (old) state.profiles[id] = old; else delete state.profiles[id]; throw error; }
     emit();
   });
@@ -117,10 +118,12 @@ function registerRetroHandlers() {
     // The task belongs to the main process and survives navigation away from Retro.
     (async () => {
       try {
-        const result = await scan(id, profile.romFolders, progress => { job = { ...progress, platform: id }; emit(); });
+        const result = await scan(id, profile.romFolders, progress => { job = { ...progress, platform: id }; emit(); }, profile.extensions || []);
         state.games = mergeScan(state.games, result.games, id);
         matchGames(); persist();
-        job = null; emit({ message: `Found ${result.games.length} games`, warnings: result.warnings.slice(0, 20) });
+        job = null;
+        if (result.games.length) emit({ message: `Found ${result.games.length} games`, warnings: result.warnings.slice(0, 20) });
+        else emit({ warnings: [emptyScanHint(id, result.skipped), ...result.warnings.slice(0, 19)] });
       } catch (error) { job = null; emit({ error: error.message }); }
     })();
   });

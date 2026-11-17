@@ -24,10 +24,11 @@ function parseSfo(buffer) {
   return result;
 }
 
-async function scan(platformId, roots, onProgress = () => {}) {
+async function scan(platformId, roots, onProgress = () => {}, extra = []) {
   const platform = platforms[platformId];
   if (!platform) throw new Error("Unknown console");
-  const candidates = new Map(), visited = new Set(), warnings = [];
+  const extensions = new Set([...platform.extensions, ...extra]);
+  const candidates = new Map(), visited = new Set(), warnings = [], skipped = new Map();
   let inspected = 0;
   async function walk(directory, depth = 0) {
     if (depth > 64 || visited.has(pathKey(directory))) return;
@@ -42,9 +43,11 @@ async function scan(platformId, roots, onProgress = () => {}) {
       if (!entry.isFile()) continue;
       if (++inspected % 100 === 0) onProgress({ phase: "scanning", inspected, found: candidates.size });
       const ext = path.extname(file).slice(1).toLowerCase();
-      if (platformId === "ps3") {
-        if (entry.name.toUpperCase() !== "EBOOT.BIN" || path.basename(directory).toUpperCase() !== "USRDIR") continue;
-      } else if (!platform.extensions.includes(ext)) continue;
+      const ps3Game = platformId === "ps3" && entry.name.toUpperCase() === "EBOOT.BIN" && path.basename(directory).toUpperCase() === "USRDIR";
+      if (!ps3Game && !extensions.has(ext)) {
+        if (ext) skipped.set(ext, (skipped.get(ext) || 0) + 1);
+        continue;
+      }
       // Raw GameCube/Wii images carry a platform magic; shared ISO extensions
       // alone are not enough to distinguish the two consoles.
       if (["gamecube", "wii"].includes(platformId) && ["iso", "gcm"].includes(ext)) {
@@ -59,7 +62,7 @@ async function scan(platformId, roots, onProgress = () => {}) {
         } finally { await handle.close(); }
       }
       let name = path.basename(file, path.extname(file)), serial = null;
-      if (platformId === "ps3") {
+      if (ps3Game) {
         const gameDir = path.dirname(directory);
         name = path.basename(gameDir).toUpperCase() === "PS3_GAME" ? path.basename(path.dirname(gameDir)) : path.basename(gameDir);
         try { const sfo = parseSfo(await fs.readFile(path.join(gameDir, "PARAM.SFO"))); name = sfo.TITLE || name; serial = sfo.TITLE_ID || null; } catch { /* Folder name remains usable. */ }
@@ -104,7 +107,20 @@ async function scan(platformId, roots, onProgress = () => {}) {
     group.missingDependencies.push(...(item.missingDependencies || []));
   }
   for (const game of groups.values()) game.files.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  return { games: [...groups.values()], warnings, inspected };
+  return { games: [...groups.values()], warnings, inspected, skipped };
+}
+
+// Explains an empty scan by naming the file types that were present and the
+// consoles that read them, e.g. Switch .nsp files in a NES folder.
+function emptyScanHint(platformId, skipped) {
+  const platform = platforms[platformId];
+  const top = [...skipped].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  if (!top.length) return `No ${platform.name} games found. The selected folders contain no game files.`;
+  const details = top.map(([ext, count]) => {
+    const owners = Object.values(platforms).filter(p => p.id !== platformId && p.extensions.includes(ext)).map(p => p.name);
+    return `${count} .${ext} file${count === 1 ? "" : "s"}${owners.length ? ` (${owners.slice(0, 3).join(", ")})` : ""}`;
+  });
+  return `No ${platform.name} games found. The folders contain ${details.join(", ")}. Set up the matching console, or add the file type under Extra file types in ${platform.name} setup.`;
 }
 
 function mergeScan(existing, scanned, platformId) {
@@ -121,4 +137,4 @@ function mergeScan(existing, scanned, platformId) {
   return merged;
 }
 
-module.exports = { scan, mergeScan, normalizeTitle, cleanTitle, stripDisc, parseSfo, pathKey };
+module.exports = { scan, mergeScan, emptyScanHint, normalizeTitle, cleanTitle, stripDisc, parseSfo, pathKey };

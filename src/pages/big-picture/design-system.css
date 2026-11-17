@@ -807,7 +807,8 @@
   gap: 0.5rem;
   margin: 1rem 0;
 }
-.bp-retro-custom-args textarea {
+.bp-retro-custom-args textarea,
+.bp-retro-custom-args input {
   width: 100%;
   padding: 0.8rem;
   border: 1px solid var(--bp-line);
@@ -816,7 +817,8 @@
   color: rgb(var(--color-foreground));
   font: 0.8em monospace;
 }
-.bp-retro-custom-args textarea:focus-visible {
+.bp-retro-custom-args textarea:focus-visible,
+.bp-retro-custom-args input:focus-visible {
   outline: 2px solid rgb(var(--color-primary));
   outline-offset: 2px;
 }

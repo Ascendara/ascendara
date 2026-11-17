@@ -38,6 +38,17 @@ function customArguments(value = "") {
   return args;
 }
 
+// Extra file types let any emulator scan formats the console preset does not list.
+function extraExtensions(value = []) {
+  const list = typeof value === "string" ? value.split(/[\s,;]+/) : value;
+  if (!Array.isArray(list)) throw new Error("Invalid extra file types");
+  const extensions = [...new Set(list.map(entry => String(entry).trim().replace(/^\*?\./, "").toLowerCase()).filter(Boolean))];
+  if (extensions.length > 32) throw new Error("Use at most 32 extra file types");
+  const invalid = extensions.find(entry => !/^[a-z0-9]{1,10}$/.test(entry));
+  if (invalid) throw new Error(`"${invalid}" is not a valid file type. Use letters and numbers, like nsp or iso.`);
+  return extensions;
+}
+
 function launchArguments(platformId, profile, file) {
   const platform = platforms[platformId];
   if (!platform) throw new Error("Unknown Retro console");
@@ -66,4 +77,4 @@ function launchArguments(platformId, profile, file) {
   }
 }
 
-module.exports = { platforms, launchArguments, resolveAdapter, customArguments };
+module.exports = { platforms, launchArguments, resolveAdapter, customArguments, extraExtensions };

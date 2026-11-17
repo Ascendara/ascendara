@@ -192,6 +192,7 @@ function ConsoleSetup({
     adapter: platform.adapter,
     arguments: "",
     ...profile,
+    extensions: (profile?.extensions || []).join(", "),
     ...(initialAdapter ? { adapter: initialAdapter } : {}),
     ...(initialAdapter && profile?.adapter !== initialAdapter
       ? { executable: "", core: "" }
@@ -382,6 +383,21 @@ function ConsoleSetup({
               <Plus className="mr-2 h-4 w-4" />
               {t("retro.setup.addRomFolder")}
             </Button>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="retro-extra-extensions" className="text-sm font-medium">
+              {t("retro.setup.extraExtensions")}
+            </label>
+            <Input
+              id="retro-extra-extensions"
+              value={draft.extensions}
+              onChange={event => set("extensions", event.target.value)}
+              placeholder={t("retro.setup.extraExtensionsPlaceholder")}
+              className="font-mono"
+            />
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {t("retro.setup.extraExtensionsHelp")}
+            </p>
           </div>
           <PathField
             label={t("retro.setup.saveFolder")}
