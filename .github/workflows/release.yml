@@ -6,7 +6,8 @@ on:
     # Every push to development replaces the rolling "testing" prerelease, which
     # experimental installs; promote-testing.yml copies one to public-testing
     branches: [development]
-    paths-ignore: ['**/*.md']
+    # Plugin merges only change the plugin list, which the app reads from GitHub
+    paths-ignore: ['**/*.md', 'plugins/**']
   workflow_dispatch:
     inputs:
       testing:

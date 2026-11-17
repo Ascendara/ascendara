@@ -5152,7 +5152,7 @@
     "openOnStartup": "Open Ascendara on Startup",
     "openOnStartupDescription": "Automatically launch Ascendara when you start your computer.",
     "plugins": {
-      "browseDescription": "Plugins reviewed by the Ascendara team. Submit your own on Discord.",
+      "browseDescription": "Plugins reviewed by the Ascendara team. Submit your own with a pull request on GitHub.",
       "browseTab": "Browse",
       "by": "by {{author}}",
       "description": "Plugins change how Ascendara looks and works. They run with full access to the app.",
@@ -5191,7 +5191,7 @@
       "registryFailed": "Couldn't load the plugin list: {{error}}",
       "safeMode": "Safe mode is on, so no plugins are running. Restart Ascendara normally to run them.",
       "sideloaded": "Sideloaded",
-      "sourceGithub": "GitHub main",
+      "sourceGithub": "GitHub",
       "sourceLocal": "This checkout",
       "title": "Plugins",
       "toggle": "Turn {{name}} on or off",

@@ -1,7 +1,7 @@
 # Ascendara Plugins
 
 This folder is the official plugin list. Ascendara reads `index.json` from here
-on GitHub and shows these plugins under **Settings → Plugins → Browse**.
+on the `development` branch and shows these plugins under **Settings → Plugins → Browse**.
 
 Each plugin lives in its own folder, named after the plugin's id:
 
@@ -15,24 +15,42 @@ plugins/
 
 ## Submitting a plugin
 
-1. Build and test your plugin locally with **Install from folder**.
-2. Post it in the plugin submissions channel on the
-   [Ascendara Discord](https://discord.gg/ap6W3xMTKW) with a link to its source.
-3. A maintainer reviews the code, adds the folder here, and regenerates the index.
+Plugins are submitted as pull requests to `development`:
 
-Updates go through the same review. Bump `version` in `manifest.json` for every
-change, or users won't be offered the update.
+1. Build and test your plugin with **Install from folder** in Ascendara.
+2. Fork this repository and create a branch from `development`.
+3. Copy your plugin's folder into `plugins/`. The folder name is the plugin's id.
+4. From the repository root, run:
 
-## For maintainers
+   ```bash
+   node scripts/build-plugin-index.cjs
+   ```
 
-After adding or changing a plugin folder:
+   It only needs Node.js 22, no `yarn install`. It checks your manifest and
+   adds your plugin, with a hash of every file, to `index.json`.
 
-```bash
-node scripts/build-plugin-index.cjs
-```
+5. Commit your plugin's folder and `plugins/index.json`, and nothing else.
+6. Open a pull request against `development` using the plugin template: add
+   `?template=plugin.md` to the pull request URL, or copy
+   [`.github/PULL_REQUEST_TEMPLATE/plugin.md`](../.github/PULL_REQUEST_TEMPLATE/plugin.md)
+   into the description.
 
-This validates every manifest and pins each file by SHA-256. Ascendara refuses
-files that don't match, so users always get the version that was reviewed.
-`npm test` fails if `index.json` is out of date.
+Automated checks validate every manifest and fail if `index.json` doesn't match
+the plugin folders. A maintainer then reviews the code. Once it's merged, the
+plugin appears in **Browse** for everyone within a few minutes.
+
+### Updating a plugin
+
+Same steps: change your files, **increase `version`** in `manifest.json`, run
+the script again, and open a pull request listing what changed. Users are only
+offered an update when the version goes up.
+
+## Reviewing
+
+- The pull request should only touch one plugin's folder and `plugins/index.json`.
+- Read every file. Reject minified or obfuscated code, bundled programs, and
+  permissions the plugin doesn't use.
+- The `Source checks` workflow must pass. It fails if a manifest is invalid or
+  `index.json` is stale.
 
 The guide to writing plugins is at https://ascendara.app/docs/plugins/overview.

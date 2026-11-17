@@ -31,12 +31,13 @@ const {
   incompatibility,
 } = require("./plugin-manifest");
 
-// The official list lives in the plugins folder of the Ascendara repo.
+// The official list lives in the plugins folder of the Ascendara repo, on the
+// development branch, where plugin pull requests are merged.
 const REGISTRY_URL =
   process.env.ASCENDARA_PLUGIN_REGISTRY ||
-  "https://raw.githubusercontent.com/Ascendara/ascendara/main/plugins";
+  "https://raw.githubusercontent.com/Ascendara/ascendara/development/plugins";
 // From source, the list can be read from this checkout instead, so plugins can be
-// tried before they're merged to main. Settings switches between the two.
+// tried before they're merged. Settings switches between the two.
 const LOCAL_REGISTRY =
   isDev && !process.env.ASCENDARA_PLUGIN_REGISTRY
     ? path.join(__dirname, "..", "..", "..", "plugins")
