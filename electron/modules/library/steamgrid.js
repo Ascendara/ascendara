@@ -208,10 +208,17 @@ async function fetchGameAssets(gameName, gameDir, selectedGameId, selectedLogoId
  *
  * Returns { gameId, grid, hero, logo, header } where any field may be null.
  */
+// Keep in step with artwork_search_key in the API, which matches approved
+// artwork overrides against these cleaned names
 function cleanGameName(gameName) {
   return gameName
     .replace(/\[[^\]]*\]/g, "") // repack tags like [FitGirl Repack]
-    .replace(/[\s,]+v\d[\d.]*.*$/i, "") // "Title v1.2" and FitGirl's "Title, v1.2 + DLCs"
+    .replace(/\s+\S*_\S*/g, "") // build ids like "TSC2_WP_Win64_Shipping_prev_20_signed"
+    .replace(/[\s,]+v+\d[\d.]*.*$/i, "") // "Title v1.2", "Title vv1.2-GOG" and "Title, v1.2 + DLCs"
+    .replace(/[\s,]+(?:release|build)[\s._-]*\d.*$/i, "") // "Title release-57", "Title build 1234"
+    .replace(/\s+(?:alpha|beta|hotfix|early access)(?:[\s._-]*[\d.]+)?$/i, "") // "Title alpha"
+    .replace(/\s+(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{6,}$/i, "") // commit hashes like "509170a9"
+    .replace(/\s+[A-Z]{3,}\d{2,}$/, "") // uploader codes like "RSRU42"
     .replace(/ premium edition/i, "")
     .replace(/\(\s*\)/g, "") // strip empty parentheses from mangled Hydra titles
     .replace(/\s{2,}/g, " ")
