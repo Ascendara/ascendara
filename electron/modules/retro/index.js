@@ -2,7 +2,7 @@ const fs = require("fs-extra");
 const path = require("path");
 const { spawn, execFile } = require("child_process");
 const { promisify } = require("util");
-const { Worker } = require("worker_threads");
+const axios = require("axios");
 const { app, ipcMain, dialog, BrowserWindow, shell } = require("electron");
 const { platforms, launchArguments, resolveAdapter, customArguments, extraExtensions } = require("./platforms");
 const expanded = require("./expanded-catalogue.json");
@@ -10,11 +10,29 @@ const { scan, mergeScan, emptyScanHint, normalizeTitle, pathKey } = require("./s
 const saves = require("./saves");
 const { identifyEmulator, detectFolders } = require("./detect");
 const { setPlayingActivity, updateDiscordRPCToLibrary } = require("../app/discord-rpc");
+const { API_URL } = require("../core/config");
+
+// Covers and game info come from LaunchBox's database, kept on the Ascendara API.
+// Only the library's games are looked up; the Catalogue tab searches online.
+const METADATA_URL = `${API_URL}/retro/metadata`;
+const RECHECK_UNMATCHED_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Requests to the metadata API, with the API's own message when it refuses one
+// (for example "Retro metadata is not ready yet").
+async function metadataRequest(request) {
+  try {
+    return (await request()).data;
+  } catch (error) {
+    const message = error.response?.data?.error;
+    if (typeof message === "string" && message) throw new Error(message.slice(0, 200));
+    if (error.response) throw new Error(`The game info service returned an error (${error.response.status}). Try again later.`);
+    throw new Error("Couldn't reach the game info service. Check your internet connection.");
+  }
+}
 
 function registerRetroHandlers() {
   const directory = path.join(app.getPath("userData"), "retro");
   const stateFile = path.join(directory, "library.json");
-  const catalogueFile = path.join(directory, "catalogue.json");
   const recoveryDirectory = path.join(directory, "backups");
   fs.ensureDirSync(directory);
   let state = { version: 1, profiles: {}, games: [] }, loadError = null;
@@ -22,8 +40,8 @@ function registerRetroHandlers() {
     if (fs.existsSync(stateFile)) state = fs.readJsonSync(stateFile);
     if (state.version !== 1 || !Array.isArray(state.games) || !state.profiles) throw new Error("Invalid library structure");
   } catch (error) { loadError = `Retro library could not be loaded: ${error.message}. Your file is preserved at ${stateFile}.`; }
-  let catalogue = { games: [], updatedAt: null }, titleIndex = new Map();
-  let job = null, worker = null;
+  let catalogueStatus = { count: 0, updatedAt: null, checkedAt: 0 }, matching = null, matchAgain = false;
+  let job = null;
   const running = new Map(), busyProfiles = new Set();
   const persist = () => {
     fs.writeJsonSync(`${stateFile}.tmp`, state);
@@ -32,24 +50,70 @@ function registerRetroHandlers() {
   const emit = (event = {}) => {
     for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send("retro-changed", { job, ...event });
   };
-  const loadCatalogue = () => {
-    if (fs.existsSync(catalogueFile)) catalogue = fs.readJsonSync(catalogueFile);
-    titleIndex = new Map();
-    for (const game of catalogue.games) {
-      for (const name of [game.title, ...(game.aliases || [])]) {
-        const key = `${game.platform}:${normalizeTitle(name)}`;
-        if (!titleIndex.has(key)) titleIndex.set(key, new Map());
-        titleIndex.get(key).set(game.id, game);
-      }
-    }
-  };
-  try { loadCatalogue(); } catch (error) { console.warn("[Retro] Catalogue cache could not be loaded", error.message); }
+  // Older versions downloaded the whole LaunchBox catalogue. Remove it and look
+  // every automatically matched game up again from the API.
+  for (const file of ["catalogue.json", "catalogue-download.zip"]) {
+    const legacy = path.join(directory, file);
+    if (!fs.existsSync(legacy)) continue;
+    try {
+      fs.removeSync(legacy);
+      for (const game of state.games) if (!game.manualMetadata) { delete game.metadataId; delete game.metadataCheckedAt; }
+      if (!loadError) persist();
+    } catch (error) { console.warn("[Retro] Could not remove the old catalogue", error.message); }
+  }
+  const platformFor = catalogueName => Object.values(platforms).find(p => p.catalogue && p.catalogue === catalogueName)?.id;
+  // Looks up covers and info for games that don't have them yet. Games with no
+  // match are asked about again after a week, in case LaunchBox adds them.
   const matchGames = () => {
-    for (const game of state.games) {
-      if (game.metadataId || game.manualMetadata) continue;
-      const matches = titleIndex.get(`${game.platform}:${normalizeTitle(game.title)}`);
-      if (matches?.size === 1) applyMetadata(game, [...matches.values()][0], false);
-    }
+    // A scan can add games while a lookup is out; run once more afterwards.
+    if (matching) { matchAgain = true; return matching; }
+    matching = (async () => {
+      const now = Date.now();
+      const pending = state.games.filter(game => !game.metadataId && !game.manualMetadata && platforms[game.platform]?.catalogue && !(now - (game.metadataCheckedAt || 0) < RECHECK_UNMATCHED_MS));
+      const byPlatform = new Map();
+      for (const game of pending) {
+        if (!byPlatform.has(game.platform)) byPlatform.set(game.platform, []);
+        byPlatform.get(game.platform).push(game);
+      }
+      let changed = false;
+      for (const [id, games] of byPlatform) {
+        for (let start = 0; start < games.length; start += 500) {
+          const batch = games.slice(start, start + 500);
+          try {
+            const data = await metadataRequest(() => axios.post(`${METADATA_URL}/match`, { platform: platforms[id].catalogue, keys: [...new Set(batch.map(game => normalizeTitle(game.title)))] }, { timeout: 30000 }));
+            for (const requested of batch) {
+              // A scan may have replaced or removed the game while the request was out.
+              const game = state.games.find(g => g.id === requested.id);
+              if (!game || game.metadataId || game.manualMetadata) continue;
+              const metadata = data?.matches?.[normalizeTitle(game.title)];
+              if (metadata) applyMetadata(game, metadata, false);
+              game.metadataCheckedAt = now;
+              changed = true;
+            }
+          } catch (error) { console.warn(`[Retro] Metadata lookup for ${id} failed:`, error.message); }
+        }
+      }
+      if (changed) { persist(); emit(); }
+    })().finally(() => {
+      matching = null;
+      if (matchAgain) { matchAgain = false; matchGames(); }
+    });
+    return matching;
+  };
+  // Checked hourly, or every five minutes while the API isn't answering.
+  const refreshCatalogueStatus = async () => {
+    if (Date.now() - catalogueStatus.checkedAt < (catalogueStatus.count ? 60 : 5) * 60 * 1000) return;
+    catalogueStatus.checkedAt = Date.now();
+    try {
+      const data = await metadataRequest(() => axios.get(METADATA_URL, { timeout: 15000 }));
+      const names = new Set(Object.values(platforms).map(p => p.catalogue).filter(Boolean));
+      const count = Object.entries(data?.platforms || {}).reduce((sum, [name, n]) => sum + (names.has(name) ? Number(n) || 0 : 0), 0);
+      const becameReady = count > 0 && !catalogueStatus.count;
+      catalogueStatus = { count, updatedAt: data?.updatedAt || null, checkedAt: catalogueStatus.checkedAt };
+      emit();
+      // Games added while the API was unavailable are matched once it answers.
+      if (becameReady) matchGames();
+    } catch (error) { console.warn("[Retro] Catalogue status unavailable:", error.message); }
   };
   function applyMetadata(game, metadata, manual) {
     Object.assign(game, { metadataId: metadata.id, title: metadata.title, year: metadata.year, genres: metadata.genres, description: metadata.description, developer: metadata.developer, cover: metadata.cover, manualMetadata: manual });
@@ -79,12 +143,14 @@ function registerRetroHandlers() {
   }
   // Other console shows the name the user gave it.
   const platformList = () => Object.values(platforms).map(platform => platform.id === "other" && state.profiles.other?.consoleName ? { ...platform, name: state.profiles.other.consoleName } : platform);
-  handle("state", () => ({ ...state, platforms: platformList(), job, running: [...running.keys()], catalogue: { count: catalogue.games.length, updatedAt: catalogue.updatedAt } }));
+  handle("state", () => {
+    refreshCatalogueStatus();
+    return { ...state, platforms: platformList(), job, running: [...running.keys()], catalogue: { count: catalogueStatus.count, updatedAt: catalogueStatus.updatedAt } };
+  });
   handle("pick", async kind => {
     const folders = ["romFolder", "saveFolder"].includes(kind);
-    if (!folders && !["executable", "core", "catalogue", "cover", "backup"].includes(kind)) throw new Error("Unknown selection type");
+    if (!folders && !["executable", "core", "cover", "backup"].includes(kind)) throw new Error("Unknown selection type");
     const filters = {
-      catalogue: [{ name: "LaunchBox metadata", extensions: ["xml", "zip"] }],
       cover: [{ name: "Cover image", extensions: ["png", "jpg", "jpeg", "webp"] }],
       backup: [{ name: "Retro backup", extensions: ["zip"] }],
       core: [{ name: "RetroArch core", extensions: ["dll", "so", "dylib"] }],
@@ -155,41 +221,19 @@ function registerRetroHandlers() {
     await validateFile(executable, "Emulator executable");
     return identifyEmulator(executable);
   });
-  handle("catalogue", source => {
-    requireIdle();
-    if (source && (typeof source !== "string" || !path.isAbsolute(source) || !/\.(xml|zip)$/i.test(source))) throw new Error("Select Metadata.xml or Metadata.zip");
-    job = { phase: "catalogue" }; emit();
-    worker = new Worker(path.join(__dirname, "catalogue-worker.js"), { workerData: { directory, source: source || null } });
-    let finished = false, lastProgress = 0;
-    const finish = error => {
-      if (finished) return;
-      finished = true; worker = null; job = null;
-      if (error) emit({ error });
-      else {
-        try { loadCatalogue(); matchGames(); persist(); emit({ message: `Catalogue ready: ${catalogue.games.length.toLocaleString()} games` }); }
-        catch (failure) { emit({ error: failure.message }); }
-      }
-    };
-    worker.on("message", message => {
-      if (message.error) finish(message.error);
-      else if (message.done) finish();
-      else if (message.progress && Date.now() - lastProgress > 300) { lastProgress = Date.now(); job = message.progress; emit(); }
-    });
-    worker.on("error", error => finish(error.message));
-    worker.on("exit", code => { if (!finished) finish(`Catalogue worker stopped (${code})`); });
+  handle("search", async (id, query) => {
+    const platform = requirePlatform(id);
+    if (!platform.catalogue) return [];
+    const data = await metadataRequest(() => axios.get(`${METADATA_URL}/search`, { params: { platform: platform.catalogue, q: String(query || "").slice(0, 200) }, timeout: 15000 }));
+    return (data?.games || []).map(game => ({ ...game, platform: id }));
   });
-  handle("search", (id, query) => {
-    requirePlatform(id);
-    const term = normalizeTitle(String(query || "").slice(0, 200));
-    if (!term) return catalogue.games.filter(g => g.platform === id).slice(0, 60);
-    return catalogue.games.filter(g => g.platform === id && [g.title, ...(g.aliases || [])].some(n => normalizeTitle(n).includes(term))).slice(0, 60);
-  });
-  handle("update-game", (id, input) => {
+  handle("update-game", async (id, input) => {
     requireIdle();
     const game = requireGame(id);
     if (input.metadataId) {
-      const metadata = catalogue.games.find(g => g.id === String(input.metadataId) && g.platform === game.platform);
-      if (!metadata) throw new Error("Catalogue match not found for this console");
+      if (!/^\d{1,20}$/.test(String(input.metadataId))) throw new Error("Catalogue match not found for this console");
+      const metadata = await metadataRequest(() => axios.get(`${METADATA_URL}/game/${input.metadataId}`, { timeout: 15000 }));
+      if (platformFor(metadata?.platform) !== game.platform) throw new Error("Catalogue match not found for this console");
       applyMetadata(game, metadata, true);
     } else if (input.title !== undefined) {
       if (typeof input.title !== "string" || !input.title.trim() || input.title.length > 250) throw new Error("Enter a game title");
@@ -273,7 +317,7 @@ function registerRetroHandlers() {
     try { persist(); } catch (error) { console.warn("[Retro] Session save failed", error.message); }
   };
   const timer = setInterval(flushSessions, 30000); timer.unref();
-  app.on("before-quit", () => { flushSessions(); worker?.terminate(); });
+  app.on("before-quit", flushSessions);
 
   async function withSaves(id, callback) {
     requirePlatform(id); requireClosed(id);
@@ -324,6 +368,7 @@ function registerRetroHandlers() {
       await fs.unlink(source);
     }
   }));
+  if (!loadError) matchGames();
 }
 
 module.exports = { registerRetroHandlers };

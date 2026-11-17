@@ -7,7 +7,7 @@ const { identifyImage } = require("./detect");
 const pathKey = file => process.platform === "win32" ? path.resolve(file).toLowerCase() : path.resolve(file);
 const stripDisc = name => name.replace(/\s*[([](?:disc|disk|cd)\s*\d+(?:\s*of\s*\d+)?[)\]]/gi, "").trim();
 const cleanTitle = name => stripDisc(name).replace(/\s*\[[^\]]*\]/g, "").replace(/\s*\((?:USA|Europe|Japan|World|Asia|En|Fr|De|Es|It|Rev\b|v\d)[^)]*\)/gi, "").trim();
-const normalizeTitle = name => cleanTitle(name).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/,\s*the$/, "").replace(/^the\s+/, "").replace(/[^a-z0-9]/g, "");
+const normalizeTitle = name => cleanTitle(name).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/,\s*the(?=\s*(?:$|[-:]))/, "").replace(/^the\s+/, "").replace(/[^a-z0-9]/g, "");
 
 function parseSfo(buffer) {
   if (buffer.length < 20 || buffer.readUInt32LE(0) !== 0x46535000) return {};

@@ -1158,15 +1158,7 @@ export default function Retro() {
               {state.job.platform ? ` · ${platformFor(state.job.platform)?.name}` : ""}
             </p>
             <p className="text-muted-foreground">
-              {state.job.bytes
-                ? t("retro.job.bytesDownloaded", {
-                    count: Math.round(state.job.bytes / 1024 / 1024),
-                  })
-                : state.job.records
-                  ? t("retro.job.recordsProcessed", {
-                      count: state.job.records.toLocaleString(),
-                    })
-                  : t("retro.job.filesChecked", { count: state.job.inspected || 0 })}
+              {t("retro.job.filesChecked", { count: state.job.inspected || 0 })}
               {t("retro.job.leaveMessage")}
             </p>
           </div>
@@ -1265,11 +1257,13 @@ export default function Retro() {
               <BookOpen className="mr-2 h-4 w-4" />
               {t("retro.tabs.catalogue")}
             </Button>
-            <span className="ml-auto text-xs text-muted-foreground">
-              {t("retro.tabs.catalogueCount", {
-                count: state.catalogue.count.toLocaleString(),
-              })}
-            </span>
+            {state.catalogue.count > 0 && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                {t("retro.tabs.catalogueCount", {
+                  count: state.catalogue.count.toLocaleString(),
+                })}
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap gap-3">
             <div className="relative min-w-[200px] flex-1">
@@ -1424,38 +1418,8 @@ export default function Retro() {
             <>
               <p className="text-sm text-muted-foreground">
                 {t("retro.catalogue.description")}
-                {!state.catalogue.count
-                  ? t("retro.catalogue.downloadPrompt")
-                  : t("retro.catalogue.searchPrompt")}
+                {t("retro.catalogue.searchPrompt")}
               </p>
-              <div className="flex flex-wrap gap-2 rounded-xl bg-card p-3 shadow">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!!state.job}
-                  onClick={() => perform(() => retroCall("updateCatalogue"))}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  {t(
-                    state.catalogue.count
-                      ? "retro.actions.updateCatalogue"
-                      : "retro.actions.downloadCatalogue"
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={!!state.job}
-                  onClick={() =>
-                    perform(async () => {
-                      const file = await retroCall("pick", "catalogue");
-                      if (file) await retroCall("updateCatalogue", file);
-                    })
-                  }
-                >
-                  {t("retro.actions.importMetadata")}
-                </Button>
-              </div>
               {searchBusy && <Loader2 className="h-5 w-5 animate-spin" />}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
                 {catalogueResults.map(game => (

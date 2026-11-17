@@ -4128,14 +4128,9 @@
     "step5Title": "Paste the Cookie"
   },
   "retro": {
-    "actions": {
-      "downloadCatalogue": "Download catalogue",
-      "importMetadata": "Import metadata",
-      "updateCatalogue": "Update catalogue"
-    },
+    "actions": {},
     "catalogue": {
       "description": "Browse metadata for this console. To play a game, add its local ROM folder in console setup.",
-      "downloadPrompt": " Download or import the LaunchBox catalogue to begin.",
       "inLibrary": "In your library",
       "noResults": "No catalogue matches found.",
       "searchPrompt": " Search by title to find a game (up to 60 results)."
@@ -4357,15 +4352,11 @@
       "yearLabel": "Year"
     },
     "job": {
-      "bytesDownloaded": "{{count}} MB downloaded",
       "filesChecked": "{{count}} files checked",
       "leaveMessage": ". You can leave this page while it finishes.",
       "phases": {
-        "catalogue": "Processing catalogue",
-        "downloading catalogue": "Downloading catalogue",
         "scanning": "Scanning"
-      },
-      "recordsProcessed": "{{count}} records processed"
+      }
     },
     "layout": {
       "ascendIncluded": "Expanded presets included with Ascend",

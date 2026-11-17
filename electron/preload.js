@@ -47,7 +47,6 @@ contextBridge.exposeInMainWorld("electron", {
     detect: roots => ipcRenderer.invoke("retro-detect", roots),
     identifyEmulator: executable =>
       ipcRenderer.invoke("retro-identify-emulator", executable),
-    updateCatalogue: source => ipcRenderer.invoke("retro-catalogue", source),
     search: (id, query) => ipcRenderer.invoke("retro-search", id, query),
     updateGame: (id, data) => ipcRenderer.invoke("retro-update-game", id, data),
     setCover: (id, file) => ipcRenderer.invoke("retro-cover", id, file),
