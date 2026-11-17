@@ -62,6 +62,7 @@ import {
   Upload,
 } from "lucide-react";
 import EarnedBadges from "@/components/EarnedBadges";
+import ProfileReviews from "@/components/ProfileReviews";
 
 const VUS = ["online", "away", "busy", "invisible"];
 
@@ -1476,6 +1477,8 @@ const Profile = () => {
               </div>
             )}
           </Panel>
+
+          {IsAscendUser && <ProfileReviews user={UserData} />}
 
           <Panel data-tour="profile-history" className="overflow-hidden">
             <PanelHeader

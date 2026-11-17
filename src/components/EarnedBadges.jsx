@@ -36,7 +36,7 @@ const EARNED_BADGES = [
 
 // Review milestones, by number of different games reviewed. 40 is the top
 // tier and glows like a legendary level.
-const REVIEW_TIERS = [
+export const REVIEW_TIERS = [
   { count: 40, colors: ["#fde047", "#d97706"], legendary: true },
   { count: 30, colors: ["#c084fc", "#7e22ce"] },
   { count: 20, colors: ["#e879f9", "#a21caf"] },
@@ -178,7 +178,7 @@ const ornamentSpill = rank => (rank >= 6 ? 3.8 : rank >= 4 ? 2.8 : 0);
 // Level emblems add the ornaments above by rank. All motion is skipped when
 // the system asks for reduced motion, and for still emblems like the locked
 // ones in the catalog.
-function MilestoneEmblem({
+export function MilestoneEmblem({
   value,
   colors,
   shape,
@@ -717,7 +717,7 @@ function MilestoneLadder({
 // Every badge in one place: the special badges, then the level and review
 // milestone ladders. The badge that was clicked is highlighted, and when the
 // badge belongs to a known user their earned milestones are lit.
-function BadgeCatalogDialog({ open, onOpenChange, highlight, user }) {
+export function BadgeCatalogDialog({ open, onOpenChange, highlight, user }) {
   const { t } = useLanguage();
   const { userData } = useAuth();
   const navigate = useNavigate();

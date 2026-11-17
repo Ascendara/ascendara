@@ -3399,6 +3399,36 @@ export const getLikedReviews = async gameID => {
 };
 
 /**
+ * The signed-in member's own reviews, newest first, for their Profile page.
+ * Anonymous reviews are included, since only the member sees this list.
+ * @returns {Promise<{reviews: object[], error: string|null}>}
+ */
+export const getMyReviews = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { reviews: [], error: "Not authenticated" };
+    }
+
+    const response = await userAuthenticatedFetch(
+      user,
+      `${API_URL}/app/v2/reviews/mine`,
+      { method: "GET" }
+    );
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return { reviews: [], error: data.error || "Failed to load reviews" };
+    }
+
+    return { reviews: Array.isArray(data.reviews) ? data.reviews : [], error: null };
+  } catch (error) {
+    console.error("Get user reviews error:", error);
+    return { reviews: [], error: error.message };
+  }
+};
+
+/**
  * Like or unlike a review
  * @param {string} gameID
  * @param {string} reviewId
