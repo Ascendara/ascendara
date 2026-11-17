@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Check,
   X,
@@ -10,6 +10,7 @@ import {
   Puzzle,
   Shield,
   Gamepad2,
+  ArrowRight,
   ExternalLink,
   Loader2,
   MessageCircle,
@@ -57,27 +58,8 @@ const FEATURES = [
   { key: "andMoreComing", icon: Sparkles },
 ];
 
-// Each plan's accent, kept in one place so cards, chips and buttons agree.
-const PLAN_STYLES = {
-  monthly: {
-    card: "border-border/60 bg-card/60 hover:border-border hover:bg-card",
-    chip: "",
-    check: "text-muted-foreground",
-    cta: "bg-muted text-foreground group-hover:bg-muted/70",
-  },
-  sixMonth: {
-    card: "border-primary/50 bg-primary/[0.06] shadow-xl shadow-primary/10 ring-1 ring-primary/30 hover:shadow-primary/20",
-    chip: "bg-primary text-white",
-    check: "text-primary",
-    cta: "bg-primary text-white shadow-md shadow-primary/30 group-hover:bg-primary/90",
-  },
-  lifetime: {
-    card: "border-amber-500/40 bg-gradient-to-b from-amber-500/[0.08] to-transparent hover:border-amber-500/60 hover:shadow-lg hover:shadow-amber-500/10",
-    chip: "bg-gradient-to-r from-amber-500 to-amber-600 text-black",
-    check: "text-amber-500",
-    cta: "bg-gradient-to-r from-amber-500 to-amber-600 text-black shadow-md shadow-amber-500/25 group-hover:from-amber-400 group-hover:to-amber-500",
-  },
-};
+const COPY = "ascend.settings.subscriptionDialogV2";
+const FEATURE_INTERVAL_MS = 3500;
 
 const formatPrice = (cents, currency = "usd") =>
   new Intl.NumberFormat(undefined, {
@@ -87,29 +69,111 @@ const formatPrice = (cents, currency = "usd") =>
     maximumFractionDigits: 2,
   }).format(cents / 100);
 
+const planKind = plan =>
+  plan.intervalCount === 0
+    ? "lifetime"
+    : plan.intervalCount === 6
+      ? "sixMonth"
+      : "monthly";
+
+// One feature at a time, auto-advancing; hovering pauses it and the icons jump to one.
+const FeatureShowcase = ({ t }) => {
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const feature = FEATURES[active];
+  const base = `${COPY}.includedFeatures.${feature.key}`;
+
+  useEffect(() => {
+    if (paused) return;
+    const timer = setTimeout(
+      () => setActive(index => (index + 1) % FEATURES.length),
+      FEATURE_INTERVAL_MS
+    );
+    return () => clearTimeout(timer);
+  }, [active, paused]);
+
+  return (
+    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+      <div className="relative h-[128px] overflow-hidden rounded-2xl bg-white/10 p-4 ring-1 ring-white/15 backdrop-blur">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={feature.key}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15">
+                <feature.icon className="h-4 w-4 text-white" />
+              </div>
+              <h4 className="text-sm font-semibold text-white">{t(`${base}.title`)}</h4>
+            </div>
+            <p className="mt-2.5 line-clamp-3 text-[13px] leading-relaxed text-white/75">
+              {t(`${base}.description`)}
+            </p>
+          </motion.div>
+        </AnimatePresence>
+        {!paused && (
+          <motion.div
+            key={active}
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ duration: FEATURE_INTERVAL_MS / 1000, ease: "linear" }}
+            className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-white/50"
+          />
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {FEATURES.map((item, index) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => setActive(index)}
+            aria-label={t(`${COPY}.includedFeatures.${item.key}.title`)}
+            title={t(`${COPY}.includedFeatures.${item.key}.title`)}
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
+              index === active
+                ? "scale-110 bg-white text-primary shadow-md"
+                : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
+            )}
+          >
+            <item.icon className="h-3.5 w-3.5" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const PartnerCodeField = ({ code, setCode, expanded, setExpanded, t }) => {
   if (!expanded) {
     return (
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="mx-auto flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+        className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
       >
-        <TicketPercent className="h-4 w-4" />
-        {t("ascend.settings.subscriptionDialogV2.partnerCode")}
+        <TicketPercent className="h-3.5 w-3.5" />
+        {t(`${COPY}.partnerCode`)}
       </button>
     );
   }
   return (
-    <div className="mx-auto w-full max-w-sm">
+    <div>
       <div
         className={cn(
-          "flex h-11 items-center gap-2.5 rounded-xl border bg-background px-3 transition-colors focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20",
+          "flex h-10 items-center gap-2.5 rounded-xl border bg-background px-3 transition-colors focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20",
           code ? "border-primary/50" : "border-border"
         )}
       >
         <TicketPercent
-          className={cn("h-4 w-4 shrink-0", code ? "text-primary" : "text-muted-foreground")}
+          className={cn(
+            "h-4 w-4 shrink-0",
+            code ? "text-primary" : "text-muted-foreground"
+          )}
         />
         <input
           autoFocus
@@ -122,8 +186,8 @@ const PartnerCodeField = ({ code, setCode, expanded, setExpanded, t }) => {
                 .slice(0, 64)
             )
           }
-          placeholder={t("ascend.settings.subscriptionDialogV2.partnerCodePlaceholder")}
-          aria-label={t("ascend.settings.subscriptionDialogV2.partnerCodePlaceholder")}
+          placeholder={t(`${COPY}.partnerCodePlaceholder`)}
+          aria-label={t(`${COPY}.partnerCodePlaceholder`)}
           autoComplete="off"
           spellCheck={false}
           className="h-full min-w-0 flex-1 bg-transparent font-mono text-sm tracking-widest outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-muted-foreground"
@@ -132,157 +196,125 @@ const PartnerCodeField = ({ code, setCode, expanded, setExpanded, t }) => {
           <button
             type="button"
             onClick={() => setCode("")}
-            aria-label={t("ascend.settings.subscriptionDialogV2.removeCode")}
+            aria-label={t(`${COPY}.removeCode`)}
             className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
-      <p className="mt-2 text-center text-xs text-muted-foreground">
-        {t("ascend.settings.subscriptionDialogV2.partnerCodeHint")}
+      <p
+        className={cn(
+          "mt-1.5 text-xs",
+          code ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+        )}
+      >
+        {t(code ? `${COPY}.codeApplied` : `${COPY}.partnerCodeHint`)}
       </p>
     </div>
   );
 };
 
-const PlanCard = ({ plan, index, hasPartnerCode, onSelect, t }) => {
-  const kind =
-    plan.intervalCount === 0 ? "lifetime" : plan.intervalCount === 6 ? "sixMonth" : "monthly";
-  const style = PLAN_STYLES[kind];
-  const blocked = kind === "monthly" && hasPartnerCode;
-  const codeApplies = hasPartnerCode && kind !== "monthly";
+const MembershipOption = ({
+  plan,
+  index,
+  selected,
+  blocked,
+  hasPartnerCode,
+  onSelect,
+  t,
+}) => {
+  const kind = planKind(plan);
+  const lifetime = kind === "lifetime";
   const currency = plan.currency || "usd";
 
-  const name = {
-    monthly: t("ascend.settings.monthly"),
-    sixMonth: t("ascend.settings.sixMonths"),
-    lifetime: t("ascend.settings.subscriptionDialogV2.lifetime"),
-  }[kind];
-  const chip = {
-    sixMonth: t("ascend.settings.subscriptionDialogV2.mostPopular"),
-    lifetime: t("ascend.settings.subscriptionDialogV2.oneTimePurchase"),
-  }[kind];
+  const name = t(`${COPY}.${kind}`);
+  const badge = { sixMonth: t(`${COPY}.membersPick`), lifetime: t(`${COPY}.forever`) }[
+    kind
+  ];
   // With a partner code, lifetime is a fixed price instead of pay-what-you-want.
   const price =
-    formatPrice(plan.unitAmount, currency) + (kind === "lifetime" && !hasPartnerCode ? "+" : "");
-  const suffix = {
-    monthly: t("ascend.settings.subscriptionDialogV2.perMonth"),
-    sixMonth: t("ascend.settings.subscriptionDialogV2.perSixMonths"),
-  }[kind];
-  const subtitle = {
-    monthly: t("ascend.settings.subscriptionDialogV2.billedMonthly"),
-    sixMonth: t("ascend.settings.subscriptionDialogV2.billedEvery6Months", {
-      price: formatPrice(Math.round(plan.unitAmount / 6), currency),
-    }),
-    lifetime: hasPartnerCode
-      ? t("ascend.settings.subscriptionDialogV2.lifetimeWithCode", {
-          price: formatPrice(plan.unitAmount, currency),
-        })
-      : t("ascend.settings.subscriptionDialogV2.lifetimeSupport"),
-  }[kind];
-  const perks = [
-    { label: t("ascend.settings.subscriptionDialogV2.allPremiumFeatures") },
-    { label: t("ascend.settings.subscriptionDialogV2.prioritySupport") },
-    kind === "sixMonth" && {
-      label: t("ascend.settings.subscriptionDialogV2.save25"),
-      highlight: true,
-    },
-    kind === "lifetime" && {
-      label: t("ascend.settings.subscriptionDialogV2.neverPayAgain"),
-      highlight: true,
-    },
-  ].filter(Boolean);
+    formatPrice(plan.unitAmount, currency) + (lifetime && !hasPartnerCode ? "+" : "");
+  const suffix = t(
+    `${COPY}.${{ monthly: "perMonth", sixMonth: "perSixMonths", lifetime: "once" }[kind]}`
+  );
+  const note = blocked
+    ? t(`${COPY}.partnerCodeNotMonthly`)
+    : {
+        monthly: t(`${COPY}.monthlyNote`),
+        sixMonth: t(`${COPY}.sixMonthNote`, {
+          price: formatPrice(Math.round(plan.unitAmount / 6), currency),
+        }),
+        lifetime: hasPartnerCode
+          ? t(`${COPY}.lifetimeWithCode`, {
+              price: formatPrice(plan.unitAmount, currency),
+            })
+          : t(`${COPY}.lifetimeNote`),
+      }[kind];
 
   return (
     <motion.button
       type="button"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: blocked ? 0.45 : 1, y: 0 }}
-      transition={{ delay: index * 0.08, duration: 0.3 }}
+      role="radio"
+      aria-checked={selected}
+      initial={{ opacity: 0, x: 12 }}
+      animate={{ opacity: blocked ? 0.45 : 1, x: 0 }}
+      transition={{ delay: 0.1 + index * 0.06, duration: 0.25 }}
       disabled={blocked}
-      onClick={event => onSelect(plan.id, event)}
+      onClick={() => onSelect(plan.id)}
       className={cn(
-        "group relative flex flex-col rounded-2xl border p-6 text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        style.card,
-        blocked ? "cursor-not-allowed" : "hover:-translate-y-0.5"
+        "flex w-full items-center gap-3.5 rounded-xl border px-4 py-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        blocked && "cursor-not-allowed",
+        selected
+          ? lifetime
+            ? "border-amber-500/70 bg-amber-500/[0.07]"
+            : "border-primary/70 bg-primary/[0.07]"
+          : "border-border/70 hover:border-border hover:bg-muted/40"
       )}
     >
-      <div className="flex min-h-[1.5rem] items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-foreground">{name}</span>
-        {chip && (
-          <span
-            className={cn(
-              "rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
-              style.chip
-            )}
-          >
-            {chip}
-          </span>
+      <span
+        className={cn(
+          "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+          selected
+            ? lifetime
+              ? "border-amber-500 bg-amber-500"
+              : "border-primary bg-primary"
+            : "border-muted-foreground/40"
         )}
-      </div>
+      >
+        {selected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+      </span>
 
-      <div className="mt-5 flex items-baseline gap-1">
-        <span className="text-4xl font-bold tracking-tight text-foreground">{price}</span>
-        {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
-      </div>
-      <p className="mt-2 min-h-[2.5rem] text-sm leading-snug text-muted-foreground">
-        {subtitle}
-      </p>
-
-      <div className="my-5 h-px bg-border/60" />
-
-      <ul className="space-y-2.5 text-sm">
-        {perks.map(perk => (
-          <li
-            key={perk.label}
-            className={cn(
-              "flex items-center gap-2.5",
-              perk.highlight ? cn("font-medium", style.check) : "text-muted-foreground"
-            )}
-          >
-            <Check className={cn("h-4 w-4 shrink-0", style.check)} />
-            {perk.label}
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-auto pt-6">
-        {codeApplies && (
-          <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            <TicketPercent className="h-3.5 w-3.5" />
-            {t("ascend.settings.subscriptionDialogV2.codeApplied")}
-          </p>
-        )}
-        <span
-          className={cn(
-            "flex h-11 w-full items-center justify-center rounded-xl text-sm font-semibold transition-all",
-            style.cta
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-foreground">{name}</span>
+          {badge && (
+            <span
+              className={cn(
+                "rounded-full px-2 py-px text-[10px] font-semibold uppercase tracking-wider",
+                lifetime
+                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                  : "bg-primary/15 text-primary"
+              )}
+            >
+              {badge}
+            </span>
           )}
-        >
-          {blocked
-            ? t("ascend.settings.subscriptionDialogV2.partnerCodeNotMonthly")
-            : t("ascend.settings.subscriptionDialogV2.continue")}
         </span>
-      </div>
+        <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+          {note}
+        </span>
+      </span>
+
+      <span className="shrink-0 text-right">
+        <span className="block text-lg font-bold leading-none tracking-tight text-foreground">
+          {price}
+        </span>
+        <span className="mt-1 block text-[11px] text-muted-foreground">{suffix}</span>
+      </span>
     </motion.button>
   );
 };
-
-const TrustFooter = ({ t, showCancel }) => (
-  <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
-    <span className="flex items-center gap-1.5">
-      <LockKeyhole className="h-3.5 w-3.5" />
-      {t("ascend.settings.subscriptionDialogV2.securePayments")}
-    </span>
-    {showCancel && (
-      <span className="flex items-center gap-1.5">
-        <Check className="h-3.5 w-3.5" />
-        {t("ascend.settings.subscriptionDialogV2.cancelAnytime")}
-      </span>
-    )}
-  </div>
-);
 
 const SubscriptionPlanDialog = ({
   open,
@@ -292,21 +324,33 @@ const SubscriptionPlanDialog = ({
   isLifetimeUpgrade = false,
   t,
 }) => {
-  const lifetimePlan = availablePlans.find(plan => plan.intervalCount === 0);
   const [showRedirectDialog, setShowRedirectDialog] = useState(false);
   const [partnerCode, setPartnerCode] = useState("");
   const [showPartnerCode, setShowPartnerCode] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
   const redirectCloseRef = useRef(null);
   const hasPartnerCode = partnerCode.length > 0;
-  const partnerCodeField = (
-    <PartnerCodeField
-      code={partnerCode}
-      setCode={setPartnerCode}
-      expanded={showPartnerCode}
-      setExpanded={setShowPartnerCode}
-      t={t}
-    />
-  );
+
+  // Members already on a plan can only move up to lifetime.
+  const plans = isLifetimeUpgrade
+    ? availablePlans.filter(plan => plan.intervalCount === 0)
+    : availablePlans;
+  const isBlocked = plan => hasPartnerCode && planKind(plan) === "monthly";
+  const preferred =
+    plans.find(plan => planKind(plan) === "sixMonth") ||
+    plans.find(plan => !isBlocked(plan)) ||
+    plans[0];
+  const selectedPlan =
+    plans.find(plan => plan.id === selectedId && !isBlocked(plan)) ||
+    (preferred && !isBlocked(preferred)
+      ? preferred
+      : plans.find(plan => !isBlocked(plan)));
+  const joiningForLife = selectedPlan && planKind(selectedPlan) === "lifetime";
+
+  // Each time the dialog opens, start from the recommended membership.
+  useEffect(() => {
+    if (open) setSelectedId(null);
+  }, [open]);
 
   // Auto-close redirect dialog after 10 seconds
   useEffect(() => {
@@ -315,188 +359,139 @@ const SubscriptionPlanDialog = ({
     return () => clearTimeout(timer);
   }, [showRedirectDialog]);
 
-  const handlePlanClick = async (planId, event) => {
-    if (event.currentTarget.contains(document.activeElement)) document.activeElement.blur();
+  const handleJoin = async event => {
+    if (!selectedPlan) return;
+    if (event.currentTarget.contains(document.activeElement))
+      document.activeElement.blur();
     onOpenChange(false);
     setShowRedirectDialog(true);
-    if (!(await onPlanSelection(planId, partnerCode || undefined))) setShowRedirectDialog(false);
+    if (!(await onPlanSelection(selectedPlan.id, partnerCode || undefined)))
+      setShowRedirectDialog(false);
   };
 
-  const closeButton = (
-    <button
-      onClick={() => onOpenChange(false)}
-      aria-label={t("common.close", { defaultValue: "Close" })}
-      className="absolute right-4 top-4 z-10 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-    >
-      <X className="h-5 w-5" />
-    </button>
-  );
-
-  const brandMark = (
-    <div className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/20 bg-background shadow-lg shadow-primary/15">
-      <AscendLogo className="h-9 w-9" />
-    </div>
+  const title = t(isLifetimeUpgrade ? `${COPY}.lifetimeUpgradeTitle` : `${COPY}.title`);
+  const description = t(
+    isLifetimeUpgrade ? `${COPY}.lifetimeUpgradeDescription` : `${COPY}.description`
   );
 
   return (
     <>
       <AlertDialog open={open} onOpenChange={onOpenChange}>
-        <AlertDialogContent
-          className={cn(
-            "flex max-h-[90vh] flex-col gap-0 overflow-hidden border-border/50 bg-background p-0 sm:rounded-2xl",
-            isLifetimeUpgrade ? "max-w-md" : "max-w-5xl"
-          )}
-        >
-          {closeButton}
+        <AlertDialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden border-border/50 bg-background p-0 sm:rounded-2xl">
+          <button
+            onClick={() => onOpenChange(false)}
+            aria-label={t("common.close", { defaultValue: "Close" })}
+            className="absolute right-3 top-3 z-20 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
 
-          {isLifetimeUpgrade ? (
-            <div className="relative overflow-y-auto px-8 pb-7 pt-10">
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-amber-500/15 via-amber-500/5 to-transparent" />
+          <div className="grid min-h-0 overflow-y-auto md:grid-cols-[1fr_1.05fr]">
+            {/* The invitation: who you're joining and what members get */}
+            <section className="relative overflow-hidden bg-gradient-to-br from-primary via-primary/90 to-violet-950 p-7 text-white md:p-8">
+              <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-32 -left-16 h-72 w-72 rounded-full bg-fuchsia-400/20 blur-3xl" />
+
               <div className="relative">
-                {brandMark}
-                <AlertDialogHeader className="text-center">
-                  <AlertDialogTitle className="text-2xl font-bold tracking-tight">
-                    {t("ascend.settings.upgradeToLifetime")}
+                <div className="flex items-center gap-3">
+                  <AscendLogo className="h-10 w-10 drop-shadow-lg" />
+                  <span className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
+                    {t(`${COPY}.eyebrow`)}
+                  </span>
+                </div>
+
+                <AlertDialogHeader className="mt-6 space-y-2 text-left">
+                  <AlertDialogTitle className="text-3xl font-bold leading-tight tracking-tight text-white">
+                    {title}
                   </AlertDialogTitle>
-                  <AlertDialogDescription className="leading-relaxed">
-                    {t("ascend.settings.lifetimeUpgradeDescription")}
+                  <AlertDialogDescription className="text-sm leading-relaxed text-white/75">
+                    {description}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
 
-                {lifetimePlan && (
-                  <div className="my-6 rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/[0.08] to-transparent p-5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold">
-                        {t("ascend.settings.subscriptionDialogV2.lifetime")}
-                      </span>
-                      <span className="rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-black">
-                        {t("ascend.settings.subscriptionDialogV2.oneTimePurchase")}
-                      </span>
-                    </div>
-                    <p className="mt-4 text-4xl font-bold tracking-tight">
-                      {formatPrice(lifetimePlan.unitAmount, lifetimePlan.currency || "usd")}
-                      {!hasPartnerCode && "+"}
-                    </p>
-                    <p className="mt-2 text-sm leading-snug text-muted-foreground">
-                      {hasPartnerCode
-                        ? t("ascend.settings.subscriptionDialogV2.lifetimeWithCode", {
-                            price: formatPrice(
-                              lifetimePlan.unitAmount,
-                              lifetimePlan.currency || "usd"
-                            ),
-                          })
-                        : t("ascend.settings.subscriptionDialogV2.lifetimeSupport")}
-                    </p>
-                    <div className="my-4 h-px bg-border/60" />
-                    <ul className="space-y-2.5 text-sm text-muted-foreground">
-                      {["allPremiumFeatures", "neverPayAgain"].map(key => (
-                        <li key={key} className="flex items-center gap-2.5">
-                          <Check className="h-4 w-4 shrink-0 text-amber-500" />
-                          {t(`ascend.settings.subscriptionDialogV2.${key}`)}
-                        </li>
-                      ))}
-                    </ul>
-                    {hasPartnerCode && (
-                      <p className="mt-4 flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                        <TicketPercent className="h-3.5 w-3.5" />
-                        {t("ascend.settings.subscriptionDialogV2.codeApplied")}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                <button
-                  disabled={!lifetimePlan}
-                  onClick={event => handlePlanClick(lifetimePlan.id, event)}
-                  className="h-12 w-full rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 font-semibold text-black shadow-md shadow-amber-500/25 transition-all hover:from-amber-400 hover:to-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50"
-                >
-                  {t("ascend.settings.upgradeToLifetime")}
-                </button>
-                <div className="mt-5">{partnerCodeField}</div>
-                <div className="mt-6">
-                  <TrustFooter t={t} />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="overflow-y-auto">
-              <div className="relative px-6 pb-10 pt-12 sm:px-10">
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-primary/15 via-primary/5 to-transparent" />
-                <div className="relative">
-                  {brandMark}
-                  <AlertDialogHeader className="mb-10 text-center">
-                    <AlertDialogTitle className="text-3xl font-bold tracking-tight">
-                      {t("ascend.settings.subscriptionDialogV2.title")}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription className="mx-auto mt-2 max-w-xl text-base">
-                      {t("ascend.settings.subscriptionDialogV2.description")}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-
-                  <div
-                    className={cn(
-                      "grid gap-5",
-                      availablePlans.length === 1 ? "mx-auto max-w-sm" : "md:grid-cols-3"
-                    )}
-                  >
-                    {availablePlans.map((plan, index) => (
-                      <PlanCard
-                        key={plan.id}
-                        plan={plan}
-                        index={index}
-                        hasPartnerCode={hasPartnerCode}
-                        onSelect={handlePlanClick}
-                        t={t}
-                      />
-                    ))}
-                  </div>
-
-                  <div className="mt-7">{partnerCodeField}</div>
-                  <div className="mt-5">
-                    <TrustFooter t={t} showCancel />
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-border/50 bg-muted/20 px-6 py-8 sm:px-10">
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-base font-semibold text-foreground">
-                    {t("ascend.settings.subscriptionDialogV2.everythingIncluded")}
+                <div className="mt-7 flex items-center justify-between">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-white/60">
+                    {t(`${COPY}.membersGet`)}
                   </h3>
                   <button
-                    onClick={() => window.open("https://ascendara.app/ascend?ref=app", "_blank")}
-                    className="flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
+                    onClick={() =>
+                      window.open("https://ascendara.app/ascend?ref=app", "_blank")
+                    }
+                    className="flex items-center gap-1 text-xs font-medium text-white/70 transition-colors hover:text-white"
                   >
-                    {t("ascend.settings.subscriptionDialogV2.learnMore")}
+                    {t(`${COPY}.seeEverything`)}
                     <ExternalLink className="h-3 w-3" />
                   </button>
                 </div>
-                <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {FEATURES.map(feature => {
-                    const base = `ascend.settings.subscriptionDialogV2.includedFeatures.${feature.key}`;
-                    return (
-                      <div key={feature.key} className="flex gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                          <feature.icon className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-medium text-foreground">
-                            {t(`${base}.title`)}
-                          </h4>
-                          <p
-                            title={t(`${base}.description`)}
-                            className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground"
-                          >
-                            {t(`${base}.description`)}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="mt-3">
+                  <FeatureShowcase t={t} />
                 </div>
               </div>
-            </div>
-          )}
+            </section>
+
+            {/* Choosing how to join */}
+            <section className="flex flex-col p-7 md:p-8">
+              <h3 className="text-sm font-semibold text-foreground">
+                {t(`${COPY}.chooseMembership`)}
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t(`${COPY}.sameMembership`)}
+              </p>
+
+              <div role="radiogroup" className="mt-5 space-y-2.5">
+                {plans.map((plan, index) => (
+                  <MembershipOption
+                    key={plan.id}
+                    plan={plan}
+                    index={index}
+                    selected={plan.id === selectedPlan?.id}
+                    blocked={isBlocked(plan)}
+                    hasPartnerCode={hasPartnerCode}
+                    onSelect={setSelectedId}
+                    t={t}
+                  />
+                ))}
+              </div>
+
+              <div className="mt-4">
+                <PartnerCodeField
+                  code={partnerCode}
+                  setCode={setPartnerCode}
+                  expanded={showPartnerCode}
+                  setExpanded={setShowPartnerCode}
+                  t={t}
+                />
+              </div>
+
+              <div className="mt-auto pt-6">
+                <button
+                  disabled={!selectedPlan}
+                  onClick={handleJoin}
+                  className={cn(
+                    "group flex h-12 w-full items-center justify-center gap-2 rounded-xl font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50",
+                    joiningForLife
+                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-black shadow-lg shadow-amber-500/25 hover:from-amber-400 hover:to-amber-500 focus-visible:ring-amber-500"
+                      : "bg-primary text-white shadow-lg shadow-primary/30 hover:bg-primary/90 focus-visible:ring-primary"
+                  )}
+                >
+                  {t(joiningForLife ? `${COPY}.joinForLife` : `${COPY}.join`)}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </button>
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <LockKeyhole className="h-3 w-3" />
+                    {t(`${COPY}.securePayments`)}
+                  </span>
+                  {!joiningForLife && (
+                    <span className="flex items-center gap-1">
+                      <Check className="h-3 w-3" />
+                      {t(`${COPY}.leaveAnytime`)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </section>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
 
@@ -517,15 +512,16 @@ const SubscriptionPlanDialog = ({
 
           <div className="flex flex-col items-center justify-center space-y-4 py-6">
             <div className="relative flex h-16 w-16 items-center justify-center">
-              <Loader2 className="absolute h-16 w-16 animate-spin text-primary/40" strokeWidth={1.5} />
+              <Loader2
+                className="absolute h-16 w-16 animate-spin text-primary/40"
+                strokeWidth={1.5}
+              />
               <AscendLogo className="h-8 w-8" />
             </div>
             <AlertDialogHeader className="text-center">
-              <AlertDialogTitle>
-                {t("ascend.settings.subscriptionDialogV2.redirectingToCheckout")}
-              </AlertDialogTitle>
+              <AlertDialogTitle>{t(`${COPY}.redirectingToCheckout`)}</AlertDialogTitle>
               <AlertDialogDescription className="mt-2 text-sm">
-                {t("ascend.settings.subscriptionDialogV2.completeCheckoutMessage")}
+                {t(`${COPY}.completeCheckoutMessage`)}
               </AlertDialogDescription>
             </AlertDialogHeader>
             {partnerCode && (
