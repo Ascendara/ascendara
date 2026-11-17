@@ -11,7 +11,7 @@ const sax = require("sax");
 const { platforms } = require("./platforms");
 
 async function parseCatalogue(stream) {
-  const platformIds = new Map(Object.values(platforms).map(p => [p.catalogue.toLowerCase(), p.id]));
+  const platformIds = new Map(Object.values(platforms).filter(p => p.catalogue).map(p => [p.catalogue.toLowerCase(), p.id]));
   const games = new Map(), images = new Map(), aliases = new Map();
   const parser = sax.parser(true, { trim: true });
   let record = null, tag = null, kind = null, count = 0;

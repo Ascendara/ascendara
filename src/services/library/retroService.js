@@ -23,6 +23,7 @@ const RETRO_PLATFORMS = new Set([
   "gb",
   "gbc",
   "gba",
+  "other",
   ...expanded.platforms.map(platform => platform.id),
 ]);
 

@@ -57,6 +57,11 @@ export function RetroConsoleSetup({
         {choices.map(item => <SurfaceButton key={item.id} {...focus(`adapter-${item.id}`)}
           aria-pressed={draft.adapter === item.id} onClick={() => set("adapter", item.id)}>{item.name}</SurfaceButton>)}
       </div>
+      {platform.id === "other" && <label className="bp-retro-custom-args">
+        <strong>Console name</strong>
+        <input {...focus("console-name")} maxLength={40} value={draft.consoleName || ""} onChange={event => set("consoleName", event.target.value)} onKeyDown={event => event.stopPropagation()}
+          placeholder="e.g. Nintendo Switch 2" />
+      </label>}
       <div className="bp-retro-setting">
         <div><strong>Emulator executable</strong><small>{draft.executable || "Select the emulator application"}</small></div>
         <div className="bp-retro-setting-actions">

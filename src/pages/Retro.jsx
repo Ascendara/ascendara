@@ -269,7 +269,9 @@ function ConsoleSetup({
             {t("retro.setup.setupInstructions")}
             {platform.id === "ps3"
               ? t("retro.setup.ps3Instructions")
-              : t("retro.setup.romInstructions")}
+              : platform.id === "other"
+                ? t("retro.setup.otherInstructions")
+                : t("retro.setup.romInstructions")}
           </div>
           <div className="space-y-2">
             {preset && (
@@ -305,6 +307,20 @@ function ConsoleSetup({
               {t("retro.setup.presetHint")}
             </p>
           </div>
+          {platform.id === "other" && (
+            <div className="space-y-2">
+              <label htmlFor="retro-console-name" className="text-sm font-medium">
+                {t("retro.setup.consoleName")}
+              </label>
+              <Input
+                id="retro-console-name"
+                maxLength={40}
+                value={draft.consoleName || ""}
+                onChange={event => set("consoleName", event.target.value)}
+                placeholder={t("retro.setup.consoleNamePlaceholder")}
+              />
+            </div>
+          )}
           <PathField
             label={t("retro.setup.executable")}
             kind="executable"
@@ -342,11 +358,13 @@ function ConsoleSetup({
           <div className="space-y-2">
             <p className="text-sm font-medium">{t("retro.setup.romFolders")}</p>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              {t("retro.setup.romFoldersHelp", {
-                extensions: platform.extensions.length
-                  ? platform.extensions.join(", ")
-                  : t("retro.setup.romFoldersFallback"),
-              })}
+              {platform.id === "other"
+                ? t("retro.setup.otherRomFoldersHelp")
+                : t("retro.setup.romFoldersHelp", {
+                    extensions: platform.extensions.length
+                      ? platform.extensions.join(", ")
+                      : t("retro.setup.romFoldersFallback"),
+                  })}
             </p>
             {draft.romFolders.map(folder => (
               <div key={folder} className="flex items-center gap-2 rounded border p-2">
@@ -1056,7 +1074,9 @@ export default function Retro() {
     );
   const localizedPlatforms = state.platforms.map(platform => ({
     ...platform,
-    name: t(`retro.platformNames.${platform.id}`),
+    name:
+      (platform.id === "other" && state.profiles.other?.consoleName) ||
+      t(`retro.platformNames.${platform.id}`),
   }));
   const platformFor = id => localizedPlatforms.find(p => p.id === id);
   const availablePlatforms = localizedPlatforms.filter(

@@ -12,6 +12,8 @@ const platforms = {
   gb: { name: "Game Boy", emulator: "RetroArch", adapter: "retroarch", catalogue: "Nintendo Game Boy", extensions: ["gb", "zip", "7z"], coreHint: "Gambatte" },
   gbc: { name: "Game Boy Color", emulator: "RetroArch", adapter: "retroarch", catalogue: "Nintendo Game Boy Color", extensions: ["gbc", "zip", "7z"], coreHint: "Gambatte" },
   gba: { name: "Game Boy Advance", emulator: "RetroArch", adapter: "retroarch", catalogue: "Nintendo Game Boy Advance", extensions: ["gba", "zip", "7z"], coreHint: "mGBA" },
+  // For systems Retro doesn't list: any emulator, the user's own file types and name.
+  other: { name: "Other console", emulator: "Custom emulator", adapter: "custom", catalogue: "", extensions: [], website: "https://ascendara.app/docs/features/retro#other-consoles" },
 };
 for (const platform of expanded.platforms) {
   const emulator = expanded.emulators.find(entry => entry.id === platform.adapter);

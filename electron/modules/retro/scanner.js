@@ -112,15 +112,17 @@ async function scan(platformId, roots, onProgress = () => {}, extra = []) {
 
 // Explains an empty scan by naming the file types that were present and the
 // consoles that read them, e.g. Switch .nsp files in a NES folder.
-function emptyScanHint(platformId, skipped) {
-  const platform = platforms[platformId];
+function emptyScanHint(platformId, skipped, name = platforms[platformId].name) {
+  const none = platformId === "other" && name === platforms.other.name ? "No games found." : `No ${name} games found.`;
   const top = [...skipped].sort((a, b) => b[1] - a[1]).slice(0, 3);
-  if (!top.length) return `No ${platform.name} games found. The selected folders contain no game files.`;
+  if (!top.length) return `${none} The selected folders contain no game files.`;
   const details = top.map(([ext, count]) => {
     const owners = Object.values(platforms).filter(p => p.id !== platformId && p.extensions.includes(ext)).map(p => p.name);
     return `${count} .${ext} file${count === 1 ? "" : "s"}${owners.length ? ` (${owners.slice(0, 3).join(", ")})` : ""}`;
   });
-  return `No ${platform.name} games found. The folders contain ${details.join(", ")}. Set up the matching console, or add the file type under Extra file types in ${platform.name} setup.`;
+  const found = `${none} The folders contain ${details.join(", ")}.`;
+  if (platformId === "other") return `${found} Add the file types your emulator opens under Extra file types, then scan again.`;
+  return `${found} Set up the console they belong to, or add their file types under Extra file types. For a console Retro doesn't list, use Other console.`;
 }
 
 function mergeScan(existing, scanned, platformId) {

@@ -24,7 +24,7 @@ const families = [
   ],
   ["Microsoft", ["xbox", "xbox360"]],
   ["Sega", ["genesis", "segacd", "sega32x", "saturn", "dreamcast", "naomi"]],
-  ["Other", ["atomiswave", "pcengine"]],
+  ["Other", ["atomiswave", "pcengine", "other"]],
 ];
 
 export default function RetroConsoles({

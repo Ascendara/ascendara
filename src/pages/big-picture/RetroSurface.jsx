@@ -135,6 +135,7 @@ export function RetroSurface({ navigation, active, onBack }) {
     ? [
         ["setup-back"],
         setupChoices.map(item => `adapter-${item.id}`),
+        ...(setupId === "other" ? [["console-name"]] : []),
         [
           "pick-emulator",
           "emulator-website",

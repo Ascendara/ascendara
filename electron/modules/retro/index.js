@@ -76,7 +76,9 @@ function registerRetroHandlers() {
       catch (error) { console.warn(`[Retro] ${channel}:`, error.message); return { success: false, error: error.message }; }
     });
   }
-  handle("state", () => ({ ...state, platforms: Object.values(platforms), job, running: [...running.keys()], catalogue: { count: catalogue.games.length, updatedAt: catalogue.updatedAt } }));
+  // Other console shows the name the user gave it.
+  const platformList = () => Object.values(platforms).map(platform => platform.id === "other" && state.profiles.other?.consoleName ? { ...platform, name: state.profiles.other.consoleName } : platform);
+  handle("state", () => ({ ...state, platforms: platformList(), job, running: [...running.keys()], catalogue: { count: catalogue.games.length, updatedAt: catalogue.updatedAt } }));
   handle("pick", async kind => {
     const folders = ["romFolder", "saveFolder"].includes(kind);
     if (!folders && !["executable", "core", "catalogue", "cover", "backup"].includes(kind)) throw new Error("Unknown selection type");
@@ -95,6 +97,7 @@ function registerRetroHandlers() {
     const adapter = resolveAdapter(id, input);
     customArguments(input.arguments);
     const extensions = extraExtensions(input.extensions);
+    const consoleName = id === "other" && typeof input.consoleName === "string" ? input.consoleName.trim().slice(0, 40) : "";
     if (input.executable) {
       await validateFile(input.executable, "Emulator executable");
       if (process.platform === "win32" && path.extname(input.executable).toLowerCase() !== ".exe") throw new Error("Select the emulator's .exe file");
@@ -106,7 +109,7 @@ function registerRetroHandlers() {
     if (input.saveFolder) await saves.checkRoot(input.saveFolder);
     requireIdle(); requireClosed(id);
     const old = state.profiles[id];
-    state.profiles[id] = { adapter, arguments: input.arguments || "", executable: input.executable || "", core: input.core || "", romFolders: [...new Set(input.romFolders)], extensions, saveFolder: input.saveFolder || "", fullscreen: input.fullscreen !== false };
+    state.profiles[id] = { adapter, arguments: input.arguments || "", executable: input.executable || "", core: input.core || "", romFolders: [...new Set(input.romFolders)], extensions, ...(consoleName ? { consoleName } : {}), saveFolder: input.saveFolder || "", fullscreen: input.fullscreen !== false };
     try { persist(); } catch (error) { if (old) state.profiles[id] = old; else delete state.profiles[id]; throw error; }
     emit();
   });
@@ -123,7 +126,7 @@ function registerRetroHandlers() {
         matchGames(); persist();
         job = null;
         if (result.games.length) emit({ message: `Found ${result.games.length} games`, warnings: result.warnings.slice(0, 20) });
-        else emit({ warnings: [emptyScanHint(id, result.skipped), ...result.warnings.slice(0, 19)] });
+        else emit({ warnings: [emptyScanHint(id, result.skipped, profile.consoleName || undefined), ...result.warnings.slice(0, 19)] });
       } catch (error) { job = null; emit({ error: error.message }); }
     })();
   });
