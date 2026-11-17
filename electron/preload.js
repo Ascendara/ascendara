@@ -21,6 +21,24 @@ const preloadIpc = createPreloadIpcTransport(ipcRenderer);
 // MAIN ELECTRON API
 //=============================================================================
 contextBridge.exposeInMainWorld("electron", {
+  plugins: {
+    list: () => ipcRenderer.invoke("plugins-list"),
+    registry: force => ipcRenderer.invoke("plugins-registry", force),
+    setRegistrySource: source =>
+      ipcRenderer.invoke("plugins-set-registry-source", source),
+    install: id => ipcRenderer.invoke("plugins-install", id),
+    pickFolder: () => ipcRenderer.invoke("plugins-pick-folder"),
+    installFolder: token => ipcRenderer.invoke("plugins-install-folder", token),
+    uninstall: id => ipcRenderer.invoke("plugins-uninstall", id),
+    setEnabled: (id, enabled) => ipcRenderer.invoke("plugins-set-enabled", id, enabled),
+    sources: () => ipcRenderer.invoke("plugins-sources"),
+    call: (id, method, ...args) =>
+      ipcRenderer.invoke("plugins-call", id, method, ...args),
+    changed: () => ipcRenderer.invoke("plugins-changed"),
+    openFolder: () => ipcRenderer.invoke("plugins-open-folder"),
+    onEvent: callback => preloadIpc.subscribe("plugins-event", callback),
+    onReload: callback => preloadIpc.subscribe("plugins-reload", callback),
+  },
   retro: {
     getState: () => ipcRenderer.invoke("retro-state"),
     pick: kind => ipcRenderer.invoke("retro-pick", kind),

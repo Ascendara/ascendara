@@ -63,6 +63,7 @@ import {
   Layers,
   Wrench,
   Microscope,
+  Puzzle,
   MonitorPlay,
   CircleHelp,
   Heart,
@@ -103,6 +104,7 @@ import GameIndexManager from "@/components/GameIndexManager";
 import AchievementFolderSearch from "@/components/AchievementFolderSearch";
 import NotificationSoundSettings from "@/components/NotificationSoundSettings";
 import LibraryTransferSettings from "@/components/LibraryTransferSettings";
+import PluginSettings from "@/components/PluginSettings";
 import AppBranchPicker, { getAppBranch } from "@/components/AppBranchPicker";
 import { API_URL } from "@/config/api";
 import { clearLegacySideScrollbarPreference } from "@/lib/sideScrollbarPreference";
@@ -862,6 +864,7 @@ function Settings() {
       descriptionKey: isOnMac ? "descriptionMac" : "description",
     },
     { id: "tools", icon: Wrench },
+    { id: "plugins", icon: Puzzle },
     { id: "advanced", icon: Microscope },
   ].map(category => ({
     ...category,
@@ -3695,6 +3698,15 @@ function Settings() {
                   }
                 />
               )}
+            </SettingsCategory>
+
+            <SettingsCategory {...categoryProps("plugins")}>
+              <SettingsSection
+                id="plugins"
+                description={t("settings.plugins.description")}
+              >
+                <PluginSettings />
+              </SettingsSection>
             </SettingsCategory>
 
             <SettingsCategory {...categoryProps("advanced")}>

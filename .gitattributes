@@ -1,0 +1,2 @@
+# Plugin files are pinned by hash in plugins/index.json, so keep their exact bytes.
+plugins/** -text

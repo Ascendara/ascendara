@@ -466,6 +466,8 @@ const Navigation = memo(({ items }) => {
                 ) : (
                   <motion.div
                     key={item.path}
+                    // A stable selector for plugins and themes
+                    data-nav-path={item.path}
                     className="relative flex shrink-0 items-center justify-center"
                     initial={{
                       ...DOCK_ITEM_HIDDEN,

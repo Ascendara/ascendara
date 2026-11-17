@@ -1,0 +1,11 @@
+{
+  "name": "Hide Ascend",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Removes the Ascend button from the navigation bar.",
+  "details": "For anyone who doesn't use Ascend and wants a cleaner navigation bar. Only the button is hidden, so Ascend itself keeps working.",
+  "affects": ["Hides the Ascend button in the navigation bar"],
+  "license": "MIT",
+  "apiVersion": 1,
+  "main": "index.js"
+}

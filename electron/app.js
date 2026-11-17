@@ -406,6 +406,7 @@ function registerCriticalHandlers() {
   require("./modules/library/libraryTransfer").registerLibraryTransferHandlers();
   require("./modules/store-accounts").registerStoreAccountHandlers();
   require("./modules/retro").registerRetroHandlers();
+  require("./modules/app/plugins").registerPluginHandlers();
   system.registerSystemHandlers();
   require("./modules/compat/proton").registerRunnerHandlers();
   if (process.platform === "darwin") {

@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,6 +17,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
 import { formatSessionTime } from "@/hooks/useGameSession";
+import { getGameActions, subscribeGameActions } from "@/lib/plugins";
 import {
   AlertTriangle,
   Bolt,
@@ -30,6 +32,7 @@ import {
   Monitor,
   Pencil,
   Play,
+  Puzzle,
   Settings2,
   StopCircle,
   TextCursorInput,
@@ -82,6 +85,15 @@ export default function GameActions({
   onDelete,
 }) {
   const { t } = useLanguage();
+  const pluginActions = useSyncExternalStore(subscribeGameActions, getGameActions).filter(
+    action => {
+      try {
+        return !action.when || action.when(game);
+      } catch {
+        return false;
+      }
+    }
+  );
 
   return (
     <TooltipProvider>
@@ -313,6 +325,22 @@ export default function GameActions({
                   </span>
                 )}
               </DropdownMenuItem>
+            )}
+
+            {pluginActions.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                {pluginActions.map(action => (
+                  <DropdownMenuItem
+                    key={action.key}
+                    className="gap-2"
+                    onSelect={() => action.run(game)}
+                  >
+                    <Puzzle className="h-4 w-4" />
+                    {action.label}
+                  </DropdownMenuItem>
+                ))}
+              </>
             )}
 
             <DropdownMenuSeparator />

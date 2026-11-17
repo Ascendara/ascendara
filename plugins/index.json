@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "plugins": [
+    {
+      "id": "hide-ascend-nav",
+      "name": "Hide Ascend",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Removes the Ascend button from the navigation bar.",
+      "details": "For anyone who doesn't use Ascend and wants a cleaner navigation bar. Only the button is hidden, so Ascend itself keeps working.",
+      "affects": [
+        "Hides the Ascend button in the navigation bar"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "",
+      "minAppVersion": "",
+      "apiVersion": 1,
+      "permissions": [],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "b9e95151146336976a3edd263fe8d73a57c4bb7f9fab5e7db25fa1fa574693fd",
+          "size": 250
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "57832687d4ecefe6b03530edf856bc92c64992e4f477fb2ba05bfbbc173a00f1",
+          "size": 411
+        }
+      ]
+    }
+  ]
+}

@@ -31,6 +31,7 @@
   ],
   "scripts": {
     "test": "node --test tests/*.test.cjs",
+    "plugins:index": "node scripts/build-plugin-index.cjs",
     "audit:code": "node scripts/audit-code.cjs",
     "lint": "eslint src electron binaries/AscendaraAchievementWatcher/src scripts/*.cjs tests/*.cjs",
     "dev": "vite --mode development",
