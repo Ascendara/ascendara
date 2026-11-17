@@ -170,7 +170,8 @@
         "xci",
         "nro",
         "nsz",
-        "xcz"
+        "xcz",
+        "nup"
       ],
       "ascend": true
     }
@@ -276,7 +277,7 @@
       "platforms": [
         "3ds"
       ],
-      "website": "https://azahar-emu.org/pages/download/",
+      "website": "https://github.com/azahar-emu/azahar/releases",
       "args": [
         "{rom}"
       ],

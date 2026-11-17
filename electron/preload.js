@@ -43,7 +43,10 @@ contextBridge.exposeInMainWorld("electron", {
     getState: () => ipcRenderer.invoke("retro-state"),
     pick: kind => ipcRenderer.invoke("retro-pick", kind),
     saveProfile: (id, profile) => ipcRenderer.invoke("retro-save-profile", id, profile),
-    scan: id => ipcRenderer.invoke("retro-scan", id),
+    scan: ids => ipcRenderer.invoke("retro-scan", ids),
+    detect: roots => ipcRenderer.invoke("retro-detect", roots),
+    identifyEmulator: executable =>
+      ipcRenderer.invoke("retro-identify-emulator", executable),
     updateCatalogue: source => ipcRenderer.invoke("retro-catalogue", source),
     search: (id, query) => ipcRenderer.invoke("retro-search", id, query),
     updateGame: (id, data) => ipcRenderer.invoke("retro-update-game", id, data),

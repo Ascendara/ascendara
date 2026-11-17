@@ -35,6 +35,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import RetroCloudSaves from "@/components/RetroCloudSaves";
 import RetroConsoles from "@/components/RetroConsoles";
 import RetroEmulators from "@/components/RetroEmulators";
+import RetroQuickAdd from "@/components/RetroQuickAdd";
 import useRetroAccess from "@/hooks/useRetroAccess";
 import expanded from "../../electron/modules/retro/expanded-catalogue.json";
 import {
@@ -909,6 +910,7 @@ export default function Retro() {
   const navigate = useNavigate();
   const access = useRetroAccess();
   const [showEmulators, setShowEmulators] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [setupAdapter, setSetupAdapter] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
@@ -1099,15 +1101,25 @@ export default function Retro() {
               {t("retro.title")}
             </h2>
           </div>
-          <Button
-            variant="outline"
-            className="gap-2 rounded-xl border-primary/25 text-primary"
-            onClick={() => setShowEmulators(true)}
-          >
-            <Sparkles className="h-4 w-4" />
-            {t("retro.expanded.title")}
-            <ArrowRight className="h-4 w-4" />
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              className="gap-2 rounded-xl text-secondary"
+              disabled={!!state.job}
+              onClick={() => setShowQuickAdd(true)}
+            >
+              <Plus className="h-4 w-4" />
+              {t("retro.quickAdd.title")}
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2 rounded-xl border-primary/25 text-primary"
+              onClick={() => setShowEmulators(true)}
+            >
+              <Sparkles className="h-4 w-4" />
+              {t("retro.expanded.title")}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border pb-4 text-xs text-muted-foreground">
           <span>
@@ -1490,6 +1502,14 @@ export default function Retro() {
             setSetupId(id);
             setShowEmulators(false);
           }}
+        />
+      )}
+      {showQuickAdd && (
+        <RetroQuickAdd
+          platforms={localizedPlatforms}
+          profiles={state.profiles}
+          access={access}
+          onClose={() => setShowQuickAdd(false)}
         />
       )}
       {setup && (

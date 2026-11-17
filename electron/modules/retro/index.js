@@ -8,6 +8,7 @@ const { platforms, launchArguments, resolveAdapter, customArguments, extraExtens
 const expanded = require("./expanded-catalogue.json");
 const { scan, mergeScan, emptyScanHint, normalizeTitle, pathKey } = require("./scanner");
 const saves = require("./saves");
+const { identifyEmulator, detectFolders } = require("./detect");
 const { setPlayingActivity, updateDiscordRPCToLibrary } = require("../app/discord-rpc");
 
 function registerRetroHandlers() {
@@ -113,22 +114,46 @@ function registerRetroHandlers() {
     try { persist(); } catch (error) { if (old) state.profiles[id] = old; else delete state.profiles[id]; throw error; }
     emit();
   });
-  handle("scan", async id => {
-    requirePlatform(id); requireIdle();
-    const profile = state.profiles[id];
-    if (!profile?.romFolders?.length) throw new Error("Add a ROM folder in console setup first");
-    job = { phase: "scanning", platform: id, inspected: 0 }; emit();
+  // Scans one console, or several in a row when Add games sets up more than one.
+  handle("scan", async ids => {
+    const list = Array.isArray(ids) ? [...new Set(ids)] : [ids];
+    if (!list.length || list.length > 64) throw new Error("Choose a console to scan");
+    for (const id of list) {
+      requirePlatform(id);
+      if (!state.profiles[id]?.romFolders?.length) throw new Error("Add a ROM folder in console setup first");
+    }
+    requireIdle();
+    job = { phase: "scanning", platform: list[0], inspected: 0 }; emit();
     // The task belongs to the main process and survives navigation away from Retro.
     (async () => {
-      try {
-        const result = await scan(id, profile.romFolders, progress => { job = { ...progress, platform: id }; emit(); }, profile.extensions || []);
-        state.games = mergeScan(state.games, result.games, id);
-        matchGames(); persist();
-        job = null;
-        if (result.games.length) emit({ message: `Found ${result.games.length} games`, warnings: result.warnings.slice(0, 20) });
-        else emit({ warnings: [emptyScanHint(id, result.skipped, profile.consoleName || undefined), ...result.warnings.slice(0, 19)] });
-      } catch (error) { job = null; emit({ error: error.message }); }
+      let found = 0;
+      const warnings = [];
+      for (const id of list) {
+        const profile = state.profiles[id];
+        try {
+          const result = await scan(id, profile.romFolders, progress => { job = { ...progress, platform: id }; emit(); }, profile.extensions || []);
+          state.games = mergeScan(state.games, result.games, id);
+          matchGames(); persist();
+          found += result.games.length;
+          if (!result.games.length) warnings.push(emptyScanHint(id, result.skipped, profile.consoleName || undefined));
+          warnings.push(...result.warnings);
+        } catch (error) { warnings.push(`${platforms[id].name}: ${error.message}`); }
+      }
+      job = null;
+      if (found) emit({ message: `Found ${found} games`, warnings: warnings.slice(0, 20) });
+      else emit({ warnings: warnings.slice(0, 20) });
     })();
+  });
+  handle("detect", async roots => {
+    if (!Array.isArray(roots) || !roots.length || roots.length > 32) throw new Error("Choose up to 32 folders");
+    for (const root of roots) {
+      if (typeof root !== "string" || !path.isAbsolute(root) || !(await fs.stat(root)).isDirectory()) throw new Error("Folder does not exist");
+    }
+    return detectFolders(roots);
+  });
+  handle("identify-emulator", async executable => {
+    await validateFile(executable, "Emulator executable");
+    return identifyEmulator(executable);
   });
   handle("catalogue", source => {
     requireIdle();

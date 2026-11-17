@@ -75,7 +75,8 @@ export async function retroCall(method, ...args) {
   }
   if (
     premiumLaunch ||
-    (["scan", "search", "website"].includes(method) && premiumPlatform(args[0])) ||
+    (["search", "website"].includes(method) && premiumPlatform(args[0])) ||
+    (method === "scan" && [].concat(args[0]).some(premiumPlatform)) ||
     (method === "saveProfile" &&
       (expanded.platforms.some(platform => platform.id === args[0]) ||
         expanded.emulators.some(emulator => emulator.id === args[1]?.adapter))) ||

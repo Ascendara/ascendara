@@ -4508,6 +4508,30 @@
       "pointFolders": "Keep your game and save folders organized beforehand so scans and save backups work smoothly.",
       "pointFrontend": "Ascendara doesn't download or run the games itself — it launches everything through your own emulators.",
       "title": "Welcome to Retro"
+    },
+    "quickAdd": {
+      "addAndScan_one": "Add {{count}} console and scan",
+      "addAndScan_other": "Add {{count}} consoles and scan",
+      "alreadySetUp": "Already set up: {{emulator}}",
+      "change": "Change emulator",
+      "chooseCore": "Choose core",
+      "chooseEmulator": "Choose emulator",
+      "consoleFor": "Console for {{files}}",
+      "customEmulator": "{{name}} (custom emulator)",
+      "description": "Choose the folders your games are in. Retro works out which consoles they're for, and recognizes your emulators when you pick them.",
+      "detecting": "Looking through your folders…",
+      "emulators": "Emulators",
+      "emulatorsHint": "Pick each console's emulator. Retro recognizes common emulators and sets them up for you; anything else is added as a custom emulator. You can also skip this and set it up later.",
+      "files_one": "{{count}} file ({{types}})",
+      "files_other": "{{count}} files ({{types}})",
+      "folders": "Game folders",
+      "found": "What Retro found",
+      "locked": "Needs Ascend. To use another emulator, choose Other console for these files above.",
+      "noEmulator": "No emulator yet",
+      "nothing": "No game files found in these folders.",
+      "skip": "Don't add",
+      "title": "Add games",
+      "truncated": "These folders have more than 100,000 files, so Retro only looked at the first 100,000."
     }
   },
   "search": {

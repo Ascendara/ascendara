@@ -2,6 +2,7 @@ const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
 const { platforms } = require("./platforms");
+const { identifyImage } = require("./detect");
 
 const pathKey = file => process.platform === "win32" ? path.resolve(file).toLowerCase() : path.resolve(file);
 const stripDisc = name => name.replace(/\s*[([](?:disc|disk|cd)\s*\d+(?:\s*of\s*\d+)?[)\]]/gi, "").trim();
@@ -48,18 +49,12 @@ async function scan(platformId, roots, onProgress = () => {}, extra = []) {
         if (ext) skipped.set(ext, (skipped.get(ext) || 0) + 1);
         continue;
       }
-      // Raw GameCube/Wii images carry a platform magic; shared ISO extensions
-      // alone are not enough to distinguish the two consoles.
-      if (["gamecube", "wii"].includes(platformId) && ["iso", "gcm"].includes(ext)) {
-        const handle = await fs.open(file, "r");
-        try {
-          const header = Buffer.alloc(32);
-          const { bytesRead } = await handle.read(header, 0, header.length, 0);
-          if (bytesRead === 32) {
-            const detected = header.readUInt32BE(0x18) === 0x5d1c9ea3 ? "wii" : header.readUInt32BE(0x1c) === 0xc2339f3d ? "gamecube" : null;
-            if (detected && detected !== platformId) continue;
-          }
-        } finally { await handle.close(); }
+      // Disc images share extensions across consoles; their headers say which
+      // console they're for, so skip images made for another one.
+      if (["iso", "gcm"].includes(ext)) {
+        const detected = await identifyImage(file);
+        const matches = detected === "playstation" ? ["ps1", "ps2"].includes(platformId) : detected === platformId;
+        if (detected && !matches) continue;
       }
       let name = path.basename(file, path.extname(file)), serial = null;
       if (ps3Game) {
