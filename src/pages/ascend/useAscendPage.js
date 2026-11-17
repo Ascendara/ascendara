@@ -2102,7 +2102,9 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
         hardwareId = await window.electron.getHardwareId();
       }
 
-      if (hardwareId) {
+      // The dev preview never opens checkout, so a stale deleted-account flag on
+      // this machine's hardware ID shouldn't block it.
+      if (hardwareId && !(isDev && ownsLifetime)) {
         const deletedCheck = await checkDeletedAccount(hardwareId);
         if (deletedCheck.isDeleted) {
           toast.error(
