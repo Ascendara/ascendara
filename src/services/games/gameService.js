@@ -716,15 +716,15 @@ const gameService = {
   },
 
   /**
-   * Force a re-fetch of the active custom source, bypassing cache.
+   * Force a re-fetch of a custom source (the active one by default), bypassing cache.
    * Returns the fresh { games, metadata } payload.
    */
-  async refreshCustomSource() {
+  async refreshCustomSource(source) {
     const settings = await window.electron.getSettings();
     if (!settings?.customSourcesMode) {
       throw new Error("Custom Sources Mode is not enabled");
     }
-    const customSource = settings?.customSource;
+    const customSource = source || settings?.customSource;
     if (!customSource?.url) {
       throw new Error("No custom source is selected");
     }
@@ -732,7 +732,12 @@ const gameService = {
       force: true,
       refetch: true,
     });
-    await this.updateCache(data, false, null, customSource.url);
+    if (settings.combineSources) {
+      // The combined catalog is rebuilt from each source's fresh cache
+      this.clearMemoryCache();
+    } else {
+      await this.updateCache(data, false, null, customSource.url);
+    }
     // Clear legacy caches so Search.jsx reloads fresh data
     localStorage.removeItem(CACHE_KEY);
     localStorage.removeItem(CACHE_TIMESTAMP_KEY);

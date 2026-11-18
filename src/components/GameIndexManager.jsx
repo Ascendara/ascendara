@@ -72,6 +72,7 @@ import {
   dropSource,
   orderedSources,
   pickSource,
+  replaceSource,
   usesOfficialIndex,
 } from "@/lib/combinedSources";
 import {
@@ -184,6 +185,7 @@ const GameIndexManager = ({
   const [sourceBucketUrl, setSourceBucketUrl] = useState("");
   const [sourceBucketUrlDraft, setSourceBucketUrlDraft] = useState("");
   const [isSyncingCustomSource, setIsSyncingCustomSource] = useState(false);
+  const [syncingSourceUrl, setSyncingSourceUrl] = useState(null);
 
   // Manual paste fallback (triggered on 403 from upstream source)
   const [manualPasteOpen, setManualPasteOpen] = useState(false);
@@ -898,7 +900,9 @@ const GameIndexManager = ({
     );
   };
 
-  const handleSyncCustomSource = async sourceOverride => {
+  // `extra` syncs a combined source other than the current one, leaving the
+  // current source's state and setting untouched.
+  const handleSyncCustomSource = async (sourceOverride, { extra = false } = {}) => {
     const source = sourceOverride || customSource;
     if (!source?.url) {
       toast.error(t("localRefresh.customSourceNone") || "No custom source selected");
@@ -906,12 +910,11 @@ const GameIndexManager = ({
     }
     if (isSyncingCustomSource) return;
     setIsSyncingCustomSource(true);
+    setSyncingSourceUrl(source.url);
     try {
-      const data = await gameService.refreshCustomSource();
+      const data = await gameService.refreshCustomSource(extra ? source : undefined);
       const count = data?.games?.length || 0;
       const now = Date.now();
-      setCustomSourceLastSynced(new Date(now));
-      setCustomSourceGameCount(count);
       const nextPayload = withTorrentSourceCapabilities(
         {
           ...source,
@@ -921,8 +924,17 @@ const GameIndexManager = ({
         },
         data?.games
       );
-      setCustomSource(nextPayload);
-      await updateSetting("customSource", nextPayload);
+      if (extra) {
+        await updateSetting(
+          "extraSources",
+          replaceSource(settings, source, nextPayload).extraSources
+        );
+      } else {
+        setCustomSourceLastSynced(new Date(now));
+        setCustomSourceGameCount(count);
+        setCustomSource(nextPayload);
+        await updateSetting("customSource", nextPayload);
+      }
       // Save to library so the user can swap back to it later
       await upsertLibraryEntry(nextPayload);
       // Also flip hasIndexBefore so gating UI treats this as "ready"
@@ -954,7 +966,14 @@ const GameIndexManager = ({
       // If we already have saved JSON for this source, don't revert -- the
       // user's data is still usable, we just couldn't refresh it.
       const hasSavedJson = !!source?.lastSynced;
-      if (isFetchFailure) {
+      if (extra) {
+        // Pasting JSON by hand only works for the current source, and a
+        // combined source keeps its last synced games either way.
+        toast.error(
+          (t("localRefresh.customSourceSyncFailed") || "Sync failed") +
+            (err?.message ? `: ${err.message}` : "")
+        );
+      } else if (isFetchFailure) {
         toast.error(
           (t("localRefresh.customSourceSyncFailed") || "Sync failed") +
             " - " +
@@ -985,6 +1004,7 @@ const GameIndexManager = ({
       }
     } finally {
       setIsSyncingCustomSource(false);
+      setSyncingSourceUrl(null);
     }
   };
 
@@ -1984,6 +2004,33 @@ const GameIndexManager = ({
                                   <CircleCheck className="h-3 w-3" />
                                   {t("externalSources.inUse")}
                                 </Badge>
+                              )}
+                              {inUse && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground"
+                                  disabled={isSyncingCustomSource}
+                                  onClick={() => {
+                                    const extra = entry.url !== customSource?.url;
+                                    handleSyncCustomSource(extra ? entry : undefined, {
+                                      extra,
+                                    });
+                                  }}
+                                  aria-label={t("externalSources.syncNamed", {
+                                    name: entry.name,
+                                  })}
+                                  title={t("externalSources.syncNamed", {
+                                    name: entry.name,
+                                  })}
+                                >
+                                  <RefreshCw
+                                    className={cn(
+                                      "h-4 w-4",
+                                      syncingSourceUrl === entry.url && "animate-spin"
+                                    )}
+                                  />
+                                </Button>
                               )}
                               {inUse && combining && (
                                 <Button
