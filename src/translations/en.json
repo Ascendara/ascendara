@@ -2662,6 +2662,14 @@
     "modsSupported": "Mods Available",
     "modsTitle": "Nexus Mods",
     "newAchievementsFound": "{{count}} new achievement(s) found!",
+    "nexusDownload": {
+      "downloading": "Downloading {{file}}",
+      "failed": "The mod couldn't be downloaded. Try again from the Nexus Mods window.",
+      "openFolder": "Open folder",
+      "saved": "{{file}} saved",
+      "waiting": "Pick your download on Nexus Mods",
+      "waitingDescription": "Sign in if asked, then choose Manual download. Ascendara saves the file next to the game."
+    },
     "nextPage": "Next page",
     "noAchievementsDescription": "No achievements found for this game. Play the game and Ascendara will automatically detect and track them.",
     "noAchievementsFound": "No Achievements Found",

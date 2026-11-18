@@ -2475,65 +2475,199 @@ function registerMiscHandlers() {
     }
   });
 
+  // The folder an installed game lives in. Throws when it can't be found.
+  const findGameDirectory = (gameName, isCustom) => {
+    const settings = settingsManager.getSettings();
+    if (!settings.downloadDirectory) {
+      throw new Error("Download directory not set");
+    }
+
+    let gameDirectory;
+
+    if (isCustom) {
+      // For custom games, use the games.json to find the executable path
+      const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
+      if (!fs.existsSync(gamesFilePath)) {
+        throw new Error("Custom games file not found");
+      }
+
+      const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
+      const customGame = gamesData.games.find(g => g.game === gameName);
+
+      if (!customGame || !customGame.executable) {
+        throw new Error("Custom game executable not found");
+      }
+
+      // Get directory from executable path
+      gameDirectory = path.dirname(customGame.executable);
+    } else {
+      // For downloaded games, search in all download directories
+      const allDirectories = [
+        settings.downloadDirectory,
+        ...(settings.additionalDirectories || []),
+      ];
+
+      const sanitizedGame = sanitizeText(gameName);
+
+      for (const directory of allDirectories) {
+        const testGameDir = path.join(directory, sanitizedGame);
+        const testGameInfoPath = path.join(
+          testGameDir,
+          `${sanitizedGame}.ascendara.json`
+        );
+
+        if (fs.existsSync(testGameInfoPath)) {
+          gameDirectory = testGameDir;
+          break;
+        }
+      }
+
+      if (!gameDirectory) {
+        throw new Error(`Game directory not found for ${gameName}`);
+      }
+    }
+
+    // Ensure game directory exists
+    if (!fs.existsSync(gameDirectory)) {
+      throw new Error(`Game directory does not exist: ${gameDirectory}`);
+    }
+    return gameDirectory;
+  };
+
+  // Download a Nexus mod file inside Ascendara instead of the system browser,
+  // so it lands next to the game on every platform. Nexus only hands files to
+  // a signed-in website session, so the user picks the file on the real page
+  // (signing in once; the session is kept) and the download is caught here.
+  // Settles with { status: "completed", path, directory } once the file is
+  // saved, or "closed" / "failed".
+  let nexusWindow = null;
+  ipcMain.handle("download-nexus-mod", async (ipcEvent, { url, gameName, isCustom }) => {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error("Invalid Nexus URL");
+    }
+    const isNexusHost = host =>
+      host === "nexusmods.com" || host.endsWith(".nexusmods.com");
+    if (parsed.protocol !== "https:" || !isNexusHost(parsed.hostname)) {
+      throw new Error("Only Nexus Mods links are allowed");
+    }
+
+    // Installed games keep mods in their own folder; games that aren't
+    // installed yet get one in the system Downloads folder.
+    let directory;
+    try {
+      directory = path.join(findGameDirectory(gameName, isCustom), "AscendaraMods");
+    } catch {
+      directory = path.join(
+        app.getPath("downloads"),
+        "Ascendara Mods",
+        sanitizeText(gameName || "Nexus")
+      );
+    }
+
+    // One Nexus window at a time; a new request takes it over.
+    if (nexusWindow && !nexusWindow.isDestroyed()) nexusWindow.close();
+
+    const sender = ipcEvent.sender;
+    const window = new BrowserWindow({
+      width: 1280,
+      height: 860,
+      autoHideMenuBar: true,
+      icon: path.join(
+        __dirname,
+        "../..",
+        process.platform === "linux" ? "icon.png" : "icon.ico"
+      ),
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        // Persisted so the Nexus sign-in survives restarts
+        partition: "persist:nexusmods",
+        sandbox: true,
+        webSecurity: true,
+      },
+    });
+    nexusWindow = window;
+    const nexusSession = window.webContents.session;
+
+    // Sign-in providers and Nexus popups open in the same window; ads don't.
+    window.webContents.setWindowOpenHandler(({ url: popupUrl }) => {
+      if (isSafeExternalUrl(popupUrl)) window.loadURL(popupUrl);
+      return { action: "deny" };
+    });
+    // "Mod manager download" links (nxm://) have nothing to open them here
+    window.webContents.on("will-navigate", (event, navUrl) => {
+      if (!isSafeExternalUrl(navUrl)) event.preventDefault();
+    });
+
+    return new Promise(resolve => {
+      let settled = false;
+      let downloading = false;
+      const settle = result => {
+        if (settled) return;
+        settled = true;
+        nexusSession.removeListener("will-download", onWillDownload);
+        resolve(result);
+      };
+
+      const onWillDownload = (event, item, webContents) => {
+        if (webContents !== window.webContents || downloading) return;
+        downloading = true;
+        try {
+          fs.mkdirSync(directory, { recursive: true });
+        } catch (error) {
+          console.error("Failed to create mod folder:", error);
+          event.preventDefault();
+          settle({ status: "failed", error: error.message });
+          return;
+        }
+        const fileName = path.basename(item.getFilename()) || "mod";
+        const savePath = path.join(directory, fileName);
+        item.setSavePath(savePath);
+        console.log("Saving Nexus mod to:", savePath);
+        // The page's job is done; keep it out of the way while the file arrives
+        if (!window.isDestroyed()) window.hide();
+
+        item.on("updated", () => {
+          const total = item.getTotalBytes();
+          if (sender.isDestroyed()) return;
+          sender.send("nexus-mod-download-progress", {
+            fileName,
+            received: item.getReceivedBytes(),
+            total,
+          });
+        });
+        item.once("done", (_, state) => {
+          if (!window.isDestroyed()) window.close();
+          if (state === "completed") {
+            settle({ status: "completed", path: savePath, directory, fileName });
+          } else {
+            settle({ status: "failed", error: state, fileName });
+          }
+        });
+      };
+      nexusSession.on("will-download", onWillDownload);
+
+      window.once("closed", () => {
+        if (nexusWindow === window) nexusWindow = null;
+        // A started download finishes on its own and settles from "done"
+        if (!downloading) settle({ status: "closed" });
+      });
+
+      window.loadURL(url).catch(error => {
+        console.error("Failed to load Nexus page:", error);
+      });
+    });
+  });
+
   // Download trainer to game directory
   ipcMain.handle(
     "download-trainer-to-game",
     async (_, downloadUrl, gameName, isCustom) => {
       try {
-        const settings = settingsManager.getSettings();
-        if (!settings.downloadDirectory) {
-          throw new Error("Download directory not set");
-        }
-
-        let gameDirectory;
-
-        if (isCustom) {
-          // For custom games, use the games.json to find the executable path
-          const gamesFilePath = path.join(settings.downloadDirectory, "games.json");
-          if (!fs.existsSync(gamesFilePath)) {
-            throw new Error("Custom games file not found");
-          }
-
-          const gamesData = JSON.parse(fs.readFileSync(gamesFilePath, "utf8"));
-          const customGame = gamesData.games.find(g => g.game === gameName);
-
-          if (!customGame || !customGame.executable) {
-            throw new Error("Custom game executable not found");
-          }
-
-          // Get directory from executable path
-          gameDirectory = path.dirname(customGame.executable);
-        } else {
-          // For downloaded games, search in all download directories
-          const allDirectories = [
-            settings.downloadDirectory,
-            ...(settings.additionalDirectories || []),
-          ];
-
-          const sanitizedGame = sanitizeText(gameName);
-
-          for (const directory of allDirectories) {
-            const testGameDir = path.join(directory, sanitizedGame);
-            const testGameInfoPath = path.join(
-              testGameDir,
-              `${sanitizedGame}.ascendara.json`
-            );
-
-            if (fs.existsSync(testGameInfoPath)) {
-              gameDirectory = testGameDir;
-              break;
-            }
-          }
-
-          if (!gameDirectory) {
-            throw new Error(`Game directory not found for ${gameName}`);
-          }
-        }
-
-        // Ensure game directory exists
-        if (!fs.existsSync(gameDirectory)) {
-          throw new Error(`Game directory does not exist: ${gameDirectory}`);
-        }
+        const gameDirectory = findGameDirectory(gameName, isCustom);
 
         // Download the trainer file
         const trainerPath = path.join(gameDirectory, "ascendaraFlingTrainer.exe");

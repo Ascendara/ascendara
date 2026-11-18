@@ -1501,7 +1501,8 @@ function InstalledGameScreen() {
   const [nexusGameData, setNexusGameData] = useState(null);
   const nexusMods = useNexusMods(
     nexusGameData,
-    supportsModManaging && isAuthenticated && ascendAccess.hasAccess
+    supportsModManaging && isAuthenticated && ascendAccess.hasAccess,
+    { gameName: game?.game || game?.name, isCustom: game?.isCustom || false }
   );
 
   // FLiNG Trainer state

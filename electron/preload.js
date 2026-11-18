@@ -603,6 +603,11 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("download-soundtrack", track, game),
   downloadTrainerToGame: (downloadUrl, gameName, isCustom) =>
     ipcRenderer.invoke("download-trainer-to-game", downloadUrl, gameName, isCustom),
+  downloadNexusMod: options => ipcRenderer.invoke("download-nexus-mod", options),
+  onNexusModDownloadProgress: callback =>
+    preloadIpc.subscribe("nexus-mod-download-progress", callback, {
+      selectArgs: args => [args[0]],
+    }),
   isDownloaderRunning: () => ipcRenderer.invoke("is-downloader-running"),
   getRunningDownloads: () => ipcRenderer.invoke("get-running-downloads"),
   getDownloadHistory: () => ipcRenderer.invoke("get-download-history"),

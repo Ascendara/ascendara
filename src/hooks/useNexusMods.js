@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useLanguage } from "@/context/LanguageContext";
 import nexusModsService from "@/services/integrations/nexusModsService";
 
 const PER_PAGE = 12;
@@ -7,8 +9,10 @@ const PER_PAGE = 12;
  * Browse a game's Nexus mods: paging, search, sort and the picked mod's files.
  * @param {object|null} nexusGameData - The game on Nexus, from checkModSupport
  * @param {boolean} enabled - Load the first page once the game is known
+ * @param {{gameName: string, isCustom?: boolean}} [game] - Where downloaded mods are saved
  */
-export function useNexusMods(nexusGameData, enabled = true) {
+export function useNexusMods(nexusGameData, enabled = true, game = null) {
+  const { t } = useLanguage();
   const [mods, setMods] = useState([]);
   const [loading, setLoading] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -80,11 +84,59 @@ export function useNexusMods(nexusGameData, enabled = true) {
     setModFilesLoading(false);
   };
 
-  // Nexus needs a signed-in browser to hand out files
-  const downloadMod = (mod, fileId = null) => {
-    window.electron.openURL(
-      nexusModsService.getModDownloadUrl(domainName, mod.modId, fileId)
+  // Nexus only hands files to a signed-in website session, so the file is
+  // picked on the real page in an Ascendara window, which saves it next to
+  // the game instead of the browser's Downloads folder.
+  const downloadMod = async (mod, fileId = null) => {
+    const url = nexusModsService.getModDownloadUrl(domainName, mod.modId, fileId);
+    if (!window.electron?.downloadNexusMod) {
+      window.electron.openURL(url);
+      return;
+    }
+    const toastId = toast.loading(t("gameScreen.nexusDownload.waiting"), {
+      description: t("gameScreen.nexusDownload.waitingDescription"),
+    });
+    const removeProgress = window.electron.onNexusModDownloadProgress(
+      ({ fileName, received, total }) => {
+        toast.loading(t("gameScreen.nexusDownload.downloading", { file: fileName }), {
+          id: toastId,
+          description:
+            total > 0
+              ? `${Math.floor((received / total) * 100)}%`
+              : nexusModsService.formatFileSize(received),
+        });
+      }
     );
+    try {
+      const result = await window.electron.downloadNexusMod({
+        url,
+        gameName: game?.gameName,
+        isCustom: !!game?.isCustom,
+      });
+      if (result?.status === "completed") {
+        toast.success(t("gameScreen.nexusDownload.saved", { file: result.fileName }), {
+          id: toastId,
+          description: result.directory,
+          action: {
+            label: t("gameScreen.nexusDownload.openFolder"),
+            onClick: () => window.electron.openFolderPath(result.directory),
+          },
+        });
+      } else if (result?.status === "failed") {
+        toast.error(t("gameScreen.nexusDownload.failed"), { id: toastId });
+      } else {
+        toast.dismiss(toastId);
+      }
+    } catch (error) {
+      console.error("Error downloading Nexus mod:", error);
+      toast.error(t("gameScreen.nexusDownload.failed"), { id: toastId });
+    } finally {
+      removeProgress?.();
+    }
+  };
+
+  const viewMod = mod => {
+    window.electron.openURL(nexusModsService.getModDownloadUrl(domainName, mod.modId));
   };
 
   return {
@@ -125,6 +177,7 @@ export function useNexusMods(nexusGameData, enabled = true) {
       files: modFiles,
       loading: modFilesLoading,
       onDownload: downloadMod,
+      onView: viewMod,
     },
   };
 }

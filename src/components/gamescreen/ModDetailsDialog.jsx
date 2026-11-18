@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-/** A Nexus mod's details and files, each downloadable from Nexus. */
+/** A Nexus mod's details and files, each downloaded through Ascendara's Nexus window. */
 export default function ModDetailsDialog({
   open,
   onOpenChange,
@@ -31,6 +31,7 @@ export default function ModDetailsDialog({
   files,
   loading,
   onDownload,
+  onView,
 }) {
   const { t } = useLanguage();
   const [showOldVersions, setShowOldVersions] = useState(false);
@@ -227,7 +228,7 @@ export default function ModDetailsDialog({
           >
             {t("common.close")}
           </Button>
-          <Button className="gap-2 text-secondary" onClick={() => onDownload(mod)}>
+          <Button className="gap-2 text-secondary" onClick={() => onView(mod)}>
             <ExternalLink className="h-4 w-4" />
             {t("gameScreen.viewOnNexus")}
           </Button>

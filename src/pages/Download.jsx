@@ -406,7 +406,9 @@ function PublicDownloadPage() {
   const [hasAscendAccess, setHasAscendAccess] = useState(false);
   const [showModsBrowser, setShowModsBrowser] = useState(false);
   // Loads once the browser is first opened
-  const nexusMods = useNexusMods(nexusGameData, showModsBrowser);
+  const nexusMods = useNexusMods(nexusGameData, showModsBrowser, {
+    gameName: gameData?.game,
+  });
   const [supportsFlingTrainer, setSupportsFlingTrainer] = useState(false);
   const [flingTrainerData, setFlingTrainerData] = useState(null);
   const [isPlayLater, setIsPlayLater] = useState(() => {
