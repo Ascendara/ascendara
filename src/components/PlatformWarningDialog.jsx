@@ -34,9 +34,6 @@ const PlatformWarningDialog = ({ onClose }) => {
             <p className="text-sm text-primary">
               {t("app.platform.warning.development")}
             </p>
-            <p className="text-sm text-primary">
-              ~ {t("app.platform.warning.fromSantiago")}
-            </p>
           </div>
 
           <div className="mt-6 flex justify-end">

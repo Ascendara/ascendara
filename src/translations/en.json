@@ -31,7 +31,7 @@
       "creating": "Creating Account...",
       "emailLabel": "Email Address:",
       "goBack": "Go Back & Edit",
-      "message": "Please confirm that your email address is correct. We'll send a verification link there.",
+      "message": "Please confirm that your email address is correct. A verification link will be sent there.",
       "title": "Confirm Your Email",
       "warning": "This email cannot be changed once it's verified!"
     },
@@ -39,7 +39,7 @@
       "confirmed": "Request Submitted",
       "deleting": "Submitting...",
       "departureDescription": "Your feedback helps improve Ascendara. This is optional and won't prevent your deletion request.",
-      "departurePlaceholder": "Tell me what led to your decision...",
+      "departurePlaceholder": "What led to your decision?",
       "departureSkip": "Skip and request deletion",
       "departureSubmit": "Send feedback and request deletion",
       "departureTitle": "Why are you leaving Ascend?",
@@ -114,7 +114,7 @@
       "profiles": "Custom Profiles",
       "profilesDesc": "Set up your personalized profile with a custom bio, showcase your gaming preferences, and let others know what you're all about. Make your profile uniquely yours.",
       "reportTracking": "Report Tracking",
-      "reportTrackingDesc": "Reports you send while signed in, from app issues to broken games and download errors, show up in a Reports tab in Ascend. See which ones are still open, which have been handled, and any reply from the developer.",
+      "reportTrackingDesc": "Reports you send while signed in, from app issues to broken games and download errors, show up in a Reports tab in Ascend. See which ones are still open, which have been handled, and any replies.",
       "retroSaves": "Retro Cloud Saves",
       "retroSavesDesc": "Back up your Retro library's memory cards and save folders to the cloud, then restore them on any device. Ascendara keeps a recovery copy of your local saves before every restore.",
       "trainers": "FLiNG Trainers",
@@ -134,7 +134,7 @@
       "createAccount": "Create Account",
       "didYouMean": "Did you mean {{email}}?",
       "displayName": "Display Name",
-      "displayNamePlaceholder": "What should we call you?",
+      "displayNamePlaceholder": "What should Ascendara call you?",
       "email": "Email",
       "emailPlaceholder": "Enter your email",
       "linkWithPC": "Permanently link this account with this PC",
@@ -213,7 +213,7 @@
       "changeFailed": "Couldn't change your email. Try again in a moment.",
       "checkNow": "I've verified my email",
       "checking": "Checking for verification automatically",
-      "emailChanged": "Email changed. We sent a new link to {{email}}.",
+      "emailChanged": "Email changed. A new link was sent to {{email}}.",
       "emailFailed": "Couldn't send the verification email. Try again in a moment.",
       "emailInUse": "That email already has an Ascend account.",
       "emailSent": "Verification email sent. Check your inbox.",
@@ -297,8 +297,7 @@
     "platform": {
       "warning": {
         "description": "You are currently using Ascendara on a non-Windows platform. While cross-platform is in development, some features may not work as expected.",
-        "development": "Ascendara is still in active development, and it is recommended that you use Windows for the best experience. I appreciate your patience and feedback as I continue to improve cross-platform support.",
-        "fromSantiago": "Santiago, Ascendara's Solo Developer",
+        "development": "Ascendara is still in active development, and Windows is recommended for the best experience. Cross-platform support keeps improving, and feedback helps.",
         "title": "Platform Compatibility Notice",
         "understand": "I Understand"
       }
@@ -319,13 +318,13 @@
     },
     "runningInDev": "DEVELOPMENT MODE",
     "supportDialog": {
-      "ascend": "Join Ascend",
+      "ascend": "Support with Ascend",
       "dismissRating": "Dismiss rating",
       "dismissWarning": "You haven't rated Ascendara yet. Dismiss the rating and continue?",
       "feedback": "Give Feedback",
       "goBack": "Go back",
-      "message": "You're starting to use Ascendara and I would love for you to rate it or give me some feedback.",
-      "note": "I've spent so much time creating Ascendara as a passion project. Every feature, every line of code is crafted with care. Your support means everything to me and helps me continue making Ascendara even better.",
+      "message": "You're starting to use Ascendara. Rate it or share some feedback to help shape what comes next.",
+      "note": "Ascendara is a passion project, and every feature is built with care. Your support helps keep it going and make it even better.",
       "ratings": {
         "1": "Not for me",
         "2": "Needs work",
@@ -342,7 +341,7 @@
       "failedDesc": "Your review was not submitted. Sorry about that!",
       "featuredGame": "Show off a game",
       "hours": "{{hours}} hrs",
-      "message": "You've been using Ascendara for over a month now, and I'd love to hear what you think of it. Write a few words about your experience.",
+      "message": "You've been using Ascendara for over a month now. Write a few words about your experience.",
       "mostPlayed": "Most played",
       "namePlaceholder": "Your name (optional)",
       "noGame": "Don't show a game",
@@ -558,7 +557,7 @@
         "submit": "Submit Request",
         "submitting": "Submitting...",
         "success": "Community request submitted! Awaiting admin approval.",
-        "successDescription": "Your request is being reviewed by the lead developer. You'll be notified once it's approved.",
+        "successDescription": "Your request is being reviewed. You'll be notified once it's approved.",
         "title": "Request Community Creation"
       },
       "denied": "Denied",
@@ -640,7 +639,7 @@
           "title": "Custom role"
         },
         "support": {
-          "description": "Get help from the team and community when something goes wrong.",
+          "description": "Get help from the community when something goes wrong.",
           "title": "Help and support"
         }
       },
@@ -788,7 +787,7 @@
         "author": "Ascend",
         "cancel": "Cancel",
         "daily": "{{hours}} of play in one day was flagged",
-        "dialogDescription": "Tell me what happened. Reports go straight to the lead developer of Ascendara.",
+        "dialogDescription": "Describe what happened.",
         "dialogTitle": "Something wrong with this flag?",
         "failed": "Couldn't send your report",
         "ledger": "{{hours}} of playtime wasn't counted",
@@ -803,7 +802,7 @@
         "report": "Something wrong?",
         "response": "Response from tago",
         "sending": "Sending...",
-        "sent": "Report sent to the lead developer",
+        "sent": "Report sent",
         "status": {
           "cleared": "Reviewed, counted",
           "disputed": "Reported, in review",
@@ -1669,7 +1668,7 @@
       },
       "couldNotReport": "Report was not submitted.",
       "couldNotReportDesc": "Your report was not submitted. Please try again later.",
-      "description": "What went wrong? Reported issues in Ascendara go straight to the lead developer.",
+      "description": "What went wrong? Describe the issue so it can be fixed.",
       "detailsLabel": "Details",
       "detailsPlaceholder": "What happened, and what were you doing when it did?",
       "error": "Failed to submit report",
@@ -1682,7 +1681,7 @@
       "submitting": "Submitting report...",
       "success": "Report submitted successfully!",
       "title": "Report Issue",
-      "tooVague": "That's not really explaining anything. The developer can't see what happened before or after the issue, so please be a little more descriptive: what were you doing, and what went wrong?"
+      "tooVague": "That's not really explaining anything. Reports only include what you write here, so please be a little more descriptive: what were you doing, and what went wrong?"
     },
     "reportIssue": "Report Issue",
     "reportToAscendara": "Report to Ascendara",
@@ -1709,7 +1708,7 @@
     "antivirusWarningDesc": "Your antivirus may detect online multiplayer files as threats and delete them. Enable 'Protect Directories from Defender' in Settings to prevent this.",
     "artworkCorrection": {
       "chooseCover": "Pick the cover that matches this game.",
-      "chooseGame": "Pick the game this really is so we can use its artwork.",
+      "chooseGame": "Pick the game this really is so Ascendara can use its artwork.",
       "noCovers": "No covers were found for this game. You can still submit it as the correct game.",
       "noMatches": "No matching games found. Try a different name.",
       "search": "Search",
@@ -1984,9 +1983,9 @@
       "title": "Game Already Installed"
     },
     "remoteDownloads": "Remote Control",
-    "reportDescription": "Describe what's wrong so we can fix it quickly",
+    "reportDescription": "Describe what's wrong so it can be fixed quickly",
     "reportDialog": {
-      "description": "Tell me what's wrong with {{game}}. Reports go straight to the lead developer of Ascendara.",
+      "description": "Describe what's wrong with {{game}}.",
       "detailsLabel": "Details",
       "title": "Report Game",
       "wrongArtwork": "Wrong cover or banner?",
@@ -2121,7 +2120,7 @@
       "viewingOlderTitle": "Viewing an older version."
     },
     "toast": {
-      "alreadyReported": "You've already reported this game. Thanks, we'll take a look.",
+      "alreadyReported": "You've already reported this game. Thanks, it'll be looked into.",
       "conflictResolveFailed": "Failed to resolve folder conflict",
       "deletedExisting": "Existing folder deleted",
       "downloadFailed": "Failed to start download",
@@ -2245,7 +2244,7 @@
     },
     "error": "Error",
     "errorReported": "Issue Reported Successfully",
-    "errorReportedDescription": "Thank you for helping improve Ascendara. Ascendara lead developer will investigate this issue.",
+    "errorReportedDescription": "Thank you for helping improve Ascendara. This issue will be looked into.",
     "errors": {
       "commandFailed": "Failed to run the command",
       "killFailed": "Failed to kill download",
@@ -2806,7 +2805,7 @@
   "home": {
     "actionGames": "Action Games",
     "footer": {
-      "description": "Ascendara is built and maintained by a single developer as a passion project. Sharing Ascendara with others helps it grow and reach more users.",
+      "description": "Ascendara is an independent passion project. Sharing Ascendara with others helps it grow and reach more users.",
       "donate": "Support Development",
       "github": "View on GitHub",
       "madeWith": "Made with ❤️ by Santiago & Contributors",
@@ -3478,7 +3477,7 @@
     "removeGameFromLibrary": "Remove from Library",
     "renameFolderDesc": "Enter a new name for this folder.",
     "renameFolderTitle": "Rename Folder",
-    "restoreGameDataDescription": "We found saved data for {{game}} from when you previously deleted it. Would you like to restore your playtime and stats?",
+    "restoreGameDataDescription": "Saved data was found for {{game}} from when you previously deleted it. Would you like to restore your playtime and stats?",
     "restoreGameDataNo": "Start Fresh",
     "restoreGameDataTitle": "Restore Game Data?",
     "restoreGameDataYes": "Restore Data",
@@ -5178,7 +5177,7 @@
     "openOnStartup": "Open Ascendara on Startup",
     "openOnStartupDescription": "Automatically launch Ascendara when you start your computer.",
     "plugins": {
-      "browseDescription": "Plugins reviewed by the Ascendara team. Submit your own with a pull request on GitHub.",
+      "browseDescription": "Every plugin is reviewed before it's published here. Submit your own with a pull request on GitHub.",
       "browseTab": "Browse",
       "by": "by {{author}}",
       "description": "Plugins change how Ascendara looks and works. They run with full access to the app.",
@@ -5221,7 +5220,7 @@
       "sourceLocal": "This checkout",
       "title": "Plugins",
       "toggle": "Turn {{name}} on or off",
-      "trustOfficial": "The Ascendara team reviewed this version. Plugins can still read and change anything in Ascendara, including your accounts and downloads. If a plugin breaks Ascendara, start it with --safe-mode to turn every plugin off.",
+      "trustOfficial": "This version was reviewed before being published. Plugins can still read and change anything in Ascendara, including your accounts and downloads. If a plugin breaks Ascendara, start it with --safe-mode to turn every plugin off.",
       "trustSideloaded": "Nobody has reviewed this plugin. Plugins can read and change anything in Ascendara, including your accounts and downloads, so only enable plugins from people you trust. If a plugin breaks Ascendara, start it with --safe-mode to turn every plugin off.",
       "uninstall": "Uninstall {{name}}",
       "uninstallConfirm": "Uninstall",
@@ -5499,7 +5498,7 @@
     "warningDescription": "Ascendara is designed as a testing platform for video games, allowing users to evaluate gameplay, performance, and compatibility before making a purchase decision. Ascendara strongly encourages users to support game developers by purchasing games they enjoy.",
     "warningReadMore": "Read more",
     "warningShowLess": "Show less",
-    "warningSupportDevelopers": "Game developers invest significant time, resources, and creativity into creating the experiences we all enjoy. Your purchase directly supports their ability to continue making great games and sustains the gaming industry.",
+    "warningSupportDevelopers": "Game developers invest significant time, resources, and creativity into creating the experiences players enjoy. Your purchase directly supports their ability to continue making great games and sustains the gaming industry.",
     "warningSupportDevelopersCallToAction": "Please support the developers by purchasing games you enjoy.",
     "warningTitle": "Hey there, please read this!",
     "windowControls": "Window Controls",
@@ -5926,7 +5925,7 @@
     "umuLauncherNotInstalled": "UMU Launcher is recommended, without it, games may crash at startup. You can install it later in Settings.",
     "umuProtonDesc": "Alternative Proton build maintained by the UMU team. More stable than Proton GE but less updated. Only install if you know what you're doing.",
     "welcomeTo": "Welcome to",
-    "welcomeToAscendaraDescription2": "You're almost ready to start using Ascendara. We'll go through the onboarding process together to setup the basics, but first please read the Terms of Service and Privacy Policy.",
+    "welcomeToAscendaraDescription2": "You're almost ready to start using Ascendara. Onboarding will walk you through the basics, but first please read the Terms of Service and Privacy Policy.",
     "youCanChangeThisLater": "You can always update your language later in Settings.",
     "youWillReceiveAdminPrompts": "You will receive administrator prompts from official Microsoft installers to install the required components. Your computer may need to restart after installation.",
     "yourContinuedSupport": "Your continued support has made Ascendara what it is today. Ascendara has been completely rebuilt from the ground up with a new look and feel you've been asking for."
@@ -5945,7 +5944,7 @@
     "install": "Install Now",
     "installError": "Installation failed. Please try again.",
     "installSteamCMD": "Install SteamCMD Sidecar",
-    "installSteamCMDDescription": "First, we need to install the SteamCMD Sidecar. This CLI tool allows you to download items from the Steam Workshop without a UI.",
+    "installSteamCMDDescription": "First, the SteamCMD Sidecar needs to be installed. This CLI tool allows you to download items from the Steam Workshop without a UI.",
     "installSuccess": "Installation Complete!",
     "installingSteamCMD": "Installing SteamCMD Sidecar...",
     "mainDescription": "Paste workshop item links here to download them. Ascendara will add them to a directory for you to manage yourself.",
