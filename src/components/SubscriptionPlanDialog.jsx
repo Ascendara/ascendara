@@ -76,12 +76,28 @@ const planKind = plan =>
       ? "sixMonth"
       : "monthly";
 
+const FeatureSlide = ({ feature, t, className, ...props }) => {
+  const base = `${COPY}.includedFeatures.${feature.key}`;
+  return (
+    <div className={className} {...props}>
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15">
+          <feature.icon className="h-4 w-4 text-white" />
+        </div>
+        <h4 className="text-sm font-semibold text-white">{t(`${base}.title`)}</h4>
+      </div>
+      <p className="mt-2.5 text-[13px] leading-relaxed text-white/75">
+        {t(`${base}.description`)}
+      </p>
+    </div>
+  );
+};
+
 // One feature at a time, auto-advancing; hovering pauses it and the icons jump to one.
 const FeatureShowcase = ({ t }) => {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const feature = FEATURES[active];
-  const base = `${COPY}.includedFeatures.${feature.key}`;
 
   useEffect(() => {
     if (paused) return;
@@ -94,24 +110,28 @@ const FeatureShowcase = ({ t }) => {
 
   return (
     <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <div className="relative h-[128px] overflow-hidden rounded-2xl bg-white/10 p-4 ring-1 ring-white/15 backdrop-blur">
+      <div className="relative grid overflow-hidden rounded-2xl bg-white/10 p-4 ring-1 ring-white/15 backdrop-blur">
+        {/* Every feature sits hidden in the same cell, so the card is as tall as
+            the longest description and nothing gets cut off or jumps between slides */}
+        {FEATURES.map(item => (
+          <FeatureSlide
+            key={item.key}
+            feature={item}
+            t={t}
+            className="invisible [grid-area:1/1]"
+            aria-hidden
+          />
+        ))}
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={feature.key}
+            className="[grid-area:1/1]"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.22 }}
           >
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15">
-                <feature.icon className="h-4 w-4 text-white" />
-              </div>
-              <h4 className="text-sm font-semibold text-white">{t(`${base}.title`)}</h4>
-            </div>
-            <p className="mt-2.5 line-clamp-3 text-[13px] leading-relaxed text-white/75">
-              {t(`${base}.description`)}
-            </p>
+            <FeatureSlide feature={feature} t={t} />
           </motion.div>
         </AnimatePresence>
         {!paused && (
