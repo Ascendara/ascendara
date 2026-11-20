@@ -336,6 +336,22 @@ function registerGameHandlers() {
   const settingsManager = getSettingsManager();
 
   // Get all games
+  // When a game finished installing: the file map is written once extraction
+  // is done. Creation time, since updates rewrite it. Falls back to the game's
+  // info file, which is created when its download starts.
+  async function installedAt(gameDirectory, gameInfoPath) {
+    for (const file of [
+      path.join(gameDirectory, "filemap.ascendara.json"),
+      gameInfoPath,
+    ]) {
+      try {
+        const stats = await fs.promises.stat(file);
+        return Math.round(stats.birthtimeMs > 0 ? stats.birthtimeMs : stats.mtimeMs);
+      } catch {}
+    }
+    return null;
+  }
+
   ipcMain.handle("get-games", async () => {
     const settings = settingsManager.getSettings();
     try {
@@ -366,6 +382,10 @@ function registerGameHandlers() {
                 ensureInstallSize(parsed, path.join(downloadDir, dir), gameInfoPath);
                 return {
                   ...parsed,
+                  installedAt: await installedAt(
+                    path.join(downloadDir, dir),
+                    gameInfoPath
+                  ),
                   isCustom: false,
                   custom: false,
                   _sourceDir: downloadDir,

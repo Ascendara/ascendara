@@ -734,6 +734,12 @@ const Library = () => {
         const bTime = b.playTime || 0;
         if (aTime !== bTime) return bTime - aTime;
       }
+      if (sortMode === "installed") {
+        // Newest first; games without a known install date go last
+        const aInstalled = a.installedAt || 0;
+        const bInstalled = b.installedAt || 0;
+        if (aInstalled !== bInstalled) return bInstalled - aInstalled;
+      }
       // Alphabetical
       return sortOrder === "asc"
         ? aName.localeCompare(bName)
@@ -2569,6 +2575,12 @@ const Library = () => {
                       icon: <Timer className="h-4 w-4" />,
                       active: sortMode === "playtime",
                       onClick: () => setSortMode("playtime"),
+                    },
+                    {
+                      label: t("library.sort.lastInstalled"),
+                      icon: <Clock className="h-4 w-4" />,
+                      active: sortMode === "installed",
+                      onClick: () => setSortMode("installed"),
                     },
                   ].map(item => (
                     <DropdownMenuItem

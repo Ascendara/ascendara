@@ -1959,6 +1959,7 @@ function registerMiscHandlers() {
           version,
           executable,
           isRunning: false,
+          installedAt: Date.now(),
         });
         const temporary = `${gamesFilePath}.${crypto.randomUUID()}.tmp`;
         try {
