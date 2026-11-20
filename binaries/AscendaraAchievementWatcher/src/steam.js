@@ -16,24 +16,64 @@ const appData =
     process.platform === "darwin" ? "Library/Application Support" : ".config"
   );
 
-// Simple fetch wrapper for Node.js
-async function fetchJson(url) {
+const FETCH_TIMEOUT_MS = 15000;
+const FETCH_ATTEMPTS = 3;
+
+// 4xx means the request itself is bad (unknown appid, no achievements),
+// so retrying or retrying later won't help.
+class FetchError extends Error {
+  constructor(message, permanent) {
+    super(message);
+    this.permanent = permanent;
+  }
+}
+
+function fetchJsonOnce(url) {
   return new Promise((resolve, reject) => {
     const lib = url.startsWith("https") ? https : http;
-    lib
-      .get(url, res => {
-        let data = "";
-        res.on("data", chunk => (data += chunk));
-        res.on("end", () => {
-          try {
-            resolve(JSON.parse(data));
-          } catch (err) {
-            reject(err);
-          }
-        });
-      })
-      .on("error", reject);
+    const req = lib.get(url, res => {
+      let data = "";
+      res.on("data", chunk => (data += chunk));
+      res.on("end", () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          reject(
+            new FetchError(
+              `HTTP ${res.statusCode} from ${url}`,
+              res.statusCode >= 400 && res.statusCode < 500 && res.statusCode !== 429
+            )
+          );
+          return;
+        }
+        try {
+          resolve(JSON.parse(data));
+        } catch (err) {
+          reject(new FetchError(`Invalid JSON from ${url}`, false));
+        }
+      });
+      res.on("error", reject);
+    });
+    req.setTimeout(FETCH_TIMEOUT_MS, () =>
+      req.destroy(new FetchError(`Timed out fetching ${url}`, false))
+    );
+    req.on("error", reject);
   });
+}
+
+// The schema proxy times out when Steam is slow, so retry transient failures
+async function fetchJson(url) {
+  let lastErr;
+  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
+    try {
+      return await fetchJsonOnce(url);
+    } catch (err) {
+      lastErr = err;
+      if (err.permanent) break;
+      if (attempt < FETCH_ATTEMPTS) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * 2 ** (attempt - 1)));
+      }
+    }
+  }
+  throw lastErr;
 }
 
 const steamLang = require("./steam.json");
@@ -112,41 +152,64 @@ function resolveIconUrl(icon, appID) {
 }
 module.exports.resolveIconUrl = resolveIconUrl;
 
-module.exports.loadSteamData = async (appID, lang, key = null) => {
+// Bumped when cached schemas need refreshing (v1: names come from the store)
+const SCHEMA_CACHE_VERSION = 1;
+
+module.exports.loadSteamData = async (appID, lang) => {
   if (!steamLang.some(language => language.api === lang)) {
-    throw "Unsupported API language code";
+    throw new FetchError("Unsupported API language code", true);
   }
 
   const cache = path.join(appData, "Achievement Watcher/steam_cache/schema", lang);
+  const filePath = path.join(cache, `${appID}.db`);
+  let result;
 
   try {
-    let filePath = path.join(`${cache}`, `${appID}.db`);
-    let result;
-
     if (await existsAndIsYoungerThan(filePath, { timeUnit: "M", time: 6 })) {
       result = JSON.parse(await fs.readFile(filePath));
-    } else {
-      // Fetch from backend API (no key needed)
-      result = await getSteamData(appID, lang, key);
-      // Ensure cache directory exists before writing
+    }
+  } catch (err) {
+    result = null;
+  }
+
+  if (!result || result.cacheVersion !== SCHEMA_CACHE_VERSION) {
+    try {
+      if (result) {
+        // Older cache: the schema is fine, only the name needs fixing
+        const storeName = await getStoreName(appID);
+        if (!storeName) return withIcons(result, appID);
+        result.name = storeName;
+        result.cacheVersion = SCHEMA_CACHE_VERSION;
+      } else {
+        result = await getSteamData(appID, lang);
+      }
       await fs.mkdir(cache, { recursive: true });
       fs.writeFile(filePath, JSON.stringify(result, null, 2)).catch(err => {
         console.log(err);
       });
-    }
-
-    if (Array.isArray(result?.achievement?.list)) {
-      for (const ach of result.achievement.list) {
-        ach.icon = resolveIconUrl(ach.icon, appID);
-        ach.icongray = resolveIconUrl(ach.icongray, appID);
+    } catch (err) {
+      if (!result) {
+        const wrapped = new FetchError(
+          `Could not load Steam data for ${appID} - ${lang}: ${err.message || err}`,
+          !!err.permanent
+        );
+        throw wrapped;
       }
     }
-
-    return result;
-  } catch (err) {
-    throw `Could not load Steam data for ${appID} - ${lang}: ${err}`;
   }
+
+  return withIcons(result, appID);
 };
+
+function withIcons(result, appID) {
+  if (Array.isArray(result?.achievement?.list)) {
+    for (const ach of result.achievement.list) {
+      ach.icon = resolveIconUrl(ach.icon, appID);
+      ach.icongray = resolveIconUrl(ach.icongray, appID);
+    }
+  }
+  return result;
+}
 
 module.exports.fetchIcon = async (url, appID) => {
   try {
@@ -166,21 +229,15 @@ module.exports.fetchIcon = async (url, appID) => {
   }
 };
 
-async function getSteamData(appID, lang, key = null) {
+async function getSteamData(appID, lang) {
   // Use backend API proxy instead of direct Steam API call
   const url = `https://api.ascendara.app/api/proxy/steam/achievements?appid=${appID}&lang=${lang}`;
 
   const data = await fetchJson(url);
 
-  const schema = data.game.availableGameStats;
+  const schema = data?.game?.availableGameStats;
   if (!(schema && schema.achievements && schema.achievements.length > 0))
-    throw "Schema doesn't have any achievement";
-
-  // Use name provided by GetSchema if it exists
-  const schemaName = data.game.gameName;
-
-  // Search in AppList only if name is empty
-  const finalName = schemaName || (await findInAppList(+appID, key));
+    throw new FetchError("Schema doesn't have any achievement", true);
 
   // Browse achievements to manage hidden achievements without descriptions
   schema.achievements.forEach(ach => {
@@ -189,9 +246,12 @@ async function getSteamData(appID, lang, key = null) {
     }
   });
 
-  const result = {
-    name: finalName,
+  const storeName = await getStoreName(appID);
+  return {
+    name: storeName || data.game.gameName || `AppID ${appID}`,
     appid: appID,
+    // Without a store name, leave the cache outdated so the name is retried
+    cacheVersion: storeName ? SCHEMA_CACHE_VERSION : 0,
     binary: null,
     img: {
       header: `https://cdn.akamai.steamstatic.com/steam/apps/${appID}/header.jpg`,
@@ -204,63 +264,19 @@ async function getSteamData(appID, lang, key = null) {
       list: schema.achievements,
     },
   };
-
-  return result;
 }
 
-async function findInAppList(appID, key) {
-  if (!appID || !(Number.isInteger(appID) && appID > 0)) throw "ERR_INVALID_APPID";
-
-  const cache = path.join(appData, "Achievement Watcher/steam_cache/schema");
-  const filepath = path.join(cache, "appList.json");
-
-  // 1. Try reading local cache
+// The schema's gameName is the developer's internal name, which is often a
+// codename (Salt and Sacrifice is "Project Mage (DEPRECATED ASK FOR NEW KEY)").
+// Games are matched to library folders by name, so use the store name.
+async function getStoreName(appID) {
   try {
-    const list = JSON.parse(await fs.readFile(filepath));
-    const app = list.find(app => app.appid === appID);
-    if (app) return app.name;
-  } catch (e) {}
-
-  // 2. Try download
-  try {
-    // Ensure cache directory exists before writing
-    await fs.mkdir(cache, { recursive: true });
-
-    console.log("Fetching App List from Steam...");
-
-    // 1st try: New API
-    let list = [];
-    if (key) {
-      try {
-        const url = `https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${key}&max_results=50000`;
-        const data = await fetchJson(url);
-        list = data.response?.apps || [];
-      } catch (e) {
-        console.warn("IStoreService failed, trying fallback...");
-      }
-    }
-
-    // 2nd try: Old public API (Fallback)
-    if (!list.length) {
-      const url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/?format=json";
-      const data = await fetchJson(url);
-      list = data.applist?.apps || data.applist?.apps || [];
-    }
-
-    if (!Array.isArray(list) || list.length === 0)
-      throw "Invalid app list format from Steam API";
-
-    // Save cache
-    list.sort((a, b) => b.appid - a.appid);
-    await fs.writeFile(filepath, JSON.stringify(list, null, 2));
-    console.log("appList.json cached at", filepath);
-
-    const app = list.find(app => app.appid === appID);
-    if (!app) return `AppID ${appID}`; // Fallback
-    return app.name;
+    const url = `https://api.ascendara.app/api/proxy/steam/appdetails?appids=${appID}`;
+    const data = await fetchJson(url);
+    const name = data?.[appID]?.data?.name;
+    if (name) return name;
   } catch (err) {
-    console.error("Failed to fetch App List:", err);
-    // Fix: return ID instead of crashing
-    return `AppID ${appID}`;
+    console.warn(`Store name lookup failed for ${appID}:`, err.message || err);
   }
+  return null;
 }

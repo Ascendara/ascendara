@@ -286,11 +286,20 @@ async function writeInitialAchievements(target, appid) {
   try {
     game = await app.load(appid);
   } catch (err) {
-    console.log(`No achievements to list for ${target.name} (${appid})`);
+    console.log(
+      `No achievements to list for ${target.name} (${appid}):`,
+      err.message || err
+    );
+    // Only a missing schema is final; a timeout is retried next rescan
+    if (!err.permanent) initialWritten.delete(target.folder);
     return;
   }
   await writeAchievementsJson(target, game, await track.load(appid));
 }
+
+// Save files whose unlocks couldn't be processed because the schema fetch
+// failed, retried every rescan so the unlocks aren't lost until the next one.
+const retryFiles = new Map(); // file -> options
 
 async function processAchievementFile(name, options, { notify = true } = {}) {
   const filePath = path.parse(name);
@@ -302,7 +311,14 @@ async function processAchievementFile(name, options, { notify = true } = {}) {
   const appID = getAppIdForFile(filePath, options);
   console.log(`Detected appID: ${appID}`);
 
-  const game = await app.load(appID);
+  let game;
+  try {
+    game = await app.load(appID);
+    retryFiles.delete(name);
+  } catch (err) {
+    if (!err.permanent) retryFiles.set(name, options);
+    throw err;
+  }
   const achievements = await monitor.parse(name);
   if (achievements.length === 0) return;
 
@@ -482,6 +498,10 @@ var app = {
       }
     }
 
+    for (const [file, options] of [...retryFiles]) {
+      await enqueue(() => processAchievementFile(file, options));
+    }
+
     for (const appID of [...(await loadPending())]) {
       await enqueue(async () => {
         const cache = await track.load(appID);
@@ -531,6 +551,10 @@ var app = {
       console.log(`loading steam schema for ${appID}`);
       const lang = await getSteamApiLang();
       game = await steam.loadSteamData(appID, lang);
+      // Toasts and library matching use this name, so log it to spot codenames
+      console.log(
+        `Schema for ${appID}: ${game.name} (${game.achievement.total} achievements)`
+      );
       this.cache.push(game);
       console.log("from file cache or remote");
     }
