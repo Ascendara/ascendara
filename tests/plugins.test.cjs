@@ -131,7 +131,8 @@ async function withPlugins(run, routes = {}, electron = {}) {
         BrowserWindow: { getAllWindows: () => [] },
         ...electron,
       };
-    if (request === "../core/config") return { appVersion: "12.3.0" };
+    // New enough for every listed plugin's minAppVersion
+    if (request === "../core/config") return { appVersion: "99.0.0" };
     if (request === "../core/settings") return { getSettingsManager: () => ({}) };
     return realLoad.call(this, request, ...rest);
   };
@@ -197,10 +198,11 @@ test("installs a plugin from the list, runs its calls, and uninstalls it", async
 
 test("refuses plugin files that don't match their pinned hash", async () => {
   const tampered = JSON.parse(fs.readFileSync(path.join(REGISTRY, "index.json"), "utf8"));
-  tampered.plugins[0].files[0].sha256 = "0".repeat(64);
+  const target = tampered.plugins.find(plugin => plugin.id === "hide-ascend-nav");
+  target.files[0].sha256 = "0".repeat(64);
   await withPlugins(
     async ({ invoke }) => {
-      await assert.rejects(invoke("plugins-install", tampered.plugins[0].id), /changed/);
+      await assert.rejects(invoke("plugins-install", target.id), /changed/);
       assert.deepEqual((await invoke("plugins-list")).plugins, []);
     },
     { "/index.json": JSON.stringify(tampered) }
@@ -298,5 +300,118 @@ test("the plugin list includes file sizes but not hashes", async () => {
     assert.ok(entry.files.length > 0);
     assert.ok(entry.files.every(file => file.path && file.size > 0 && !file.sha256));
     assert.equal(entry.installedPermissions, null);
+  });
+});
+
+test("manifest settings are checked and get sensible defaults", () => {
+  const settings = validateManifest(
+    manifest({
+      settings: [
+        { key: "hide", type: "boolean", label: "Hide it" },
+        { key: "count", type: "number", label: "Count", default: 500, min: 1, max: 50 },
+        {
+          key: "size",
+          type: "select",
+          label: "Size",
+          default: "missing",
+          options: [
+            { value: "s", label: "Small" },
+            { value: "l", label: "Large" },
+          ],
+        },
+        { key: "path", type: "text", label: "Path", placeholder: "/opt/tools" },
+      ],
+    }),
+    "example"
+  ).settings;
+  assert.deepEqual(
+    settings.map(setting => [setting.key, setting.default]),
+    [
+      ["hide", false],
+      ["count", 50],
+      ["size", "s"],
+      ["path", ""],
+    ]
+  );
+  assert.deepEqual(validateManifest(manifest(), "example").settings, []);
+  const invalid = setting => () =>
+    validateManifest(manifest({ settings: [setting] }), "example");
+  assert.throws(invalid({ key: "a", type: "color", label: "A" }), /unknown type/);
+  assert.throws(invalid({ key: "a", type: "boolean" }), /label/);
+  assert.throws(invalid({ key: "bad key", type: "boolean", label: "A" }), /letters/);
+  assert.throws(
+    invalid({ key: "a", type: "select", label: "A", options: [] }),
+    /options/
+  );
+  assert.throws(
+    () =>
+      validateManifest(
+        manifest({
+          settings: [
+            { key: "a", type: "boolean", label: "A" },
+            { key: "a", type: "boolean", label: "A" },
+          ],
+        }),
+        "example"
+      ),
+    /twice/
+  );
+  assert.equal(
+    validateManifest(manifest({ permissions: ["manageDownloads"] }), "example")
+      .permissions[0],
+    "manageDownloads"
+  );
+});
+
+test("plugins can find a game's executable and App ID, and open only folders", async () => {
+  const game = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-game-"));
+  fs.mkdirSync(path.join(game, "bin", "x64"), { recursive: true });
+  fs.writeFileSync(path.join(game, "bin", "x64", "steam_appid.txt"), "1437400\n");
+  fs.writeFileSync(path.join(game, "game.exe"), "");
+  const opened = [];
+  try {
+    await withPlugins(
+      async ({ invoke }) => {
+        await invoke("plugins-install", "hide-ascend-nav");
+        const call = (method, ...args) =>
+          invoke("plugins-call", "hide-ascend-nav", method, ...args);
+        const custom = {
+          game: "Game",
+          isCustom: true,
+          executable: path.join(game, "game.exe"),
+        };
+
+        assert.equal(await call("games.executable", custom), custom.executable);
+        assert.equal(
+          await call("games.executable", {
+            ...custom,
+            executable: path.join(game, "gone.exe"),
+          }),
+          null
+        );
+        assert.equal(await call("games.appId", custom), "1437400");
+        assert.equal(
+          await call("games.appId", { ...custom, steamAppId: "283640" }),
+          "283640"
+        );
+
+        await call("openFolder", game);
+        assert.deepEqual(opened, [game]);
+        await assert.rejects(call("openFolder", custom.executable), /Folder not found/);
+        await assert.rejects(call("openFolder", "relative"), /full folder path/);
+      },
+      {},
+      { shell: { openPath: async target => (opened.push(target), "") } }
+    );
+  } finally {
+    fs.rmSync(game, { recursive: true, force: true });
+  }
+});
+
+test("plugin sources include their settings", async () => {
+  await withPlugins(async ({ invoke }) => {
+    await invoke("plugins-install", "hide-nav-items");
+    const [source] = await invoke("plugins-sources");
+    assert.ok(source.settings.some(setting => setting.key === "workshop"));
   });
 });

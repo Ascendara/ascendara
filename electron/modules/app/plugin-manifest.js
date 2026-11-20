@@ -14,7 +14,10 @@ const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 const PERMISSIONS = {
   downloads: "Download files from the internet into its own folder",
   processes: "Run programs on your computer",
+  manageDownloads: "Pause and resume your game downloads",
 };
+const SETTING_KEY_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/;
+const MAX_SETTINGS = 30;
 
 function compareVersions(a, b) {
   const left = String(a).split(".").map(Number);
@@ -32,6 +35,88 @@ function resolveInside(root, relative) {
   const base = path.resolve(root);
   const resolved = path.resolve(base, relative);
   return resolved.startsWith(base + path.sep) ? resolved : null;
+}
+
+// Options a plugin shows under Settings → Plugins, read with ascendara.settings.
+// Each has a key, a label and a type: boolean, select, text or number.
+function validateSettings(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error("settings must be a list");
+  if (value.length > MAX_SETTINGS)
+    throw new Error(`settings can have at most ${MAX_SETTINGS} entries`);
+  const keys = new Set();
+  return value.map(setting => {
+    if (!setting || typeof setting !== "object")
+      throw new Error("Each setting must be an object");
+    const { key, type } = setting;
+    if (typeof key !== "string" || !SETTING_KEY_PATTERN.test(key))
+      throw new Error(`Setting key "${key}" must be letters, numbers, - or _`);
+    if (keys.has(key)) throw new Error(`Setting "${key}" is listed twice`);
+    keys.add(key);
+    const label = typeof setting.label === "string" ? setting.label.trim() : "";
+    if (!label) throw new Error(`Setting "${key}" needs a label`);
+    const base = {
+      key,
+      type,
+      label: label.slice(0, 100),
+      description:
+        typeof setting.description === "string"
+          ? setting.description.trim().slice(0, 300)
+          : "",
+    };
+    if (type === "boolean") return { ...base, default: setting.default === true };
+    if (type === "text") {
+      return {
+        ...base,
+        default: typeof setting.default === "string" ? setting.default.slice(0, 500) : "",
+        placeholder:
+          typeof setting.placeholder === "string"
+            ? setting.placeholder.slice(0, 100)
+            : "",
+      };
+    }
+    if (type === "number") {
+      const bound = name => (Number.isFinite(setting[name]) ? setting[name] : undefined);
+      const min = bound("min");
+      const max = bound("max");
+      if (min !== undefined && max !== undefined && min > max)
+        throw new Error(`Setting "${key}" has min above max`);
+      let fallback = Number.isFinite(setting.default) ? setting.default : (min ?? 0);
+      if (min !== undefined) fallback = Math.max(min, fallback);
+      if (max !== undefined) fallback = Math.min(max, fallback);
+      return { ...base, default: fallback, min, max };
+    }
+    if (type === "select") {
+      const options = setting.options;
+      if (
+        !Array.isArray(options) ||
+        options.length === 0 ||
+        options.length > MAX_SETTINGS ||
+        options.some(
+          option =>
+            !option ||
+            typeof option.value !== "string" ||
+            typeof option.label !== "string" ||
+            !option.label.trim()
+        )
+      )
+        throw new Error(
+          `Setting "${key}" needs 1 to ${MAX_SETTINGS} options with a value and label`
+        );
+      const cleaned = options.map(option => ({
+        value: option.value.slice(0, 100),
+        label: option.label.trim().slice(0, 100),
+      }));
+      return {
+        ...base,
+        options: cleaned,
+        default: cleaned.some(option => option.value === setting.default)
+          ? setting.default
+          : cleaned[0].value,
+      };
+    }
+    throw new Error(`Setting "${key}" has unknown type "${type}"`);
+  });
 }
 
 function validateManifest(manifest, id) {
@@ -92,6 +177,7 @@ function validateManifest(manifest, id) {
     minAppVersion,
     apiVersion,
     permissions: [...new Set(permissions)],
+    settings: validateSettings(manifest.settings),
     main,
     style: manifest.style || "",
   };

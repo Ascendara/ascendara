@@ -5213,8 +5213,10 @@
       "learn": "How plugins work",
       "official": "Official",
       "openFolder": "Open plugins folder",
+      "options": "{{name}} options",
       "permissions": {
         "downloads": "Download files from the internet",
+        "manageDownloads": "Pause and resume your game downloads",
         "processes": "Run programs on your computer"
       },
       "permissionsLabel": "Can:",

@@ -9,6 +9,7 @@ import {
   Loader2,
   RefreshCw,
   ShieldCheck,
+  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import PluginDetailsDialog from "@/components/PluginDetailsDialog";
+import PluginOptions from "@/components/PluginOptions";
 import { pluginFailure, reloadPlugins } from "@/lib/plugins";
 
 const DOCS_URL = "https://ascendara.app/docs/plugins/overview";
@@ -92,6 +94,8 @@ export default function PluginSettings() {
     plugins: null,
   });
   const [busy, setBusy] = useState(null);
+  // Plugin whose options are open
+  const [optionsOpen, setOptionsOpen] = useState(null);
   // { kind: "install" | "update" | "enable" | "uninstall", plugin }
   const [confirming, setConfirming] = useState(null);
 
@@ -255,13 +259,32 @@ export default function PluginSettings() {
                 key={plugin.id}
                 plugin={plugin}
                 footer={
-                  error && (
-                    <p className="text-destructive text-sm">
-                      {t("settings.plugins.failed", { error })}
-                    </p>
-                  )
+                  <>
+                    {error && (
+                      <p className="text-destructive text-sm">
+                        {t("settings.plugins.failed", { error })}
+                      </p>
+                    )}
+                    {optionsOpen === plugin.id && plugin.settings?.length > 0 && (
+                      <PluginOptions plugin={plugin} />
+                    )}
+                  </>
                 }
               >
+                {plugin.settings?.length > 0 && (
+                  <Button
+                    size="icon"
+                    variant={optionsOpen === plugin.id ? "secondary" : "ghost"}
+                    aria-label={t("settings.plugins.options", { name: plugin.name })}
+                    aria-expanded={optionsOpen === plugin.id}
+                    title={t("settings.plugins.options", { name: plugin.name })}
+                    onClick={() =>
+                      setOptionsOpen(open => (open === plugin.id ? null : plugin.id))
+                    }
+                  >
+                    <SlidersHorizontal className="h-4 w-4" />
+                  </Button>
+                )}
                 {update && !update.incompatible && (
                   <Button
                     size="sm"

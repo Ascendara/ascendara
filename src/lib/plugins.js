@@ -10,6 +10,60 @@ const eventHandlers = new Set();
 let gameActions = [];
 const gameActionListeners = new Set();
 let subscribed = false;
+// plugin id -> listeners for changes to its options
+const settingListeners = new Map();
+
+// Options set under Settings → Plugins. Stored per plugin; missing keys use
+// the manifest's defaults.
+const settingsKey = id => `plugin:${id}:settings`;
+
+function readPluginSettings(id) {
+  try {
+    const value = JSON.parse(localStorage.getItem(settingsKey(id)) || "{}");
+    return value && typeof value === "object" ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+export function getPluginSettings(id, schema = []) {
+  const stored = readPluginSettings(id);
+  return Object.fromEntries(
+    schema.map(setting => [
+      setting.key,
+      Object.hasOwn(stored, setting.key) ? stored[setting.key] : setting.default,
+    ])
+  );
+}
+
+function notifySettings(id, key) {
+  for (const listener of [...(settingListeners.get(id) || [])]) {
+    try {
+      listener(key);
+    } catch (error) {
+      console.error(`[Plugin ${id}] settings listener failed`, error);
+    }
+  }
+}
+
+export function setPluginSetting(id, key, value) {
+  const stored = readPluginSettings(id);
+  stored[key] = value;
+  try {
+    localStorage.setItem(settingsKey(id), JSON.stringify(stored));
+  } catch (error) {
+    console.error(`[Plugins] Couldn't save ${id} settings`, error);
+  }
+  notifySettings(id, key);
+}
+
+// Other windows hear about changes through the storage event.
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", event => {
+    const match = event.key?.match(/^plugin:(.+):settings$/);
+    if (match) notifySettings(match[1], null);
+  });
+}
 
 const cleanError = error =>
   new Error(
@@ -46,6 +100,11 @@ function createApi(source, cleanups) {
     return cleanup;
   };
   const storageKey = key => `plugin:${id}:${key}`;
+  const schema = Array.isArray(source.settings) ? source.settings : [];
+  const requirePermission = permission => {
+    if (!source.permissions?.includes(permission))
+      throw new Error(`Add "${permission}" to the plugin's permissions`);
+  };
 
   return {
     id,
@@ -94,6 +153,56 @@ function createApi(source, cleanups) {
       },
     },
 
+    // The options the plugin declares in its manifest's "settings".
+    settings: {
+      get(key) {
+        return getPluginSettings(id, schema)[key];
+      },
+      all() {
+        return getPluginSettings(id, schema);
+      },
+      // callback(allValues, changedKey); changedKey is null when unknown
+      onChange(callback) {
+        const listener = key => callback(getPluginSettings(id, schema), key);
+        if (!settingListeners.has(id)) settingListeners.set(id, new Set());
+        settingListeners.get(id).add(listener);
+        return onCleanup(() => settingListeners.get(id)?.delete(listener));
+      },
+    },
+
+    // Read-only view of Ascendara's own settings.
+    app: {
+      async getSettings() {
+        return structuredClone(await electron.getSettings());
+      },
+      onSettingsChange(callback) {
+        return onCleanup(
+          electron.onSettingsChanged(async (_event, data) =>
+            callback(structuredClone(data || (await electron.getSettings())))
+          )
+        );
+      },
+    },
+
+    downloads: {
+      // [{ id, name, status, progress, speed, ... }]; status is "downloading",
+      // "paused", "stopped", "extracting", "queued", "updating", "error", ...
+      list: () => electron.getDownloads(),
+      onProgress: callback => onCleanup(electron.onDownloadProgress(callback)),
+      onComplete: callback => onCleanup(electron.onDownloadComplete(callback)),
+      onError: callback => onCleanup(electron.onDownloadError(callback)),
+      pause(name) {
+        requirePermission("manageDownloads");
+        return electron.stopDownload(name, false);
+      },
+      resume(name) {
+        requirePermission("manageDownloads");
+        return electron.resumeDownload(name);
+      },
+    },
+
+    openFolder: folder => call("openFolder", folder),
+
     files: {
       read: file => call("files.read", file),
       write: (file, text) => call("files.write", file, text),
@@ -135,13 +244,28 @@ function createApi(source, cleanups) {
 
     games: {
       directory: game => call("games.directory", game),
+      // Full path to the game's executable, or null when it's missing
+      executable: game => call("games.executable", game),
+      // The game's Steam App ID, or null when it can't be found
+      appId: game => call("games.appId", game),
+      // { appId, folders }: emulator save folders named after the App ID
+      saveFolders: game => call("games.saveFolders", game),
       onLaunch(callback) {
         return onCleanup(
           electron.onGameLaunchSuccess((_event, data) => callback(data?.game))
         );
       },
+      // callback(name, game): `game` can be passed to directory() or saveFolders()
       onExit(callback) {
-        return onCleanup(electron.onGameClosed((_event, data) => callback(data?.game)));
+        return onCleanup(
+          electron.onGameClosed((_event, data) =>
+            callback(data?.game, {
+              game: data?.game,
+              isCustom: !!data?.isCustom,
+              executable: data?.installation?.executable,
+            })
+          )
+        );
       },
     },
 

@@ -21,6 +21,8 @@ const {
   getSelectedGameDirectories,
   getManagedGameDirectory,
 } = require("../library/gameDirectories");
+const { findGameAppId } = require("../library/gameAppId");
+const { searchAchievementFolders } = require("../library/achievementFolderSearch");
 const {
   API_VERSION,
   ID_PATTERN,
@@ -502,6 +504,55 @@ function gameDirectory(game) {
   return null;
 }
 
+// Full path to the game's executable. Library games can store it relative to
+// their folder.
+function gameExecutable(game) {
+  if (!game || typeof game !== "object") throw new Error("Pass the game object");
+  const executable = typeof game.executable === "string" ? game.executable : "";
+  if (!executable) return null;
+  if (path.isAbsolute(executable)) return fs.existsSync(executable) ? executable : null;
+  const directory = gameDirectory(game);
+  if (!directory) return null;
+  const resolved = path.join(directory, executable);
+  return fs.existsSync(resolved) ? resolved : null;
+}
+
+async function gameAppId(game) {
+  if (game && typeof game === "object") {
+    const known = String(game.steamAppId || game.appid || "").trim();
+    if (/^\d{1,10}$/.test(known)) return known;
+  }
+  return findGameAppId(gameDirectory(game));
+}
+
+// Emulator save folders named after the game's App ID, the same places the
+// Achievement Watcher looks.
+async function gameSaveFolders(game) {
+  const appId = await gameAppId(game);
+  if (!appId) return { appId: null, folders: [] };
+  let documentsPath;
+  try {
+    documentsPath = app.getPath("documents");
+  } catch {}
+  const found = await searchAchievementFolders({
+    appId,
+    watchedFolders: getSettingsManager().getSettings().watchingFolders,
+    documentsPath,
+    maxMs: 5000,
+  });
+  return { appId, folders: found.success ? found.results : [] };
+}
+
+// Only folders, so this needs no permission: opening a folder can't run anything.
+async function openFolder(target) {
+  if (typeof target !== "string" || !path.isAbsolute(target))
+    throw new Error("openFolder takes a full folder path");
+  const stats = await fs.stat(target).catch(() => null);
+  if (!stats?.isDirectory()) throw new Error("Folder not found");
+  const error = await shell.openPath(target);
+  if (error) throw new Error(error);
+}
+
 const calls = {
   "files.read": (_sender, id, relative) => fs.readFile(dataPath(id, relative), "utf8"),
   "files.write": async (_sender, id, relative, text) => {
@@ -519,6 +570,10 @@ const calls = {
   },
   "files.remove": (_sender, id, relative) => fs.remove(dataPath(id, relative)),
   "games.directory": (_sender, _id, game) => gameDirectory(game),
+  "games.appId": (_sender, _id, game) => gameAppId(game),
+  "games.executable": (_sender, _id, game) => gameExecutable(game),
+  "games.saveFolders": (_sender, _id, game) => gameSaveFolders(game),
+  openFolder: (_sender, _id, target) => openFolder(target),
   download: { permission: "downloads", call: download },
   extract: { permission: "downloads", call: (_sender, ...args) => extract(...args) },
   run: { permission: "processes", call: run },
@@ -619,6 +674,7 @@ function registerPluginHandlers() {
           appVersion,
           platform: process.platform,
           dataPath: dataDirectory(plugin.id),
+          settings: plugin.settings || [],
           code: plugin.main ? await readSource(folder, plugin.main) : "",
           style: plugin.style ? await readSource(folder, plugin.style) : "",
         });

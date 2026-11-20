@@ -454,8 +454,10 @@ function GameCardContent({ game, compact, viewCount }) {
   return (
     <>
       <TooltipProvider delayDuration={300}>
+        {/* data-game-card / data-card-part are stable hooks for plugins, keep them */}
         <Card
           ref={cardRef}
+          data-game-card
           onClick={() => {
             // Double-check dialog wasn't just closed
             if (!dialogJustClosed.current) {
@@ -501,7 +503,10 @@ function GameCardContent({ game, compact, viewCount }) {
                 {source && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="flex min-w-0 max-w-[10rem] cursor-default items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm animate-in fade-in-50">
+                      <span
+                        data-card-part="source"
+                        className="flex min-w-0 max-w-[10rem] cursor-default items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm animate-in fade-in-50"
+                      >
                         {source.official ? (
                           <Database className="h-3 w-3 shrink-0 text-primary" />
                         ) : (
@@ -526,6 +531,7 @@ function GameCardContent({ game, compact, viewCount }) {
                     <TooltipTrigger asChild>
                       <button
                         type="button"
+                        data-card-part="verified"
                         onClick={e => {
                           e.stopPropagation();
                           setShowVerifiedDialog(true);
@@ -573,7 +579,10 @@ function GameCardContent({ game, compact, viewCount }) {
             {macCompat && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="absolute bottom-2.5 right-2.5 rounded-full bg-black/65 backdrop-blur-sm">
+                  <span
+                    data-card-part="mac-compat"
+                    className="absolute bottom-2.5 right-2.5 rounded-full bg-black/65 backdrop-blur-sm"
+                  >
                     <HighballCompatBadge
                       compat={macCompat}
                       short
@@ -589,7 +598,10 @@ function GameCardContent({ game, compact, viewCount }) {
 
             {/* Bottom-left: fresh update ribbon */}
             {updateInfo?.isRecent && !needsUpdate && (
-              <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-[11px] font-medium text-emerald-300 backdrop-blur-sm">
+              <div
+                data-card-part="recently-updated"
+                className="absolute bottom-2.5 left-2.5 flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-[11px] font-medium text-emerald-300 backdrop-blur-sm"
+              >
                 <Sparkles className="h-3 w-3" />
                 {t("gameCard.recentlyUpdated")}
               </div>
@@ -611,7 +623,10 @@ function GameCardContent({ game, compact, viewCount }) {
                 {gameRating > 0 && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="flex cursor-help items-center gap-1 font-semibold text-foreground">
+                      <span
+                        data-card-part="rating"
+                        className="flex cursor-help items-center gap-1 font-semibold text-foreground"
+                      >
                         <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                         <span className="tabular-nums">{Math.round(gameRating)}</span>
                       </span>
@@ -624,7 +639,10 @@ function GameCardContent({ game, compact, viewCount }) {
                 {viewCount > 0 && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="flex cursor-help items-center gap-1">
+                      <span
+                        data-card-part="views"
+                        className="flex cursor-help items-center gap-1"
+                      >
                         <Eye className="h-3.5 w-3.5" />
                         <span className="tabular-nums">
                           {t("gameCard.views", { views: formatCompactNumber(viewCount) })}
@@ -638,7 +656,10 @@ function GameCardContent({ game, compact, viewCount }) {
                 )}
 
                 {(game.dlc || game.online || game.storyOnly) && (
-                  <div className="ml-auto flex items-center gap-1">
+                  <div
+                    data-card-part="features"
+                    className="ml-auto flex items-center gap-1"
+                  >
                     {game.dlc && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -687,7 +708,10 @@ function GameCardContent({ game, compact, viewCount }) {
 
             {/* Tags: single row, overflow collapses into +N */}
             {gameCategories.length > 0 && (
-              <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+              <div
+                data-card-part="tags"
+                className="flex min-w-0 items-center gap-1.5 overflow-hidden"
+              >
                 {categories.map((cat, index) => (
                   <Badge
                     key={`${cat}-${index}`}
@@ -718,6 +742,7 @@ function GameCardContent({ game, compact, viewCount }) {
             {/* Spec strip: size / version / updated */}
             {specs.length > 0 && (
               <div
+                data-card-part="specs"
                 className="mt-auto grid divide-x divide-border/60 rounded-lg bg-muted/40"
                 style={{ gridTemplateColumns: `repeat(${specs.length}, minmax(0, 1fr))` }}
               >
