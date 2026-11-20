@@ -1,4 +1,3 @@
-import { canUseTorrentOnlySource } from "@/services/downloads/torrentCapability";
 import DebridSettings from "@/components/DebridSettings";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useTheme, clearCustomTheme } from "@/context/ThemeContext";
@@ -1136,16 +1135,6 @@ function Settings() {
     );
   }
 
-  const localTorrentRequiredBySource = Boolean(
-    settings.customSourcesMode &&
-    settings.customSource?.torrentOnly &&
-    settings.torrentEnabled &&
-    !canUseTorrentOnlySource(settings.customSource, {
-      ...settings,
-      torrentEnabled: false,
-    })
-  );
-
   const handleTorrentToggle = () => {
     if (!settings.torrentEnabled) {
       setShowTorrentWarning(true);
@@ -2100,39 +2089,11 @@ function Settings() {
                       {t("settings.torrentingDescription")}
                     </p>
                   </div>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div>
-                          <Switch
-                            checked={settings.torrentEnabled}
-                            onCheckedChange={handleTorrentToggle}
-                            disabled={localTorrentRequiredBySource}
-                          />
-                        </div>
-                      </TooltipTrigger>
-                      {localTorrentRequiredBySource ? (
-                        <TooltipContent>
-                          <p className="text-secondary">
-                            {t("settings.torrentRequiredBySource") ||
-                              "Your selected external source requires torrenting."}
-                          </p>
-                        </TooltipContent>
-                      ) : null}
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Switch
+                    checked={settings.torrentEnabled}
+                    onCheckedChange={handleTorrentToggle}
+                  />
                 </div>
-                {localTorrentRequiredBySource && (
-                  <div className="mb-4 rounded-md border border-orange-500/30 bg-orange-500/5 p-3 text-xs text-orange-700 dark:text-orange-300">
-                    {(
-                      t("settings.torrentLockedBySourceNote") ||
-                      "Torrenting can't be disabled while {{name}} is selected - some of its torrent links require Ascendara's local torrent client. Change the external source in Local Refresh first."
-                    ).replace(
-                      "{{name}}",
-                      settings.customSource?.name || "this external source"
-                    )}
-                  </div>
-                )}
               </SettingsSection>
             </SettingsCategory>
 

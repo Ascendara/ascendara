@@ -2061,6 +2061,9 @@
       "title": "Where do you want to download this game?"
     },
     "sendingTorrent": "Sending Torrent...",
+    "setUpDebrid": "Set up debrid",
+    "enableTorrenting": "Enable torrenting",
+    "torrentNeedsRoute": "This game is only available as a torrent. Set up a debrid service to download it directly, or enable torrenting.",
     "shareGame": "Share Ascendara Game Link",
     "specs": {
       "component": "Component",
@@ -3713,6 +3716,10 @@
     "title": "Your Game Index",
     "torrentOnly": "Torrent only",
     "torrentOnlyDialogLater": "Not now",
+    "torrentOnlyBrowseDebrid": "{{name}} only provides torrent downloads. You can still browse it. To download, set up a debrid service to get games as direct downloads, or enable torrenting.",
+    "torrentOnlyBrowseTorrent": "{{name}} only provides .torrent files, which debrid services can't take. You can still browse it, but downloading needs torrenting enabled.",
+    "torrentOnlyDialogEnableTorrenting": "Enable torrenting",
+    "torrentOnlyDialogSetUpDebrid": "Set up debrid",
     "torrentOnlyDialogOpenSettings": "Open Settings",
     "torrentOnlyDialogTitle": "This source uses torrents only",
     "torrentOnlyDialogVpn": "Torrenting exposes your IP to peers — using a VPN is strongly recommended.",

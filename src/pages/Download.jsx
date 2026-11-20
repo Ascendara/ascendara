@@ -1839,6 +1839,15 @@ function PublicDownloadPage() {
         links.some(link => typeof link === "string" && link.trim().length > 0)
     );
 
+  // A torrent-only game keeps its torrent option without a torrent route, so
+  // the panel can explain how to download it instead of showing nothing
+  const torrentOnlyGame = !Object.entries(downloadLinks).some(
+    ([provider, links]) =>
+      provider !== "torrent" &&
+      Array.isArray(links) &&
+      links.some(link => typeof link === "string" && link.length > 0)
+  );
+
   const providers = hasProviders
     ? Object.entries(downloadLinks)
         .filter(([provider, links]) => {
@@ -1849,7 +1858,7 @@ function PublicDownloadPage() {
           );
           if (!hasValidLink) return false;
           if (provider === "torrent") {
-            return canDownloadTorrentLinks(links, settings);
+            return canDownloadTorrentLinks(links, settings) || torrentOnlyGame;
           }
           return true;
         })
@@ -1881,6 +1890,9 @@ function PublicDownloadPage() {
       } else if (ddlProviders.length > 0) {
         setSelectedProvider(ddlProviders[0]);
       } else if (canDownloadTorrentLinks(gameData.download_links.torrent, settings)) {
+        setSelectedProvider("torrent");
+      } else if (availableProviders.includes("torrent")) {
+        // No torrent route yet: the panel explains how to set one up
         setSelectedProvider("torrent");
       } else {
         setSelectedProvider("");
@@ -2109,6 +2121,7 @@ function PublicDownloadPage() {
               }
               debridAvailable={debridAvailable}
               cloudTorrent={cloudTorrentAvailable}
+              magnetAvailable={activeTorrentLinks.some(isMagnetLink)}
               debridPick={debridPick}
               debridPickOptions={debridPickOptions}
               onDebridPickChange={setDebridPick}

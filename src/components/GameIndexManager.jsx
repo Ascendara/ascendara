@@ -202,6 +202,9 @@ const GameIndexManager = ({
   // hosts and the user hasn't enabled torrenting in Settings yet)
   const [torrentWarningOpen, setTorrentWarningOpen] = useState(false);
   const [torrentWarningSource, setTorrentWarningSource] = useState(null);
+  // Debrid only takes magnets, so a source of raw .torrent files needs the local client
+  const torrentWarningDebridUsable =
+    torrentWarningSource?.torrentSupport?.cloudCompatible !== false;
 
   // JSON Import Dialog
   const [showJsonImportDialog, setShowJsonImportDialog] = useState(false);
@@ -805,23 +808,8 @@ const GameIndexManager = ({
       torrentOnly: isSourceMetaTorrentOnly(source) || undefined,
     };
     payload.lastUsed = Date.now();
-
-    // A torrent-only source needs either local torrenting or the selected
-    // debrid service's magnet support before committing the selection.
-    if (isSourceMetaTorrentOnly(payload)) {
-      try {
-        const current = await window.electron.getSettings();
-        if (
-          !canUseTorrentOnlySource(payload, current, { allowUnknownCloud: true })
-        ) {
-          setTorrentWarningSource({ ...payload, blocked: true });
-          setTorrentWarningOpen(true);
-          return;
-        }
-      } catch (e) {
-        console.warn("[LocalRefresh] torrent pre-check failed:", e);
-      }
-    }
+    // Torrent-only sources can be browsed without a torrent route; the sync
+    // below explains how to download from them (maybeWarnTorrentOnly).
 
     // Clear active custom list when picking a regular external source.
     if (activeCustomList) {
@@ -856,16 +844,16 @@ const GameIndexManager = ({
     const now = Date.now();
     const payload = { ...entry, lastUsed: now };
 
+    // Browsing is allowed without a torrent route, but say how to download
     if (payload.torrentOnly) {
       try {
         const current = await window.electron.getSettings();
         if (!canUseTorrentOnlySource(payload, current)) {
-          setTorrentWarningSource({ ...payload, blocked: true });
+          setTorrentWarningSource(payload);
           setTorrentWarningOpen(true);
-          return;
         }
       } catch (e) {
-        console.warn("[LocalRefresh] saved-source torrent pre-check failed:", e);
+        console.warn("[LocalRefresh] saved-source torrent check failed:", e);
       }
     }
 
@@ -2767,9 +2755,13 @@ const GameIndexManager = ({
               </AlertDialogTitle>
               <AlertDialogDescription className="space-y-2 text-muted-foreground">
                 <span className="block">
-                  {t("localRefresh.torrentHandlerRequired", {
-                    name: torrentWarningSource?.name || "This source",
-                  })}
+                  {torrentWarningDebridUsable
+                    ? t("localRefresh.torrentOnlyBrowseDebrid", {
+                        name: torrentWarningSource?.name || "This source",
+                      })
+                    : t("localRefresh.torrentOnlyBrowseTorrent", {
+                        name: torrentWarningSource?.name || "This source",
+                      })}
                 </span>
                 <span className="block rounded-md border border-orange-500/30 bg-orange-500/5 p-2 text-xs text-orange-700 dark:text-orange-300">
                   {t("localRefresh.torrentOnlyDialogVpn") ||
@@ -2782,7 +2774,11 @@ const GameIndexManager = ({
                 {t("localRefresh.torrentOnlyDialogLater") || "Not now"}
               </AlertDialogCancel>
               <AlertDialogAction
-                className="bg-orange-500 text-white hover:bg-orange-600"
+                className={
+                  torrentWarningDebridUsable
+                    ? "border border-border bg-transparent text-foreground hover:bg-muted"
+                    : "bg-orange-500 text-white hover:bg-orange-600"
+                }
                 onClick={() => {
                   setTorrentWarningOpen(false);
                   navigate("/settings", {
@@ -2790,8 +2786,21 @@ const GameIndexManager = ({
                   });
                 }}
               >
-                {t("localRefresh.torrentOnlyDialogOpenSettings") || "Open Settings"}
+                {t("localRefresh.torrentOnlyDialogEnableTorrenting")}
               </AlertDialogAction>
+              {torrentWarningDebridUsable && (
+                <AlertDialogAction
+                  className="text-secondary"
+                  onClick={() => {
+                    setTorrentWarningOpen(false);
+                    navigate("/settings", {
+                      state: { scrollTo: "debrid-services", category: "debrid" },
+                    });
+                  }}
+                >
+                  {t("localRefresh.torrentOnlyDialogSetUpDebrid")}
+                </AlertDialogAction>
+              )}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

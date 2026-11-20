@@ -20,10 +20,7 @@ test("local torrent capability depends only on the Ascendara torrent toggle", as
     torrentPassword: "unused",
   };
   assert.equal(
-    canDownloadTorrentLinks(
-      ["https://example.test/game.torrent"],
-      legacyQbitSettings
-    ),
+    canDownloadTorrentLinks(["https://example.test/game.torrent"], legacyQbitSettings),
     true,
     "legacy qBittorrent connection settings must not gate the built-in client"
   );
@@ -33,10 +30,7 @@ test("torrent source links accept magnets and .torrent URLs", async () => {
   const { canDownloadTorrentLinks } = await capability;
   const local = { torrentEnabled: true };
 
-  assert.equal(
-    canDownloadTorrentLinks(["magnet:?xt=urn:btih:test"], local),
-    true
-  );
+  assert.equal(canDownloadTorrentLinks(["magnet:?xt=urn:btih:test"], local), true);
   assert.equal(
     canDownloadTorrentLinks(["https://example.test/game.torrent"], local),
     true
@@ -45,14 +39,8 @@ test("torrent source links accept magnets and .torrent URLs", async () => {
     canDownloadTorrentLinks(["https://example.test/game.torrent?download=1"], local),
     true
   );
-  assert.equal(
-    canDownloadTorrentLinks(["https://example.test/game.zip"], local),
-    false
-  );
-  assert.equal(
-    canDownloadTorrentLinks(["https://example.test/game.torrent"], {}),
-    false
-  );
+  assert.equal(canDownloadTorrentLinks(["https://example.test/game.zip"], local), false);
+  assert.equal(canDownloadTorrentLinks(["https://example.test/game.torrent"], {}), false);
 
   const cloudOnly = {
     debridEnabled: true,
@@ -72,11 +60,8 @@ test("torrent source links accept magnets and .torrent URLs", async () => {
 });
 
 test("synced torrent-only sources persist link-level cloud coverage", async () => {
-  const {
-    analyzeTorrentSource,
-    withTorrentSourceCapabilities,
-    canUseTorrentOnlySource,
-  } = await capability;
+  const { analyzeTorrentSource, withTorrentSourceCapabilities, canUseTorrentOnlySource } =
+    await capability;
 
   const rawOnlyGames = [
     { download_links: { torrent: ["https://example.test/a.torrent"] } },
@@ -128,10 +113,7 @@ test("synced torrent-only sources persist link-level cloud coverage", async () =
     { download_links: { torrent: ["magnet:?xt=urn:btih:a"] } },
     {
       download_links: {
-        torrent: [
-          "https://example.test/b.torrent",
-          "magnet:?xt=urn:btih:b",
-        ],
+        torrent: ["https://example.test/b.torrent", "magnet:?xt=urn:btih:b"],
       },
     },
   ];
@@ -181,20 +163,14 @@ test("cloud torrent capability remains independent from local torrenting", async
     torrentEnabled: false,
   };
   assert.equal(localTorrentEnabled(torbox), false);
-  assert.equal(
-    canDownloadTorrentLinks(["magnet:?xt=urn:btih:torbox"], torbox),
-    true
-  );
+  assert.equal(canDownloadTorrentLinks(["magnet:?xt=urn:btih:torbox"], torbox), true);
 
   const realDebrid = {
     debridEnabled: true,
     realDebridApiKey: "rd",
     torrentEnabled: false,
   };
-  assert.equal(
-    canDownloadTorrentLinks(["magnet:?xt=urn:btih:rd"], realDebrid),
-    true
-  );
+  assert.equal(canDownloadTorrentLinks(["magnet:?xt=urn:btih:rd"], realDebrid), true);
 
   assert.equal(
     canDownloadTorrentLinks(["magnet:?xt=urn:btih:rd"], {
@@ -202,84 +178,5 @@ test("cloud torrent capability remains independent from local torrenting", async
       useRealDebridForTorrents: false,
     }),
     false
-  );
-});
-
-test("active torrent-only sources keep at least one usable local or cloud route", async () => {
-  const { wouldDisableActiveTorrentSource } = await capability;
-  const source = {
-    name: "Cloud-compatible source",
-    torrentOnly: true,
-    torrentSupport: {
-      hasMagnet: true,
-      hasTorrentFile: false,
-      cloudCompatible: true,
-    },
-  };
-  const current = {
-    customSourcesMode: true,
-    customSource: source,
-    torrentEnabled: false,
-    debridEnabled: true,
-    torboxApiKey: "tb",
-    useTorboxForTorrents: true,
-    debridProviderEnabled: {},
-  };
-
-  assert.equal(
-    wouldDisableActiveTorrentSource(current, { ...current, debridEnabled: false }),
-    true,
-    "the debrid master switch cannot remove the last torrent route"
-  );
-  assert.equal(
-    wouldDisableActiveTorrentSource(current, {
-      ...current,
-      debridProviderEnabled: { torbox: false },
-    }),
-    true,
-    "pausing the only cloud torrent provider cannot remove the last route"
-  );
-  assert.equal(
-    wouldDisableActiveTorrentSource(current, { ...current, torboxApiKey: "" }),
-    true,
-    "disconnecting the only cloud torrent provider cannot remove the last route"
-  );
-  assert.equal(
-    wouldDisableActiveTorrentSource(current, {
-      ...current,
-      useTorboxForTorrents: false,
-    }),
-    true,
-    "turning off magnet handling on the only cloud provider cannot remove the last route"
-  );
-
-  const withBackupProvider = {
-    ...current,
-    realDebridApiKey: "rd",
-    useRealDebridForTorrents: true,
-  };
-  assert.equal(
-    wouldDisableActiveTorrentSource(withBackupProvider, {
-      ...withBackupProvider,
-      debridProviderEnabled: { torbox: false },
-    }),
-    false,
-    "one cloud provider may be disabled when another usable provider remains"
-  );
-  assert.equal(
-    wouldDisableActiveTorrentSource(
-      { ...current, torrentEnabled: true },
-      { ...current, torrentEnabled: true, debridEnabled: false }
-    ),
-    false,
-    "cloud routes may be disabled while the local built-in torrent client remains enabled"
-  );
-  assert.equal(
-    wouldDisableActiveTorrentSource(
-      { ...current, customSourcesMode: false },
-      { ...current, customSourcesMode: false, debridEnabled: false }
-    ),
-    false,
-    "inactive custom sources do not constrain unrelated settings"
   );
 });

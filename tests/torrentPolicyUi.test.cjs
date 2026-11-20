@@ -3,24 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const read = relative =>
-  fs.readFileSync(path.join(__dirname, "..", relative), "utf8");
-
-test("Debrid settings route destructive torrent changes through the shared source guard", () => {
-  const source = read("src/components/DebridSettings.jsx");
-
-  assert.match(
-    source,
-    /function Overview\([^)]*\)\s*\{\s*const \{ settings, setSettings \} = useTorrentSafeSettings\(\)/
-  );
-  assert.match(
-    source,
-    /function ServiceCard\([^)]*\)\s*\{\s*const \{ settings, setSettings \} = useTorrentSafeSettings\(\)/
-  );
-  assert.match(source, /wouldDisableActiveTorrentSource\(current, next\)/);
-  assert.match(source, /const disconnected = await setSettings/);
-  assert.match(source, /if \(!disconnected\) return;/);
-});
+const read = relative => fs.readFileSync(path.join(__dirname, "..", relative), "utf8");
 
 test("Downloads surfaces expose a disabled-torrent queue block instead of generic waiting", () => {
   const downloads = read("src/pages/Downloads.jsx");

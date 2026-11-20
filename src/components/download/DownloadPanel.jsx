@@ -14,6 +14,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { MAGIC_LINK_PROVIDERS, VERIFIED_PROVIDERS } from "@/config/providers";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowDownCircle,
@@ -266,6 +267,7 @@ export default function DownloadPanel({
   debridProvider,
   debridAvailable,
   cloudTorrent,
+  magnetAvailable,
   debridPick,
   debridPickOptions,
   onDebridPickChange,
@@ -291,6 +293,7 @@ export default function DownloadPanel({
   countdownEndsAt,
 }) {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const countdown = useCountdown(linkStage === "countdown" ? countdownEndsAt : null);
   const [showMagicInfo, setShowMagicInfo] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
@@ -525,8 +528,36 @@ export default function DownloadPanel({
           {/* Torrent flows */}
           {isTorrentMode && !cloudTorrent && !settings.torrentEnabled && (
             <Notice>
-              {t("download.toast.torrentDisabled") ||
-                "Enable torrenting in Settings to download this game."}
+              {/* Debrid only takes magnets, so raw .torrent files need the local client */}
+              <span className="block">
+                {magnetAvailable
+                  ? t("download.torrentNeedsRoute")
+                  : t("download.toast.torrentDisabled")}
+              </span>
+              <span className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+                {magnetAvailable && (
+                  <button
+                    type="button"
+                    className="font-medium underline-offset-2 hover:underline"
+                    onClick={() =>
+                      navigate("/settings", {
+                        state: { scrollTo: "debrid-services", category: "debrid" },
+                      })
+                    }
+                  >
+                    {t("download.setUpDebrid")}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="font-medium underline-offset-2 hover:underline"
+                  onClick={() =>
+                    navigate("/settings", { state: { scrollTo: "torrent-downloads" } })
+                  }
+                >
+                  {t("download.enableTorrenting")}
+                </button>
+              </span>
             </Notice>
           )}
           {isTorrentMode && cloudTorrent && (

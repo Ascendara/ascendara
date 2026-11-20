@@ -20,9 +20,7 @@ export function isSourceMetaTorrentOnly(source) {
     : null;
   if (!options || options.length === 0) return false;
 
-  return options.every(
-    option => String(option?.name || "").toLowerCase() === "torrent"
-  );
+  return options.every(option => String(option?.name || "").toLowerCase() === "torrent");
 }
 
 export function analyzeTorrentSource(games) {
@@ -74,14 +72,10 @@ export function analyzeTorrentSource(games) {
 
   return {
     known: linkedGames > 0,
-    torrentOnly:
-      linkedGames > 0 &&
-      torrentGames === linkedGames &&
-      !hasNonTorrentLinks,
+    torrentOnly: linkedGames > 0 && torrentGames === linkedGames && !hasNonTorrentLinks,
     hasMagnet,
     hasTorrentFile,
-    cloudCompatible:
-      torrentGames > 0 && cloudCoveredTorrentGames === torrentGames,
+    cloudCompatible: torrentGames > 0 && cloudCoveredTorrentGames === torrentGames,
   };
 }
 
@@ -126,15 +120,4 @@ export function canUseTorrentOnlySource(
   }
 
   return source.torrentSupport.cloudCompatible === true;
-}
-
-export function wouldDisableActiveTorrentSource(currentSettings, nextSettings) {
-  const source =
-    currentSettings?.customSourcesMode === true ? currentSettings.customSource : null;
-  if (!source?.torrentOnly) return false;
-
-  return (
-    canUseTorrentOnlySource(source, currentSettings) &&
-    !canUseTorrentOnlySource(source, nextSettings)
-  );
 }
