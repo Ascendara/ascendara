@@ -631,13 +631,13 @@ function PublicDownloadPage() {
     }
     let cancelled = false;
     gameService
-      .findSourceEntries(gameData.game)
+      .findSourceEntries(gameData.groupKey || gameData.game)
       .then(entries => !cancelled && setSourceEntries(entries))
       .catch(error => console.error("Error finding other sources:", error));
     return () => {
       cancelled = true;
     };
-  }, [gameData?.game, settings.customSourcesMode]);
+  }, [gameData?.game, gameData?.groupKey, settings.customSourcesMode]);
 
   const handleSourceSelect = entry => {
     setLatestGameData(null);

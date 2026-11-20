@@ -3,6 +3,12 @@ import { SEAMLESS_PROVIDERS } from "@/config/providers";
 import { API_URL } from "@/config/api";
 import { activePrivateSourceIds } from "@/lib/activePrivateSources";
 import {
+  groupCatalogGames,
+  normalizeCatalogTitle,
+  titlesMatch,
+  titlesMatchNormalized,
+} from "@/lib/catalogMatch";
+import {
   activeExternalSources,
   combinedSourceKey,
   orderedSources,
@@ -23,6 +29,10 @@ const UPDATE_CHECK_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 const UPDATE_CHECK_RETRY_DELAY = 60 * 1000; // wait before retrying a failed check
 const UPDATE_CHECK_FAILED = Symbol("update-check-failed");
 const updateCheckCache = new Map(); // "gameID|version" -> { result, expires }
+
+// Multi-entry groups from the last catalog load, keyed by normalized title.
+// Used by findSourceEntries so old versions stay reachable from the Sources UI.
+let sourceEntryGroups = new Map();
 
 // Memory cache to avoid localStorage reads
 let inFlightLoad = null;
@@ -349,11 +359,17 @@ const gameService = {
       return data;
     }
 
+    // From here on the catalog comes from a single source (or the index), so
+    // any groups from the previous combined load no longer apply.
+    sourceEntryGroups = new Map();
+
     // Custom Sources Mode: fetch directly from a Hydra-compatible JSON source.
     // No local index, no images, no Python scraper - just fetch + map + cache.
     if (activeCustomUrl) {
       try {
-        const data = await this._loadCustomSourceData(customSource);
+        const data = this._groupCatalogData(
+          await this._loadCustomSourceData(customSource)
+        );
         await this.updateCache(data, false, null, activeCustomUrl);
         return data;
       } catch (error) {
@@ -504,7 +520,7 @@ const gameService = {
     const failed = [];
     let officialData = null;
     // Official games keep the index's categories, covers and ranking
-    const games = results.flatMap((result, rank) => {
+    const flatGames = results.flatMap((result, rank) => {
       const entry = entries[rank];
       if (result.status === "rejected") {
         if (entry.official) {
@@ -518,6 +534,11 @@ const gameService = {
       if (entry.official) officialData = result.value;
       return (result.value?.games || []).map(game => ({ ...game, sourceRank: rank }));
     });
+    // Editions, extras and patch versions of one game become a single card.
+    // Older versions remain listed under the game's sources on the download page.
+    const grouped = groupCatalogGames(flatGames);
+    sourceEntryGroups = grouped.groups;
+    const games = grouped.games;
     const sources = entries.filter(e => !e.official).map(e => e.source);
     return {
       games,
@@ -531,6 +552,21 @@ const gameService = {
         failedSources: failed,
         games: games.length,
       },
+    };
+  },
+
+  /**
+   * Collapse a single source's patch/edition entries onto one card per game.
+   * The multi-entry groups feed findSourceEntries on the download page.
+   */
+  _groupCatalogData(data) {
+    if (!Array.isArray(data?.games)) return data;
+    const grouped = groupCatalogGames(data.games);
+    sourceEntryGroups = grouped.groups;
+    return {
+      ...data,
+      games: grouped.games,
+      metadata: { ...(data.metadata || {}), games: grouped.games.length },
     };
   },
 
@@ -701,10 +737,12 @@ const gameService = {
     }
     const label =
       customSource?.name || customSource?.title || customSource?.label || "Custom";
-    const data = this._mapAndCacheHydraJson(parsed, {
-      url: customSource.url,
-      label,
-    });
+    const data = this._groupCatalogData(
+      this._mapAndCacheHydraJson(parsed, {
+        url: customSource.url,
+        label,
+      })
+    );
     // Persist the raw JSON to disk so it survives cache clears and future
     // loads don't attempt a network fetch.
     await persistUserProvidedJson(customSource.url, parsed);
@@ -728,7 +766,7 @@ const gameService = {
     if (!customSource?.url) {
       throw new Error("No custom source is selected");
     }
-    const data = await this._loadCustomSourceData(customSource, {
+    let data = await this._loadCustomSourceData(customSource, {
       force: true,
       refetch: true,
     });
@@ -736,6 +774,7 @@ const gameService = {
       // The combined catalog is rebuilt from each source's fresh cache
       this.clearMemoryCache();
     } else {
+      data = this._groupCatalogData(data);
       await this.updateCache(data, false, null, customSource.url);
     }
     // Clear legacy caches so Search.jsx reloads fresh data
@@ -864,10 +903,7 @@ const gameService = {
   },
 
   normalizeForMatch(name) {
-    return cleanHydraTitle(name || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim();
+    return normalizeCatalogTitle(name || "");
   },
 
   async findCatalogMatch(name) {
@@ -885,16 +921,24 @@ const gameService = {
 
   /**
    * Every entry for this game across the sources in use, so the details page
-   * can switch between them. Empty unless more than one source carries it.
+   * can switch between them. Empty unless more than one source/version carries it.
    */
   async findSourceEntries(name) {
     const target = this.normalizeForMatch(name);
     if (!target) return [];
     const { games } = await this.getCachedData();
     if (!Array.isArray(games)) return [];
-    const entries = games.filter(game => this.normalizeForMatch(game.game) === target);
-    const sources = new Set(entries.map(game => game.customSource || ""));
-    return sources.size > 1 ? entries : [];
+
+    const grouped = sourceEntryGroups.get(target);
+    if (grouped) return grouped.length > 1 ? grouped : [];
+    for (const [key, entries] of sourceEntryGroups) {
+      if (titlesMatchNormalized(key, target)) {
+        return entries.length > 1 ? entries : [];
+      }
+    }
+
+    const entries = games.filter(game => titlesMatch(game.game || game.name || "", name));
+    return entries.length > 1 ? entries : [];
   },
 
   async getGamesByCategory(category) {
@@ -936,6 +980,7 @@ const gameService = {
     inFlightLoad = null;
     // Index-based update answers depend on the index that is being swapped out
     updateCheckCache.clear();
+    sourceEntryGroups = new Map();
     memoryCache = {
       games: null,
       metadata: null,
