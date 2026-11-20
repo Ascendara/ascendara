@@ -1,0 +1,26 @@
+{
+  "name": "Compact Mode",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Makes text, spacing and game cards smaller so more fits on screen.",
+  "details": "Useful on small or low-resolution screens. Pick how compact in this plugin's options. A few fixed-size parts, like the title bar, keep their size.",
+  "affects": ["Scales down text, spacing and cards across Ascendara"],
+  "license": "MIT",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js",
+  "settings": [
+    {
+      "key": "scale",
+      "type": "select",
+      "label": "Size",
+      "default": "90",
+      "options": [
+        { "value": "95", "label": "Slightly smaller (95%)" },
+        { "value": "90", "label": "Compact (90%)" },
+        { "value": "85", "label": "More compact (85%)" },
+        { "value": "80", "label": "Most compact (80%)" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "name": "Run With",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Start games through another program, like a mod launcher or injector.",
+  "details": "Set the program and its arguments in this plugin's options, and \"Run with ...\" appears in every game's Manage menu. In the arguments, {exe} becomes the game's executable and {dir} its folder, for example: --launch \"{exe}\". Playtime and the game's running state aren't tracked when a game is started this way.",
+  "affects": ["Adds \"Run with ...\" to the Manage menu on a game's page"],
+  "license": "MIT",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js",
+  "permissions": ["processes"],
+  "settings": [
+    {
+      "key": "tool",
+      "type": "text",
+      "label": "Program",
+      "description": "Full path to the program that starts the game.",
+      "placeholder": "C:\\Tools\\Launcher\\launcher.exe"
+    },
+    {
+      "key": "args",
+      "type": "text",
+      "label": "Arguments",
+      "description": "{exe} is the game's executable, {dir} its folder.",
+      "default": "\"{exe}\""
+    },
+    {
+      "key": "label",
+      "type": "text",
+      "label": "Menu name",
+      "description": "Shown as \"Run with <name>\". Leave empty to use the program's name."
+    },
+    {
+      "key": "toolFolder",
+      "type": "boolean",
+      "label": "Start in the program's folder instead of the game's"
+    }
+  ]
+}

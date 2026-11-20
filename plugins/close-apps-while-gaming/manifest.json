@@ -1,0 +1,35 @@
+{
+  "name": "Close Apps While Gaming",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Closes programs you pick when a game starts, and opens them again afterwards. Windows only.",
+  "details": "Frees up memory and CPU for the game. List the programs in this plugin's options, like chrome.exe, Spotify.exe. They're asked to close normally, the same as clicking X, unless you turn on force closing. Programs that hide in the tray instead of closing, like Discord, need force closing. They reopen when the last game started from Ascendara closes.",
+  "affects": ["Closes and reopens the programs you list around play sessions"],
+  "license": "MIT",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js",
+  "permissions": ["processes"],
+  "settings": [
+    {
+      "key": "programs",
+      "type": "text",
+      "label": "Programs to close",
+      "description": "Separate names with commas.",
+      "placeholder": "chrome.exe, Spotify.exe"
+    },
+    {
+      "key": "force",
+      "type": "boolean",
+      "label": "Force close",
+      "description": "Unsaved work in these programs is lost.",
+      "default": false
+    },
+    {
+      "key": "reopen",
+      "type": "boolean",
+      "label": "Reopen them when the game closes",
+      "default": true
+    }
+  ]
+}

@@ -2,6 +2,248 @@
   "schema": 1,
   "plugins": [
     {
+      "id": "close-apps-while-gaming",
+      "name": "Close Apps While Gaming",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Closes programs you pick when a game starts, and opens them again afterwards. Windows only.",
+      "details": "Frees up memory and CPU for the game. List the programs in this plugin's options, like chrome.exe, Spotify.exe. They're asked to close normally, the same as clicking X, unless you turn on force closing. Programs that hide in the tray instead of closing, like Discord, need force closing. They reopen when the last game started from Ascendara closes.",
+      "affects": [
+        "Closes and reopens the programs you list around play sessions"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "",
+      "minAppVersion": "12.3.2",
+      "apiVersion": 1,
+      "permissions": [
+        "processes"
+      ],
+      "settings": [
+        {
+          "key": "programs",
+          "type": "text",
+          "label": "Programs to close",
+          "description": "Separate names with commas.",
+          "default": "",
+          "placeholder": "chrome.exe, Spotify.exe"
+        },
+        {
+          "key": "force",
+          "type": "boolean",
+          "label": "Force close",
+          "description": "Unsaved work in these programs is lost.",
+          "default": false
+        },
+        {
+          "key": "reopen",
+          "type": "boolean",
+          "label": "Reopen them when the game closes",
+          "description": "",
+          "default": true
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "96eccfdd2be6f34c33a7a6a993083557f6722819bbb5d5ac24b7f355acd1016d",
+          "size": 3066
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "edbeb4c23c9beae724207194edfe6e3520a5776281e6eea27cb1245543ea9dd9",
+          "size": 1288
+        }
+      ]
+    },
+    {
+      "id": "compact-mode",
+      "name": "Compact Mode",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Makes text, spacing and game cards smaller so more fits on screen.",
+      "details": "Useful on small or low-resolution screens. Pick how compact in this plugin's options. A few fixed-size parts, like the title bar, keep their size.",
+      "affects": [
+        "Scales down text, spacing and cards across Ascendara"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "",
+      "minAppVersion": "12.3.2",
+      "apiVersion": 1,
+      "permissions": [],
+      "settings": [
+        {
+          "key": "scale",
+          "type": "select",
+          "label": "Size",
+          "description": "",
+          "options": [
+            {
+              "value": "95",
+              "label": "Slightly smaller (95%)"
+            },
+            {
+              "value": "90",
+              "label": "Compact (90%)"
+            },
+            {
+              "value": "85",
+              "label": "More compact (85%)"
+            },
+            {
+              "value": "80",
+              "label": "Most compact (80%)"
+            }
+          ],
+          "default": "90"
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "3c1e28697885d43f1c778466f6f01e804fdd11b459ec77d5222965bf3bb07560",
+          "size": 507
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "9e739e532cc13c0e190fe3572a7c80ac81a81d46bedb13af402669f872e5b5c6",
+          "size": 864
+        }
+      ]
+    },
+    {
+      "id": "dxvk",
+      "name": "DXVK",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Install DXVK into a game from its Manage menu, to fix stutter and crashes in older games. Windows only.",
+      "details": "DXVK runs Direct3D 8, 9, 10 and 11 games on Vulkan. It often fixes stutter, crashes and low frame rates in older games, especially on AMD and Intel graphics. Pick the game's Direct3D version and whether it's 32 or 64-bit in this plugin's options, then use \"Install DXVK\" on the game's page. Files the game already had are backed up, and \"Remove DXVK\" puts them back. DXVK is downloaded from its official GitHub releases the first time it's used. Needs a graphics card with Vulkan support. Don't use it in online games with anti-cheat.",
+      "affects": [
+        "Adds \"Install DXVK\" and \"Remove DXVK\" to the Manage menu",
+        "Copies DXVK's DLLs into the game's folder when you install it"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "https://github.com/doitsujin/dxvk",
+      "minAppVersion": "12.3.2",
+      "apiVersion": 1,
+      "permissions": [
+        "downloads",
+        "processes"
+      ],
+      "settings": [
+        {
+          "key": "api",
+          "type": "select",
+          "label": "The game's Direct3D version",
+          "description": "Check the game's store page or PCGamingWiki if you're not sure.",
+          "options": [
+            {
+              "value": "d3d11",
+              "label": "Direct3D 10 or 11"
+            },
+            {
+              "value": "d3d9",
+              "label": "Direct3D 9"
+            },
+            {
+              "value": "d3d8",
+              "label": "Direct3D 8"
+            }
+          ],
+          "default": "d3d11"
+        },
+        {
+          "key": "arch",
+          "type": "select",
+          "label": "The game is",
+          "description": "",
+          "options": [
+            {
+              "value": "x64",
+              "label": "64-bit"
+            },
+            {
+              "value": "x32",
+              "label": "32-bit"
+            }
+          ],
+          "default": "x64"
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "0c7b9faa0ae4c62115daa529a2012120884025894b126af18d3a9b5d37f4b8bf",
+          "size": 4130
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "02419eb6e5c37d40bdbeec006e0cd9695956e9fbd531f6a348d7eb9cac2de84f",
+          "size": 1743
+        }
+      ]
+    },
+    {
+      "id": "gaming-power-plan",
+      "name": "Gaming Power Plan",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Switches Windows to High performance while you play, then back. Windows only.",
+      "details": "Laptops and power-saving plans can hold the CPU back in games. While a game started from Ascendara is running, this switches to the power plan you pick, and goes back to your usual plan when the last game closes. Ultimate Performance only exists if it was added to Windows, and other plans can be picked by their GUID.",
+      "affects": [
+        "Changes the Windows power plan while a game is running"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "",
+      "minAppVersion": "12.3.2",
+      "apiVersion": 1,
+      "permissions": [
+        "processes"
+      ],
+      "settings": [
+        {
+          "key": "plan",
+          "type": "select",
+          "label": "Power plan while playing",
+          "description": "",
+          "options": [
+            {
+              "value": "high",
+              "label": "High performance"
+            },
+            {
+              "value": "ultimate",
+              "label": "Ultimate Performance"
+            }
+          ],
+          "default": "high"
+        },
+        {
+          "key": "customGuid",
+          "type": "text",
+          "label": "Or use this power plan GUID",
+          "description": "For other plans. Run \"powercfg /list\" in a terminal to see their GUIDs.",
+          "default": "",
+          "placeholder": "381b4222-f694-41f0-9685-ff5bb260df2e"
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "21ff641c753ab48a4268dd7bfd2e11d1319a93c40125355c6931367aee4d2519",
+          "size": 3063
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "998885c706944404d07f35fda0a192e5e6eab0ca4e54be28ea0a78b11c786d55",
+          "size": 1266
+        }
+      ]
+    },
+    {
       "id": "hide-ascend-nav",
       "name": "Hide Ascend",
       "version": "1.0.0",
@@ -17,6 +259,7 @@
       "minAppVersion": "",
       "apiVersion": 1,
       "permissions": [],
+      "settings": [],
       "files": [
         {
           "path": "index.js",
@@ -27,6 +270,484 @@
           "path": "manifest.json",
           "sha256": "57832687d4ecefe6b03530edf856bc92c64992e4f477fb2ba05bfbbc173a00f1",
           "size": 411
+        }
+      ]
+    },
+    {
+      "id": "hide-menubar-badges",
+      "name": "Hide Title Bar Badges",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Choose which badges show next to the Ascendara name, like \"Torrenting is enabled - use VPN\".",
+      "details": "Pick the badges to hide in this plugin's options. They come back when the plugin is turned off. Only the badges are hidden: torrenting, Big Picture and everything else keep working. Update and connection badges always stay visible.",
+      "affects": [
+        "Hides the title bar badges you choose"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "",
+      "minAppVersion": "12.3.2",
+      "apiVersion": 1,
+      "permissions": [],
+      "settings": [
+        {
+          "key": "torrent-warning",
+          "type": "boolean",
+          "label": "Hide \"Torrenting is enabled - use VPN\"",
+          "description": "Using a VPN is still recommended while torrenting.",
+          "default": true
+        },
+        {
+          "key": "big-picture",
+          "type": "boolean",
+          "label": "Hide \"Big Picture\"",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "public-testing",
+          "type": "boolean",
+          "label": "Hide \"Public Testing\"",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "experimental",
+          "type": "boolean",
+          "label": "Hide \"Experimental\"",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "dev",
+          "type": "boolean",
+          "label": "Hide \"Running in development\"",
+          "description": "",
+          "default": false
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "c5ac999bf86dcfe5586c1d455408c23c39c2a45421914a6fae615e303904f383",
+          "size": 776
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "ea0ae30ced47798b03e30b495a41aaa9943682607d2a05e81d0946dfa357f74f",
+          "size": 1174
+        }
+      ]
+    },
+    {
+      "id": "hide-nav-items",
+      "name": "Hide Navigation Items",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Choose which buttons show in the navigation bar.",
+      "details": "Pick the buttons to hide in this plugin's options, for a shorter navigation bar. Only the buttons are hidden: the pages keep working. Home and Settings always stay visible so you can't lock yourself out.",
+      "affects": [
+        "Hides the navigation bar buttons you choose"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "",
+      "minAppVersion": "12.3.2",
+      "apiVersion": 1,
+      "permissions": [],
+      "settings": [
+        {
+          "key": "search",
+          "type": "boolean",
+          "label": "Hide Search",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "library",
+          "type": "boolean",
+          "label": "Hide Library",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "downloads",
+          "type": "boolean",
+          "label": "Hide Downloads",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "debridDownloads",
+          "type": "boolean",
+          "label": "Hide Debrid Downloads",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "profile",
+          "type": "boolean",
+          "label": "Hide Profile",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "ascend",
+          "type": "boolean",
+          "label": "Hide Ascend",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "workshop",
+          "type": "boolean",
+          "label": "Hide Workshop Downloader",
+          "description": "",
+          "default": false
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "80a88e411777aea6cc80a89a24795023838b3ce837870685cf002c5b3c57e890",
+          "size": 923
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "f715562cf063e71241ac8024b386d123c382924f489a777489f8d0f3a34c148d",
+          "size": 1061
+        }
+      ]
+    },
+    {
+      "id": "hide-store-card-details",
+      "name": "Hide Store Card Details",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Choose what game cards in Search show, like ratings, views or tags.",
+      "details": "For a cleaner store. Pick the details to hide in this plugin's options. The game page still shows everything.",
+      "affects": [
+        "Hides the game card details you choose in Search"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "",
+      "minAppVersion": "12.3.2",
+      "apiVersion": 1,
+      "permissions": [],
+      "settings": [
+        {
+          "key": "rating",
+          "type": "boolean",
+          "label": "Hide ratings",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "views",
+          "type": "boolean",
+          "label": "Hide view counts",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "features",
+          "type": "boolean",
+          "label": "Hide DLC, online and story labels",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "tags",
+          "type": "boolean",
+          "label": "Hide genre tags",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "specs",
+          "type": "boolean",
+          "label": "Hide size, version and update date",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "source",
+          "type": "boolean",
+          "label": "Hide the source label",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "verified",
+          "type": "boolean",
+          "label": "Hide the verified badge",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "recently-updated",
+          "type": "boolean",
+          "label": "Hide \"Recently updated\"",
+          "description": "",
+          "default": false
+        },
+        {
+          "key": "mac-compat",
+          "type": "boolean",
+          "label": "Hide Mac compatibility",
+          "description": "",
+          "default": false
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "69ba8354cc4cb757d303599d663424f222f927904d9de41fbe2456fcdbe4a72b",
+          "size": 809
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "0b69059aa7541647dfbd3c6204143a07c04693c6efedfbb3cdbf30ee9ba249e1",
+          "size": 1267
+        }
+      ]
+    },
+    {
+      "id": "open-save-folder",
+      "name": "Save Folder",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Adds \"Open save folder\" and \"Copy executable path\" to a game's Manage menu.",
+      "details": "Finds where a game keeps its saves by its Steam App ID, in the same places the achievement tracker looks: GSE Saves, Goldberg, CODEX, RUNE, OnlineFix, EMPRESS and others. Handy for backing up saves by hand or moving them between PCs.",
+      "affects": [
+        "Adds two items to the Manage menu on a game's page"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "",
+      "minAppVersion": "12.3.2",
+      "apiVersion": 1,
+      "permissions": [],
+      "settings": [],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "7e7ac6db24ea6af3abaee94a3af641fc81afa9e5aa93bc301a1c64a2521bb517",
+          "size": 1872
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "2dbbae8116a7ef1a5cb294ea87284915716b90d7f23ecef0a69681668dd0af6e",
+          "size": 579
+        }
+      ]
+    },
+    {
+      "id": "pause-downloads-while-playing",
+      "name": "Pause Downloads While Playing",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Pauses game downloads while you play, and resumes them when you stop.",
+      "details": "Downloading in the background can cause lag in online games and stutter while the disk is busy. When a game started from Ascendara launches, running downloads are paused. They resume when the last running game closes. Downloads you paused yourself are left alone.",
+      "affects": [
+        "Pauses and resumes your game downloads around play sessions"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "",
+      "minAppVersion": "12.3.2",
+      "apiVersion": 1,
+      "permissions": [
+        "manageDownloads"
+      ],
+      "settings": [
+        {
+          "key": "autoResume",
+          "type": "boolean",
+          "label": "Resume downloads when the game closes",
+          "description": "",
+          "default": true
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "fdf48e6123adbe307b8d476fd26860da2ce14e250a88f6ceb9ff9383d90e6314",
+          "size": 2569
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "1ad2712a66424bce5dc5c5226814978f2f046f8f860b76622a4afe8201be24f5",
+          "size": 827
+        }
+      ]
+    },
+    {
+      "id": "run-with",
+      "name": "Run With",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Start games through another program, like a mod launcher or injector.",
+      "details": "Set the program and its arguments in this plugin's options, and \"Run with ...\" appears in every game's Manage menu. In the arguments, {exe} becomes the game's executable and {dir} its folder, for example: --launch \"{exe}\". Playtime and the game's running state aren't tracked when a game is started this way.",
+      "affects": [
+        "Adds \"Run with ...\" to the Manage menu on a game's page"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "",
+      "minAppVersion": "12.3.2",
+      "apiVersion": 1,
+      "permissions": [
+        "processes"
+      ],
+      "settings": [
+        {
+          "key": "tool",
+          "type": "text",
+          "label": "Program",
+          "description": "Full path to the program that starts the game.",
+          "default": "",
+          "placeholder": "C:\\Tools\\Launcher\\launcher.exe"
+        },
+        {
+          "key": "args",
+          "type": "text",
+          "label": "Arguments",
+          "description": "{exe} is the game's executable, {dir} its folder.",
+          "default": "\"{exe}\"",
+          "placeholder": ""
+        },
+        {
+          "key": "label",
+          "type": "text",
+          "label": "Menu name",
+          "description": "Shown as \"Run with <name>\". Leave empty to use the program's name.",
+          "default": "",
+          "placeholder": ""
+        },
+        {
+          "key": "toolFolder",
+          "type": "boolean",
+          "label": "Start in the program's folder instead of the game's",
+          "description": "",
+          "default": false
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "b90700d56019662eb5b6d03fcc876469bb0021e1c39401f999ae41043588c66a",
+          "size": 1752
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "af68e267430d1f8c0dd951425ffea16acb22223c4faa84097c01af1fd5781aa6",
+          "size": 1412
+        }
+      ]
+    },
+    {
+      "id": "save-backups",
+      "name": "Save Backups",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Backs up a game's saves every time it closes, and keeps the newest copies.",
+      "details": "When a game closes, its save folder is zipped into this plugin's folder. The save folder is found by the game's Steam App ID, the same way the achievement tracker finds it. Use \"Open save backups\" in a game's Manage menu to get to the backups, and unzip one into the save folder to restore it. Uses the tar program built into Windows 10 and newer, macOS and Linux.",
+      "affects": [
+        "Copies save folders into this plugin's folder when a game closes",
+        "Adds \"Back up saves now\" and \"Open save backups\" to the Manage menu"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "",
+      "minAppVersion": "12.3.2",
+      "apiVersion": 1,
+      "permissions": [
+        "processes"
+      ],
+      "settings": [
+        {
+          "key": "keep",
+          "type": "number",
+          "label": "Backups to keep per game",
+          "description": "",
+          "default": 5,
+          "min": 1,
+          "max": 50
+        },
+        {
+          "key": "notify",
+          "type": "boolean",
+          "label": "Show a message after each automatic backup",
+          "description": "",
+          "default": false
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "260cc36e0b5d92855552393e5530af3e87db56187328071487d02821275f1481",
+          "size": 3636
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "fa06b3acb2b13c9aeb825207f0e80077b508257285ccaa756f1cd8ecd8d65480",
+          "size": 1159
+        }
+      ]
+    },
+    {
+      "id": "session-timer",
+      "name": "Session Timer",
+      "version": "1.0.0",
+      "author": "tago",
+      "description": "Reminds you to take a break after playing for a while.",
+      "details": "Shows a reminder once a game has been running for the time you pick, and optionally again at the same interval. When the game closes, it can also say how long you played. Only games started from Ascendara are timed.",
+      "affects": [
+        "Shows break reminders while a game started from Ascendara is running"
+      ],
+      "changelog": "",
+      "license": "MIT",
+      "homepage": "",
+      "minAppVersion": "12.3.2",
+      "apiVersion": 1,
+      "permissions": [],
+      "settings": [
+        {
+          "key": "remindAfter",
+          "type": "number",
+          "label": "Remind me after (minutes)",
+          "description": "",
+          "default": 60,
+          "min": 5,
+          "max": 600
+        },
+        {
+          "key": "repeat",
+          "type": "boolean",
+          "label": "Keep reminding at the same interval",
+          "description": "",
+          "default": true
+        },
+        {
+          "key": "summary",
+          "type": "boolean",
+          "label": "Say how long I played when the game closes",
+          "description": "",
+          "default": true
+        }
+      ],
+      "files": [
+        {
+          "path": "index.js",
+          "sha256": "5541a28bf7d9161ed0258bf291722afee9d8f5c0fd567cf3a0247b3d44112d44",
+          "size": 1901
+        },
+        {
+          "path": "manifest.json",
+          "sha256": "5a1a0b23497b40eb336e181eb14effbcd5a4bae81561ad127df4210c7ab1b275",
+          "size": 1021
         }
       ]
     }

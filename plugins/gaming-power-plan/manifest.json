@@ -1,0 +1,32 @@
+{
+  "name": "Gaming Power Plan",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Switches Windows to High performance while you play, then back. Windows only.",
+  "details": "Laptops and power-saving plans can hold the CPU back in games. While a game started from Ascendara is running, this switches to the power plan you pick, and goes back to your usual plan when the last game closes. Ultimate Performance only exists if it was added to Windows, and other plans can be picked by their GUID.",
+  "affects": ["Changes the Windows power plan while a game is running"],
+  "license": "MIT",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js",
+  "permissions": ["processes"],
+  "settings": [
+    {
+      "key": "plan",
+      "type": "select",
+      "label": "Power plan while playing",
+      "default": "high",
+      "options": [
+        { "value": "high", "label": "High performance" },
+        { "value": "ultimate", "label": "Ultimate Performance" }
+      ]
+    },
+    {
+      "key": "customGuid",
+      "type": "text",
+      "label": "Or use this power plan GUID",
+      "description": "For other plans. Run \"powercfg /list\" in a terminal to see their GUIDs.",
+      "placeholder": "381b4222-f694-41f0-9685-ff5bb260df2e"
+    }
+  ]
+}

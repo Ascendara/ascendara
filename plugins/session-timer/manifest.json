@@ -1,0 +1,34 @@
+{
+  "name": "Session Timer",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Reminds you to take a break after playing for a while.",
+  "details": "Shows a reminder once a game has been running for the time you pick, and optionally again at the same interval. When the game closes, it can also say how long you played. Only games started from Ascendara are timed.",
+  "affects": ["Shows break reminders while a game started from Ascendara is running"],
+  "license": "MIT",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js",
+  "settings": [
+    {
+      "key": "remindAfter",
+      "type": "number",
+      "label": "Remind me after (minutes)",
+      "default": 60,
+      "min": 5,
+      "max": 600
+    },
+    {
+      "key": "repeat",
+      "type": "boolean",
+      "label": "Keep reminding at the same interval",
+      "default": true
+    },
+    {
+      "key": "summary",
+      "type": "boolean",
+      "label": "Say how long I played when the game closes",
+      "default": true
+    }
+  ]
+}

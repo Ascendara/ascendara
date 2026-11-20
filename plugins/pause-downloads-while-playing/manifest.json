@@ -1,0 +1,21 @@
+{
+  "name": "Pause Downloads While Playing",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Pauses game downloads while you play, and resumes them when you stop.",
+  "details": "Downloading in the background can cause lag in online games and stutter while the disk is busy. When a game started from Ascendara launches, running downloads are paused. They resume when the last running game closes. Downloads you paused yourself are left alone.",
+  "affects": ["Pauses and resumes your game downloads around play sessions"],
+  "license": "MIT",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js",
+  "permissions": ["manageDownloads"],
+  "settings": [
+    {
+      "key": "autoResume",
+      "type": "boolean",
+      "label": "Resume downloads when the game closes",
+      "default": true
+    }
+  ]
+}

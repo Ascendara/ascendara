@@ -1,0 +1,12 @@
+{
+  "name": "Save Folder",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Adds \"Open save folder\" and \"Copy executable path\" to a game's Manage menu.",
+  "details": "Finds where a game keeps its saves by its Steam App ID, in the same places the achievement tracker looks: GSE Saves, Goldberg, CODEX, RUNE, OnlineFix, EMPRESS and others. Handy for backing up saves by hand or moving them between PCs.",
+  "affects": ["Adds two items to the Manage menu on a game's page"],
+  "license": "MIT",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js"
+}

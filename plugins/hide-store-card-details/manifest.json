@@ -1,0 +1,35 @@
+{
+  "name": "Hide Store Card Details",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Choose what game cards in Search show, like ratings, views or tags.",
+  "details": "For a cleaner store. Pick the details to hide in this plugin's options. The game page still shows everything.",
+  "affects": ["Hides the game card details you choose in Search"],
+  "license": "MIT",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js",
+  "settings": [
+    { "key": "rating", "type": "boolean", "label": "Hide ratings" },
+    { "key": "views", "type": "boolean", "label": "Hide view counts" },
+    {
+      "key": "features",
+      "type": "boolean",
+      "label": "Hide DLC, online and story labels"
+    },
+    { "key": "tags", "type": "boolean", "label": "Hide genre tags" },
+    {
+      "key": "specs",
+      "type": "boolean",
+      "label": "Hide size, version and update date"
+    },
+    { "key": "source", "type": "boolean", "label": "Hide the source label" },
+    { "key": "verified", "type": "boolean", "label": "Hide the verified badge" },
+    {
+      "key": "recently-updated",
+      "type": "boolean",
+      "label": "Hide \"Recently updated\""
+    },
+    { "key": "mac-compat", "type": "boolean", "label": "Hide Mac compatibility" }
+  ]
+}

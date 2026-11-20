@@ -1,0 +1,21 @@
+{
+  "name": "Hide Navigation Items",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Choose which buttons show in the navigation bar.",
+  "details": "Pick the buttons to hide in this plugin's options, for a shorter navigation bar. Only the buttons are hidden: the pages keep working. Home and Settings always stay visible so you can't lock yourself out.",
+  "affects": ["Hides the navigation bar buttons you choose"],
+  "license": "MIT",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js",
+  "settings": [
+    { "key": "search", "type": "boolean", "label": "Hide Search" },
+    { "key": "library", "type": "boolean", "label": "Hide Library" },
+    { "key": "downloads", "type": "boolean", "label": "Hide Downloads" },
+    { "key": "debridDownloads", "type": "boolean", "label": "Hide Debrid Downloads" },
+    { "key": "profile", "type": "boolean", "label": "Hide Profile" },
+    { "key": "ascend", "type": "boolean", "label": "Hide Ascend" },
+    { "key": "workshop", "type": "boolean", "label": "Hide Workshop Downloader" }
+  ]
+}

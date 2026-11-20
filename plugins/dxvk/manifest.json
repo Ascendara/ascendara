@@ -1,0 +1,41 @@
+{
+  "name": "DXVK",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Install DXVK into a game from its Manage menu, to fix stutter and crashes in older games. Windows only.",
+  "details": "DXVK runs Direct3D 8, 9, 10 and 11 games on Vulkan. It often fixes stutter, crashes and low frame rates in older games, especially on AMD and Intel graphics. Pick the game's Direct3D version and whether it's 32 or 64-bit in this plugin's options, then use \"Install DXVK\" on the game's page. Files the game already had are backed up, and \"Remove DXVK\" puts them back. DXVK is downloaded from its official GitHub releases the first time it's used. Needs a graphics card with Vulkan support. Don't use it in online games with anti-cheat.",
+  "affects": [
+    "Adds \"Install DXVK\" and \"Remove DXVK\" to the Manage menu",
+    "Copies DXVK's DLLs into the game's folder when you install it"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/doitsujin/dxvk",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js",
+  "permissions": ["downloads", "processes"],
+  "settings": [
+    {
+      "key": "api",
+      "type": "select",
+      "label": "The game's Direct3D version",
+      "description": "Check the game's store page or PCGamingWiki if you're not sure.",
+      "default": "d3d11",
+      "options": [
+        { "value": "d3d11", "label": "Direct3D 10 or 11" },
+        { "value": "d3d9", "label": "Direct3D 9" },
+        { "value": "d3d8", "label": "Direct3D 8" }
+      ]
+    },
+    {
+      "key": "arch",
+      "type": "select",
+      "label": "The game is",
+      "default": "x64",
+      "options": [
+        { "value": "x64", "label": "64-bit" },
+        { "value": "x32", "label": "32-bit" }
+      ]
+    }
+  ]
+}

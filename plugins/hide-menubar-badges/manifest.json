@@ -1,0 +1,25 @@
+{
+  "name": "Hide Title Bar Badges",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Choose which badges show next to the Ascendara name, like \"Torrenting is enabled - use VPN\".",
+  "details": "Pick the badges to hide in this plugin's options. They come back when the plugin is turned off. Only the badges are hidden: torrenting, Big Picture and everything else keep working. Update and connection badges always stay visible.",
+  "affects": ["Hides the title bar badges you choose"],
+  "license": "MIT",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js",
+  "settings": [
+    {
+      "key": "torrent-warning",
+      "type": "boolean",
+      "label": "Hide \"Torrenting is enabled - use VPN\"",
+      "description": "Using a VPN is still recommended while torrenting.",
+      "default": true
+    },
+    { "key": "big-picture", "type": "boolean", "label": "Hide \"Big Picture\"" },
+    { "key": "public-testing", "type": "boolean", "label": "Hide \"Public Testing\"" },
+    { "key": "experimental", "type": "boolean", "label": "Hide \"Experimental\"" },
+    { "key": "dev", "type": "boolean", "label": "Hide \"Running in development\"" }
+  ]
+}

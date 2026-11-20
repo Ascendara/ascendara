@@ -1,0 +1,32 @@
+{
+  "name": "Save Backups",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Backs up a game's saves every time it closes, and keeps the newest copies.",
+  "details": "When a game closes, its save folder is zipped into this plugin's folder. The save folder is found by the game's Steam App ID, the same way the achievement tracker finds it. Use \"Open save backups\" in a game's Manage menu to get to the backups, and unzip one into the save folder to restore it. Uses the tar program built into Windows 10 and newer, macOS and Linux.",
+  "affects": [
+    "Copies save folders into this plugin's folder when a game closes",
+    "Adds \"Back up saves now\" and \"Open save backups\" to the Manage menu"
+  ],
+  "license": "MIT",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js",
+  "permissions": ["processes"],
+  "settings": [
+    {
+      "key": "keep",
+      "type": "number",
+      "label": "Backups to keep per game",
+      "default": 5,
+      "min": 1,
+      "max": 50
+    },
+    {
+      "key": "notify",
+      "type": "boolean",
+      "label": "Show a message after each automatic backup",
+      "default": false
+    }
+  ]
+}
