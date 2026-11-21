@@ -164,7 +164,7 @@ test("Download auto-selection and cloud UI use link-level torrent capability", (
 
   assert.match(
     downloadPage,
-    /canDownloadTorrentLinks\(gameData\.download_links\.torrent, settings\)/,
+    /canDownloadTorrentLinks\((?:gameData|downloadGameData)\.download_links\.torrent, settings\)/,
     "automatic torrent selection must use the actual torrent links"
   );
   assert.match(
