@@ -341,6 +341,7 @@ export const registerUser = async (email, password, displayName, hardwareId = nu
             "[registerUser] Firestore document created and verified successfully"
           );
           firestoreSuccess = true;
+          await syncSearchName(user.uid, displayName);
           break;
         } else {
           console.warn(
@@ -507,6 +508,9 @@ export const updateUserProfile = async profileData => {
     }
 
     await updateDoc(doc(db, "users", user.uid), updateData);
+    if (profileData.displayName !== undefined) {
+      await syncSearchName(user.uid, profileData.displayName);
+    }
 
     return { success: true, error: null };
   } catch (error) {
@@ -718,6 +722,20 @@ export const subscribeToUserData = (uid, callback) => {
   );
 };
 
+// Lowercase copy of a display name, which user search queries on
+const searchNameOf = name => (typeof name === "string" ? name.trim().toLowerCase() : "");
+
+// Best effort: without the copy a profile is still found by its exact casing
+const syncSearchName = async (uid, displayName) => {
+  const displayNameLower = searchNameOf(displayName);
+  if (!uid || !displayNameLower) return;
+  try {
+    await updateDoc(doc(db, "users", uid), { displayNameLower });
+  } catch (error) {
+    console.warn("Failed to sync search name:", error);
+  }
+};
+
 /**
  * Get user data from Firestore
  * @param {string} uid - User ID
@@ -731,6 +749,13 @@ export const getUserData = async uid => {
     if (docSnap.exists()) {
       // Ensure all expected fields exist with defaults
       const data = docSnap.data();
+      if (
+        uid === auth.currentUser?.uid &&
+        data.displayName &&
+        data.displayNameLower !== searchNameOf(data.displayName)
+      ) {
+        syncSearchName(uid, data.displayName);
+      }
       return {
         data: {
           ...data,
@@ -789,6 +814,9 @@ export const updateUserData = async (uid, data) => {
     }
 
     await updateDoc(doc(db, "users", uid), updateData);
+    if (data.displayName !== undefined) {
+      await syncSearchName(uid, data.displayName);
+    }
     return { success: true, error: null };
   } catch (error) {
     console.error("Update user data error:", error);
@@ -2109,11 +2137,6 @@ export const verifyAscendAccess = async (hardwareId = null) => {
 
 // ==================== FRIEND SYSTEM ====================
 
-/**
- * Search users by display name with extended profile data
- * @param {string} searchQuery - Search query
- * @returns {Promise<{users: array, error: string|null}>}
- */
 // The signed-in user's friends, so a private friend's badges still show
 const getMyFriendUids = async () => {
   try {
@@ -2124,6 +2147,37 @@ const getMyFriendUids = async () => {
   }
 };
 
+const USER_SEARCH_LIMIT = 20;
+const USER_SEARCH_CACHE_MS = 60 * 1000;
+const TRIAL_LENGTH_MS = 7 * 24 * 60 * 60 * 1000;
+const userSearchCache = new Map(); // "uid|query" -> { users, expires }
+
+const usersWithPrefix = (field, prefix) =>
+  getDocs(
+    query(
+      collection(db, "users"),
+      where(field, ">=", prefix),
+      where(field, "<=", prefix + "\uf8ff"),
+      limit(USER_SEARCH_LIMIT)
+    )
+  );
+
+// Subscribers, staff and accounts still inside their 7-day trial can use Ascend
+const canUseAscend = data => {
+  if (data.ascendSubscription?.active === true) return true;
+  if (data.verified === true || data.owner === true || data.contributor === true) {
+    return true;
+  }
+  const createdAt = data.createdAt?.toDate?.();
+  return !!createdAt && Date.now() - createdAt.getTime() < TRIAL_LENGTH_MS;
+};
+
+/**
+ * Search users by display name with extended profile data. Matches names that
+ * start with the query, ignoring case, reading at most a few small pages.
+ * @param {string} searchQuery - Search query
+ * @returns {Promise<{users: array, error: string|null}>}
+ */
 export const searchUsers = async searchQuery => {
   try {
     const currentUser = auth.currentUser;
@@ -2131,36 +2185,47 @@ export const searchUsers = async searchQuery => {
       return { users: [], error: "No user logged in" };
     }
 
-    const usersRef = collection(db, "users");
-    const queryLower = searchQuery.toLowerCase().trim();
+    const typed = (searchQuery || "").trim();
+    const queryLower = searchNameOf(typed);
+    if (!queryLower) return { users: [], error: null };
 
-    const q = query(
-      usersRef,
-      where("displayName", ">=", queryLower[0]), // First character prefix
-      where("displayName", "<=", queryLower[0] + "\uf8ff"),
-      limit(100) // Cap results for performance
-    );
-    const snapshot = await getDocs(q);
+    const cacheKey = `${currentUser.uid}|${queryLower}`;
+    const cached = userSearchCache.get(cacheKey);
+    if (cached && cached.expires > Date.now()) {
+      return { users: cached.users, error: null };
+    }
+
+    const docs = new Map();
+    const collect = snapshot => snapshot.forEach(d => docs.set(d.id, d.data()));
+    collect(await usersWithPrefix("displayNameLower", queryLower));
+
+    // Profiles that don't carry displayNameLower yet are only reachable by
+    // their stored casing, so try the casings people usually type.
+    if (docs.size < USER_SEARCH_LIMIT) {
+      const casings = new Set([
+        typed,
+        queryLower,
+        queryLower.charAt(0).toUpperCase() + queryLower.slice(1),
+      ]);
+      const snapshots = await Promise.all(
+        [...casings].map(casing => usersWithPrefix("displayName", casing))
+      );
+      snapshots.forEach(collect);
+    }
 
     const users = [];
-
-    // Collect matching user IDs first - only include users with active Ascend or verified/owner/contributor status
-    // Client-side filtering for contains matching (more intuitive than prefix-only)
     const matchingUsers = [];
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      const displayName = (data.displayName || "").toLowerCase();
-      // Match if displayName contains the query (not just starts with) and has access
-      const nameMatches = displayName.includes(queryLower);
-      const ascendSub = data.ascendSubscription;
-      const hasActiveAscend = ascendSub?.active === true;
-      const isVerified =
-        data.verified === true || data.owner === true || data.contributor === true;
-      const hasAccess = hasActiveAscend || isVerified;
-
-      if (doc.id !== currentUser.uid && nameMatches && hasAccess) {
-        matchingUsers.push({ uid: doc.id, data });
+    for (const [uid, data] of docs) {
+      const nameMatches = searchNameOf(data.displayName).startsWith(queryLower);
+      if (uid !== currentUser.uid && nameMatches && canUseAscend(data)) {
+        matchingUsers.push({ uid, data });
       }
+    }
+    // Exact name first, then shortest, so "neko" beats "neko123"
+    matchingUsers.sort((a, b) => {
+      const an = searchNameOf(a.data.displayName);
+      const bn = searchNameOf(b.data.displayName);
+      return (bn === queryLower) - (an === queryLower) || an.length - bn.length;
     });
 
     // Batch fetch status for all matching users
@@ -2207,6 +2272,7 @@ export const searchUsers = async searchQuery => {
       });
     }
 
+    userSearchCache.set(cacheKey, { users, expires: Date.now() + USER_SEARCH_CACHE_MS });
     return { users, error: null };
   } catch (error) {
     console.error("Search users error:", error);
