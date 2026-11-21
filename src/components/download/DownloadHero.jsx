@@ -148,19 +148,23 @@ export default function DownloadHero({
   showTimemachine,
   onOpenTimemachine,
   source,
+  showReleaseTags = true,
+  buildSourceGameData,
 }) {
   const { t } = useLanguage();
   const isVr = gameData.category?.includes("Virtual Reality");
-  const buildStatus = steamBuildStatus(gameData);
+  const buildGame = buildSourceGameData || gameData;
+  const buildStatus = steamBuildStatus(buildGame);
   const hasTags =
-    gameData.online || gameData.storyOnly || gameData.dlc || gameData.emulator || isVr;
+    showReleaseTags &&
+    (gameData.online || gameData.storyOnly || gameData.dlc || gameData.emulator || isVr);
   const buildNote =
     buildStatus === "latest"
-      ? t("download.steamBuild.latestTooltip", { build: gameData.sourceBuildId })
+      ? t("download.steamBuild.latestTooltip", { build: buildGame.sourceBuildId })
       : buildStatus === "behind"
         ? t("download.steamBuild.behindTooltip", {
-            build: gameData.sourceBuildId,
-            latest: gameData.latestBuildId,
+            build: buildGame.sourceBuildId,
+            latest: buildGame.latestBuildId,
           })
         : null;
   const timemachineNote = showTimemachine ? t("download.timemachine.openTooltip") : null;

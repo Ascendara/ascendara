@@ -1911,6 +1911,17 @@ function PublicDownloadPage() {
     }
   }, [downloadGameData, settings, debridHosts]);
 
+  // The hero follows the selected source for its version, badges and stats
+  // while the Steam description, reviews, views and artwork stay official.
+  const downloadSource = gameSource(downloadGameData, settings);
+  const isExternalSource = !!downloadSource && !downloadSource.official;
+  // An external source carrying the exact same version shares the official
+  // build remarks
+  const sameVersionAsOfficial =
+    isExternalSource &&
+    !!downloadGameData?.version &&
+    downloadGameData.version === gameData?.version;
+
   if (gameData && gameData.game) {
     gameData.game = sanitizeGameName(gameData.game);
   }
@@ -2072,12 +2083,12 @@ function PublicDownloadPage() {
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[auto_1fr]">
           <div className="min-w-0 lg:col-start-1">
             <DownloadHero
-              gameData={gameData}
+              gameData={downloadGameData}
               bannerImage={artworkReady ? bannerImage : null}
               coverImage={artworkReady ? coverGridUrl || steamCover : null}
               coverFallback={steamCover}
               artworkLoading={!artworkReady}
-              isVerified={isVerified}
+              isVerified={isVerified && !isExternalSource}
               onShowVerified={() => setShowVerifiedDialog(true)}
               gameRating={gameRating}
               viewCount={viewCount}
@@ -2091,11 +2102,14 @@ function PublicDownloadPage() {
               releaseDate={steamData?.release_date}
               hltbData={hltbData}
               showTimemachine={
+                !isExternalSource &&
                 timemachineSetting &&
                 (!!gameData.hasHistory || !gameService.indexTracksHistory())
               }
               onOpenTimemachine={() => setShowTimemachineSelection(true)}
-              source={gameSource(gameData, settings)}
+              source={downloadSource}
+              showReleaseTags={!isExternalSource}
+              buildSourceGameData={sameVersionAsOfficial ? gameData : downloadGameData}
             />
           </div>
 
