@@ -53,7 +53,7 @@ import {
   forceSyncDownloads,
   notifyDownloadStart,
 } from "@/services/ascend/downloadSyncService";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Loader, Wine } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -196,6 +196,19 @@ function PublicDownloadPage() {
   const [gameData, setGameData] = useState(state?.gameData);
   // The live entry, kept while an older Time Machine version is being viewed
   const [latestGameData, setLatestGameData] = useState(null);
+  // Download options come from the selected source while the page keeps the
+  // game identity that was already loaded (Steam, artwork, metadata, ...).
+  const [selectedSourceEntry, setSelectedSourceEntry] = useState(null);
+  const downloadGameData = useMemo(() => {
+    if (!selectedSourceEntry) return gameData;
+    return {
+      ...selectedSourceEntry,
+      game: gameData?.game ?? selectedSourceEntry.game,
+      name: gameData?.name ?? selectedSourceEntry.name,
+      groupKey: gameData?.groupKey ?? selectedSourceEntry.groupKey,
+      privateSource: gameData?.privateSource ?? selectedSourceEntry.privateSource,
+    };
+  }, [gameData, selectedSourceEntry]);
   const [isUpdating, setIsUpdating] = useState(state?.gameData?.isUpdating || false);
   const { t } = useLanguage();
   const { settings, setSettings } = useSettings();
@@ -218,12 +231,14 @@ function PublicDownloadPage() {
     if (state?.gameData) {
       setGameData(state.gameData);
       setLatestGameData(null);
+      setSelectedSourceEntry(null);
       setIsUpdating(state.gameData.isUpdating || false);
     }
   }, [state?.gameData]);
 
   const handleTimemachineSelect = release => {
     const latest = latestGameData || gameData;
+    setSelectedSourceEntry(null);
     if (release.live) {
       setGameData(latest);
       setLatestGameData(null);
@@ -247,6 +262,7 @@ function PublicDownloadPage() {
     if (!latestGameData) return;
     setGameData(latestGameData);
     setLatestGameData(null);
+    setSelectedSourceEntry(null);
     toast.success(t("download.timemachine.backToLatestToast"), {
       description: latestGameData.version || undefined,
       duration: 3000,
@@ -612,7 +628,7 @@ function PublicDownloadPage() {
         // Combined catalogs mix official and external games, so ask per game
         const isCustomSource =
           metadata?.customSource === true ||
-          (metadata?.combined === true && !!gameData?.customSource);
+          (metadata?.combined === true && !!downloadGameData?.customSource);
         setIsExternalSourcesMode(isCustomSource);
       } catch (error) {
         console.error("Error checking external sources mode:", error);
@@ -621,7 +637,7 @@ function PublicDownloadPage() {
     };
 
     checkExternalSourcesMode();
-  }, [gameData?.customSource]);
+  }, [downloadGameData?.customSource]);
 
   // The same game from the user's other sources, to switch between on this page
   useEffect(() => {
@@ -641,7 +657,7 @@ function PublicDownloadPage() {
 
   const handleSourceSelect = entry => {
     setLatestGameData(null);
-    setGameData(entry);
+    setSelectedSourceEntry(entry);
   };
 
   // Keep the whereToDownload ref in sync with the latest function
@@ -704,16 +720,16 @@ function PublicDownloadPage() {
       setIsPlayLater(false);
     } else {
       const gameToSave = {
-        game: gameData.game,
-        gameID: gameData.gameID,
-        imgID: gameData.imgID,
-        version: gameData.version,
-        size: gameData.size,
-        category: gameData.category,
-        dlc: gameData.dlc,
-        online: gameData.online,
-        download_links: gameData.download_links,
-        desc: gameData.desc,
+        game: downloadGameData.game,
+        gameID: downloadGameData.gameID,
+        imgID: downloadGameData.imgID,
+        version: downloadGameData.version,
+        size: downloadGameData.size,
+        category: downloadGameData.category,
+        dlc: downloadGameData.dlc,
+        online: downloadGameData.online,
+        download_links: downloadGameData.download_links,
+        desc: downloadGameData.desc,
         addedAt: Date.now(),
       };
       playLaterGames.push(gameToSave);
@@ -735,15 +751,15 @@ function PublicDownloadPage() {
     } else {
       updated = [...favs, gameData.game];
       meta[gameData.game] = {
-        imgID: gameData.imgID || null,
-        gameID: gameData.gameID || null,
-        version: gameData.version || null,
-        size: gameData.size || null,
-        category: gameData.category || null,
-        dlc: gameData.dlc || false,
-        online: gameData.online || false,
-        download_links: gameData.download_links || null,
-        desc: gameData.desc || null,
+        imgID: downloadGameData.imgID || null,
+        gameID: downloadGameData.gameID || null,
+        version: downloadGameData.version || null,
+        size: downloadGameData.size || null,
+        category: downloadGameData.category || null,
+        dlc: downloadGameData.dlc || false,
+        online: downloadGameData.online || false,
+        download_links: downloadGameData.download_links || null,
+        desc: downloadGameData.desc || null,
       };
     }
     localStorage.setItem("game-favorites", JSON.stringify(updated));
@@ -781,6 +797,7 @@ function PublicDownloadPage() {
 
   const pendingDirectUrl = useRef(null);
   async function whereToDownload(directUrl = null) {
+    const gameData = downloadGameData;
     pendingDirectUrl.current = directUrl;
     console.log("[DL] whereToDownload called, directUrl:", directUrl);
     // Check if game is wanting to update
@@ -881,6 +898,7 @@ function PublicDownloadPage() {
 
   // Stops a download that can't fit and warns when the install may not
   async function confirmInstallSpace(dir) {
+    const gameData = downloadGameData;
     const directory = dir
       ? settings.additionalDirectories?.[dir - 1]
       : settings.downloadDirectory;
@@ -923,6 +941,7 @@ function PublicDownloadPage() {
     forceStart = false,
     skipConflictCheck = false
   ) {
+    const gameData = downloadGameData;
     const downloadProvider =
       browserDirectUrl.current === directUrl && directUrl ? "direct" : selectedProvider;
     let resolvedByDebrid = false;
@@ -1826,7 +1845,7 @@ function PublicDownloadPage() {
     setTimeout(() => setShowShareCopySuccess(false), 2000);
   };
 
-  const downloadLinks = gameData?.download_links || {};
+  const downloadLinks = downloadGameData?.download_links || {};
   const hasProviders = Object.keys(downloadLinks).length > 0;
   // On Ascendara's index, no links of any kind (not just none usable with the
   // current settings) means the files were taken down because they stopped working
@@ -1859,13 +1878,13 @@ function PublicDownloadPage() {
   console.log("Final Available Providers:", providers);
 
   useEffect(() => {
-    if (gameData?.download_links) {
-      const availableProviders = Object.keys(gameData.download_links).filter(
-        provider => gameData.download_links[provider]?.length > 0
+    if (downloadGameData?.download_links) {
+      const availableProviders = Object.keys(downloadGameData.download_links).filter(
+        provider => downloadGameData.download_links[provider]?.length > 0
       );
       const ddlProviders = availableProviders.filter(p => p !== "torrent");
       const supportedDebridProvider = ddlProviders.find(provider => {
-        const links = gameData.download_links[provider];
+        const links = downloadGameData.download_links[provider];
         const link = Array.isArray(links)
           ? links.find(value => typeof value === "string" && value.trim())
           : links;
@@ -1880,7 +1899,9 @@ function PublicDownloadPage() {
         setSelectedProvider(supportedDebridProvider);
       } else if (ddlProviders.length > 0) {
         setSelectedProvider(ddlProviders[0]);
-      } else if (canDownloadTorrentLinks(gameData.download_links.torrent, settings)) {
+      } else if (
+        canDownloadTorrentLinks(downloadGameData.download_links.torrent, settings)
+      ) {
         setSelectedProvider("torrent");
       } else {
         setSelectedProvider("");
@@ -1888,10 +1909,13 @@ function PublicDownloadPage() {
     } else {
       setSelectedProvider("");
     }
-  }, [gameData, settings, debridHosts]);
+  }, [downloadGameData, settings, debridHosts]);
 
   if (gameData && gameData.game) {
     gameData.game = sanitizeGameName(gameData.game);
+  }
+  if (downloadGameData && downloadGameData !== gameData && downloadGameData.game) {
+    downloadGameData.game = sanitizeGameName(downloadGameData.game);
   }
 
   if (!gameData) {
@@ -1933,7 +1957,7 @@ function PublicDownloadPage() {
     name: debrid.getProvider(id)?.name || id,
   }));
   const downloadMode =
-    settings.gameSource === "fitgirl" && gameData.torrentLink
+    settings.gameSource === "fitgirl" && downloadGameData.torrentLink
       ? "fitgirl"
       : selectedProvider === "torrent"
         ? "torrent"
@@ -1944,7 +1968,7 @@ function PublicDownloadPage() {
           : "manual";
   const activeTorrentLinks =
     downloadMode === "fitgirl"
-      ? [gameData.torrentLink].filter(isTorrentLink)
+      ? [downloadGameData.torrentLink].filter(isTorrentLink)
       : downloadMode === "torrent"
         ? (Array.isArray(selectedLinks) ? selectedLinks : [selectedLinks]).filter(
             isTorrentLink
@@ -2091,12 +2115,12 @@ function PublicDownloadPage() {
             )}
             <SourceSwitcher
               entries={sourceEntries}
-              current={gameData}
+              current={selectedSourceEntry || gameData}
               onSelect={handleSourceSelect}
             />
             <DownloadPanel
               mode={downloadMode}
-              gameData={gameData}
+              gameData={downloadGameData}
               settings={settings}
               providers={providers}
               filesUnavailable={filesUnavailable}
