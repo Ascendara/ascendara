@@ -31,6 +31,9 @@ test("close titles match but sequels and numbered entries stay apart", async () 
   assert.ok(titlesMatch("The Witcher 3", "The Witcher 3: Wild Hunt"));
   assert.ok(titlesMatch("Grand Theft Auto V", "Grand Theft Auto 5"));
   assert.ok(titlesMatch("Probably Stolen", "Probably Stolen Cyberpunk Shopkeeper Sim"));
+  assert.ok(
+    titlesMatch("Red Dead Redemption 2", "Red Dead Redemption 2 - .50 + UE Unlocker")
+  );
 
   assert.ok(!titlesMatch("Schedule I", "Schedule II"));
   assert.ok(!titlesMatch("Hades", "Hades II"));
@@ -38,6 +41,9 @@ test("close titles match but sequels and numbered entries stay apart", async () 
   assert.ok(!titlesMatch("The Witcher 3", "The Witcher 3.5"));
   assert.ok(!titlesMatch("The Room", "Room"));
   assert.ok(!titlesMatch("Final Fantasy VII Remake", "Final Fantasy VII Rebirth"));
+  assert.ok(
+    !titlesMatch("Red Dead Redemption", "Red Dead Redemption 2 - .50 + UE Unlocker")
+  );
 });
 
 test("build versions compare numerically and releases beat prereleases", async () => {
@@ -93,6 +99,24 @@ test("official and external listings merge, and equal versions keep the official
   assert.equal(games.length, 1);
   assert.equal(games[0].game, "Cyberpunk 2077");
   assert.equal(games[0].customSource, undefined);
+});
+
+test("leading-dot version tails still merge with the base game", async () => {
+  const { groupCatalogGames } = await load();
+  const { games, groups } = groupCatalogGames([
+    { game: "Red Dead Redemption 2", version: "1491.50", sourceRank: 0 },
+    {
+      game: "Red Dead Redemption 2 - .50 + UE Unlocker",
+      sourceRank: 1,
+      customSource: "SteamRIP",
+    },
+    { game: "Red Dead Redemption", version: "1.0", sourceRank: 0 },
+  ]);
+
+  assert.equal(games.length, 2);
+  assert.ok(games.some(game => game.game === "Red Dead Redemption 2"));
+  assert.ok(games.some(game => game.game === "Red Dead Redemption"));
+  assert.equal(groups.get("red dead redemption 2")?.length, 2);
 });
 
 test("newer external versions become the default card without merging sequels", async () => {

@@ -40,7 +40,13 @@ const ROMAN_VALUES = {
 // Bare dotted builds ("0.4.6f13", "v1.2", "1.2.3") but never plain title
 // numbers such as "Cyberpunk 2077".
 const BARE_VERSION = /\bv?\.?\d+\.\d+(?:[._-]\d+)*[a-z]?\d*\b/gi;
+
+const LEADING_DOT_VERSION = /(^|[\s\-–—:+,(])v?\.\d{2,}(?=$|[\s\-–—:+,).])/gi;
 const MOD_TAGS = /\b(?:redmod|red4ext|redscript)\b/gi;
+
+function stripVersionTokens(text) {
+  return text.replace(LEADING_DOT_VERSION, "$1 ").replace(BARE_VERSION, " ");
+}
 
 const BUILD_IN_TITLE =
   /\b(?:build|update|patch|hotfix|version)\s*[#.]?\s*\d+(?:[._-]\d+)*\b/i;
@@ -67,9 +73,9 @@ function tidyNormalized(text) {
  */
 export function normalizeCatalogTitle(title) {
   if (typeof title !== "string") return "";
-  const prepared = title.replace(MOD_TAGS, " ").replace(BARE_VERSION, " ");
+  const prepared = stripVersionTokens(title.replace(MOD_TAGS, " "));
   const cleaned = cleanGameTitle(prepared);
-  const text = (cleaned || prepared).replace(MOD_TAGS, " ").replace(BARE_VERSION, " ");
+  const text = stripVersionTokens(cleaned || prepared).replace(MOD_TAGS, " ");
   return tidyNormalized(text);
 }
 
@@ -256,10 +262,9 @@ function compareCatalogEntries(left, right) {
 
 function displayTitleOf(entry) {
   const raw = entry.game || entry.name || "";
-  const prepared = raw.replace(MOD_TAGS, " ").replace(BARE_VERSION, " ");
-  const text = cleanGameTitle(prepared)
+  const prepared = stripVersionTokens(raw.replace(MOD_TAGS, " "));
+  const text = stripVersionTokens(cleanGameTitle(prepared))
     .replace(MOD_TAGS, " ")
-    .replace(BARE_VERSION, " ")
     .replace(/\s+/g, " ")
     .replace(/^[\s\-–—:&+,.]+|[\s\-–—:&+,]+$/g, "")
     .trim();
