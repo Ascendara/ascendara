@@ -1,6 +1,6 @@
 // Groups the same game across catalogue sources and patch versions.
 // Titles are cleaned of editions, extras and build numbers, then compared with
-// Jaro-Winkler plus prefix/substring matching.
+// Jaro-Winkler.
 
 import { cleanGameTitle } from "./steamMatch.js";
 
@@ -43,6 +43,8 @@ const BARE_VERSION = /\bv?\.?\d+\.\d+(?:[._-]\d+)*[a-z]?\d*\b/gi;
 
 const LEADING_DOT_VERSION = /(^|[\s\-–—:+,(])v?\.\d{2,}(?=$|[\s\-–—:+,).])/gi;
 const MOD_TAGS = /\b(?:redmod|red4ext|redscript)\b/gi;
+// Repacks list bundled extras after " + " (DLC, unlockers, soundtracks).
+const EXTRAS_TAIL = /\s\+\s.*$/;
 
 function stripVersionTokens(text) {
   return text.replace(LEADING_DOT_VERSION, "$1 ").replace(BARE_VERSION, " ");
@@ -53,7 +55,6 @@ const BUILD_IN_TITLE =
 const VERSION_IN_TITLE = /\b(?:v\.?\s*)?\d+\.\d+(?:[._-]\d+)*[a-z]?\d*\b/i;
 
 const JARO_WINKLER_THRESHOLD = 0.95;
-const MIN_SUBSTRING_LENGTH = 8;
 
 function tidyNormalized(text) {
   return text
@@ -73,7 +74,8 @@ function tidyNormalized(text) {
  */
 export function normalizeCatalogTitle(title) {
   if (typeof title !== "string") return "";
-  const prepared = stripVersionTokens(title.replace(MOD_TAGS, " "));
+  const base = title.replace(EXTRAS_TAIL, "") || title;
+  const prepared = stripVersionTokens(base.replace(MOD_TAGS, " "));
   const cleaned = cleanGameTitle(prepared);
   const text = stripVersionTokens(cleaned || prepared).replace(MOD_TAGS, " ");
   return tidyNormalized(text);
@@ -90,27 +92,6 @@ function numberSignature(key) {
     if (roman) parts.push(String(roman));
   }
   return parts.join(".");
-}
-
-function wordCount(key) {
-  return key ? key.split(" ").length : 0;
-}
-
-function boundaryAt(text, index) {
-  return index >= text.length || text[index] === " ";
-}
-
-function containsAtBoundaries(long, short) {
-  let from = 0;
-  while (from <= long.length - short.length) {
-    const index = long.indexOf(short, from);
-    if (index === -1) return false;
-    const before = index === 0 || long[index - 1] === " ";
-    const after = boundaryAt(long, index + short.length);
-    if (before && after) return true;
-    from = index + 1;
-  }
-  return false;
 }
 
 /** Jaro-Winkler similarity for two already-normalized strings. */
@@ -178,14 +159,8 @@ export function titlesMatchNormalized(left, right) {
   // Different sequel/entry numbers mean different games, however close the text.
   if (numberSignature(left) !== numberSignature(right)) return false;
 
-  const [shorter, longer] = left.length <= right.length ? [left, right] : [right, left];
-  if (wordCount(shorter) >= 2) {
-    const startsWith = longer.startsWith(shorter) && boundaryAt(longer, shorter.length);
-    const contained =
-      shorter.length >= MIN_SUBSTRING_LENGTH && containsAtBoundaries(longer, shorter);
-    if (startsWith || contained) return true;
-  }
-
+  // Extra words left after cleaning are a subtitle naming another game
+  // (Far Cry / Far Cry Primal), so only near-identical spellings merge.
   return jaroWinkler(left, right) >= JARO_WINKLER_THRESHOLD;
 }
 

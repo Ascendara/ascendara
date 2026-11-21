@@ -28,14 +28,16 @@ test("close titles match but sequels and numbered entries stay apart", async () 
   );
   assert.ok(titlesMatch("Schedule I", "Schedule I 0.4.6f13"));
   assert.ok(titlesMatch("Schedule I", "Schedule I v0.4.5f2"));
-  assert.ok(titlesMatch("The Witcher 3", "The Witcher 3: Wild Hunt"));
   assert.ok(titlesMatch("Grand Theft Auto V", "Grand Theft Auto 5"));
-  assert.ok(titlesMatch("Probably Stolen", "Probably Stolen Cyberpunk Shopkeeper Sim"));
   assert.ok(
     titlesMatch("Red Dead Redemption 2", "Red Dead Redemption 2 - .50 + UE Unlocker")
   );
 
   assert.ok(!titlesMatch("Schedule I", "Schedule II"));
+  assert.ok(!titlesMatch("Far Cry", "Far Cry Primal"));
+  assert.ok(!titlesMatch("Assassin's Creed", "Assassin's Creed Unity"));
+  assert.ok(!titlesMatch("Marvel's Spider-Man", "Marvel's Spider-Man Miles Morales"));
+  assert.ok(!titlesMatch("Tomb Raider", "Rise of the Tomb Raider"));
   assert.ok(!titlesMatch("Hades", "Hades II"));
   assert.ok(!titlesMatch("Portal", "Portal 2"));
   assert.ok(!titlesMatch("The Witcher 3", "The Witcher 3.5"));
@@ -119,7 +121,7 @@ test("leading-dot version tails still merge with the base game", async () => {
   assert.equal(groups.get("red dead redemption 2")?.length, 2);
 });
 
-test("newer external versions become the default card without merging sequels", async () => {
+test("newer external versions become the default card without merging sequels or subtitles", async () => {
   const { groupCatalogGames } = await load();
   const { games, groups } = groupCatalogGames([
     { game: "Cyberpunk 2077", version: "2.21", sourceRank: 0 },
@@ -140,12 +142,14 @@ test("newer external versions become the default card without merging sequels", 
     },
   ]);
 
-  assert.equal(games.length, 4);
+  assert.equal(games.length, 5);
   const cyberpunk = games.find(game => game.groupKey === "cyberpunk 2077");
   assert.equal(cyberpunk.game, "Cyberpunk 2077");
   assert.equal(cyberpunk.version, "2.30");
   assert.equal(groups.get("cyberpunk 2077").length, 2);
   assert.ok(games.some(game => game.game === "Hades"));
   assert.ok(games.some(game => game.game === "Hades II"));
-  assert.equal(groups.get("probably stolen").length, 2);
+  assert.ok(games.some(game => game.game === "Probably Stolen"));
+  assert.ok(games.some(game => game.game === "Probably Stolen Cyberpunk Shopkeeper Sim"));
+  assert.equal(groups.get("probably stolen"), undefined);
 });
