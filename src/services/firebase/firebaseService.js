@@ -341,7 +341,7 @@ export const registerUser = async (email, password, displayName, hardwareId = nu
             "[registerUser] Firestore document created and verified successfully"
           );
           firestoreSuccess = true;
-          await syncSearchName(user.uid, displayName);
+          refreshSearchCard();
           break;
         } else {
           console.warn(
@@ -508,9 +508,7 @@ export const updateUserProfile = async profileData => {
     }
 
     await updateDoc(doc(db, "users", user.uid), updateData);
-    if (profileData.displayName !== undefined) {
-      await syncSearchName(user.uid, profileData.displayName);
-    }
+    refreshSearchCard(profileData);
 
     return { success: true, error: null };
   } catch (error) {
@@ -722,18 +720,26 @@ export const subscribeToUserData = (uid, callback) => {
   );
 };
 
-// Lowercase copy of a display name, which user search queries on
-const searchNameOf = name => (typeof name === "string" ? name.trim().toLowerCase() : "");
+// Fields the API's user search index shows on a result card
+const SEARCH_CARD_FIELDS = [
+  "displayName",
+  "photoURL",
+  "bio",
+  "country",
+  "socials",
+  "private",
+  "preventFriendRequests",
+];
 
-// Best effort: without the copy a profile is still found by its exact casing
-const syncSearchName = async (uid, displayName) => {
-  const displayNameLower = searchNameOf(displayName);
-  if (!uid || !displayNameLower) return;
-  try {
-    await updateDoc(doc(db, "users", uid), { displayNameLower });
-  } catch (error) {
-    console.warn("Failed to sync search name:", error);
-  }
+// Best effort: tells the API to re-read the signed-in user's search card after
+// a profile edit. Without it the card catches up at the next index rebuild.
+const refreshSearchCard = (changed = null) => {
+  const user = auth.currentUser;
+  if (!user) return;
+  if (changed && !SEARCH_CARD_FIELDS.some(field => changed[field] !== undefined)) return;
+  userAuthenticatedFetch(user, `${API_URL}/ascend/users/search/refresh`, {
+    method: "POST",
+  }).catch(error => console.warn("Failed to refresh search card:", error));
 };
 
 /**
@@ -749,13 +755,6 @@ export const getUserData = async uid => {
     if (docSnap.exists()) {
       // Ensure all expected fields exist with defaults
       const data = docSnap.data();
-      if (
-        uid === auth.currentUser?.uid &&
-        data.displayName &&
-        data.displayNameLower !== searchNameOf(data.displayName)
-      ) {
-        syncSearchName(uid, data.displayName);
-      }
       return {
         data: {
           ...data,
@@ -814,9 +813,7 @@ export const updateUserData = async (uid, data) => {
     }
 
     await updateDoc(doc(db, "users", uid), updateData);
-    if (data.displayName !== undefined) {
-      await syncSearchName(uid, data.displayName);
-    }
+    if (uid === auth.currentUser?.uid) refreshSearchCard(data);
     return { success: true, error: null };
   } catch (error) {
     console.error("Update user data error:", error);
@@ -2147,34 +2144,13 @@ const getMyFriendUids = async () => {
   }
 };
 
-const USER_SEARCH_LIMIT = 20;
 const USER_SEARCH_CACHE_MS = 60 * 1000;
-const TRIAL_LENGTH_MS = 7 * 24 * 60 * 60 * 1000;
 const userSearchCache = new Map(); // "uid|query" -> { users, expires }
 
-const usersWithPrefix = (field, prefix) =>
-  getDocs(
-    query(
-      collection(db, "users"),
-      where(field, ">=", prefix),
-      where(field, "<=", prefix + "\uf8ff"),
-      limit(USER_SEARCH_LIMIT)
-    )
-  );
-
-// Subscribers, staff and accounts still inside their 7-day trial can use Ascend
-const canUseAscend = data => {
-  if (data.ascendSubscription?.active === true) return true;
-  if (data.verified === true || data.owner === true || data.contributor === true) {
-    return true;
-  }
-  const createdAt = data.createdAt?.toDate?.();
-  return !!createdAt && Date.now() - createdAt.getTime() < TRIAL_LENGTH_MS;
-};
-
 /**
- * Search users by display name with extended profile data. Matches names that
- * start with the query, ignoring case, reading at most a few small pages.
+ * Search Ascend users by display name prefix, ignoring case. The API answers
+ * from an in-memory index, so this costs no Firestore reads beyond the online
+ * status of the results and the signed-in user's friend list.
  * @param {string} searchQuery - Search query
  * @returns {Promise<{users: array, error: string|null}>}
  */
@@ -2185,8 +2161,7 @@ export const searchUsers = async searchQuery => {
       return { users: [], error: "No user logged in" };
     }
 
-    const typed = (searchQuery || "").trim();
-    const queryLower = searchNameOf(typed);
+    const queryLower = (searchQuery || "").trim().toLowerCase();
     if (!queryLower) return { users: [], error: null };
 
     const cacheKey = `${currentUser.uid}|${queryLower}`;
@@ -2195,82 +2170,24 @@ export const searchUsers = async searchQuery => {
       return { users: cached.users, error: null };
     }
 
-    const docs = new Map();
-    const collect = snapshot => snapshot.forEach(d => docs.set(d.id, d.data()));
-    collect(await usersWithPrefix("displayNameLower", queryLower));
-
-    // Profiles that don't carry displayNameLower yet are only reachable by
-    // their stored casing, so try the casings people usually type.
-    if (docs.size < USER_SEARCH_LIMIT) {
-      const casings = new Set([
-        typed,
-        queryLower,
-        queryLower.charAt(0).toUpperCase() + queryLower.slice(1),
-      ]);
-      const snapshots = await Promise.all(
-        [...casings].map(casing => usersWithPrefix("displayName", casing))
-      );
-      snapshots.forEach(collect);
+    const url = new URL(`${API_URL}/ascend/users/search`);
+    url.searchParams.set("q", queryLower);
+    const response = await userAuthenticatedFetch(currentUser, url.href);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { users: [], error: result.error || "User search is unavailable" };
     }
 
-    const users = [];
-    const matchingUsers = [];
-    for (const [uid, data] of docs) {
-      const nameMatches = searchNameOf(data.displayName).startsWith(queryLower);
-      if (uid !== currentUser.uid && nameMatches && canUseAscend(data)) {
-        matchingUsers.push({ uid, data });
-      }
-    }
-    // Exact name first, then shortest, so "neko" beats "neko123"
-    matchingUsers.sort((a, b) => {
-      const an = searchNameOf(a.data.displayName);
-      const bn = searchNameOf(b.data.displayName);
-      return (bn === queryLower) - (an === queryLower) || an.length - bn.length;
-    });
-
-    // Batch fetch status for all matching users
-    const matchingUserIds = matchingUsers.map(u => u.uid);
+    const found = Array.isArray(result.users) ? result.users : [];
     const [statusMap, friendUids] = await Promise.all([
-      batchGetUserStatus(matchingUserIds),
+      batchGetUserStatus(found.map(u => u.uid)),
       getMyFriendUids(),
     ]);
-
-    // Build user results
-    for (const { uid, data } of matchingUsers) {
-      // Prefer the server-credited total; cloudLibrary playTime is client-written
-      const games = data.cloudLibrary?.games || [];
-      let totalPlaytime = data.profileStats?.totalPlaytime || 0;
-      if (!totalPlaytime) {
-        games.forEach(game => {
-          totalPlaytime += game.playTime || 0;
-        });
-      }
-
-      // If user is private, don't include their stats
-      const isPrivate = data.private || false;
-
-      users.push({
-        uid,
-        displayName: data.displayName,
-        photoURL: data.photoURL,
-        bio: isPrivate ? null : data.bio || null,
-        country: isPrivate ? null : data.country || null,
-        verified: data.verified || false,
-        owner: data.owner || false,
-        contributor: data.contributor || false,
-        bugCatcher: data.bugCatcher || false,
-        reviewCount: data.reviewCount,
-        discordLinked: Boolean(data.socials?.linkedDiscord),
-        lifetimeMember: data.ascendSubscription?.lifetime === true,
-        private: isPrivate,
-        isFriend: friendUids.has(uid),
-        preventFriendRequests: data.preventFriendRequests === true,
-        status: statusMap.get(uid) || "offline",
-        level: isPrivate ? 0 : data.profileStats?.level || 1,
-        totalPlaytime: isPrivate ? 0 : totalPlaytime,
-        gamesPlayed: isPrivate ? 0 : games.length,
-      });
-    }
+    const users = found.map(u => ({
+      ...u,
+      isFriend: friendUids.has(u.uid),
+      status: statusMap.get(u.uid) || "offline",
+    }));
 
     userSearchCache.set(cacheKey, { users, expires: Date.now() + USER_SEARCH_CACHE_MS });
     return { users, error: null };
