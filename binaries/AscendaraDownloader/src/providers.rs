@@ -35,6 +35,9 @@ fn host_matches(host: &str, domains: &[&str]) -> bool {
 pub const BUZZHEAVIER_DOMAINS: [&str; 7] =
     ["buzzheavier.com", "bzzhr.co", "bzzhr.to", "ts.bzzhr.to", "fafda.to", "fuckingfast.net", "fuckingfast.co"];
 
+/// Buzzheavier only serves its file pages to visitors coming from SteamRIP.
+const BUZZHEAVIER_REFERER: &str = "https://steamrip.com/";
+
 pub fn is_buzzheavier(url: &str) -> bool {
     host_matches(&host_of(url), &BUZZHEAVIER_DOMAINS)
 }
@@ -122,19 +125,27 @@ pub async fn resolve_buzzheavier(client: &Client, url: &str) -> Result<Resolved>
     if parts.len() >= 2 && parts[0] == "d" && parsed.query().is_some() {
         return Ok(Resolved { url: url.to_string(), filename: None, referer: None });
     }
+    // Without a SteamRIP referer the page redirects to steamrip.com, which
+    // refuses the downloader and looked like Buzzheavier rate limiting.
     let page = client
         .get(url)
         .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
         .header("Accept-Language", "en-US,en;q=0.9")
+        .header("Referer", BUZZHEAVIER_REFERER)
         .timeout(Duration::from_secs(30))
         .send()
         .await
         .context("Could not open the Buzzheavier page")?;
+    if !is_buzzheavier(page.url().as_str()) {
+        bail!("Buzzheavier sent the download to another site ({}) instead of the file page", host_of(page.url().as_str()));
+    }
     match page.status().as_u16() {
-        403 | 429 => bail!(
-            "Buzzheavier blocked the request (HTTP {}). The host may be rate limiting you; try again later or with a VPN.",
-            page.status().as_u16()
+        // The page sits behind a Cloudflare bot check the downloader can't pass;
+        // the app opens it in a browser window and passes the file link instead.
+        403 => bail!(
+            "Buzzheavier's bot check blocked the download page (HTTP 403). Start the download from the game's page in Ascendara so it can open the link in a browser window."
         ),
+        429 => bail!("Buzzheavier is rate limiting you (HTTP 429). Try again in a few minutes."),
         404 => bail!("Buzzheavier file not found (HTTP 404). The link may have expired or been removed."),
         status if status >= 400 => bail!("Buzzheavier returned HTTP {status}"),
         _ => {}

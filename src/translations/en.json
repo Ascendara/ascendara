@@ -1756,6 +1756,8 @@
     "downloadOptions": {
       "ascendaraHandler": "Ascendara Download Handler",
       "buzzheavierReminder": "Tip: In the popup window, double-click the download button to start the download",
+      "buzzheavierSlow": "BuzzHeavier limits download speed on its servers, so downloads from it are often slower than your connection.",
+      "useGofileInstead": "Use GoFile instead",
       "downloadLink": "Download Link:",
       "downloadNow": "Download Now",
       "downloadOptions": "Download Options",

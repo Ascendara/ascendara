@@ -25,6 +25,7 @@ import {
   Download,
   ExternalLink,
   FileX,
+  Gauge,
   Link2,
   Loader,
   Magnet,
@@ -253,6 +254,32 @@ function FilesUnavailable() {
   );
 }
 
+// BuzzHeavier holds every connection to a low speed on its side, so the
+// download can't reach the person's full connection there.
+function SlowHostNote({ canUseGofile, onUseGofile }) {
+  const { t } = useLanguage();
+  return (
+    <div className="flex items-start gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+      <Gauge className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <p>
+        {t("download.downloadOptions.buzzheavierSlow")}
+        {canUseGofile && (
+          <>
+            {" "}
+            <button
+              type="button"
+              onClick={onUseGofile}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              {t("download.downloadOptions.useGofileInstead")}
+            </button>
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
 /**
  * The download card on the game page. `mode` decides which flow is shown:
  * "fitgirl" | "torrent" | "seamless" (Magic Link or debrid) | "manual".
@@ -476,14 +503,22 @@ export default function DownloadPanel({
                     {t("download.downloadOptions.downloadSource")}
                   </SectionLabel>
                   {showSources ? (
-                    <SourceList
-                      providers={providers}
-                      selectedProvider={selectedProvider}
-                      onProviderChange={onProviderChange}
-                      debridAvailable={debridAvailable}
-                      debridProvider={debridProvider}
-                      onMagicInfo={openMagicInfo}
-                    />
+                    <>
+                      <SourceList
+                        providers={providers}
+                        selectedProvider={selectedProvider}
+                        onProviderChange={onProviderChange}
+                        debridAvailable={debridAvailable}
+                        debridProvider={debridProvider}
+                        onMagicInfo={openMagicInfo}
+                      />
+                      {selectedProvider === "buzzheavier" && !usingDebrid && (
+                        <SlowHostNote
+                          canUseGofile={providers.includes("gofile")}
+                          onUseGofile={() => onProviderChange("gofile")}
+                        />
+                      )}
+                    </>
                   ) : (
                     <p className="text-sm text-muted-foreground">
                       {t("download.downloadOptions.noProviders")}
