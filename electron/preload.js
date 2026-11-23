@@ -613,6 +613,7 @@ contextBridge.exposeInMainWorld("electron", {
   getDownloadHistory: () => ipcRenderer.invoke("get-download-history"),
   getDownloads: () => ipcRenderer.invoke("get-downloads"),
   getDownloadLog: lines => ipcRenderer.invoke("get-download-log", lines),
+  getReportLogs: () => ipcRenderer.invoke("get-report-logs"),
 
   // Download Events
   onDownloadProgress: callback =>

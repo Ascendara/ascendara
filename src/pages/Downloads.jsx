@@ -82,8 +82,9 @@ import {
 import { cn } from "@/lib/utils";
 import { privateSourceMessage } from "@/lib/privateSourceMessages";
 import SpeedGraph, { formatSpeed, markDownloadStart } from "@/components/SpeedGraph";
-import { API_URL } from "@/config/api";
-import { getReporterHeaders } from "@/services/firebase/firebaseService";
+import DownloadReportDialog, {
+  shouldPromptDownloadReports,
+} from "@/components/download/DownloadReportDialog";
 import { freedByPause, isDownloadHalted } from "@/services/downloads/downloadState";
 import { useDownloadStall } from "@/hooks/useDownloadStall";
 import CloudTorrentList, { useCloudTorrents } from "@/components/debrid/CloudTorrentList";
@@ -1557,7 +1558,6 @@ const DownloadCard = ({
   isCompleted,
   isFading,
 }) => {
-  const [isReporting, setIsReporting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isRepairingDlls, setIsRepairingDlls] = useState(false);
   const [isKeepingGame, setIsKeepingGame] = useState(false);
@@ -1933,85 +1933,31 @@ const DownloadCard = ({
     return predefinedErrorPatterns.some(pattern => message.includes(pattern));
   };
 
-  const handleReport = async () => {
-    if (wasReported) return;
-    setIsReporting(true);
+  const reportErrorKey = `${game.game}-${downloadingData?.message || "unknown"}`;
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+
+  const rememberReportChoice = storageKey => {
     try {
-      const authHeaders = await window.electron.getAuthHeaders();
-      const response = await fetch(`${API_URL}/auth/token`, {
-        headers: authHeaders,
-      });
-      if (!response.ok) throw new Error("Failed to obtain token");
-      const { token } = await response.json();
-
-      const details = [
-        "**Game Information**",
-        `• Name: ${game.game}`,
-        `• Version: ${game.version || "Unknown"}`,
-        `• Size: ${game.size || "Unknown"}`,
-        "",
-        "**Error**",
-        "```",
-        getErrorMessage() || "Unknown error",
-        "```",
-        ...(downloadingData.message && downloadingData.message !== getErrorMessage()
-          ? ["", "**Original Error**", "```", downloadingData.message, "```"]
-          : []),
-        ...(downloadingData.previousError
-          ? ["", "**Error Before Retry**", "```", downloadingData.previousError, "```"]
-          : []),
-        "",
-        "**Download State**",
-        `• Progress: ${downloadingData.progressCompleted || "0"}%`,
-        `• Speed: ${downloadingData.progressDownloadSpeeds || "N/A"}`,
-        "",
-        "**System Info**",
-        `• Platform: ${window.electron.getPlatform() || "Unknown"}`,
-        `• App Version: v${__APP_VERSION__ || "Unknown"}`,
-        `• Timestamp: ${new Date().toISOString()}`,
-      ].join("\n");
-
-      const reportResponse = await fetch(`${API_URL}/app/report/feature`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          ...(await getReporterHeaders()),
-        },
-        body: JSON.stringify({
-          reportType: "GameDownload",
-          reason: `Download Error: ${game.game}`,
-          details,
-          gameName: game.game,
-        }),
-      });
-
-      if (!reportResponse.ok) throw new Error("Failed to submit report");
-
-      const errorKey = `${game.game}-${downloadingData?.message || "unknown"}`;
-      const reportedErrors = JSON.parse(localStorage.getItem("reportedErrors") || "{}");
-      reportedErrors[errorKey] = true;
-      localStorage.setItem("reportedErrors", JSON.stringify(reportedErrors));
-      setWasReported(true);
-
-      toast.success(t("downloads.errorReported"), {
-        description: t("downloads.errorReportedDescription"),
-      });
-    } catch (error) {
-      console.error("Failed to report error:", error);
-      toast.error(t("common.reportDialog.couldNotReport"), {
-        description: t("common.reportDialog.couldNotReportDesc"),
-      });
-    } finally {
-      setIsReporting(false);
-    }
+      const stored = JSON.parse(localStorage.getItem(storageKey) || "{}");
+      stored[reportErrorKey] = true;
+      localStorage.setItem(storageKey, JSON.stringify(stored));
+    } catch {}
   };
 
+  const handleReport = () => {
+    if (!wasReported) setReportDialogOpen(true);
+  };
+
+  // Ask once per error before sending anything; nothing is reported without consent
   useEffect(() => {
-    if (hasError && !wasReported && !isPredefinedError(downloadingData.message)) {
-      handleReport();
-    }
-  }, [hasError, wasReported, downloadingData.message]);
+    if (!hasError || wasReported || isPredefinedError(downloadingData.message)) return;
+    if (!shouldPromptDownloadReports()) return;
+    try {
+      const dismissed = JSON.parse(localStorage.getItem("dismissedReportErrors") || "{}");
+      if (dismissed[reportErrorKey]) return;
+    } catch {}
+    setReportDialogOpen(true);
+  }, [hasError, wasReported, reportErrorKey]);
 
   // The downloaded archive was quarantined or deleted: only a fresh download helps.
   const isSourceMissing = Boolean(downloadingData?.sourceMissing);
@@ -2904,19 +2850,15 @@ const DownloadCard = ({
                     variant="outline"
                     size="sm"
                     onClick={handleReport}
-                    disabled={isReporting || wasReported}
+                    disabled={wasReported}
                     className="gap-2"
                   >
-                    {isReporting ? (
-                      <Loader className="h-4 w-4 animate-spin" />
-                    ) : wasReported ? (
+                    {wasReported ? (
                       <CircleCheck className="h-4 w-4" />
                     ) : (
                       <AlertTriangle className="h-4 w-4" />
                     )}
-                    {isReporting
-                      ? t("common.reporting")
-                      : wasReported
+                    {wasReported
                         ? t("downloads.alreadyReported")
                         : t("common.reportToAscendara")}
                   </Button>
@@ -2948,6 +2890,20 @@ const DownloadCard = ({
               </a>
             )}
           </Callout>
+        )}
+        {hasError && (
+          <DownloadReportDialog
+            open={reportDialogOpen}
+            onOpenChange={setReportDialogOpen}
+            game={game}
+            downloadingData={downloadingData}
+            errorMessage={errorMessage}
+            onReported={() => {
+              rememberReportChoice("reportedErrors");
+              setWasReported(true);
+            }}
+            onDismissed={() => rememberReportChoice("dismissedReportErrors")}
+          />
         )}
 
         {/* Live log, inline */}

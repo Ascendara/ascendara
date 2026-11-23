@@ -960,6 +960,54 @@ function registerMiscHandlers() {
     }
   });
 
+  // Log tails attached to a report the person agreed to send. Home folder and
+  // account names are replaced so the report doesn't carry them.
+  ipcMain.handle("get-report-logs", async () => {
+    const appDataPath = path.join(app.getPath("appData"), "Ascendara by tagoWorks");
+    // The downloader writes to ~/.config on macOS and Linux
+    const configPath = path.join(os.homedir(), ".config", "Ascendara by tagoWorks");
+    const files = {
+      "downloadmanager.log": [appDataPath, configPath],
+      "debug.log": [appDataPath],
+      "gamehandler.log": [appDataPath],
+    };
+    const home = os.homedir();
+    const homePattern = home
+      ? new RegExp(
+          home.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\\\|\//g, "[\\\\/]"),
+          "gi"
+        )
+      : null;
+    const redact = text =>
+      (homePattern ? text.replace(homePattern, "~") : text).replace(
+        /([\\/](?:Users|home)[\\/])[^\\/\r\n"':]+/gi,
+        "$1<user>"
+      );
+    const logs = {};
+    for (const [name, folders] of Object.entries(files)) {
+      for (const folder of [...new Set(folders)]) {
+        const filePath = path.join(folder, name);
+        try {
+          const { size } = await fs.promises.stat(filePath);
+          const length = Math.min(size, 256 * 1024);
+          const handle = await fs.promises.open(filePath, "r");
+          try {
+            const buffer = Buffer.alloc(length);
+            await handle.read(buffer, 0, length, size - length);
+            let text = buffer.toString("utf-8");
+            // A cut log starts mid-line
+            if (length < size) text = text.slice(text.indexOf("\n") + 1);
+            logs[name] = redact(text);
+          } finally {
+            await handle.close();
+          }
+          break;
+        } catch {}
+      }
+    }
+    return logs;
+  });
+
   // Upload support logs
   ipcMain.handle("upload-support-logs", async (_, sessionToken, appToken) => {
     try {
