@@ -554,7 +554,14 @@ function useBigPicturePage() {
     const toastId = `bp-debrid-${game.game}`;
     toast.loading(t("download.toast.processingLink"), { id: toastId });
     try {
-      const result = await debrid.resolveHost(settings, link, host, game, 0, provider.id);
+      const result = await debrid.resolveHost(
+        settings,
+        link,
+        host,
+        game,
+        game.installDirIndex || 0,
+        provider.id
+      );
       const url =
         result.url || (cloud ? await waitForCloudFile(result, provider, toastId) : null);
       toast.dismiss(toastId);
@@ -613,7 +620,13 @@ function useBigPicturePage() {
     }
     if (cloud && isMagnetLink(link)) {
       try {
-        const result = await debrid.submitMagnet(settings, link, game, 0, cloud.id);
+        const result = await debrid.submitMagnet(
+          settings,
+          link,
+          game,
+          game.installDirIndex || 0,
+          cloud.id
+        );
         toast.success(
           t("debrid.sentToCloud", {
             provider: debrid.getProvider(result.providerId)?.name || cloud.name,
@@ -645,7 +658,7 @@ function useBigPicturePage() {
     version: game.version || "",
     imgID: game.imgID,
     size: game.size || "",
-    additionalDirIndex: 0,
+    additionalDirIndex: game.installDirIndex || 0,
     gameID: game.gameID || "",
   });
 

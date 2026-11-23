@@ -155,7 +155,7 @@ const _processNextInQueueInternal = async () => {
         debridLink,
         null,
         null,
-        0,
+        nextItem.additionalDirIndex || 0,
         nextItem.debridProviderId || "realdebrid"
       );
       if (!resolved.url)

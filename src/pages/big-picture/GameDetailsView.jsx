@@ -38,6 +38,7 @@ import { useMediaSwipe } from "./useMediaSwipe";
 import { useControllerInput } from "./useControllerInput";
 import { DetailBackButton } from "./DetailBackButton";
 import { TimemachineDialog } from "./TimemachineDialog";
+import { InstallLocationDialog } from "./InstallLocationDialog";
 import { ScreenshotGallery, getScreenshotColumns } from "./ScreenshotGallery";
 
 const hasAnyLink = links =>
@@ -147,23 +148,46 @@ const GameDetailsView = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, timemachineAvailable]);
 
+  // With more than one games directory set, ask where a new install goes.
+  // Updates and reinstalls stay where the game already is.
+  const [showLocationDialog, setShowLocationDialog] = useState(false);
+  const installDirectories = useMemo(
+    () =>
+      // index is what the downloader expects: 0 = default, n = additional n - 1
+      [settings.downloadDirectory, ...(settings.additionalDirectories || [])]
+        .map((path, index) => ({ path, index }))
+        .filter(({ path }) => typeof path === "string" && path.trim()),
+    [settings.downloadDirectory, settings.additionalDirectories]
+  );
+  const asksForLocation = installDirectories.length > 1 && !isInstalled && !needsUpdate;
+
+  const proceedDownload = useCallback(
+    installDirIndex => {
+      const target = needsUpdate
+        ? { ...shown, isUpdating: true }
+        : { ...shown, installDirIndex };
+      if (isSeamless && availableProviders.length > 1) {
+        onShowProviderDialog(target, availableProviders);
+      } else {
+        onDownload(target);
+      }
+    },
+    [needsUpdate, shown, isSeamless, availableProviders, onShowProviderDialog, onDownload]
+  );
+
   const startDownload = useCallback(() => {
     if (downloadBlocked) return;
-    const target = needsUpdate ? { ...shown, isUpdating: true } : shown;
-    if (isSeamless && availableProviders.length > 1) {
-      onShowProviderDialog(target, availableProviders);
-    } else {
-      onDownload(target);
-    }
-  }, [
-    downloadBlocked,
-    needsUpdate,
-    shown,
-    isSeamless,
-    availableProviders,
-    onShowProviderDialog,
-    onDownload,
-  ]);
+    if (asksForLocation) setShowLocationDialog(true);
+    else proceedDownload(0);
+  }, [downloadBlocked, asksForLocation, proceedDownload]);
+
+  const handleSelectLocation = useCallback(
+    index => {
+      setShowLocationDialog(false);
+      proceedDownload(index);
+    },
+    [proceedDownload]
+  );
 
   const handleSelectRelease = useCallback(selected => {
     setRelease(selected.live ? null : selected);
@@ -411,7 +435,7 @@ const GameDetailsView = ({
 
   const handleInput = useCallback(
     action => {
-      if (dialogOpen || showTimemachine) return;
+      if (dialogOpen || showTimemachine || showLocationDialog) return;
 
       if (lightboxOpen) {
         if (action === "LEFT" || action === "UP") stepLightbox(-1);
@@ -499,6 +523,7 @@ const GameDetailsView = ({
       onBack,
       dialogOpen,
       showTimemachine,
+      showLocationDialog,
       lightboxOpen,
       focusedSection,
       screenshotIndex,
@@ -540,13 +565,18 @@ const GameDetailsView = ({
       if (action === "MENU" && !showMedia && !lightboxOpen) onBack();
       else handleInput(action);
     },
-    { priority: 5, blocked: dialogOpen || showTimemachine }
+    { priority: 5, blocked: dialogOpen || showTimemachine || showLocationDialog }
   );
 
   const hasScreenshots = screenshots.length > 0;
   const mediaSwipe = useMediaSwipe({
     showMedia,
-    enabled: hasScreenshots && !lightboxOpen && !dialogOpen && !showTimemachine,
+    enabled:
+      hasScreenshots &&
+      !lightboxOpen &&
+      !dialogOpen &&
+      !showTimemachine &&
+      !showLocationDialog,
     open: () => {
       setShowMedia(true);
       setFocusedSection("screenshots");
@@ -1000,6 +1030,15 @@ const GameDetailsView = ({
         showingVersion={shown.version || ""}
         onSelect={handleSelectRelease}
         onClose={() => setShowTimemachine(false)}
+        t={t}
+        controllerType={controllerType}
+      />
+
+      <InstallLocationDialog
+        isOpen={showLocationDialog}
+        directories={installDirectories}
+        onSelect={handleSelectLocation}
+        onClose={() => setShowLocationDialog(false)}
         t={t}
         controllerType={controllerType}
       />
