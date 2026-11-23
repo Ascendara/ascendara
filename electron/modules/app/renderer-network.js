@@ -12,6 +12,11 @@ const MAX_SERVICE_RESPONSE_BYTES = 1024 * 1024;
 const MIN_SERVICE_TIMEOUT_MS = 1000;
 const MAX_SERVICE_TIMEOUT_MS = 15000;
 
+// Status checks run minutes apart, so a kept-alive socket is usually stale by the
+// next one (dropped by a router, firewall or sleep). Writing to it hangs until
+// the timeout and reads as "offline", so each check opens a fresh connection.
+const serviceAgent = new https.Agent({ keepAlive: false });
+
 function normalizeServiceRequest(rawUrl, options = {}) {
   let parsedUrl;
   try {
@@ -72,6 +77,7 @@ function requestAscendaraService(rawUrl, options = {}) {
         method,
         headers,
         timeout,
+        agent: serviceAgent,
       },
       response => {
         response.on("error", reject);

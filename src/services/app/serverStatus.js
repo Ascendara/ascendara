@@ -95,6 +95,16 @@ const checkEndpoint = async url => {
   }
 };
 
+// One dropped request (slow startup, a network blip) shouldn't mark a service
+// down, so an unreachable check is tried once more before it counts
+const RETRY_DELAY = 2000;
+const checkEndpointWithRetry = async url => {
+  const result = await checkEndpoint(url);
+  if (!result.unreachable) return result;
+  await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+  return checkEndpoint(url);
+};
+
 // Singleton state
 let currentStatus = {
   ok: true, // Start optimistically
@@ -120,8 +130,14 @@ const checkBuckets = async () => {
   if (lastBucketCheck && Date.now() - lastBucketCheck < BUCKET_CHECK_INTERVAL) {
     return [currentStatus.storage, currentStatus.r2];
   }
-  lastBucketCheck = Date.now();
-  return Promise.all([checkEndpoint(ENDPOINTS.storage), checkEndpoint(ENDPOINTS.r2)]);
+  const results = await Promise.all([
+    checkEndpointWithRetry(ENDPOINTS.storage),
+    checkEndpointWithRetry(ENDPOINTS.r2),
+  ]);
+  // Only reuse a healthy result: a failure is checked again on the next round
+  // instead of showing for the full 30 minutes
+  lastBucketCheck = results.every(result => result.ok) ? Date.now() : null;
+  return results;
 };
 
 let pendingCheck = null;
@@ -144,8 +160,8 @@ const performStatusCheck = async (force = false) => {
     // These checks double as the connectivity probe, so there is no separate
     // ping: if none of them got any response at all, we have no internet.
     const [monitor, api] = await Promise.all([
-      checkEndpoint(ENDPOINTS.monitor),
-      checkEndpoint(ENDPOINTS.api),
+      checkEndpointWithRetry(ENDPOINTS.monitor),
+      checkEndpointWithRetry(ENDPOINTS.api),
     ]);
     const isOnline = ![monitor, api].every(r => r.unreachable);
 
