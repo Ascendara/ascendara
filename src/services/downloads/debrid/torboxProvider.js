@@ -1,3 +1,4 @@
+import { DIRECT_DOWNLOAD_HOSTS } from "../../../config/providers";
 import * as api from "../torboxService";
 
 export default {
@@ -25,7 +26,7 @@ export default {
   torrentSetting: "useTorboxForTorrents",
   prioritizeSetting: "prioritizeTorboxOverSeamless",
   torrentFallbackSetting: "fallbackToQbittorrentOnTorboxFailure",
-  seamlessHosts: ["gofile", "pixeldrain", "buzzheavier"],
+  seamlessHosts: DIRECT_DOWNLOAD_HOSTS,
   downloadsPath: "/torboxdownloads",
   hostDownloadMode: "cloud",
   metadataStorageKey: "torboxGameNames",

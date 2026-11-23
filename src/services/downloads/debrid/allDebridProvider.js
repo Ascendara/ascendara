@@ -1,3 +1,4 @@
+import { DIRECT_DOWNLOAD_HOSTS } from "../../../config/providers";
 import * as api from "../allDebridService";
 import * as signIn from "../allDebridSignIn";
 
@@ -26,7 +27,7 @@ export default {
   torrentSetting: "useAllDebridForTorrents",
   prioritizeSetting: "prioritizeAllDebridOverSeamless",
   removeAfterDoneSetting: "allDebridRemoveAfterDone",
-  seamlessHosts: ["gofile", "pixeldrain", "buzzheavier", "megadb"],
+  seamlessHosts: DIRECT_DOWNLOAD_HOSTS,
   // No cloud page: torrents being prepared are listed on the local Downloads page.
   hasDownloadsPage: false,
   // Torrents take minutes to hours in the cloud; no need to ask every 5 seconds.

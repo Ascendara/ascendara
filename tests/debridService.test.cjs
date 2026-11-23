@@ -170,24 +170,26 @@ test("host routing applies the chosen adapter's seamless preference and URL supp
       false
     );
   }
-  assert.equal(
-    debrid.canUseForHost(
-      { debridEnabled: true, torboxApiKey: "tb" },
-      "megadb",
-      "https://megadb.net/file",
-      domains
-    ),
-    true
-  );
-  assert.equal(
-    debrid.canUseForHost(
-      { debridEnabled: true, realDebridApiKey: "rd" },
-      "megadb",
-      "https://megadb.net/file",
-      domains
-    ),
-    false
-  );
+  // MegaDB downloads directly, so no service takes it unless preferred over direct
+  for (const settings of [
+    { debridEnabled: true, torboxApiKey: "tb" },
+    { debridEnabled: true, realDebridApiKey: "rd" },
+  ]) {
+    assert.equal(
+      debrid.canUseForHost(settings, "megadb", "https://megadb.net/file", domains),
+      false
+    );
+    const provider = debrid.getPreferredProvider(settings);
+    assert.equal(
+      debrid.canUseForHost(
+        { ...settings, [provider.prioritizeSetting]: true },
+        "megadb",
+        "https://megadb.net/file",
+        domains
+      ),
+      true
+    );
+  }
 });
 
 test("a third adapter works through the same interface without provider-specific branches", async t => {

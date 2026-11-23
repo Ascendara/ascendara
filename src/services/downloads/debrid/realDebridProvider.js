@@ -1,3 +1,4 @@
+import { DIRECT_DOWNLOAD_HOSTS } from "../../../config/providers";
 import * as api from "../realDebridService";
 import * as signIn from "../realDebridSignIn";
 import { resumePendingTorrents } from "../realDebridTorrentStartup";
@@ -35,7 +36,7 @@ export default {
   apiKeySetting: "realDebridApiKey",
   torrentSetting: "useRealDebridForTorrents",
   prioritizeSetting: "prioritizeRealDebridOverSeamless",
-  seamlessHosts: ["gofile", "pixeldrain", "buzzheavier", "megadb"],
+  seamlessHosts: DIRECT_DOWNLOAD_HOSTS,
   downloadsPath: "/realdebriddownloads",
   hostDownloadMode: "direct",
   metadataStorageKey: "realDebridGameData",

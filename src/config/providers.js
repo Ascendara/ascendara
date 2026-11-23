@@ -13,6 +13,10 @@ export const SEAMLESS_PROVIDERS = ["gofile", "pixeldrain"];
 // so they download without the user opening a browser.
 export const MAGIC_LINK_PROVIDERS = ["buzzheavier", "megadb"];
 
+// Hosts Ascendara downloads itself. Debrid services only take these when the
+// user turns on "Prefer over direct downloads" for that service.
+export const DIRECT_DOWNLOAD_HOSTS = [...SEAMLESS_PROVIDERS, ...MAGIC_LINK_PROVIDERS];
+
 export function isMagicLink(provider, url) {
   return (
     MAGIC_LINK_PROVIDERS.includes(String(provider || "").toLowerCase()) ||
