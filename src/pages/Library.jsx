@@ -178,6 +178,15 @@ const getLibraryCardKey = game =>
     : `${getLibraryIdentityKey(game)}:${libraryInstallKey(game)}`) ||
   `library-item:${game?.executable || game?.path || game?.installPath || "unknown"}`;
 
+// Latest known play time in ms: lastPlayed comes from cloud/store sync, while
+// the game handler stamps lastSession.endedAt locally on every exit
+const getLastPlayedTime = game => {
+  const times = [game?.lastPlayed, game?.lastSession?.endedAt]
+    .map(value => (typeof value === "number" ? value : Date.parse(value)))
+    .filter(Number.isFinite);
+  return times.length ? Math.max(...times) : 0;
+};
+
 const Library = () => {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedGames, setSelectedGames] = useState([]);
@@ -733,6 +742,12 @@ const Library = () => {
         const aTime = a.playTime || 0;
         const bTime = b.playTime || 0;
         if (aTime !== bTime) return bTime - aTime;
+      }
+      if (sortMode === "lastPlayed") {
+        // Most recent first; never-played games go last
+        const aPlayed = getLastPlayedTime(a);
+        const bPlayed = getLastPlayedTime(b);
+        if (aPlayed !== bPlayed) return bPlayed - aPlayed;
       }
       if (sortMode === "installed") {
         // Newest first; games without a known install date go last
@@ -2577,6 +2592,12 @@ const Library = () => {
                       onClick: () => setSortMode("playtime"),
                     },
                     {
+                      label: t("library.sort.lastPlayed"),
+                      icon: <History className="h-4 w-4" />,
+                      active: sortMode === "lastPlayed",
+                      onClick: () => setSortMode("lastPlayed"),
+                    },
+                    {
                       label: t("library.sort.lastInstalled"),
                       icon: <Clock className="h-4 w-4" />,
                       active: sortMode === "installed",
@@ -3362,11 +3383,8 @@ const Library = () => {
                     const bt = b.playTime || 0;
                     return bt !== at ? bt - at : aName.localeCompare(bName);
                   }
-                  case "recentlyPlayed": {
-                    const al = a.lastPlayed || 0;
-                    const bl = b.lastPlayed || 0;
-                    return bl - al;
-                  }
+                  case "recentlyPlayed":
+                    return getLastPlayedTime(b) - getLastPlayedTime(a);
                   case "recentlyAdded": {
                     const aa = a.addedAt || 0;
                     const ba = b.addedAt || 0;
