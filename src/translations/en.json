@@ -2164,6 +2164,17 @@
       "share": "Share",
       "wrongArtwork": "Wrong artwork"
     },
+    "torznab": {
+      "description": "Live results from your Prowlarr indexers. Pick a release to download it.",
+      "noResults": "No releases found for this game",
+      "search": "Search indexers",
+      "searchAgain": "Search again",
+      "searching": "Searching indexers...",
+      "sentToUsenet": "Sent to your Usenet client. Follow it in Downloads.",
+      "someFailed": "{{count}} indexer(s) didn't respond",
+      "title": "Prowlarr",
+      "usenetBadge": "Usenet"
+    },
     "trainer": "Trainer Menu",
     "update": {
       "description": "Ascendara will copy your current installation before updating. This needs extra disk space equal to the installed game, plus space for the update. Cancelling restores the previous game and its saved files. Files from a cancelled update are kept in .ascendara-updates inside your library folder.",
@@ -5502,6 +5513,33 @@
     },
     "torrenting": "Torrenting",
     "torrentingDescription": "Download torrents directly with Ascendara's built-in torrent client. A VPN is strongly recommended.",
+    "torznab": {
+      "apiKey": "API key",
+      "apiKeyHint": "Found in Prowlarr under Settings > General > Security.",
+      "connected": "Connected to the Torznab feed",
+      "connectedProwlarr": "Connected to Prowlarr with {{count}} torrent indexer(s)",
+      "connectedProwlarrUsenet": "Connected to Prowlarr with {{count}} torrent and {{usenetCount}} Usenet indexer(s)",
+      "description": "Search the indexers in Prowlarr, or any Torznab feed such as Jackett, from a game's download page. Releases download through the built-in torrent client or a debrid service.",
+      "errors": {
+        "badNzb": "This release's NZB file couldn't be read",
+        "badResponse": "The indexer sent a response Ascendara couldn't read",
+        "badTorrent": "This release's torrent file couldn't be read",
+        "invalidUrl": "Enter a valid http:// or https:// URL",
+        "noIndexers": "Prowlarr has no enabled indexers Ascendara can use",
+        "notConfigured": "Add a Prowlarr URL in Settings to search",
+        "notProwlarr": "No Prowlarr found at this URL. For another Torznab feed, use its full URL ending in /api",
+        "timeout": "The indexer took too long to respond",
+        "unauthorized": "The API key was rejected",
+        "unknownResult": "This result is out of date. Search again",
+        "unreachable": "Couldn't reach this URL. Check that it's running and the address is correct"
+      },
+      "hideKey": "Hide API key",
+      "showKey": "Show API key",
+      "test": "Test connection",
+      "title": "Prowlarr / Torznab",
+      "url": "URL",
+      "urlHint": "Your Prowlarr address, such as http://localhost:9696, to search all of its indexers. For a single Torznab feed, paste its full URL."
+    },
     "uploadLogs": "Upload Logs",
     "userSettings": {
       "browseDirectory": "Browse",

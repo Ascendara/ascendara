@@ -45,6 +45,7 @@ class SettingsManager {
       "allDebridApiKey",
       "premiumizeApiKey",
       "debridLinkApiKey",
+      "torznabApiKey",
     ];
     // Logins from features that are gone. Nothing reads them, but files can still hold them.
     this.retiredSensitiveKeys = ["twitchSecret", "twitchClientId"];
@@ -74,6 +75,10 @@ class SettingsManager {
       notificationSoundPath: "",
       downloadHandler: false,
       torrentEnabled: false,
+      // Prowlarr root URL or a single Torznab feed, searched from game pages
+      torznabEnabled: false,
+      torznabUrl: "",
+      torznabApiKey: "",
       torrentHost: "localhost",
       torrentPort: 8080,
       torrentUsername: "admin",

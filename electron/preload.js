@@ -219,6 +219,11 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.invoke("private-source-import-game", game, labels),
     export: (id, labels) => ipcRenderer.invoke("private-source-export", id, labels),
   },
+  torznab: {
+    search: query => ipcRenderer.invoke("torznab-search", query),
+    resolve: result => ipcRenderer.invoke("torznab-resolve", result),
+    test: () => ipcRenderer.invoke("torznab-test"),
+  },
   setExternalSourceJson: (sourceId, data) =>
     ipcRenderer.invoke("set-external-source-json", sourceId, data),
   getExternalSourceJson: sourceId =>

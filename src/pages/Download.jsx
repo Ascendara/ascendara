@@ -23,6 +23,9 @@ import ArtworkCorrectionDialog, {
 } from "@/components/download/ArtworkCorrectionDialog";
 import SystemRequirements from "@/components/download/SystemRequirements";
 import SourceSwitcher from "@/components/download/SourceSwitcher";
+import TorznabResults, {
+  torznabEntry,
+} from "@/components/download/TorznabResults";
 import { ModsSection } from "@/components/gamescreen/ModsTrainersTab";
 import ModDetailsDialog from "@/components/gamescreen/ModDetailsDialog";
 import { useNexusMods } from "@/hooks/useNexusMods";
@@ -2143,6 +2146,13 @@ function PublicDownloadPage() {
               entries={sourceEntries}
               current={selectedSourceEntry || gameData}
               onSelect={handleSourceSelect}
+            />
+            <TorznabResults
+              gameName={gameData.game}
+              current={selectedSourceEntry}
+              onSelect={(result, magnet) =>
+                handleSourceSelect(torznabEntry(gameData, result, magnet))
+              }
             />
             <DownloadPanel
               mode={downloadMode}

@@ -135,6 +135,7 @@ test("every sensitive setting gets the stored format", async () => {
         "allDebridApiKey",
         "premiumizeApiKey",
         "debridLinkApiKey",
+        "torznabApiKey",
       ];
       assert.deepEqual(manager.sensitiveKeys, names);
       for (const name of names)

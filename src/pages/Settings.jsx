@@ -1,4 +1,5 @@
 import DebridSettings from "@/components/DebridSettings";
+import TorznabSettings from "@/components/TorznabSettings";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useTheme, clearCustomTheme } from "@/context/ThemeContext";
 import {
@@ -614,8 +615,10 @@ function Settings() {
         return;
       }
 
-      console.log(`Trying to update: ${key} -> ${value}`);
-      window.electron.updateSetting(key, value).then(success => {
+      console.log(
+        `Trying to update: ${key} -> ${/apikey|secret|token/i.test(key) ? "[hidden]" : value}`
+      );
+      return window.electron.updateSetting(key, value).then(success => {
         console.log(`Update result ${key}:`, success);
         if (success) {
           if (key === "sideScrollBar") {
@@ -2094,6 +2097,13 @@ function Settings() {
                     onCheckedChange={handleTorrentToggle}
                   />
                 </div>
+              </SettingsSection>
+
+              <SettingsSection id="torznab-search">
+                <TorznabSettings
+                  settings={settings}
+                  onSettingChange={handleSettingChange}
+                />
               </SettingsSection>
             </SettingsCategory>
 

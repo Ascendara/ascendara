@@ -296,6 +296,23 @@ export const settingsSearchData = [
     scrollTo: "torrent-downloads",
   },
   {
+    id: "torznab-search",
+    title: "Prowlarr / Torznab Search",
+    description: "Search your Prowlarr or Torznab indexers from game pages",
+    keywords: [
+      "prowlarr",
+      "torznab",
+      "jackett",
+      "indexer",
+      "indexers",
+      "arr",
+      "api key",
+      "search",
+    ],
+    section: "Downloads",
+    scrollTo: "torznab-search",
+  },
+  {
     id: "post-download-behavior",
     title: "Post-Download Behavior / Behavior After Download",
     description: "Action to perform after downloads complete",
