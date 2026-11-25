@@ -1,0 +1,37 @@
+{
+  "name": "DS4Windows",
+  "version": "1.0.0",
+  "author": "tago",
+  "description": "Makes PlayStation controllers work in games that only support Xbox controllers. Windows only.",
+  "details": "Many games only read Xbox controllers. Steam fixes this for its own games with Steam Input, but games started from Ascendara don't get it, so a DualShock 4 or DualSense does nothing in them. This plugin starts DS4Windows when a game starts, which shows your PlayStation controller to games as an Xbox controller, and closes it again when the last game closes. DS4Windows is downloaded from its GitHub releases the first time it's needed. The first time it runs, DS4Windows asks to install the ViGEmBus driver: click Install in its welcome window, then start the game again. DS4Windows also needs the .NET 8 Desktop Runtime, and Windows offers to download it if it's missing. Already have DS4Windows? Set its path in this plugin's options.",
+  "affects": [
+    "Starts DS4Windows while a game is running, and closes it afterwards",
+    "Downloads DS4Windows the first time a game starts"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/schmaldeo/DS4Windows",
+  "minAppVersion": "12.3.2",
+  "apiVersion": 1,
+  "main": "index.js",
+  "permissions": ["downloads", "processes"],
+  "settings": [
+    {
+      "key": "mode",
+      "type": "select",
+      "label": "Run DS4Windows",
+      "description": "While Ascendara is open, Big Picture may see your controller twice. Turn on \"Hide DS4 Controller\" in DS4Windows to fix that.",
+      "default": "playing",
+      "options": [
+        { "value": "playing", "label": "Only while a game is running" },
+        { "value": "always", "label": "While Ascendara is open" }
+      ]
+    },
+    {
+      "key": "path",
+      "type": "text",
+      "label": "Use my own DS4Windows",
+      "description": "Full path to DS4Windows.exe. Leave empty to have the plugin download it.",
+      "placeholder": "C:\\Tools\\DS4Windows\\DS4Windows.exe"
+    }
+  ]
+}
