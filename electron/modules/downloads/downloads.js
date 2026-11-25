@@ -109,6 +109,7 @@ async function stopForFolderCheck(result, context) {
 }
 const dllRepair = require("./dllRepair");
 const { validateFileList } = require("./downloadManifest");
+const { findGameExecutable } = require("./executableScan");
 
 /**
  * Register download-related IPC handlers
@@ -970,50 +971,7 @@ function registerDownloadHandlers() {
       // Try to find the installed executable if we don't already have a valid one
       let executable = gameInfo.executable;
       if (!executable || !fs.existsSync(executable)) {
-        const candidates = [];
-        const walk = dir => {
-          let entries = [];
-          try {
-            entries = fs.readdirSync(dir, { withFileTypes: true });
-          } catch {
-            return;
-          }
-          for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            if (entry.isDirectory()) {
-              walk(fullPath);
-            } else if (entry.name.toLowerCase().endsWith(".exe")) {
-              const lower = entry.name.toLowerCase();
-              if (
-                lower.includes("unins") ||
-                lower.includes("setup") ||
-                lower.includes("redist") ||
-                lower.includes("vcredist") ||
-                lower.includes("directx") ||
-                lower.includes("dxsetup") ||
-                lower.includes("quicksfv") ||
-                lower.includes("checksum") ||
-                lower.includes("md5") ||
-                lower.includes("readme") ||
-                lower.includes("crashreport") ||
-                lower.includes("crashpad")
-              ) {
-                continue;
-              }
-              try {
-                candidates.push({
-                  path: fullPath,
-                  size: fs.statSync(fullPath).size,
-                });
-              } catch {}
-            }
-          }
-        };
-        walk(gameDirectory);
-        candidates.sort((a, b) => b.size - a.size);
-        if (candidates.length > 0) {
-          executable = candidates[0].path;
-        }
+        executable = findGameExecutable(gameDirectory) || executable;
       }
 
       if (executable) {

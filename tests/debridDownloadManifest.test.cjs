@@ -72,6 +72,7 @@ function loadDownloadHandlers(root, settings, spawns) {
     "./downloadLiveness": { startDownloadWatchdog() {} },
     "./torrentLink": require("../electron/modules/downloads/torrentLink"),
     "./privateSources": { resume: async () => null },
+    "./executableScan": require("../electron/modules/downloads/executableScan"),
     "./dllRepair": {},
     "./downloaderRuntime": {},
     "./gameUpdateBackup": {},
