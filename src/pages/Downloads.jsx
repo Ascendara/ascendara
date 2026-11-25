@@ -1908,6 +1908,7 @@ const DownloadCard = ({
   const predefinedErrorPatterns = [
     "content_type_error",
     "privateSources.",
+    "usenet.errors.",
     "no_files_error",
     "provider_blocked_error",
     "download_connection_error",
@@ -1982,6 +1983,14 @@ const DownloadCard = ({
     const msg = downloadingData.message;
     if (!msg) return null;
     if (game.privateSource) return privateSourceMessage(t, msg);
+    const usenetError = msg.match(/^usenet\.errors\.([A-Za-z]+)(?:\|(\{.*\}))?$/s);
+    if (usenetError) {
+      let params = {};
+      try {
+        params = usenetError[2] ? JSON.parse(usenetError[2]) : {};
+      } catch {}
+      return t(`usenet.errors.${usenetError[1]}`, params);
+    }
     if (isSourceMissing) return t("downloads.sourceMissingError");
 
     if (msg.trim().toLowerCase() === "conflict")

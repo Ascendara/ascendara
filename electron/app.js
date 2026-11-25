@@ -403,6 +403,7 @@ function registerCriticalHandlers() {
   downloads.registerDownloadHandlers();
   require("./modules/downloads/privateSources").registerPrivateSourceHandlers();
   require("./modules/sources/torznab").registerTorznabHandlers();
+  require("./modules/downloads/usenet").registerUsenetHandlers();
   games.registerGameHandlers();
   require("./modules/library/libraryTransfer").registerLibraryTransferHandlers();
   require("./modules/store-accounts").registerStoreAccountHandlers();

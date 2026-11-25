@@ -997,6 +997,9 @@ function registerDownloadHandlers() {
           async () => {
             // Wait for in-process private transfers to close their streams and
             // finish writing metadata before the shared removal flow touches files.
+            // Usenet jobs run in the user's client: pause it there, or delete it
+            // when the download is removed. The rest of this flow then marks it.
+            await require("./usenet").stop(game, isKill || deleteContents);
             const privateStopped = await require("./privateSources").stop(game);
             if (privateStopped && !isKill && !deleteContents) return true;
             console.log(
@@ -1622,6 +1625,8 @@ function registerDownloadHandlers() {
   const resumeDownload = async game => {
     const privateResult = await require("./privateSources").resume(game);
     if (privateResult) return privateResult;
+    const usenetResult = await require("./usenet").resume(game);
+    if (usenetResult) return usenetResult;
     try {
       return await withDownloadOperation(
         sanitizeGameName(sanitizeText(game)),

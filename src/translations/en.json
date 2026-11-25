@@ -5541,6 +5541,23 @@
       "urlHint": "Your Prowlarr address, such as http://localhost:9696, to search all of its indexers. For a single Torznab feed, paste its full URL."
     },
     "uploadLogs": "Upload Logs",
+    "usenet": {
+      "apiKey": "API key",
+      "apiKeyHint": "Found in SABnzbd under Config > General > Security.",
+      "category": "Category",
+      "categoryHint": "Optional. The category new jobs are added under, so they land in their own folder.",
+      "client": "Download client",
+      "connected": "Connected to {{client}} {{version}}",
+      "description": "Send Usenet releases found through Prowlarr to SABnzbd or NZBGet. Ascendara follows the download and adds the game to your library when it finishes.",
+      "localPath": "Same folder on this computer",
+      "password": "Password",
+      "pathMapping": "Path mapping",
+      "pathMappingHint": "Only needed when the client runs in Docker or on another computer. Enter its download folder as the client sees it, then the same folder as this computer sees it.",
+      "remotePath": "Client folder, e.g. /downloads",
+      "title": "Usenet",
+      "url": "URL",
+      "username": "Username"
+    },
     "userSettings": {
       "browseDirectory": "Browse",
       "description": "Update your display name that is shown on this page. You can also use this name for Goldberg cracks.",
@@ -5729,6 +5746,26 @@
     "stepOf": "Step {{current}} of {{total}}",
     "title": "Welcome to Ascendara",
     "welcome": "Let's take a quick look around so you know where everything is. It only takes a minute."
+  },
+  "usenet": {
+    "errors": {
+      "badNzb": "This release's NZB file couldn't be read",
+      "badResponse": "The Usenet client sent a response Ascendara couldn't read",
+      "folderExists": "A folder for this game already exists in your download location",
+      "invalidGame": "This game's name can't be used as a folder name",
+      "invalidUrl": "Enter a valid http:// or https:// URL",
+      "jobFailed": "The Usenet client couldn't finish this download: {{detail}}",
+      "jobMissing": "The job is no longer in the Usenet client",
+      "moveFailed": "The finished files couldn't be moved into the game folder: {{detail}}",
+      "noDownloadFolder": "Set a download location in Settings first",
+      "notConfigured": "Set up SABnzbd or NZBGet in Settings first",
+      "pathNotFound": "Ascendara can't find the finished files at {{detail}}. If the client runs in Docker or on another computer, set up path mapping in Settings",
+      "rejected": "The Usenet client didn't accept the NZB",
+      "timeout": "The Usenet client took too long to respond",
+      "unauthorized": "The Usenet client rejected the API key or login",
+      "unknownResult": "This result is out of date. Search again",
+      "unreachable": "Couldn't reach the Usenet client. Check that it's running and the URL is correct"
+    }
   },
   "welcome": {
     "alternatives": "Alternatives (optional)",

@@ -313,6 +313,23 @@ export const settingsSearchData = [
     scrollTo: "torznab-search",
   },
   {
+    id: "usenet-client",
+    title: "Usenet / SABnzbd / NZBGet",
+    description: "Send Usenet releases from Prowlarr to SABnzbd or NZBGet",
+    keywords: [
+      "usenet",
+      "nzb",
+      "newznab",
+      "sabnzbd",
+      "sab",
+      "nzbget",
+      "download client",
+      "path mapping",
+    ],
+    section: "Downloads",
+    scrollTo: "usenet-client",
+  },
+  {
     id: "post-download-behavior",
     title: "Post-Download Behavior / Behavior After Download",
     description: "Action to perform after downloads complete",

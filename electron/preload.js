@@ -224,6 +224,10 @@ contextBridge.exposeInMainWorld("electron", {
     resolve: result => ipcRenderer.invoke("torznab-resolve", result),
     test: () => ipcRenderer.invoke("torznab-test"),
   },
+  usenet: {
+    test: () => ipcRenderer.invoke("usenet-test"),
+    start: options => ipcRenderer.invoke("usenet-start", options),
+  },
   setExternalSourceJson: (sourceId, data) =>
     ipcRenderer.invoke("set-external-source-json", sourceId, data),
   getExternalSourceJson: sourceId =>

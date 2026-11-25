@@ -46,6 +46,8 @@ class SettingsManager {
       "premiumizeApiKey",
       "debridLinkApiKey",
       "torznabApiKey",
+      "usenetApiKey",
+      "usenetPassword",
     ];
     // Logins from features that are gone. Nothing reads them, but files can still hold them.
     this.retiredSensitiveKeys = ["twitchSecret", "twitchClientId"];
@@ -79,6 +81,17 @@ class SettingsManager {
       torznabEnabled: false,
       torznabUrl: "",
       torznabApiKey: "",
+      // SABnzbd or NZBGet that Usenet releases are sent to
+      usenetEnabled: false,
+      usenetClient: "sabnzbd",
+      usenetUrl: "",
+      usenetApiKey: "",
+      usenetUsername: "",
+      usenetPassword: "",
+      usenetCategory: "",
+      // The client's download folder as it sees it, and as this computer sees it
+      usenetRemotePath: "",
+      usenetLocalPath: "",
       torrentHost: "localhost",
       torrentPort: 8080,
       torrentUsername: "admin",

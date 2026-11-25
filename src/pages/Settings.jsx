@@ -1,5 +1,6 @@
 import DebridSettings from "@/components/DebridSettings";
 import TorznabSettings from "@/components/TorznabSettings";
+import UsenetSettings from "@/components/UsenetSettings";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useTheme, clearCustomTheme } from "@/context/ThemeContext";
 import {
@@ -2101,6 +2102,13 @@ function Settings() {
 
               <SettingsSection id="torznab-search">
                 <TorznabSettings
+                  settings={settings}
+                  onSettingChange={handleSettingChange}
+                />
+              </SettingsSection>
+
+              <SettingsSection id="usenet-client">
+                <UsenetSettings
                   settings={settings}
                   onSettingChange={handleSettingChange}
                 />

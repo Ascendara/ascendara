@@ -24,6 +24,7 @@ import ArtworkCorrectionDialog, {
 import SystemRequirements from "@/components/download/SystemRequirements";
 import SourceSwitcher from "@/components/download/SourceSwitcher";
 import TorznabResults, {
+  formatSize,
   torznabEntry,
 } from "@/components/download/TorznabResults";
 import { ModsSection } from "@/components/gamescreen/ModsTrainersTab";
@@ -661,6 +662,24 @@ function PublicDownloadPage() {
   const handleSourceSelect = entry => {
     setLatestGameData(null);
     setSelectedSourceEntry(entry);
+  };
+
+  // Usenet releases go to the user's SABnzbd / NZBGet; Downloads follows the job
+  const handleSendUsenet = async result => {
+    const response = await window.electron.usenet.start({
+      result,
+      game: gameData.game,
+      gameID: gameData.gameID,
+      imgID: gameData.imgID,
+      online: !!gameData.online,
+      dlc: !!gameData.dlc,
+      size: formatSize(result.size) || gameData.size || "",
+    });
+    if (response?.success) {
+      toast.success(t("download.torznab.sentToUsenet"));
+      navigate("/downloads");
+    }
+    return response;
   };
 
   // Keep the whereToDownload ref in sync with the latest function
@@ -2153,6 +2172,7 @@ function PublicDownloadPage() {
               onSelect={(result, magnet) =>
                 handleSourceSelect(torznabEntry(gameData, result, magnet))
               }
+              onSendUsenet={handleSendUsenet}
             />
             <DownloadPanel
               mode={downloadMode}
