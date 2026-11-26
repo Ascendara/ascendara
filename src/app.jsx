@@ -76,7 +76,7 @@ import {
   WISHLIST_MATCHES_EVENT,
 } from "@/services/ascend/wishlistWatchService";
 import {
-  getUnreadMessageCount,
+  subscribeToUnreadMessages,
   verifyAscendAccess,
 } from "@/services/firebase/firebaseService";
 import gameService from "@/services/games/gameService";
@@ -1154,83 +1154,43 @@ const MessageNotificationChecker = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const lastCheckedRef = useRef({});
-  const checkIntervalRef = useRef(null);
   const pathnameRef = useRef(location.pathname);
   pathnameRef.current = location.pathname;
+  // Kept in refs so a language change doesn't restart the listener
+  const tRef = useRef(t);
+  tRef.current = t;
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
 
   useEffect(() => {
-    if (!user?.uid) {
-      // Clear interval if user logs out
-      if (checkIntervalRef.current) {
-        clearInterval(checkIntervalRef.current);
-        checkIntervalRef.current = null;
-      }
-      lastCheckedRef.current = {};
-      return;
-    }
+    if (!user?.uid) return;
 
-    const checkForNewMessages = async (isInitialCheck = false) => {
-      try {
-        // Skip notifications if user is on Ascend page (real-time listener handles it)
-        if (pathnameRef.current === "/ascend") {
-          return;
-        }
+    // The first snapshot is the baseline: messages that were already unread
+    // before we started watching don't get a toast.
+    let lastCounts = null;
+    return subscribeToUnreadMessages(({ newMessages }) => {
+      const previous = lastCounts;
+      lastCounts = Object.fromEntries(
+        newMessages.map(msg => [msg.conversationId, msg.unreadCount])
+      );
+      // The Ascend page shows new messages itself
+      if (!previous || pathnameRef.current === "/ascend") return;
 
-        const result = await getUnreadMessageCount();
-        if (result.error || result.newMessages.length === 0) return;
-
-        // On the first check after mount/login, just record existing unread
-        // counts as the baseline instead of notifying for messages that were
-        // already unread before we started watching.
-        if (isInitialCheck) {
-          result.newMessages.forEach(msg => {
-            lastCheckedRef.current[msg.conversationId] = msg.unreadCount;
-          });
-          return;
-        }
-
-        // Check for new messages we haven't notified about
-        result.newMessages.forEach(msg => {
-          const lastNotified = lastCheckedRef.current[msg.conversationId] || 0;
-
-          // Only notify if this is a new message (more unread than before)
-          if (msg.unreadCount > lastNotified) {
-            // Show toast notification
-            toast(t("ascend.messages.newMessage", { name: msg.senderName }), {
-              description:
-                msg.messageText?.substring(0, 50) +
-                (msg.messageText?.length > 50 ? "..." : ""),
-              action: {
-                label: t("common.view"),
-                onClick: () => navigate("/ascend"),
-              },
-              duration: 5000,
-            });
-          }
-
-          // Update last checked count
-          lastCheckedRef.current[msg.conversationId] = msg.unreadCount;
+      newMessages.forEach(msg => {
+        if (msg.unreadCount <= (previous[msg.conversationId] || 0)) return;
+        toast(tRef.current("ascend.messages.newMessage", { name: msg.senderName }), {
+          description: msg.messageText
+            ? msg.messageText.substring(0, 50) + (msg.messageText.length > 50 ? "..." : "")
+            : undefined,
+          action: {
+            label: tRef.current("common.view"),
+            onClick: () => navigateRef.current("/ascend"),
+          },
+          duration: 5000,
         });
-      } catch (e) {
-        console.error("[MessageNotificationChecker] Error:", e);
-      }
-    };
-
-    // Initial check after a short delay - just establishes the baseline,
-    // doesn't notify for messages that were already unread before this ran
-    const initialTimeout = setTimeout(() => checkForNewMessages(true), 5000);
-
-    // Reduce polling frequency from 30s to 60s to reduce CPU usage
-    checkIntervalRef.current = setInterval(checkForNewMessages, 60000);
-
-    return () => {
-      clearTimeout(initialTimeout);
-      if (checkIntervalRef.current) {
-        clearInterval(checkIntervalRef.current);
-      }
-    };
-  }, [user?.uid, t, navigate]);
+      });
+    });
+  }, [user?.uid]);
 
   return null;
 };

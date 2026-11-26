@@ -3083,65 +3083,62 @@ export const markMessagesAsRead = async (conversationId, otherUserId) => {
 };
 
 /**
- * Get total unread message count across all conversations, using the unread
- * counters kept on each conversation document
- * @returns {Promise<{count: number, newMessages: array, error: string|null}>}
+ * Watch the unread counters kept on each of the user's conversation documents.
+ * Only conversations that change are read again, unlike polling the query.
+ * @param {function} onUpdate - Receives {count, newMessages} on every change
+ * @returns {function} Unsubscribe function
  */
-export const getUnreadMessageCount = async () => {
-  try {
-    if (!auth || !db) {
-      return { count: 0, newMessages: [], error: "Firebase not initialized" };
-    }
+export const subscribeToUnreadMessages = onUpdate => {
+  const currentUser = auth?.currentUser;
+  if (!db || !currentUser) return () => {};
 
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      return { count: 0, newMessages: [], error: "No user logged in" };
-    }
+  const q = query(
+    collection(db, "conversations"),
+    where("participants", "array-contains", currentUser.uid)
+  );
 
-    const conversationsRef = collection(db, "conversations");
-    const q = query(
-      conversationsRef,
-      where("participants", "array-contains", currentUser.uid)
-    );
-    const snapshot = await getDocs(q);
+  return onSnapshot(
+    q,
+    async snapshot => {
+      try {
+        const unread = snapshot.docs
+          .map(docSnap => {
+            const data = docSnap.data();
+            return {
+              conversationId: docSnap.id,
+              data,
+              otherUserId: data.participants.find(id => id !== currentUser.uid),
+              unreadCount: data.unreadCount?.[currentUser.uid] || 0,
+            };
+          })
+          .filter(conversation => conversation.unreadCount > 0);
 
-    const unread = snapshot.docs
-      .map(docSnap => {
-        const data = docSnap.data();
-        return {
-          conversationId: docSnap.id,
-          data,
-          otherUserId: data.participants.find(id => id !== currentUser.uid),
-          unreadCount: data.unreadCount?.[currentUser.uid] || 0,
-        };
-      })
-      .filter(conversation => conversation.unreadCount > 0);
+        const userDataMap = await batchGetUserData(unread.map(c => c.otherUserId));
+        const newMessages = unread.map(
+          ({ conversationId, data, otherUserId, unreadCount }) => {
+            const userData = userDataMap.get(otherUserId) || { displayName: "Someone" };
+            return {
+              conversationId,
+              senderId: otherUserId,
+              senderName: userData.displayName,
+              senderPhoto: userData.photoURL,
+              messageText:
+                data.lastMessageSenderId === otherUserId ? data.lastMessage : undefined,
+              unreadCount,
+            };
+          }
+        );
 
-    const userDataMap = await batchGetUserData(unread.map(c => c.otherUserId));
-    const newMessages = unread.map(
-      ({ conversationId, data, otherUserId, unreadCount }) => {
-        const userData = userDataMap.get(otherUserId) || { displayName: "Someone" };
-        return {
-          conversationId,
-          senderId: otherUserId,
-          senderName: userData.displayName,
-          senderPhoto: userData.photoURL,
-          messageText:
-            data.lastMessageSenderId === otherUserId ? data.lastMessage : undefined,
-          unreadCount,
-        };
+        onUpdate({
+          count: unread.reduce((sum, c) => sum + c.unreadCount, 0),
+          newMessages,
+        });
+      } catch (error) {
+        console.error("[subscribeToUnreadMessages] Error:", error);
       }
-    );
-
-    return {
-      count: unread.reduce((sum, c) => sum + c.unreadCount, 0),
-      newMessages,
-      error: null,
-    };
-  } catch (error) {
-    console.error("Get unread count error:", error);
-    return { count: 0, newMessages: [], error: error.message };
-  }
+    },
+    error => console.error("[subscribeToUnreadMessages] Error:", error)
+  );
 };
 
 /**
