@@ -39,6 +39,7 @@ import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
 import { Card, CardContent } from "./ui/card";
 import { listBackups as listCloudBackups } from "@/services/firebase/firebaseService";
+import { getActiveGamepad } from "@/lib/gamepad";
 
 const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false }) => {
   const [activeScreen, setActiveScreen] = useState("options"); // options, backup, restore, restoreConfirm, backupsList
@@ -184,10 +185,7 @@ const GamesBackupDialog = ({ game, open, onOpenChange, bigPictureMode = false })
     if (!bigPictureMode || !open) return;
 
     const getGamepadInput = () => {
-      const gamepads = navigator.getGamepads();
-      const gp = Array.from(gamepads).find(
-        g => g && g.connected && g.axes.length >= 2 && g.buttons.length >= 10
-      );
+      const gp = getActiveGamepad();
       if (!gp) return null;
 
       return {

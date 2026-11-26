@@ -119,6 +119,7 @@ import "./styles/scrollbar.css";
 import "@/services/app/notificationSoundService";
 import { usesOfficialIndex } from "@/lib/combinedSources";
 import { GLOBAL_TOAST_SAFE_AREA_OFFSET } from "@/lib/toastSafeArea";
+import { getActiveGamepad } from "@/lib/gamepad";
 import { AlertTriangle, RefreshCwIcon, X, Circle, Square, Triangle } from "lucide-react";
 import {
   AlertDialog,
@@ -554,11 +555,7 @@ const ControllerDetectionPrompt = () => {
     }, 500);
 
     const handleGamepadInput = () => {
-      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-      const gamepad = Array.from(gamepads).find(
-        g => g && g.connected && g.axes.length >= 2 && g.buttons.length >= 10
-      );
-
+      const gamepad = getActiveGamepad();
       if (!gamepad) return;
 
       const confirmPressed = !!gamepad.buttons[0]?.pressed;

@@ -14,6 +14,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { getActiveGamepad } from "@/lib/gamepad";
 import { API_URL } from "@/config/api";
 
 /**
@@ -57,8 +58,7 @@ export const GameAssetSearchDialog = ({
     let animationFrameId;
 
     const getGamepadInput = () => {
-      const gamepads = navigator.getGamepads();
-      const gp = gamepads[0] || gamepads[1] || gamepads[2] || gamepads[3];
+      const gp = getActiveGamepad();
       if (!gp) return null;
 
       return {

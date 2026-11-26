@@ -11,13 +11,11 @@ import {
   ArrowUp,
   Loader,
 } from "lucide-react";
+import { getActiveGamepad } from "@/lib/gamepad";
 
 // Gamepad polling
 const getGamepadInput = () => {
-  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-  const gp = Array.from(gamepads).find(
-    g => g && g.connected && g.axes.length >= 2 && g.buttons.length >= 10
-  );
+  const gp = getActiveGamepad();
   if (!gp) return null;
   const threshold = 0.5;
   return {
