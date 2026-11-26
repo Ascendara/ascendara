@@ -1036,14 +1036,12 @@ export default function useAscendPage({ cloudOnly = false } = {}) {
   const loadLeaderboard = async () => {
     setLoadingLeaderboard(true);
     try {
-      const authHeaders = await window.electron.getAuthHeaders();
-      const userId = user?.uid || "";
-      const response = await fetch(
-        `${API_URL}/ascend/leaderboard${userId ? `?userId=${userId}` : ""}`,
-        {
-          headers: authHeaders,
-        }
-      );
+      // Signed in, the API also says whether this member is kept off the board
+      const response = user
+        ? await userAuthenticatedFetch(user, `${API_URL}/ascend/leaderboard`)
+        : await fetch(`${API_URL}/ascend/leaderboard`, {
+            headers: await window.electron.getAuthHeaders(),
+          });
       if (response.ok) {
         const data = await response.json();
         // Filter out private accounts from leaderboard
