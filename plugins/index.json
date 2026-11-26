@@ -123,7 +123,7 @@
         "Starts DS4Windows while a game is running, and closes it afterwards",
         "Downloads DS4Windows the first time a game starts"
       ],
-      "changelog": "Fixes PlayStation controllers not showing up as Xbox controllers on a fresh DS4Windows.",
+      "changelog": "Fixes PlayStation controllers not showing up as Xbox controllers on a fresh DS4Windows, and Bluetooth controllers not working in Ascendara after a game closes.",
       "license": "MIT",
       "homepage": "https://github.com/schmaldeo/DS4Windows",
       "minAppVersion": "12.3.2",
@@ -151,6 +151,13 @@
           "default": "playing"
         },
         {
+          "key": "disconnect",
+          "type": "boolean",
+          "label": "Turn off Bluetooth controllers when DS4Windows closes",
+          "description": "Over Bluetooth, a PlayStation controller can't be used in Ascendara or your browser after DS4Windows closes until it reconnects. Press the PS button to turn it back on. Doesn't apply to your own DS4Windows.",
+          "default": true
+        },
+        {
           "key": "path",
           "type": "text",
           "label": "Use my own DS4Windows",
@@ -162,13 +169,13 @@
       "files": [
         {
           "path": "index.js",
-          "sha256": "12b9e6bf45b8fcda9fd8753a9e818076b9dfdef608586a74f51656e81140b370",
-          "size": 6349
+          "sha256": "679770bff8bbe9a4ca5ab6d35d46c9071fb0461d772de63017a66067c758c96e",
+          "size": 6998
         },
         {
           "path": "manifest.json",
-          "sha256": "ff28848c5ea7965009877865dec3c9df82d326bfe9321e25b421229da916266d",
-          "size": 2097
+          "sha256": "ef0030375039d97201bc5a4bb7f3547ee2e755264e8987d57b688a49ccd235f0",
+          "size": 2559
         }
       ]
     },
