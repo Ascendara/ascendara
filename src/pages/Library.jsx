@@ -4697,16 +4697,7 @@ const InstalledGameCard = memo(
       };
     }, [game.game, game.name]); // Only depend on game ID properties
 
-    // Dialog state for editing cover
     const [showEditCoverDialog, setShowEditCoverDialog] = useState(false);
-    const minSearchLength = 3;
-    const [coverSearch, setCoverSearch] = useState({
-      query: "",
-      isLoading: false,
-      results: [],
-      selectedCover: null,
-    });
-    const [coverImageUrls, setCoverImageUrls] = useState({});
 
     // Load game logo
     useEffect(() => {
@@ -4893,78 +4884,6 @@ const InstalledGameCard = memo(
       }
     };
 
-    const handleCoverSearch = async query => {
-      setCoverSearch(prev => ({
-        ...prev,
-        query,
-        isLoading: true,
-        results: [],
-        selectedCover: null,
-      }));
-      if (query.length < minSearchLength) {
-        setCoverSearch(prev => ({ ...prev, isLoading: false, results: [] }));
-        setCoverImageUrls({});
-        return;
-      }
-      try {
-        // Use SteamGridDB for proper grid covers (600x900 portrait)
-        const searchUrl = `${API_URL}/api/proxy/steamgrid/search/autocomplete/${encodeURIComponent(query)}`;
-        const searchResponse = await fetch(searchUrl);
-
-        if (!searchResponse.ok) {
-          throw new Error("SteamGridDB search failed");
-        }
-
-        const searchData = await searchResponse.json();
-
-        if (searchData.success && searchData.data && searchData.data.length > 0) {
-          // Get grid images for the first few results
-          const results = [];
-          const imageUrls = {};
-
-          for (const game of searchData.data.slice(0, 9)) {
-            try {
-              // Fetch 600x900 grid images for this game
-              const gridsUrl = `${API_URL}/api/proxy/steamgrid/grids/game/${game.id}?styles=alternate&dimensions=600x900`;
-              const gridsResponse = await fetch(gridsUrl);
-
-              if (gridsResponse.ok) {
-                const gridsData = await gridsResponse.json();
-
-                if (gridsData.success && gridsData.data && gridsData.data.length > 0) {
-                  // Use the first grid image
-                  const firstGrid = gridsData.data[0];
-                  const gameId = game.id.toString();
-
-                  results.push({
-                    game: game.name,
-                    title: game.name,
-                    gameID: gameId,
-                    imgID: gameId,
-                    img: firstGrid.url,
-                  });
-
-                  imageUrls[gameId] = firstGrid.url;
-                }
-              }
-            } catch (gridError) {
-              console.warn(`Could not fetch grids for ${game.name}:`, gridError);
-            }
-          }
-
-          setCoverSearch(prev => ({ ...prev, isLoading: false, results: results }));
-          setCoverImageUrls(imageUrls);
-        } else {
-          setCoverSearch(prev => ({ ...prev, isLoading: false, results: [] }));
-          setCoverImageUrls({});
-        }
-      } catch (err) {
-        console.error("Error searching covers:", err);
-        setCoverSearch(prev => ({ ...prev, isLoading: false, results: [] }));
-        setCoverImageUrls({});
-      }
-    };
-
     const handleCardClick = e => {
       if (game._isDownloading || game._isQueued) return;
       if (selectionMode && game.isCustom) {
@@ -5129,6 +5048,27 @@ const InstalledGameCard = memo(
                   </div>
                 </button>
 
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    setContextMenuOpen(false);
+                    setShowEditCoverDialog(true);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:translate-x-0.5 hover:bg-accent"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/30">
+                    <ImageUp className="h-4 w-4 text-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-foreground">
+                      {t("library.changeCoverImage")}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {t("library.chooseOrUploadCoverImage")}
+                    </div>
+                  </div>
+                </button>
+
                 {game.isCustom ? (
                   <button
                     onClick={handleRemoveGame}
@@ -5220,140 +5160,15 @@ const InstalledGameCard = memo(
 
     return (
       <>
-        {/* Edit Cover Dialog */}
-        <AlertDialog open={showEditCoverDialog} onOpenChange={setShowEditCoverDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-2xl font-bold text-foreground">
-                {t("library.changeCoverImage")}
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-muted-foreground">
-                {t("library.searchForCoverImage")}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            {/* Game Cover Search Section (copied and adapted from AddGameForm) */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-grow">
-                  <SearchIcon className="absolute left-2 top-1/2 h-4 w-4 -translate-y-5 transform text-muted-foreground" />
-                  <Input
-                    id="coverSearch"
-                    value={coverSearch.query}
-                    onChange={e => handleCoverSearch(e.target.value)}
-                    className="border-input bg-background pl-8 text-foreground"
-                    placeholder={t("library.searchGameCover")}
-                    minLength={minSearchLength}
-                  />
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {t("library.searchGameCoverNotice")}
-                  </p>
-                </div>
-              </div>
-              {/* Cover Search Results */}
-              {coverSearch.query.length < minSearchLength ? (
-                <div className="py-2 text-center text-sm text-muted-foreground">
-                  {t("library.enterMoreChars", { count: minSearchLength })}
-                </div>
-              ) : coverSearch.isLoading ? (
-                <div className="flex justify-center py-4">
-                  <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-                </div>
-              ) : coverSearch.results.length > 0 ? (
-                <div className="grid grid-cols-3 gap-4">
-                  {coverSearch.results.map((cover, index) => (
-                    <div
-                      key={index}
-                      onClick={() =>
-                        setCoverSearch(prev => ({ ...prev, selectedCover: cover }))
-                      }
-                      className={cn(
-                        "relative aspect-video cursor-pointer overflow-hidden rounded-lg border-2 transition-all",
-                        coverSearch.selectedCover === cover
-                          ? "border-primary shadow-lg"
-                          : "border-transparent hover:border-primary/50"
-                      )}
-                    >
-                      <img
-                        src={cover.img}
-                        alt={cover.title}
-                        className="h-full w-full object-cover"
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity hover:opacity-100">
-                        <p className="px-2 text-center text-sm text-white">
-                          {cover.title}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-2 text-center text-sm text-muted-foreground">
-                  {t("library.noResultsFound")}
-                </div>
-              )}
-            </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel
-                className="text-primary"
-                onClick={() => setShowEditCoverDialog(false)}
-              >
-                {t("common.cancel")}
-              </AlertDialogCancel>
-              <Button
-                variant="primary"
-                className="bg-primary text-secondary"
-                disabled={!coverSearch.selectedCover}
-                onClick={async () => {
-                  if (!coverSearch.selectedCover) return;
-                  // Fetch new image (no localStorage cache - persisted to disk
-                  // by the main process via IPC)
-                  try {
-                    let dataUrl;
-                    // For local index, load from local file system
-                    if (settings.usingLocalIndex && coverSearch.selectedCover.gameID) {
-                      if (coverImageUrls[coverSearch.selectedCover.gameID]) {
-                        // Already loaded, convert blob URL to data URL for storage
-                        const response = await fetch(
-                          coverImageUrls[coverSearch.selectedCover.gameID]
-                        );
-                        const blob = await response.blob();
-                        dataUrl = await new Promise(resolve => {
-                          const reader = new FileReader();
-                          reader.onloadend = () => resolve(reader.result);
-                          reader.readAsDataURL(blob);
-                        });
-                      } else {
-                        // Not loaded yet, fetch it from where the search found it
-                        const response = await fetch(coverSearch.selectedCover.img);
-                        const blob = await response.blob();
-                        dataUrl = await new Promise(resolve => {
-                          const reader = new FileReader();
-                          reader.onloadend = () => resolve(reader.result);
-                          reader.readAsDataURL(blob);
-                        });
-                      }
-                    } else {
-                      // Fetch from Steam CDN URL directly
-                      const response = await fetch(coverSearch.selectedCover.img);
-                      const blob = await response.blob();
-                      dataUrl = await new Promise(resolve => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.readAsDataURL(blob);
-                      });
-                    }
-                    setImageData(dataUrl);
-                    setShowEditCoverDialog(false);
-                  } catch (e) {
-                    console.error("Failed to update cover image", e);
-                  }
-                }}
-              >
-                {t("library.updateImage")}
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <EditCoverDialog
+          open={showEditCoverDialog}
+          onOpenChange={setShowEditCoverDialog}
+          gameName={game.game || game.name}
+          onImageUpdate={dataUrl => {
+            gameImageCache.set(game.game || game.name, dataUrl);
+            setImageData(dataUrl);
+          }}
+        />
 
         {/* Delete/Remove Game Confirmation Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

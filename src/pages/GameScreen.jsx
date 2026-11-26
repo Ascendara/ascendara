@@ -2268,7 +2268,33 @@ function InstalledGameScreen() {
       // Grid image failed, mark as not available
       setHasGridImage(false);
 
-      // 2. Fallback (Header) - Steam cover URL
+      // 2. Linked to a Steam App ID: save its cover so the library card
+      // shows it too, not just this page
+      if (game.steamAppId && steamData?.appid) {
+        try {
+          const coverBase64 = await window.electron.saveSteamCover(
+            gameId,
+            game.steamAppId
+          );
+          if (coverBase64 && isMounted) {
+            const dataUrl = `data:image/jpeg;base64,${coverBase64}`;
+            gameImageCache.set(gameId, dataUrl);
+            setImageData(dataUrl);
+            setHasGridImage(true);
+            window.dispatchEvent(
+              new CustomEvent("game-cover-updated", {
+                detail: { gameName: gameId, dataUrl },
+              })
+            );
+            return;
+          }
+        } catch (e) {
+          console.warn("Could not save Steam cover:", e);
+        }
+        if (!isMounted) return;
+      }
+
+      // 3. Fallback (Header) - Steam cover URL
       if (steamData?.cover?.url) {
         const coverUrl = steamService.formatImageUrl(steamData.cover.url, "cover_big");
         if (coverUrl && isMounted) {
@@ -2278,7 +2304,7 @@ function InstalledGameScreen() {
         }
       }
 
-      // 3. Otherwise, fetch from Electron (cover image on disk)
+      // 4. Otherwise, fetch from Electron (cover image on disk)
       try {
         const imageBase64 = await window.electron.getGameImage(gameId);
         if (imageBase64 && isMounted) {
@@ -2311,7 +2337,7 @@ function InstalledGameScreen() {
       // Clean up event listener
       window.removeEventListener("game-cover-updated", handleCoverUpdate);
     };
-  }, [game?.game, game?.name, steamData?.cover?.url]); // Add steamData.cover.url as dependency
+  }, [game?.game, game?.name, game?.steamAppId, steamData?.cover?.url]);
 
   // Older installs only have a wide header, which the portrait cover crops to its
   // middle. Fetch the tall grid for the cover instead.
