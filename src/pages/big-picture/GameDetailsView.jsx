@@ -648,7 +648,7 @@ const GameDetailsView = ({
                 ))}
             </div>
 
-            <div className="bp-dv-meta mb-8 flex shrink-0 gap-6 text-white/80">
+            <div className="bp-dv-meta mb-8 flex shrink-0 flex-wrap gap-x-6 gap-y-2 text-white/80">
               {shown.size && (
                 <div className="flex items-center gap-2">
                   <Download className="h-5 w-5" />
@@ -740,7 +740,7 @@ const GameDetailsView = ({
                   <h3 className="mb-4 text-lg font-bold text-white">
                     {t("bigPicture.selectProvider")}
                   </h3>
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-3">
                     {availableProviders.map((provider, idx) => (
                       <button
                         key={provider}
@@ -762,11 +762,11 @@ const GameDetailsView = ({
                 </div>
               )}
 
-            <div className="bp-dv-actions mb-6 flex shrink-0 gap-4">
+            <div className="bp-dv-actions mb-6 flex shrink-0 flex-wrap gap-x-6 gap-y-4">
               <button
                 onClick={startDownload}
                 disabled={downloadBlocked}
-                className={`group flex w-fit shrink-0 items-center gap-4 whitespace-nowrap rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 ${
+                className={`group flex w-fit max-w-full shrink-0 items-center gap-4 whitespace-nowrap rounded-2xl px-10 py-5 text-2xl font-black shadow-xl transition-all duration-200 ${
                   downloadBlocked
                     ? `cursor-not-allowed bg-muted text-muted-foreground opacity-50 ${
                         focusedSection === "button" && selectedButton === 0
@@ -784,23 +784,25 @@ const GameDetailsView = ({
               >
                 {filesUnavailable ? (
                   <>
-                    <TriangleAlert className="h-7 w-7" />
-                    <span>{t("bigPicture.filesUnavailable")}</span>
+                    <TriangleAlert className="h-7 w-7 shrink-0" />
+                    <span className="min-w-0 truncate">
+                      {t("bigPicture.filesUnavailable")}
+                    </span>
                   </>
                 ) : isInstalled && !needsUpdate && !release ? (
                   <>
-                    <Check className="h-7 w-7" />
-                    <span>{t("bigPicture.installed")}</span>
+                    <Check className="h-7 w-7 shrink-0" />
+                    <span className="min-w-0 truncate">{t("bigPicture.installed")}</span>
                   </>
                 ) : needsUpdate ? (
                   <>
-                    <RefreshCw className="h-7 w-7" />
-                    <span>{t("bigPicture.update")}</span>
+                    <RefreshCw className="h-7 w-7 shrink-0" />
+                    <span className="min-w-0 truncate">{t("bigPicture.update")}</span>
                   </>
                 ) : (
                   <>
-                    <Download className="h-7 w-7" />
-                    <span>
+                    <Download className="h-7 w-7 shrink-0" />
+                    <span className="min-w-0 truncate">
                       {isSeamless
                         ? t("bigPicture.startDownload")
                         : t("bigPicture.viewDetails")}
@@ -811,7 +813,7 @@ const GameDetailsView = ({
 
               <button
                 onClick={handlePlayLater}
-                className={`group flex w-fit shrink-0 items-center gap-3 whitespace-nowrap rounded-2xl px-8 py-5 text-xl font-bold shadow-lg transition-all duration-200 ${
+                className={`group flex w-fit max-w-full shrink-0 items-center gap-3 whitespace-nowrap rounded-2xl px-8 py-5 text-xl font-bold shadow-lg transition-all duration-200 ${
                   focusedSection === "button" && selectedButton === 1
                     ? isPlayLater
                       ? "scale-110 bg-green-500 text-secondary shadow-green-500/50 ring-4 ring-green-400/50"
@@ -823,13 +825,15 @@ const GameDetailsView = ({
               >
                 {isPlayLater ? (
                   <>
-                    <Check className="h-6 w-6" />
-                    <span>{t("bigPicture.addedToPlayLater")}</span>
+                    <Check className="h-6 w-6 shrink-0" />
+                    <span className="min-w-0 truncate">
+                      {t("bigPicture.addedToPlayLater")}
+                    </span>
                   </>
                 ) : (
                   <>
-                    <Clock className="h-6 w-6" />
-                    <span>{t("bigPicture.playLater")}</span>
+                    <Clock className="h-6 w-6 shrink-0" />
+                    <span className="min-w-0 truncate">{t("bigPicture.playLater")}</span>
                   </>
                 )}
               </button>
@@ -837,14 +841,16 @@ const GameDetailsView = ({
               {timemachineAvailable && (
                 <button
                   onClick={() => setShowTimemachine(true)}
-                  className={`group flex w-fit shrink-0 items-center gap-3 whitespace-nowrap rounded-2xl px-8 py-5 text-xl font-bold shadow-lg transition-all duration-200 ${
+                  className={`group flex w-fit max-w-full shrink-0 items-center gap-3 whitespace-nowrap rounded-2xl px-8 py-5 text-xl font-bold shadow-lg transition-all duration-200 ${
                     focusedSection === "button" && selectedButton === 2
                       ? "scale-110 border-2 border-primary bg-muted text-foreground shadow-primary/30 ring-4 ring-primary/50"
                       : "border-2 border-border bg-muted text-foreground shadow-muted/30 hover:border-primary/40 hover:bg-muted/80"
                   }`}
                 >
-                  <History className="h-6 w-6" />
-                  <span>{t("bigPicture.olderVersions")}</span>
+                  <History className="h-6 w-6 shrink-0" />
+                  <span className="min-w-0 truncate">
+                    {t("bigPicture.olderVersions")}
+                  </span>
                 </button>
               )}
             </div>
@@ -973,13 +979,13 @@ const GameDetailsView = ({
 
         <div className="relative flex h-full w-full flex-shrink-0 flex-col">
           <div className="absolute inset-0 -z-10 bg-background/90 backdrop-blur-md" />
-          <div className="z-20 flex items-center gap-4 border-b border-white/5 px-24 py-12">
+          <div className="z-20 flex flex-wrap items-center gap-4 border-b border-border px-24 pb-10 pt-24">
             <ImageIcon className="h-8 w-8 text-primary" />
             <h2 className="text-4xl font-light tracking-wider text-primary">
               {t("bigPicture.media")}
             </h2>
             {hasScreenshots && (
-              <div className="ml-auto flex items-center gap-8 text-xs font-bold uppercase tracking-widest text-white/60">
+              <div className="ml-auto flex flex-wrap items-center gap-x-8 gap-y-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 <span>← / → {t("bigPicture.navigate")}</span>
                 <span>
                   <span
