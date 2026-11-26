@@ -162,6 +162,11 @@
   box-shadow: none;
   border-radius: 12px;
 }
+/* The name caption is placed against its own tile; without this it drops to
+   the bottom of whatever positioned box holds the row (Classic home) */
+.bp-game--artwork {
+  position: relative;
+}
 .bp-game--artwork .bp-cover {
   border-radius: inherit;
 }
