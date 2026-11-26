@@ -1,6 +1,11 @@
 import { updateUserStatus, getUserStatus, auth } from "../firebase/firebaseService";
 
 const validStatuses = ["online", "away", "busy", "invisible"];
+// The API turns online, away and busy into offline after ten minutes without a
+// write, so those are refreshed well inside that. Offline and invisible never
+// expire, so writing them again would change nothing.
+const expiringStatuses = ["online", "away", "busy"];
+export const PRESENCE_REFRESH_MS = 4 * 60_000;
 let session = null;
 let isPlayingGame = false;
 
@@ -8,8 +13,14 @@ const publish = async state => {
   if (session !== state || state.closing || auth.currentUser?.uid !== state.userId)
     return;
   const status = state.hidden && !isPlayingGame ? "offline" : state.preference;
+  if (state.published === status && !expiringStatuses.includes(status)) {
+    return { success: true, error: null };
+  }
   const result = await updateUserStatus(status, undefined, true, false);
-  if (result.success && session === state) state.callback?.(status);
+  if (result.success && session === state) {
+    state.published = status;
+    state.callback?.(status);
+  }
   return result;
 };
 
@@ -24,6 +35,7 @@ export const initializeStatusService = (onStatusChange, userId) => {
     hidden: false,
     closing: false,
     loaded: false,
+    published: null,
     disposers: [],
     timer: null,
   };
@@ -68,8 +80,7 @@ export const initializeStatusService = (onStatusChange, userId) => {
     window.addEventListener("online", refresh);
     state.disposers.push(() => window.removeEventListener("online", refresh));
   }
-  // The API expires presence after ten minutes. Refresh while idle/playing too.
-  state.timer = setInterval(refresh, 60_000);
+  state.timer = setInterval(refresh, PRESENCE_REFRESH_MS);
   state.ready = refresh();
   return state.ready;
 };
@@ -97,7 +108,10 @@ export const setUserOnlineStatus = async (status, customMessage) => {
   const result = await updateUserStatus(status, customMessage, true, true);
   if (session === state) {
     if (!result.success && state.preference === status) state.preference = previous;
-    if (result.success) state.callback?.(status);
+    if (result.success) {
+      state.published = status;
+      state.callback?.(status);
+    }
   }
   return result;
 };
