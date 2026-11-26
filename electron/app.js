@@ -576,6 +576,9 @@ async function initializeApp() {
       setTimeout(() => {
         discordRpc.initializeDiscordRPC();
       }, 500);
+
+      // Only sends anything once the user opted in to the live count
+      require("./modules/app/livePing").startLivePing();
     });
 
     // Handle pending protocol URLs and command line protocol URL (Windows/Linux)
@@ -636,6 +639,7 @@ async function initializeApp() {
 
     // Cleanup Discord RPC and achievement watcher
     discordRpc.destroyDiscordRPC();
+    require("./modules/app/livePing").stopLivePing();
     terminateWatcher();
     terminateDevServer();
   });

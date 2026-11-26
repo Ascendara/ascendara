@@ -99,6 +99,8 @@ class SettingsManager {
       useTorboxForTorrents: true,
       fallbackToQbittorrentOnTorboxFailure: false,
       rpcEnabled: true,
+      // Live count opt-in: null until the user has been asked
+      livePing: null,
       gameSource: "steamrip",
       autoCreateShortcuts: true,
       smoothTransitions: true,
@@ -644,6 +646,8 @@ function registerSettingsHandlers() {
       if (key === "openOnStartup" || key === "startMinimized") {
         applyLoginItemSettings();
       }
+      // Opting in or out of the live count takes effect at once
+      if (key === "livePing") require("../app/livePing").refreshLivePing();
     }
     return success;
   });
@@ -706,6 +710,8 @@ function registerSettingsHandlers() {
     const success = manager.saveSettings(sanitizedOptions);
     if (success) {
       event.sender.send("settings-updated", sanitizedOptions);
+      if (sanitizedOptions.livePing !== currentSettings.livePing)
+        require("../app/livePing").refreshLivePing();
     }
     return success;
   });

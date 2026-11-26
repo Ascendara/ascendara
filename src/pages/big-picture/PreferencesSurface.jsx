@@ -49,6 +49,11 @@ const categories = [
         "Move Ascendara out of the way when you play.",
       ],
       ["rpcEnabled", "Discord activity", "Share what you are playing on Discord."],
+      [
+        "livePing",
+        "I'm playing ping",
+        "Count yourself in the live number of people on Ascendara.",
+      ],
     ],
   },
   {

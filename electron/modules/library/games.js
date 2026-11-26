@@ -1111,6 +1111,7 @@ function registerGameHandlers() {
 
         runGame.once("spawn", () => {
           setPlayingActivity(game, `pc:${game}`);
+          require("../app/livePing").refreshLivePing();
         });
 
         // The handler still runs cleanup (trainer, backups) after the game ends,
@@ -1132,6 +1133,7 @@ function registerGameHandlers() {
         runGame.on("close", code => {
           console.log(`Game ${game} exited with code ${code}`);
           runGameProcesses.delete(game);
+          require("../app/livePing").refreshLivePing();
           if (settings.hideOnGameLaunch !== false && !runGame.sessionEnded) {
             showWindow();
           }

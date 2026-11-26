@@ -382,7 +382,15 @@
         "title": "Achievement Service Not Running"
       }
     },
-    "exportSvg": "Export SVG"
+    "exportSvg": "Export SVG",
+    "livePing": {
+      "description": "Opt in to the new I'm playing ping to count yourself in how many people are on Ascendara right now. The live number helps us understand how Ascendara is used, and anyone can see it on the website.",
+      "optIn": "Count me in",
+      "optOut": "No thanks",
+      "privacy": "Only a random ID made for this and whether a game is running are sent, every few minutes while Ascendara is open. Never your account, games or anything else. Turning it off removes you from the count right away.",
+      "settingsNote": "You can change this anytime in Settings > Gaming.",
+      "title": "Show up in the live count?"
+    }
   },
   "ascend": {
     "access": {
@@ -2395,7 +2403,7 @@
       "title": "Send a report to Ascendara?",
       "updateRequired": "Update Ascendara to send reports."
     },
-    "resourceGoneError":"This game was removed from the download provider and is no longer available. Try updating your local index or using a different provider.",
+    "resourceGoneError": "This game was removed from the download provider and is no longer available. Try updating your local index or using a different provider.",
     "resume": "Resume",
     "resumeError": "Failed to Resume Download",
     "resumeErrorDescription": "Could not resume the download. The download link may have expired or the cached data is missing.",
@@ -5602,7 +5610,9 @@
       "directorySelect": "Couldn't select the folder",
       "noPermission": "Ascendara doesn't have permission to write to this folder"
     },
-    "legacyThemeWarning": "This theme uses an older format and may be missing some color options. Some colors will use default values."
+    "legacyThemeWarning": "This theme uses an older format and may be missing some color options. Some colors will use default values.",
+    "livePing": "I'm playing ping",
+    "livePingDescription": "Count yourself in the live number of people on Ascendara and playing right now, shown on the website. Only a random ID and whether a game is running are sent."
   },
   "storeAccounts": {
     "cancel": "Cancel",
@@ -5947,7 +5957,9 @@
         "importButton": "Import games",
         "importDesc": "Bring in games you already have on Steam, Epic Games, GOG, Ubisoft Connect or Battle.net. Add the ones installed on this PC, or sign in to a store to see everything you own.",
         "importTitle": "Import games you already have",
-        "subtitle": "Both are available later too, so feel free to skip.",
+        "liveDesc": "Count yourself in the live number of people on Ascendara, shown on the website. Only a random ID and whether a game is running are sent, and you can turn it off anytime in Settings.",
+        "liveTitle": "I'm playing ping",
+        "subtitle": "All of these are available later too, so feel free to skip.",
         "title": "Optional extras"
       },
       "finish": {

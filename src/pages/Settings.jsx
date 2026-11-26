@@ -2133,6 +2133,21 @@ function Settings() {
                     />
                   </div>
 
+                  <div id="live-ping" className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.livePing")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.livePingDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.livePing === true}
+                      onCheckedChange={checked =>
+                        handleSettingChange("livePing", checked)
+                      }
+                    />
+                  </div>
+
                   <div
                     id="hide-on-game-launch"
                     className="flex items-center justify-between"

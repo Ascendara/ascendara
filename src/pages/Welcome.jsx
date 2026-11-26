@@ -32,6 +32,7 @@ import {
   ArrowRight,
   ArrowLeft,
   PlusCircle,
+  Radio,
   SquareArrowRight,
   FolderDownIcon,
   FolderCheck,
@@ -714,6 +715,10 @@ const Welcome = ({ welcomeData, onComplete }) => {
   };
 
   const handleNext = () => {
+    // Leaving the live count switch off is an answer too, so it isn't asked again
+    if (step === "extras" && typeof appSettings.livePing !== "boolean") {
+      updateSetting("livePing", false);
+    }
     if (step === "language") {
       goToStep("welcome", 1);
     } else if (step === "welcome") {
@@ -1704,7 +1709,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
                         key={source}
                         type="button"
                         onClick={() => {
-                          setReferralSource(current => (current === source ? "" : source));
+                          setReferralSource(current =>
+                            current === source ? "" : source
+                          );
                           setReferralLink("");
                           setReferralLinkError("");
                         }}
@@ -2296,6 +2303,26 @@ const Welcome = ({ welcomeData, onComplete }) => {
                         {t("welcome.setup.extras.extensionButton")}
                         <ExternalLink className="ml-2 h-4 w-4" />
                       </Button>
+                    </div>
+
+                    <div className={`${cardClass} flex items-start gap-4 md:col-span-2`}>
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Radio className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="mb-1 font-semibold">
+                          {t("welcome.setup.extras.liveTitle")}
+                        </h3>
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          {t("welcome.setup.extras.liveDesc")}
+                        </p>
+                      </div>
+                      <Switch
+                        className="mt-1"
+                        checked={appSettings.livePing === true}
+                        onCheckedChange={checked => updateSetting("livePing", checked)}
+                        aria-label={t("welcome.setup.extras.liveTitle")}
+                      />
                     </div>
                   </div>
 

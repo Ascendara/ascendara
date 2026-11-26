@@ -366,6 +366,23 @@ export const settingsSearchData = [
     scrollTo: "discord-rpc",
   },
   {
+    id: "live-ping",
+    title: "I'm Playing Ping / Live Count",
+    description: "Count yourself in the live number of people on Ascendara",
+    keywords: [
+      "live",
+      "ping",
+      "playing",
+      "online",
+      "count",
+      "analytics",
+      "privacy",
+      "opt out",
+    ],
+    section: "Gaming",
+    scrollTo: "live-ping",
+  },
+  {
     id: "ludusavi",
     title: "Game Backup / Ludusavi Integration",
     description: "Backup and restore game saves",

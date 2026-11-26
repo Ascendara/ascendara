@@ -25,6 +25,7 @@ import LiveUpdateOfferDialog, {
 import UpdateOverlay from "@/components/UpdateOverlay";
 import RepairAscendaraDialog from "@/components/RepairAscendaraDialog";
 import ChangelogDialog from "@/components/ChangelogDialog";
+import LivePingDialog from "@/components/LivePingDialog";
 import MissingDllDialog from "@/components/MissingDllDialog";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { TourProvider } from "@/context/TourContext";
@@ -1180,7 +1181,8 @@ const MessageNotificationChecker = () => {
         if (msg.unreadCount <= (previous[msg.conversationId] || 0)) return;
         toast(tRef.current("ascend.messages.newMessage", { name: msg.senderName }), {
           description: msg.messageText
-            ? msg.messageText.substring(0, 50) + (msg.messageText.length > 50 ? "..." : "")
+            ? msg.messageText.substring(0, 50) +
+              (msg.messageText.length > 50 ? "..." : "")
             : undefined,
           action: {
             label: tRef.current("common.view"),
@@ -1198,7 +1200,7 @@ const MessageNotificationChecker = () => {
 const AppRoutes = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { settings } = useSettings();
+  const { settings, updateSetting } = useSettings();
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [showWelcome, setShowWelcome] = useState(null);
@@ -1641,6 +1643,22 @@ const AppRoutes = () => {
     const timer = setTimeout(() => setStartupSettled(true), 600);
     return () => clearTimeout(timer);
   }, [splashDone]);
+
+  // People who updated never saw the welcome step that asks about the live
+  // count, so they're asked once. Read from the main process, since the
+  // context's defaults would look unanswered before settings load.
+  const [askLivePing, setAskLivePing] = useState(false);
+  useEffect(() => {
+    if (!startupSettled || showWelcome !== false) return;
+    let active = true;
+    window.electron
+      .getSettings()
+      .then(saved => active && setAskLivePing(typeof saved?.livePing !== "boolean"))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [startupSettled, showWelcome]);
 
   useEffect(() => {
     if (!firstPageReady || !user?.uid) return;
@@ -2182,6 +2200,18 @@ const AppRoutes = () => {
       <WatcherWarnDialog
         open={startupSettled && showWatcherWarn}
         onOpenChange={setShowWatcherWarn}
+      />
+      <LivePingDialog
+        open={
+          askLivePing &&
+          !showChangelog &&
+          !showSupportDialog &&
+          location.pathname !== "/welcome"
+        }
+        onAnswer={answer => {
+          setAskLivePing(false);
+          updateSetting("livePing", answer);
+        }}
       />
       <ChangelogDialog
         open={startupSettled && showChangelog}
