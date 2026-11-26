@@ -115,7 +115,7 @@
     {
       "id": "ds4windows",
       "name": "DS4Windows",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "tago",
       "description": "Makes PlayStation controllers work in games that only support Xbox controllers. Windows only.",
       "details": "Many games only read Xbox controllers. Steam fixes this for its own games with Steam Input, but games started from Ascendara don't get it, so a DualShock 4 or DualSense does nothing in them. This plugin starts DS4Windows when a game starts, which shows your PlayStation controller to games as an Xbox controller, and closes it again when the last game closes. DS4Windows is downloaded from its GitHub releases the first time it's needed. The first time it runs, DS4Windows asks to install the ViGEmBus driver: click Install in its welcome window, then start the game again. DS4Windows also needs the .NET 8 Desktop Runtime, and Windows offers to download it if it's missing. Already have DS4Windows? Set its path in this plugin's options.",
@@ -123,7 +123,7 @@
         "Starts DS4Windows while a game is running, and closes it afterwards",
         "Downloads DS4Windows the first time a game starts"
       ],
-      "changelog": "",
+      "changelog": "Fixes PlayStation controllers not showing up as Xbox controllers on a fresh DS4Windows.",
       "license": "MIT",
       "homepage": "https://github.com/schmaldeo/DS4Windows",
       "minAppVersion": "12.3.2",
@@ -162,13 +162,13 @@
       "files": [
         {
           "path": "index.js",
-          "sha256": "d9a1a503c7214b244e3be728b0b5f25d00c964e0bf09db3d59ce30f9e33722ad",
-          "size": 5219
+          "sha256": "12b9e6bf45b8fcda9fd8753a9e818076b9dfdef608586a74f51656e81140b370",
+          "size": 6349
         },
         {
           "path": "manifest.json",
-          "sha256": "6e5d68e83f3b40d656dbada14ef2d3fa8146fb7f8583a92514e80c6e9d8dea6c",
-          "size": 1991
+          "sha256": "ff28848c5ea7965009877865dec3c9df82d326bfe9321e25b421229da916266d",
+          "size": 2097
         }
       ]
     },

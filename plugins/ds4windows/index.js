@@ -64,10 +64,34 @@ module.exports = {
       return bundled;
     }
 
+    // A fresh DS4Windows finds controllers but leaves them without a profile, so
+    // games never see an Xbox controller. Give every empty slot the Default
+    // profile. DS4Windows creates both files on its first run and rewrites
+    // Profiles.xml when it exits, so this only runs before it starts.
+    async function assignProfiles() {
+      const settings = `${folder}/DS4Windows/Profiles.xml`;
+      if (
+        !(await ascendara.files.exists(settings)) ||
+        !(await ascendara.files.exists(`${folder}/DS4Windows/Profiles/Default.xml`))
+      )
+        return;
+      let xml = await ascendara.files.read(settings);
+      const original = xml;
+      for (let slot = 1; slot <= 8; slot++) {
+        const tag = `Controller${slot}`;
+        if (new RegExp(`<${tag}>[^<]+</${tag}>`).test(xml)) continue;
+        xml = xml
+          .replace(new RegExp(`\\s*<${tag}\\s*/>|\\s*<${tag}>\\s*</${tag}>`), "")
+          .replace("</Profile>", `  <${tag}>Default</${tag}>\n</Profile>`);
+      }
+      if (xml !== original) await ascendara.files.write(settings, xml);
+    }
+
     async function open() {
       // The user's own DS4Windows may already be open
       if (state.pid || (await isRunning())) return;
       const exe = await program();
+      if (exe === bundled) await assignProfiles();
       const ready = await driverInstalled();
       // Without the driver, show the window so its welcome screen can install it
       let exited = false;
