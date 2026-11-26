@@ -8,7 +8,13 @@ const path = require("path");
 const os = require("os");
 const { spawn } = require("child_process");
 const { ipcMain, app, dialog } = require("electron");
-const { isDev, isWindows, isLinux, appDirectory, getLudusaviPath } = require("../core/config");
+const {
+  isDev,
+  isWindows,
+  isLinux,
+  appDirectory,
+  getLudusaviPath,
+} = require("../core/config");
 const { getSettingsManager } = require("../core/settings");
 const { sanitizeGameName } = require("../core/utils");
 
@@ -160,6 +166,135 @@ function writeCustomSavePaths(gameName, isCustomGame, settings, paths) {
   fs.writeFileSync(gameInfoPath, JSON.stringify(data, null, 2));
 }
 
+// Saves the paths and rewrites config.yaml so Ludusavi picks them up at once
+function saveCustomSavePaths(gameName, isCustomGame, paths) {
+  const settings = getSettingsManager().getSettings();
+  const cleaned = [...new Set((paths || []).map(p => String(p).trim()).filter(Boolean))];
+  writeCustomSavePaths(gameName, isCustomGame, settings, cleaned);
+  writeLudusaviConfig(ludusaviConfigDir(), collectAllCustomGames(settings));
+  return cleaned;
+}
+
+const ludusaviConfigDir = () =>
+  path.join(app.getPath("userData"), "ludusavi-cloud-config");
+
+function resolveLudusaviPath() {
+  if (!isWindows) return getLudusaviPath();
+  return isDev
+    ? path.join("./binaries/AscendaraGameHandler/dist/ludusavi.exe")
+    : path.join(appDirectory, "/resources/ludusavi.exe");
+}
+
+// Linux games run in their own wine prefix; without custom paths Ludusavi
+// has to be pointed at it to find anything.
+function linuxWinePrefixArgs(game, settings) {
+  if (!isLinux || !game) return [];
+  const hasCustomPaths =
+    readCustomSavePaths(game, false, settings).length +
+      readCustomSavePaths(game, true, settings).length >
+    0;
+  if (hasCustomPaths) return [];
+  const { sanitizeGameSlug } = require("../compat/proton");
+  const { linuxCompatDataDir } = require("../core/config");
+  const pfxPath = path.join(linuxCompatDataDir, sanitizeGameSlug(game), "pfx");
+  if (fs.existsSync(pfxPath)) {
+    console.log(`[Ludusavi] Linux: using wine prefix at ${pfxPath}`);
+    return ["--wine-prefix", pfxPath];
+  }
+  console.warn(
+    `[Ludusavi] Linux: wine prefix not found at ${pfxPath}, backup may find nothing`
+  );
+  return [];
+}
+
+// Folders that hold many games' saves. A save folder is never one of these.
+function sharedSaveRoots() {
+  const home = os.homedir();
+  return [
+    home,
+    path.join(home, "Documents"),
+    path.join(home, "Documents", "My Games"),
+    path.join(home, "Saved Games"),
+    path.join(home, "AppData"),
+    path.join(home, "AppData", "Roaming"),
+    path.join(home, "AppData", "Local"),
+    path.join(home, "AppData", "LocalLow"),
+    path.join(home, "Library", "Application Support"),
+    path.join(home, "Library", "Preferences"),
+    path.join(home, ".config"),
+    path.join(home, ".local", "share"),
+  ];
+}
+
+/**
+ * Turn the save files Ludusavi found into the folders that hold them. Folders
+ * inside another are dropped, and sibling folders (save slots) fold into their
+ * parent unless that parent is shared by many games, like AppData\Roaming.
+ */
+function saveFoldersFromFiles(files, sharedRoots = sharedSaveRoots()) {
+  const key = folder => (isWindows ? folder.toLowerCase() : folder);
+  const shared = new Set(sharedRoots.map(root => key(path.resolve(root))));
+  const isInside = (folder, parent) =>
+    key(folder).startsWith(key(parent).replace(/[\\/]+$/, "") + path.sep);
+  const outermost = folders =>
+    [...folders]
+      .sort((a, b) => a.length - b.length)
+      .reduce(
+        (kept, folder) =>
+          kept.some(parent => isInside(folder, parent)) ? kept : [...kept, folder],
+        []
+      );
+
+  let folders = outermost(new Set(files.map(file => path.dirname(path.resolve(file)))));
+  for (;;) {
+    const byParent = new Map();
+    for (const folder of folders) {
+      const parent = path.dirname(folder);
+      if (parent === folder || shared.has(key(parent))) continue;
+      byParent.set(parent, (byParent.get(parent) || 0) + 1);
+    }
+    const parent = [...byParent].find(([, count]) => count > 1)?.[0];
+    if (!parent) return folders;
+    folders = outermost([...folders, parent]);
+  }
+}
+
+/**
+ * Folders where Ludusavi's manifest (save locations from PCGamingWiki) finds
+ * this game's saves on disk. Empty when Ludusavi isn't installed or the game
+ * isn't in the manifest.
+ */
+async function findLudusaviSaveFolders(gameName) {
+  const ludusaviPath = resolveLudusaviPath();
+  if (!gameName || !ludusaviPath || !fs.existsSync(ludusaviPath)) return [];
+  const settings = getSettingsManager().getSettings();
+  const configDir = ludusaviConfigDir();
+  writeLudusaviConfig(configDir, collectAllCustomGames(settings));
+  const title = await resolveLudusaviGameName(
+    ludusaviPath,
+    configDir,
+    gameName,
+    "backup"
+  );
+  const preview = await runLudusaviJson(
+    ludusaviPath,
+    [
+      "--config",
+      configDir,
+      "backup",
+      "--preview",
+      ...linuxWinePrefixArgs(gameName, settings),
+      "--api",
+      title,
+    ],
+    30000
+  );
+  const files = Object.entries(preview?.games?.[title]?.files || {})
+    .filter(([, file]) => !file.failed && !file.ignored)
+    .map(([file]) => file);
+  return saveFoldersFromFiles(files).filter(folder => fs.existsSync(folder));
+}
+
 /**
  * Scan all games and return the full customGames list for config.yaml.
  * Ludusavi needs the complete list every time — not just the current game.
@@ -217,7 +352,7 @@ function collectAllCustomGames(settings) {
  * Resolves to `null` instead of rejecting when the process exits non-zero,
  * since that's how ludusavi reports "no match found".
  */
-function runLudusaviJson(ludusaviPath, args) {
+function runLudusaviJson(ludusaviPath, args, timeoutMs = 0) {
   return new Promise(resolve => {
     let child;
     try {
@@ -227,12 +362,14 @@ function runLudusaviJson(ludusaviPath, args) {
       return;
     }
 
+    const timer = timeoutMs ? setTimeout(() => child.kill(), timeoutMs) : null;
     let stdout = "";
     child.stdout.on("data", data => {
       stdout += data.toString();
     });
     child.on("error", () => resolve(null));
     child.on("close", () => {
+      if (timer) clearTimeout(timer);
       try {
         resolve(JSON.parse(stdout));
       } catch {
@@ -270,7 +407,13 @@ const CLOUD_RESTORE_PREFIX = "ascendara-cloud-restore-";
  * @param {"backup"|"restore"} context
  * @param {string} [backupPath] - where restore-context lookups find backups
  */
-async function resolveLudusaviGameName(ludusaviPath, configDir, game, context, backupPath) {
+async function resolveLudusaviGameName(
+  ludusaviPath,
+  configDir,
+  game,
+  context,
+  backupPath
+) {
   if (!game) return game;
 
   const contextFlag = context === "restore" ? "--restore" : "--backup";
@@ -331,15 +474,8 @@ function registerLudusaviHandlers() {
       return { success: false, error: "Invalid restore staging folder" };
     }
     try {
-      let ludusaviPath;
-      if (isWindows) {
-        ludusaviPath = isDev
-          ? path.join("./binaries/AscendaraGameHandler/dist/ludusavi.exe")
-          : path.join(appDirectory, "/resources/ludusavi.exe");
-      } else {
-        // Unix: downloaded in ~/.ascendara/ (or installed on PATH on macOS)
-        ludusaviPath = getLudusaviPath();
-      }
+      // Unix: downloaded in ~/.ascendara/ (or installed on PATH on macOS)
+      const ludusaviPath = resolveLudusaviPath();
 
       if (!ludusaviPath || !fs.existsSync(ludusaviPath)) {
         console.error(`[Ludusavi] Executable not found at: ${ludusaviPath}`);
@@ -358,15 +494,11 @@ function registerLudusaviHandlers() {
       }
 
       // Always regenerate config.yaml with up-to-date customGames before any command
-      const ludusaviConfigDir = path.join(
-        app.getPath("userData"),
-        "ludusavi-cloud-config"
-      );
-      const allCustomGames = collectAllCustomGames(settings);
-      writeLudusaviConfig(ludusaviConfigDir, allCustomGames);
+      const configDir = ludusaviConfigDir();
+      writeLudusaviConfig(configDir, collectAllCustomGames(settings));
 
       let args = [];
-      args.push("--config", ludusaviConfigDir);
+      args.push("--config", configDir);
 
       // Ludusavi requires an exact title match. Many game sources strip
       // punctuation (e.g. "Papers Please" vs. "Papers, Please"), so resolve
@@ -379,7 +511,7 @@ function registerLudusaviHandlers() {
       ) {
         resolvedGame = await resolveLudusaviGameName(
           ludusaviPath,
-          ludusaviConfigDir,
+          configDir,
           game,
           action === "restore" ? "restore" : "backup",
           backupRoot
@@ -421,28 +553,7 @@ function registerLudusaviHandlers() {
             args.push("--full-limit", ludusaviSettings.backupOptions.backupsToKeep);
           }
 
-          // Linux : add --wine-prefix if no customSavePaths for this game
-          if (isLinux && game) {
-            const { sanitizeGameSlug } = require("../compat/proton");
-            const { linuxCompatDataDir } = require("../core/config");
-            const customPaths = readCustomSavePaths(game, false, settings);
-            // verify custom games
-            const customPathsCustom = readCustomSavePaths(game, true, settings);
-            const hasCustomPaths = customPaths.length + customPathsCustom.length > 0;
-
-            if (!hasCustomPaths) {
-              const slug = sanitizeGameSlug(game);
-              const pfxPath = path.join(linuxCompatDataDir, slug, "pfx");
-              if (fs.existsSync(pfxPath)) {
-                args.push("--wine-prefix", pfxPath);
-                console.log(`[Ludusavi] Linux: using wine prefix at ${pfxPath}`);
-              } else {
-                console.warn(
-                  `[Ludusavi] Linux: wine prefix not found at ${pfxPath}, backup may find nothing`
-                );
-              }
-            }
-          }
+          args.push(...linuxWinePrefixArgs(game, settings));
 
           args.push("--api");
           break;
@@ -552,22 +663,7 @@ function registerLudusaviHandlers() {
   // Persists to game json & immediately rewrites config.yaml.
   ipcMain.handle("set-custom-save-paths", async (_, gameName, isCustomGame, paths) => {
     try {
-      const settings = settingsManager.getSettings();
-
-      // Deduplicate & strip empties
-      const cleaned = [...new Set((paths || []).map(p => p.trim()).filter(Boolean))];
-
-      writeCustomSavePaths(gameName, isCustomGame, settings, cleaned);
-
-      // Eagerly regenerate config.yaml
-      const ludusaviConfigDir = path.join(
-        app.getPath("userData"),
-        "ludusavi-cloud-config"
-      );
-      const allCustomGames = collectAllCustomGames(settings);
-      writeLudusaviConfig(ludusaviConfigDir, allCustomGames);
-
-      return { success: true, paths: cleaned };
+      return { success: true, paths: saveCustomSavePaths(gameName, isCustomGame, paths) };
     } catch (error) {
       console.error("Error in set-custom-save-paths:", error);
       return { success: false, error: error.message };
@@ -662,6 +758,13 @@ function registerLudusaviHandlers() {
   });
 }
 
+const getCustomSavePaths = (gameName, isCustomGame) =>
+  readCustomSavePaths(gameName, isCustomGame, getSettingsManager().getSettings());
+
 module.exports = {
   registerLudusaviHandlers,
+  getCustomSavePaths,
+  saveCustomSavePaths,
+  findLudusaviSaveFolders,
+  saveFoldersFromFiles,
 };

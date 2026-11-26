@@ -8,6 +8,7 @@ const Module = require("node:module");
 
 const MANIFEST = path.join(__dirname, "..", "electron/modules/app/plugin-manifest.js");
 const PLUGINS = path.join(__dirname, "..", "electron/modules/app/plugins.js");
+const LUDUSAVI = path.join(__dirname, "..", "electron/modules/library/ludusavi.js");
 const REGISTRY = path.join(__dirname, "..", "plugins");
 const { compareVersions, resolveInside, validateManifest, incompatibility } = require(
   MANIFEST
@@ -102,7 +103,7 @@ test("plugins/index.json matches the plugin folders", () => {
   );
 });
 
-async function withPlugins(run, routes = {}, electron = {}) {
+async function withPlugins(run, routes = {}, electron = {}, settings = {}) {
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-plugins-"));
   const server = http.createServer((request, response) => {
     if (routes[request.url]) {
@@ -133,10 +134,12 @@ async function withPlugins(run, routes = {}, electron = {}) {
       };
     // New enough for every listed plugin's minAppVersion
     if (request === "../core/config") return { appVersion: "99.0.0" };
-    if (request === "../core/settings") return { getSettingsManager: () => ({}) };
+    if (request === "../core/settings")
+      return { getSettingsManager: () => ({ getSettings: () => settings }) };
     return realLoad.call(this, request, ...rest);
   };
   delete require.cache[PLUGINS];
+  delete require.cache[LUDUSAVI];
   const sender = { isDestroyed: () => false, send() {} };
   const invoke = (channel, ...args) => handlers[channel]({ sender }, ...args);
   try {
@@ -145,6 +148,7 @@ async function withPlugins(run, routes = {}, electron = {}) {
   } finally {
     Module._load = realLoad;
     delete require.cache[PLUGINS];
+    delete require.cache[LUDUSAVI];
     delete process.env.ASCENDARA_PLUGIN_REGISTRY;
     server.close();
     fs.rmSync(userData, { recursive: true, force: true });
@@ -405,6 +409,73 @@ test("plugins can find a game's executable and App ID, and open only folders", a
     );
   } finally {
     fs.rmSync(game, { recursive: true, force: true });
+  }
+});
+
+test("a save folder the user picks is the only one plugins get, until it's cleared", async () => {
+  const library = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-library-"));
+  const saves = fs.mkdtempSync(path.join(os.tmpdir(), "ascendara-saves-"));
+  const gamesFile = path.join(library, "games.json");
+  fs.writeFileSync(gamesFile, JSON.stringify({ games: [{ game: "Game" }] }));
+  const picks = [];
+  try {
+    await withPlugins(
+      async ({ invoke, userData }) => {
+        await invoke("plugins-install", "hide-ascend-nav");
+        const call = (method, ...args) =>
+          invoke("plugins-call", "hide-ascend-nav", method, ...args);
+        const game = { game: "Game", isCustom: true, steamAppId: "1437400" };
+
+        picks.push(null);
+        assert.equal(await call("games.pickSaveFolder", game), null);
+        assert.equal(
+          JSON.parse(fs.readFileSync(gamesFile)).games[0].customSavePaths,
+          undefined
+        );
+
+        picks.push(saves);
+        assert.equal(await call("games.pickSaveFolder", game), saves);
+        assert.deepEqual(
+          JSON.parse(fs.readFileSync(gamesFile)).games[0].customSavePaths,
+          [saves]
+        );
+        assert.match(
+          fs.readFileSync(
+            path.join(userData, "ludusavi-cloud-config", "config.yaml"),
+            "utf8"
+          ),
+          /name: "Game"/
+        );
+        assert.deepEqual(await call("games.saveFolders", game), {
+          appId: "1437400",
+          folders: [saves],
+          custom: true,
+        });
+
+        await call("games.clearSaveFolder", game);
+        assert.equal(
+          JSON.parse(fs.readFileSync(gamesFile)).games[0].customSavePaths,
+          undefined
+        );
+        const searched = await call("games.saveFolders", game);
+        assert.equal(searched.custom, false);
+        assert.ok(!searched.folders.includes(saves));
+      },
+      {},
+      {
+        dialog: {
+          showOpenDialog: async () => {
+            const folder = picks.shift();
+            return { canceled: !folder, filePaths: folder ? [folder] : [] };
+          },
+        },
+        BrowserWindow: { getAllWindows: () => [], fromWebContents: () => null },
+      },
+      { downloadDirectory: library }
+    );
+  } finally {
+    fs.rmSync(library, { recursive: true, force: true });
+    fs.rmSync(saves, { recursive: true, force: true });
   }
 });
 

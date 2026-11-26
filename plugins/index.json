@@ -576,30 +576,31 @@
     {
       "id": "open-save-folder",
       "name": "Save Folder",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": "tago",
-      "description": "Adds \"Open save folder\" and \"Copy executable path\" to a game's Manage menu.",
-      "details": "Finds where a game keeps its saves by its Steam App ID, in the same places the achievement tracker looks: GSE Saves, Goldberg, CODEX, RUNE, OnlineFix, EMPRESS and others. Handy for backing up saves by hand or moving them between PCs.",
+      "description": "Adds \"Open save folder\", \"Set save folder\" and \"Copy executable path\" to a game's Manage menu.",
+      "details": "Finds where a game keeps its saves: the folder you set with \"Set save folder\" first, then Ludusavi's save locations from PCGamingWiki, then the places cracks keep saves by Steam App ID (GSE Saves, Goldberg, CODEX, RUNE, OnlineFix, EMPRESS and others). A folder you set is also used by Save Backups and Ludusavi backups. Handy for backing up saves by hand or moving them between PCs.",
       "affects": [
-        "Adds two items to the Manage menu on a game's page"
+        "Adds up to four items to the Manage menu on a game's page",
+        "Set save folder saves the folder in the game's Ascendara data"
       ],
-      "changelog": "",
+      "changelog": "Looks up save locations with Ludusavi, and adds Set save folder and Reset save folder for when the folder found is wrong.",
       "license": "MIT",
       "homepage": "",
-      "minAppVersion": "12.3.2",
+      "minAppVersion": "12.3.5",
       "apiVersion": 1,
       "permissions": [],
       "settings": [],
       "files": [
         {
           "path": "index.js",
-          "sha256": "7e7ac6db24ea6af3abaee94a3af641fc81afa9e5aa93bc301a1c64a2521bb517",
-          "size": 1872
+          "sha256": "62ffdd88e8e63cd9692b31db9b25cc65417abfa4d2670e09fd1b6498c568d192",
+          "size": 2558
         },
         {
           "path": "manifest.json",
-          "sha256": "2dbbae8116a7ef1a5cb294ea87284915716b90d7f23ecef0a69681668dd0af6e",
-          "size": 579
+          "sha256": "ca3adfa08682e9a82b575a2b219f22a8adad1319d52067f123fe6bcfbd220c25",
+          "size": 975
         }
       ]
     },
@@ -710,15 +711,15 @@
     {
       "id": "save-backups",
       "name": "Save Backups",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "tago",
       "description": "Backs up a game's saves every time it closes, and keeps the newest copies.",
-      "details": "When a game closes, its save folder is zipped into this plugin's folder. The save folder is found by the game's Steam App ID, the same way the achievement tracker finds it. Use \"Open save backups\" in a game's Manage menu to get to the backups, and unzip one into the save folder to restore it. Uses the tar program built into Windows 10 and newer, macOS and Linux.",
+      "details": "When a game closes, its save folder is zipped into this plugin's folder. The save folder is the one set with the Save Folder plugin's \"Set save folder\", or else found with Ludusavi's save locations and the game's Steam App ID. Use \"Open save backups\" in a game's Manage menu to get to the backups, and unzip one into the save folder to restore it. Uses the tar program built into Windows 10 and newer, macOS and Linux.",
       "affects": [
         "Copies save folders into this plugin's folder when a game closes",
         "Adds \"Back up saves now\" and \"Open save backups\" to the Manage menu"
       ],
-      "changelog": "",
+      "changelog": "Backs up the save folder you set, and finds more save folders through Ludusavi (Ascendara 12.3.5 and newer).",
       "license": "MIT",
       "homepage": "",
       "minAppVersion": "12.3.2",
@@ -752,8 +753,8 @@
         },
         {
           "path": "manifest.json",
-          "sha256": "fa06b3acb2b13c9aeb825207f0e80077b508257285ccaa756f1cd8ecd8d65480",
-          "size": 1159
+          "sha256": "11c6d412abce1d6ab00f53a3e39404f914d5c0790f1153b83981e5cc99aaada1",
+          "size": 1342
         }
       ]
     },

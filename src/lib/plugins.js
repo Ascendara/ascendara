@@ -248,8 +248,14 @@ function createApi(source, cleanups) {
       executable: game => call("games.executable", game),
       // The game's Steam App ID, or null when it can't be found
       appId: game => call("games.appId", game),
-      // { appId, folders }: emulator save folders named after the App ID
+      // { appId, folders, custom }: where the game keeps its saves, best guess
+      // first. `custom` is true when the user picked the folder.
       saveFolders: game => call("games.saveFolders", game),
+      // Asks the user for the game's save folder and keeps it for saveFolders()
+      // and Ludusavi backups. Resolves to the folder, or null when cancelled.
+      pickSaveFolder: game => call("games.pickSaveFolder", game),
+      // Forgets the picked folder, so saveFolders() searches again
+      clearSaveFolder: game => call("games.clearSaveFolder", game),
       onLaunch(callback) {
         return onCleanup(
           electron.onGameLaunchSuccess((_event, data) => callback(data?.game))

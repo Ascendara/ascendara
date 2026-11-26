@@ -1,39 +1,56 @@
-// Adds "Open save folder" and "Copy executable path" to a game's Manage menu.
-// Save folders are found by the game's Steam App ID in the places emulators
-// keep saves (GSE Saves, Goldberg, CODEX, RUNE, OnlineFix, EMPRESS, ...).
+// Adds "Open save folder", "Set save folder" and "Copy executable path" to a
+// game's Manage menu. Save folders come from the folder the user set, else
+// Ludusavi's save locations, else the places emulators keep saves by Steam App
+// ID (GSE Saves, Goldberg, CODEX, RUNE, OnlineFix, EMPRESS, ...).
 const folderName = folder => folder.split(/[\\/]/).filter(Boolean).slice(-3).join(" › ");
 
 module.exports = {
   start(ascendara) {
+    // Remembers which games have a folder set, so Reset shows up right away
+    const key = game => `custom:${game?.game || game?.name}`;
+    const hasCustom = game =>
+      ascendara.storage.get(key(game), (game?.customSavePaths || []).length > 0);
+
     ascendara.gameScreen.addAction({
       label: "Open save folder",
       async onClick(game) {
-        const { appId, folders } = await ascendara.games.saveFolders(game);
-        if (!appId) {
-          ascendara.toast(
-            "Couldn't find this game's Steam App ID, so its save folder is unknown.",
-            "error"
-          );
-          return;
-        }
+        const { folders } = await ascendara.games.saveFolders(game);
         if (folders.length === 0) {
           ascendara.toast(
-            `No save folder found for App ID ${appId}. Play the game once first.`,
+            "No save folder found. Play the game once, or use Set save folder.",
             "error"
           );
           return;
         }
-        // The most specific match is usually the one with the saves in it
-        const sorted = [...folders].sort((a, b) => b.length - a.length);
-        await ascendara.openFolder(sorted[0]);
-        if (sorted.length > 1) {
+        await ascendara.openFolder(folders[0]);
+        if (folders.length > 1) {
           ascendara.toast(
-            `Opened ${folderName(sorted[0])}. Also found: ${sorted
+            `Opened ${folderName(folders[0])}. Also found: ${folders
               .slice(1, 4)
               .map(folderName)
-              .join(", ")}`
+              .join(", ")}. Wrong one? Use Set save folder.`
           );
         }
+      },
+    });
+
+    ascendara.gameScreen.addAction({
+      label: "Set save folder",
+      async onClick(game) {
+        const folder = await ascendara.games.pickSaveFolder(game);
+        if (!folder) return;
+        ascendara.storage.set(key(game), true);
+        ascendara.toast(`Saves for this game now open ${folderName(folder)}`, "success");
+      },
+    });
+
+    ascendara.gameScreen.addAction({
+      label: "Reset save folder",
+      when: hasCustom,
+      async onClick(game) {
+        await ascendara.games.clearSaveFolder(game);
+        ascendara.storage.set(key(game), false);
+        ascendara.toast("Save folder reset. It will be searched for again.", "success");
       },
     });
 

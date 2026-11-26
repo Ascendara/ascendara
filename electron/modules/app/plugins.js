@@ -24,6 +24,11 @@ const {
 const { findGameAppId } = require("../library/gameAppId");
 const { searchAchievementFolders } = require("../library/achievementFolderSearch");
 const {
+  getCustomSavePaths,
+  saveCustomSavePaths,
+  findLudusaviSaveFolders,
+} = require("../library/ludusavi");
+const {
   API_VERSION,
   ID_PATTERN,
   PERMISSIONS,
@@ -525,11 +530,15 @@ async function gameAppId(game) {
   return findGameAppId(gameDirectory(game));
 }
 
+const gameName = game => {
+  if (!game || typeof game !== "object") throw new Error("Pass the game object");
+  return game.game || game.name;
+};
+
 // Emulator save folders named after the game's App ID, the same places the
-// Achievement Watcher looks.
-async function gameSaveFolders(game) {
-  const appId = await gameAppId(game);
-  if (!appId) return { appId: null, folders: [] };
+// Achievement Watcher looks. The most specific match comes first.
+async function emulatorSaveFolders(appId) {
+  if (!appId) return [];
   let documentsPath;
   try {
     documentsPath = app.getPath("documents");
@@ -540,7 +549,44 @@ async function gameSaveFolders(game) {
     documentsPath,
     maxMs: 5000,
   });
-  return { appId, folders: found.success ? found.results : [] };
+  return found.success ? [...found.results].sort((a, b) => b.length - a.length) : [];
+}
+
+// Where a game keeps its saves, best guess first. A folder the user set is the
+// only answer; otherwise Ludusavi's manifest, then the emulator folders.
+async function gameSaveFolders(game) {
+  const name = gameName(game);
+  const appId = await gameAppId(game).catch(() => null);
+  const custom = getCustomSavePaths(name, !!game.isCustom).filter(folder =>
+    fs.existsSync(folder)
+  );
+  if (custom.length > 0) return { appId, folders: custom, custom: true };
+  const [manifest, emulator] = await Promise.all([
+    findLudusaviSaveFolders(name).catch(error => {
+      console.warn("[Plugins] Ludusavi save lookup failed:", error.message);
+      return [];
+    }),
+    emulatorSaveFolders(appId),
+  ]);
+  const seen = new Set();
+  const folders = [...manifest, ...emulator].filter(folder => {
+    const key = path.resolve(folder).toLowerCase();
+    return !seen.has(key) && seen.add(key);
+  });
+  return { appId, folders, custom: false };
+}
+
+// Only a folder the user picks in the dialog is saved, so a plugin can't point
+// backups somewhere on its own. Returns the folder, or null when cancelled.
+async function pickGameSaveFolder(sender, game) {
+  const name = gameName(game);
+  const result = await dialog.showOpenDialog(BrowserWindow.fromWebContents(sender), {
+    title: `Select the save folder for ${name}`,
+    properties: ["openDirectory"],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  saveCustomSavePaths(name, !!game.isCustom, [result.filePaths[0]]);
+  return result.filePaths[0];
 }
 
 // Only folders, so this needs no permission: opening a folder can't run anything.
@@ -573,6 +619,10 @@ const calls = {
   "games.appId": (_sender, _id, game) => gameAppId(game),
   "games.executable": (_sender, _id, game) => gameExecutable(game),
   "games.saveFolders": (_sender, _id, game) => gameSaveFolders(game),
+  "games.pickSaveFolder": (sender, _id, game) => pickGameSaveFolder(sender, game),
+  "games.clearSaveFolder": (_sender, _id, game) => {
+    saveCustomSavePaths(gameName(game), !!game.isCustom, []);
+  },
   openFolder: (_sender, _id, target) => openFolder(target),
   download: { permission: "downloads", call: download },
   extract: { permission: "downloads", call: (_sender, ...args) => extract(...args) },

@@ -28,7 +28,14 @@ function loadPlugin(id) {
 // A fake `ascendara` with the same surface as createApi in src/lib/plugins.js
 function fakeApi(
   manifest,
-  { platform = "win32", values = {}, exec, downloads = [] } = {}
+  {
+    platform = "win32",
+    values = {},
+    exec,
+    downloads = [],
+    folders = ["C:\\Saves\\1437400"],
+    pick = null,
+  } = {}
 ) {
   const dom = new JSDOM("<!doctype html><html><head></head><body></body></html>");
   globalThis.window = dom.window;
@@ -47,6 +54,7 @@ function fakeApi(
     resumed: [],
     storage: {},
     opened: [],
+    cleared: [],
   };
   const cleanups = [];
   const onCleanup = cleanup => (cleanups.push(cleanup), cleanup);
@@ -101,7 +109,9 @@ function fakeApi(
     openFolder: async folder => record.opened.push(folder),
     games: {
       executable: async game => game.executable,
-      saveFolders: async () => ({ appId: "1437400", folders: ["C:\\Saves\\1437400"] }),
+      saveFolders: async () => ({ appId: "1437400", folders, custom: false }),
+      pickSaveFolder: async () => pick,
+      clearSaveFolder: async game => record.cleared.push(game.game),
       onLaunch: callback => listen(listeners.launch, callback),
       onExit: callback => listen(listeners.exit, callback),
     },
@@ -238,6 +248,42 @@ test("downloads pause while playing and resume after the last game closes", asyn
   await flush();
   assert.deepEqual(harness.record.resumed, ["Busy"], "only what the plugin paused");
   delete globalThis.window.__ascendaraPauseWhilePlaying;
+});
+
+test("save folder opens the best match first and can be set and reset", async () => {
+  const { manifest, plugin } = loadPlugin("open-save-folder");
+  const harness = fakeApi(manifest, {
+    folders: ["C:\\Users\\me\\AppData\\LocalLow\\Studio\\Game", "C:\\Saves\\1437400"],
+    pick: "D:\\Saves\\Game",
+  });
+  plugin.start(harness.api);
+  const game = { game: "Game", executable: "game.exe" };
+  const action = label => harness.record.actions.find(item => item.label === label);
+
+  await action("Open save folder").onClick(game);
+  assert.deepEqual(harness.record.opened, [
+    "C:\\Users\\me\\AppData\\LocalLow\\Studio\\Game",
+  ]);
+  assert.match(
+    harness.record.toasts[0].message,
+    /Also found: .*1437400.*Set save folder/
+  );
+
+  assert.equal(action("Reset save folder").when(game), false);
+  await action("Set save folder").onClick(game);
+  assert.equal(action("Reset save folder").when(game), true);
+  await action("Reset save folder").onClick(game);
+  assert.deepEqual(harness.record.cleared, ["Game"]);
+  assert.equal(action("Reset save folder").when(game), false);
+});
+
+test("save folder points to Set save folder when nothing is found", async () => {
+  const { manifest, plugin } = loadPlugin("open-save-folder");
+  const harness = fakeApi(manifest, { folders: [] });
+  plugin.start(harness.api);
+  await harness.record.actions[0].onClick({ game: "Game" });
+  assert.deepEqual(harness.record.opened, []);
+  assert.match(harness.record.toasts[0].message, /Set save folder/);
 });
 
 test("save backups zip the save folder when a game closes", async () => {
