@@ -85,7 +85,7 @@ const MenuBar = () => {
   const [menuBarMode, setMenuBarMode] = useState(() =>
     getMenuBarMode(getViewportWidth())
   );
-  const [isHomeScrolled, setIsHomeScrolled] = useState(false);
+  const [isPageScrolled, setIsPageScrolled] = useState(false);
   const mainContentRef = useRef(null);
 
   const responsivePolicy = getMenuBarResponsivePolicyForMode(menuBarMode);
@@ -93,6 +93,10 @@ const MenuBar = () => {
   const modifierKey = platform.toUpperCase().includes("MAC") ? "⌘" : "Ctrl";
   const showSearchPill =
     !location.pathname.startsWith("/welcome") && location.pathname !== "/bigpicture";
+  const dimsOnScroll =
+    location.pathname === "/" ||
+    location.pathname === "/gamescreen" ||
+    location.pathname === "/download";
 
   useEffect(() => {
     const updateMenuBarMode = () => {
@@ -218,8 +222,8 @@ const MenuBar = () => {
   }, []);
 
   useEffect(() => {
-    if (location.pathname !== "/") {
-      setIsHomeScrolled(false);
+    if (!dimsOnScroll) {
+      setIsPageScrolled(false);
       return;
     }
 
@@ -233,7 +237,7 @@ const MenuBar = () => {
         document.body?.scrollTop || 0,
         scrollContainer.scrollTop || 0
       );
-      setIsHomeScrolled(pageScrollTop > 4);
+      setIsPageScrolled(pageScrollTop > 4);
     };
     updateScrolledState();
     scrollContainer.addEventListener("scroll", updateScrolledState, { passive: true });
@@ -242,9 +246,9 @@ const MenuBar = () => {
       scrollContainer.removeEventListener("scroll", updateScrolledState);
       window.removeEventListener("scroll", updateScrolledState);
     };
-  }, [location.pathname]);
+  }, [dimsOnScroll, location.pathname]);
 
-  const scrollDimStyle = isHomeScrolled
+  const scrollDimStyle = isPageScrolled
     ? {
         backgroundColor: "rgba(10, 15, 25, 0.82)",
         boxShadow: "0 4px 18px rgba(0, 0, 0, 0.42)",
@@ -278,7 +282,7 @@ const MenuBar = () => {
 
   return (
     <div
-      className={`fixed z-50 flex w-full select-none items-center ${isHomeScrolled ? "menubar-scroll-dim" : ""}`}
+      className={`fixed z-50 flex w-full select-none items-center ${isPageScrolled ? "menubar-scroll-dim" : ""}`}
       style={{ ...MENU_BAR_HEIGHT_STYLE, WebkitAppRegion: "drag" }}
     >
       {/* data-boot-row / data-boot-pop: staggered pop-in as the boot logo lands (app.css) */}
@@ -636,7 +640,7 @@ const MenuBar = () => {
               ? "order-first ml-2"
               : "mr-2"
         }
-        dimmed={isHomeScrolled}
+        dimmed={isPageScrolled}
       />
       <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <AlertDialogContent className="max-w-2xl bg-background">
