@@ -64,10 +64,45 @@ module.exports = {
       return bundled;
     }
 
+    // Sets an element in Profiles.xml, adding it when it's missing or empty
+    const setValue = (xml, tag, value) => {
+      const existing = new RegExp(`<${tag}\\s*/>|<${tag}>[^<]*</${tag}>`);
+      const element = `<${tag}>${value}</${tag}>`;
+      return existing.test(xml)
+        ? xml.replace(existing, element)
+        : xml.replace("</Profile>", `  ${element}\n</Profile>`);
+    };
+
+    // Adjusts the downloaded DS4Windows's settings. DS4Windows creates
+    // Profiles.xml on its first run and rewrites it when it exits, so this only
+    // runs before it starts.
+    async function configure() {
+      const settings = `${folder}/DS4Windows/Profiles.xml`;
+      if (!(await ascendara.files.exists(settings))) return;
+      let xml = await ascendara.files.read(settings);
+      const original = xml;
+      // A fresh DS4Windows finds controllers but leaves them without a profile,
+      // so games never see an Xbox controller. Give empty slots the Default one.
+      if (await ascendara.files.exists(`${folder}/DS4Windows/Profiles/Default.xml`)) {
+        for (let slot = 1; slot <= 8; slot++) {
+          const tag = `Controller${slot}`;
+          if (!new RegExp(`<${tag}>[^<]+</${tag}>`).test(xml))
+            xml = setValue(xml, tag, "Default");
+        }
+      }
+      // Over Bluetooth, DS4Windows switches PlayStation controllers to a mode
+      // only it can read, and they stay in it until they disconnect. Ascendara
+      // and browsers can't see the controller until then.
+      const disconnect = ascendara.settings.get("disconnect") !== false;
+      xml = setValue(xml, "DisconnectBTAtStop", disconnect ? "True" : "False");
+      if (xml !== original) await ascendara.files.write(settings, xml);
+    }
+
     async function open() {
       // The user's own DS4Windows may already be open
       if (state.pid || (await isRunning())) return;
       const exe = await program();
+      if (exe === bundled) await configure();
       const ready = await driverInstalled();
       // Without the driver, show the window so its welcome screen can install it
       let exited = false;

@@ -162,6 +162,11 @@
   box-shadow: none;
   border-radius: 12px;
 }
+/* The name caption is placed against its own tile; without this it drops to
+   the bottom of whatever positioned box holds the row (Classic home) */
+.bp-game--artwork {
+  position: relative;
+}
 .bp-game--artwork .bp-cover {
   border-radius: inherit;
 }
@@ -906,7 +911,7 @@
   opacity: 0.7;
 }
 /* Store game details on short screens (Steam Deck is 1280x800): tighter type
-   and spacing so everything fits and the buttons stay on one line */
+   and spacing so everything fits; the buttons wrap if they still don't */
 @media (max-height: 900px) {
   .bp-detail .bp-dv-hero {
     width: 52%;
@@ -951,7 +956,7 @@
   }
   .bp-detail .bp-dv-actions {
     margin-bottom: 1rem;
-    gap: 0.875rem;
+    gap: 0.875rem 1.25rem;
   }
   .bp-detail .bp-dv-actions > button {
     gap: 0.6rem;

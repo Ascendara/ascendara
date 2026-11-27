@@ -115,7 +115,7 @@
     {
       "id": "ds4windows",
       "name": "DS4Windows",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "tago",
       "description": "Makes PlayStation controllers work in games that only support Xbox controllers. Windows only.",
       "details": "Many games only read Xbox controllers. Steam fixes this for its own games with Steam Input, but games started from Ascendara don't get it, so a DualShock 4 or DualSense does nothing in them. This plugin starts DS4Windows when a game starts, which shows your PlayStation controller to games as an Xbox controller, and closes it again when the last game closes. DS4Windows is downloaded from its GitHub releases the first time it's needed. The first time it runs, DS4Windows asks to install the ViGEmBus driver: click Install in its welcome window, then start the game again. DS4Windows also needs the .NET 8 Desktop Runtime, and Windows offers to download it if it's missing. Already have DS4Windows? Set its path in this plugin's options.",
@@ -123,7 +123,7 @@
         "Starts DS4Windows while a game is running, and closes it afterwards",
         "Downloads DS4Windows the first time a game starts"
       ],
-      "changelog": "",
+      "changelog": "Fixes PlayStation controllers not showing up as Xbox controllers on a fresh DS4Windows, and Bluetooth controllers not working in Ascendara after a game closes.",
       "license": "MIT",
       "homepage": "https://github.com/schmaldeo/DS4Windows",
       "minAppVersion": "12.3.2",
@@ -151,6 +151,13 @@
           "default": "playing"
         },
         {
+          "key": "disconnect",
+          "type": "boolean",
+          "label": "Turn off Bluetooth controllers when DS4Windows closes",
+          "description": "Over Bluetooth, a PlayStation controller can't be used in Ascendara or your browser after DS4Windows closes until it reconnects. Press the PS button to turn it back on. Doesn't apply to your own DS4Windows.",
+          "default": true
+        },
+        {
           "key": "path",
           "type": "text",
           "label": "Use my own DS4Windows",
@@ -162,13 +169,13 @@
       "files": [
         {
           "path": "index.js",
-          "sha256": "d9a1a503c7214b244e3be728b0b5f25d00c964e0bf09db3d59ce30f9e33722ad",
-          "size": 5219
+          "sha256": "679770bff8bbe9a4ca5ab6d35d46c9071fb0461d772de63017a66067c758c96e",
+          "size": 6998
         },
         {
           "path": "manifest.json",
-          "sha256": "6e5d68e83f3b40d656dbada14ef2d3fa8146fb7f8583a92514e80c6e9d8dea6c",
-          "size": 1991
+          "sha256": "ef0030375039d97201bc5a4bb7f3547ee2e755264e8987d57b688a49ccd235f0",
+          "size": 2559
         }
       ]
     },

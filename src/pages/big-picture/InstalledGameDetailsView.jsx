@@ -289,7 +289,7 @@ function InstalledGameDetailsView({
               </div>
             )}
 
-            <div className="mb-8 flex gap-6 text-white/80">
+            <div className="mb-8 flex flex-wrap gap-x-6 gap-y-2 text-white/80">
               {game.version && (
                 <div className="flex items-center gap-2">
                   <Info className="h-5 w-5" />
@@ -326,7 +326,7 @@ function InstalledGameDetailsView({
             )}
 
             {(game.dlc || game.online) && (
-              <div className="mb-8 flex gap-4">
+              <div className="mb-8 flex flex-wrap gap-4">
                 {game.dlc && (
                   <div className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/20 px-4 py-2 text-sm font-medium text-purple-300">
                     <Download className="h-4 w-4" />
@@ -551,13 +551,13 @@ function InstalledGameDetailsView({
         {/* VIEW 2: MEDIA */}
         <div className="relative flex h-full w-full flex-shrink-0 flex-col">
           <div className="absolute inset-0 -z-10 bg-background/90 backdrop-blur-md" />
-          <div className="z-20 flex items-center gap-4 border-b border-white/5 px-24 py-12">
+          <div className="z-20 flex flex-wrap items-center gap-4 border-b border-border px-24 pb-10 pt-24">
             <ImageIcon className="h-8 w-8 text-primary" />
             <h2 className="text-4xl font-light tracking-wider text-primary">
               {t("bigPicture.screenshots").toUpperCase()}
             </h2>
             {hasScreenshots && (
-              <div className="ml-auto flex items-center gap-8 text-xs font-bold uppercase tracking-widest text-white/60">
+              <div className="ml-auto flex flex-wrap items-center gap-x-8 gap-y-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 <span>← / → {t("bigPicture.navigate")}</span>
                 <span>
                   <span

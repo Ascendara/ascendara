@@ -105,6 +105,35 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
     }, 300); // 300ms debounce
   };
 
+  // Installed games keep the cover as their grid art, which every library
+  // surface reads first. Games without a folder (favorites) fall back to the
+  // central covers folder.
+  const persistCover = async (dataUrl, imgID) => {
+    if (!window.electron) return false;
+    if (window.electron.saveGameAsset) {
+      let src = dataUrl;
+      if (!src.startsWith("data:")) {
+        const blob = await (await fetch(src)).blob();
+        src = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+      const ext = src.startsWith("data:image/png") ? "png" : "jpg";
+      const result = await window.electron.saveGameAsset(
+        gameName,
+        `grid.ascendara.${ext}`,
+        src
+      );
+      if (result?.success) return true;
+    }
+    return window.electron.updateGameCover
+      ? await window.electron.updateGameCover(gameName, imgID, dataUrl)
+      : false;
+  };
+
   const handleUpdateCover = async () => {
     // Clear all caches for this game's cover image
     const localStorageKey = `game-cover-${gameName}`;
@@ -126,12 +155,7 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
         try {
           // 3. Update the image on disk via Electron IPC (no localStorage
           // caching - quota issues with base64 data URLs)
-          if (window.electron && window.electron.updateGameCover) {
-            await window.electron.updateGameCover(
-              gameName,
-              coverSearch.selectedCover.imgID,
-              dataUrl
-            );
+          if (await persistCover(dataUrl, coverSearch.selectedCover.imgID)) {
             toast.success("Cover image updated successfully");
           }
         } catch (e) {
@@ -157,8 +181,7 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
       try {
         // 3. Update the image on disk via Electron IPC (no localStorage
         // caching - quota issues with base64 data URLs)
-        if (window.electron && window.electron.updateGameCover) {
-          await window.electron.updateGameCover(gameName, null, customImage.preview);
+        if (await persistCover(customImage.preview, null)) {
           toast.success("Custom cover image saved successfully");
         } else {
           console.warn("Electron IPC not available, image cannot be persisted");

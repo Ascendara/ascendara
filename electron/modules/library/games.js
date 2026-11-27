@@ -113,6 +113,25 @@ function getCustomGameDirectory(gameInfo, settings) {
     : null;
 }
 
+// Where a game's artwork (grid, hero, logo) lives: the custom game's folder,
+// otherwise its install folder in one of the library directories
+function findGameAssetDirectory(gameName, settings) {
+  const gameInfo = findCustomGame(gameName, settings);
+  const customDir = getCustomGameDirectory(gameInfo, settings);
+  if (customDir) return { dir: customDir };
+  if (gameInfo?.launcher || gameInfo?.assetDirectory) {
+    return { dir: null, error: "Invalid imported asset directory" };
+  }
+  for (const dir of [
+    settings.downloadDirectory,
+    ...(settings.additionalDirectories || []),
+  ].filter(Boolean)) {
+    const stdDir = path.join(dir, sanitizeGameName(gameName));
+    if (fs.existsSync(stdDir)) return { dir: stdDir };
+  }
+  return { dir: null, error: "Game directory not found" };
+}
+
 /**
  * Validate game executable
  */
@@ -1857,34 +1876,11 @@ function registerGameHandlers() {
       const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
       const buffer = Buffer.from(base64Data, "base64");
 
-      // Find game directory
-      let gameDir = null;
-
-      // 1. Check custom games
-      const gameInfo = findCustomGame(gameName, settings);
-      gameDir = getCustomGameDirectory(gameInfo, settings);
-      if ((gameInfo?.launcher || gameInfo?.assetDirectory) && !gameDir) {
-        return { success: false, error: "Invalid imported asset directory" };
-      }
-
-      // 2. Check standard directories
-      if (!gameDir) {
-        const allDirectories = [
-          settings.downloadDirectory,
-          ...(settings.additionalDirectories || []),
-        ];
-        for (const dir of allDirectories) {
-          const stdDir = path.join(dir, sanitizeGameName(gameName));
-          if (fs.existsSync(stdDir)) {
-            gameDir = stdDir;
-            break;
-          }
-        }
-      }
-
-      if (!gameDir) {
-        return { success: false, error: "Game directory not found" };
-      }
+      const { dir: gameDir, error: dirError } = findGameAssetDirectory(
+        gameName,
+        settings
+      );
+      if (!gameDir) return { success: false, error: dirError };
 
       if (
         typeof filename !== "string" ||
@@ -1913,6 +1909,62 @@ function registerGameHandlers() {
       console.error("Error saving game asset:", error);
       return { success: false, error: error.message };
     }
+  });
+
+  // Save the Steam store cover as a game's library cover once it's linked to
+  // a Steam App ID. Leaves an existing grid alone unless `force` is set.
+  ipcMain.handle("save-steam-cover", async (_, gameName, appId, force = false) => {
+    const settings = settingsManager.getSettings();
+    if (!settings.downloadDirectory || !/^\d+$/.test(String(appId ?? ""))) return null;
+
+    const { dir: gameDir } = findGameAssetDirectory(gameName, settings);
+    if (gameDir && !force) {
+      for (const name of ["grid.ascendara.jpg", "grid.ascendara.png"]) {
+        if (fs.existsSync(path.join(gameDir, name))) return null;
+      }
+    }
+
+    // Portrait library art first, the wide store header for older listings
+    let buffer = null;
+    for (const file of ["library_600x900_2x.jpg", "library_600x900.jpg", "header.jpg"]) {
+      try {
+        const response = await axios.get(
+          `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/${file}`,
+          { responseType: "arraybuffer", timeout: 10000 }
+        );
+        if (response.data?.byteLength) {
+          buffer = Buffer.from(response.data);
+          break;
+        }
+      } catch (e) {}
+    }
+    if (!buffer) return null;
+
+    try {
+      if (gameDir) {
+        fs.ensureDirSync(gameDir);
+        for (const name of ["grid.ascendara.jpg", "grid.ascendara.png"]) {
+          fs.removeSync(path.join(gameDir, name));
+        }
+        fs.writeFileSync(path.join(gameDir, "grid.ascendara.jpg"), buffer);
+      } else {
+        // Not installed (e.g. a favorite): same spot custom covers use
+        if (path.basename(gameName) !== gameName) return null;
+        const centralDir = path.join(settings.downloadDirectory, "games");
+        fs.ensureDirSync(centralDir);
+        fs.writeFileSync(path.join(centralDir, `${gameName}.ascendara.jpg`), buffer);
+      }
+    } catch (error) {
+      console.error("[save-steam-cover] Error:", error);
+      return null;
+    }
+
+    BrowserWindow.getAllWindows().forEach(win => {
+      if (!win.isDestroyed()) {
+        win.webContents.send("game-assets-updated", { game: gameName, success: true });
+      }
+    });
+    return buffer.toString("base64");
   });
 
   // Repair a missing header image for an installed game.

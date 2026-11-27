@@ -1,6 +1,7 @@
 {
   "name": "DS4Windows",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "changelog": "Fixes PlayStation controllers not showing up as Xbox controllers on a fresh DS4Windows, and Bluetooth controllers not working in Ascendara after a game closes.",
   "author": "tago",
   "description": "Makes PlayStation controllers work in games that only support Xbox controllers. Windows only.",
   "details": "Many games only read Xbox controllers. Steam fixes this for its own games with Steam Input, but games started from Ascendara don't get it, so a DualShock 4 or DualSense does nothing in them. This plugin starts DS4Windows when a game starts, which shows your PlayStation controller to games as an Xbox controller, and closes it again when the last game closes. DS4Windows is downloaded from its GitHub releases the first time it's needed. The first time it runs, DS4Windows asks to install the ViGEmBus driver: click Install in its welcome window, then start the game again. DS4Windows also needs the .NET 8 Desktop Runtime, and Windows offers to download it if it's missing. Already have DS4Windows? Set its path in this plugin's options.",
@@ -25,6 +26,13 @@
         { "value": "playing", "label": "Only while a game is running" },
         { "value": "always", "label": "While Ascendara is open" }
       ]
+    },
+    {
+      "key": "disconnect",
+      "type": "boolean",
+      "label": "Turn off Bluetooth controllers when DS4Windows closes",
+      "description": "Over Bluetooth, a PlayStation controller can't be used in Ascendara or your browser after DS4Windows closes until it reconnects. Press the PS button to turn it back on. Doesn't apply to your own DS4Windows.",
+      "default": true
     },
     {
       "key": "path",

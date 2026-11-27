@@ -1,35 +1,24 @@
 // Browser-standard mapping covers Xbox, DualShock and DualSense controllers.
-let activePadIndex = null;
+import { getActiveGamepad, resetActiveGamepad } from "@/lib/gamepad";
+
+let padIndex = null;
 let stickDirection = null;
 
 export function resetGamepadInput() {
-  activePadIndex = null;
+  resetActiveGamepad();
+  padIndex = null;
   stickDirection = null;
 }
 
 const getGamepadInput = () => {
-  let pads;
-  try {
-    pads = Array.from(navigator.getGamepads?.() || []).filter(
-      pad => pad?.connected && pad.buttons.length >= 10
-    );
-  } catch {
-    return null;
-  }
-  if (!pads.length) {
-    activePadIndex = null;
+  const gp = getActiveGamepad();
+  if (!gp) {
+    padIndex = null;
     stickDirection = null;
     return null;
   }
-  const actuated = pad =>
-    pad.buttons.some(button => button.pressed || button.value > 0.5) ||
-    Math.abs(pad.axes[0] || 0) > 0.35 ||
-    Math.abs(pad.axes[1] || 0) > 0.35;
-  const current = pads.find(pad => pad.index === activePadIndex);
-  const gp =
-    current && actuated(current) ? current : pads.find(actuated) || current || pads[0];
-  if (gp.index !== activePadIndex) stickDirection = null;
-  activePadIndex = gp.index;
+  if (gp.index !== padIndex) stickDirection = null;
+  padIndex = gp.index;
 
   const x = gp.axes[0] || 0;
   const y = gp.axes[1] || 0;
