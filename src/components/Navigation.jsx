@@ -19,6 +19,7 @@ import {
 import { useAscendNotificationCount } from "@/services/ascend/ascendNotificationBadgeService";
 import { useNewSecurityFeature } from "@/services/ascend/newFeatureBadgeService";
 import { prefetchAscendData } from "@/services/ascend/ascendPrefetch";
+import { normalizeNavigationOrder } from "@/lib/navigationOrder";
 import {
   NAVIGATION_EDGE_PADDING_PX,
   NAVIGATION_COMPACT_ITEM_HEIGHT_PX,
@@ -192,8 +193,6 @@ const Navigation = memo(({ items }) => {
         hidden: !debridNavVisible,
         color: "from-yellow-400 to-amber-500",
       },
-      // Splits the download pages from the rest of the dock
-      { separator: true, path: "separator" },
     ];
 
     items.push({
@@ -226,7 +225,19 @@ const Navigation = memo(({ items }) => {
       color: "from-slate-400 to-slate-600",
     });
 
-    return items;
+    const itemsByPath = new Map(items.map(item => [item.path, item]));
+    const orderedItems = normalizeNavigationOrder(settings.navigationOrder)
+      .map(path => itemsByPath.get(path))
+      .filter(Boolean);
+
+    // Keep the visual divider after the first five ordered destinations, as in
+    // the default dock, while allowing every button to move on either side.
+    orderedItems.splice(Math.min(5, orderedItems.length), 0, {
+      separator: true,
+      path: "separator",
+    });
+
+    return orderedItems;
   }, [t, settings, debridNavVisible]);
 
   useEffect(() => {

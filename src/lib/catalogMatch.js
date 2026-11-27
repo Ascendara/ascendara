@@ -219,13 +219,13 @@ function versionOf(entry) {
 }
 
 function compareCatalogEntries(left, right) {
-  const byVersion = compareVersions(versionOf(left), versionOf(right));
-  if (byVersion) return -byVersion;
-
-  // Equal versions: the official index stays canonical.
+  // The official index is always the canonical card.
   const leftOfficial = left.customSource ? 1 : 0;
   const rightOfficial = right.customSource ? 1 : 0;
   if (leftOfficial !== rightOfficial) return leftOfficial - rightOfficial;
+
+  const byVersion = compareVersions(versionOf(left), versionOf(right));
+  if (byVersion) return -byVersion;
 
   const byRank = (left.sourceRank ?? 0) - (right.sourceRank ?? 0);
   if (byRank) return byRank;

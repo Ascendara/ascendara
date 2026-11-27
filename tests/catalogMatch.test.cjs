@@ -103,6 +103,28 @@ test("official and external listings merge, and equal versions keep the official
   assert.equal(games[0].customSource, undefined);
 });
 
+test("an external listing can never replace the official card as primary", async () => {
+  const { groupCatalogGames } = await load();
+  const { games, groups } = groupCatalogGames([
+    { game: "Grand Theft Auto V Enhanced", sourceRank: 0 },
+    {
+      game: "Grand Theft Auto V Enhanced - .20 Online 1.72",
+      sourceRank: 1,
+      customSource: "SteamRIP",
+    },
+  ]);
+
+  assert.equal(games.length, 1);
+  assert.equal(games[0].game, "Grand Theft Auto V Enhanced");
+  assert.equal(games[0].customSource, undefined);
+  assert.equal(games[0].version, undefined);
+  assert.equal(groups.get("grand theft auto v enhanced").length, 2);
+  assert.equal(
+    groups.get("grand theft auto v enhanced")[1].game,
+    "Grand Theft Auto V Enhanced - .20 Online 1.72"
+  );
+});
+
 test("leading-dot version tails still merge with the base game", async () => {
   const { groupCatalogGames } = await load();
   const { games, groups } = groupCatalogGames([
@@ -121,7 +143,7 @@ test("leading-dot version tails still merge with the base game", async () => {
   assert.equal(groups.get("red dead redemption 2")?.length, 2);
 });
 
-test("newer external versions become the default card without merging sequels or subtitles", async () => {
+test("official stays the default card even when an external version is newer", async () => {
   const { groupCatalogGames } = await load();
   const { games, groups } = groupCatalogGames([
     { game: "Cyberpunk 2077", version: "2.21", sourceRank: 0 },
@@ -145,8 +167,12 @@ test("newer external versions become the default card without merging sequels or
   assert.equal(games.length, 5);
   const cyberpunk = games.find(game => game.groupKey === "cyberpunk 2077");
   assert.equal(cyberpunk.game, "Cyberpunk 2077");
-  assert.equal(cyberpunk.version, "2.30");
-  assert.equal(groups.get("cyberpunk 2077").length, 2);
+  assert.equal(cyberpunk.version, "2.21");
+  assert.equal(cyberpunk.customSource, undefined);
+  assert.deepEqual(
+    groups.get("cyberpunk 2077").map(entry => entry.version),
+    ["2.21", "2.30"]
+  );
   assert.ok(games.some(game => game.game === "Hades"));
   assert.ok(games.some(game => game.game === "Hades II"));
   assert.ok(games.some(game => game.game === "Probably Stolen"));
