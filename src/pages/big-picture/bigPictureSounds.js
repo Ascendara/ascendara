@@ -1,5 +1,6 @@
-// Interface sounds for Big Picture. Everything is synthesized with Web Audio so
-// a button press is heard on the same frame, with no files to load or decode.
+// Interface sounds for Big Picture. Navigation sounds are synthesized with Web
+// Audio so a button press is heard on the same frame, with no files to load or
+// decode. Only the startup sound comes from a file (sounds/bigpicture.mp3).
 // Each sound is a soft, glassy tone fed into a long airy reverb, which gives
 // the console-style "aura" around every move.
 
@@ -144,14 +145,34 @@ const sounds = {
       wet: 0.45,
     });
   },
-  // A slow ambient chord when Big Picture opens
-  enter() {
-    [261.63, 392.0, 493.88, 587.33, 783.99].forEach((freq, i) =>
-      voice({ freq, at: i * 0.06, attack: 0.35, length: 2.4, gain: 0.08, wet: 0.75 })
-    );
-    voice({ freq: 1567.98, at: 0.45, attack: 0.2, length: 1.6, gain: 0.05, wet: 0.9 });
+  // Startup sound when Big Picture opens, played straight to the output
+  async enter() {
+    const buffer = await loadEnterSound();
+    if (!buffer || !enabled) return;
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start();
   },
 };
+
+let enterSound = null;
+
+function loadEnterSound() {
+  if (!enterSound) {
+    enterSound = (async () => {
+      const dataUrl = await window.electron.getAudioAsset("sounds/bigpicture.mp3");
+      if (!dataUrl) return null;
+      const data = await (await fetch(dataUrl)).arrayBuffer();
+      return ctx.decodeAudioData(data);
+    })().catch(error => {
+      console.error("Big Picture startup sound failed to load:", error);
+      enterSound = null;
+      return null;
+    });
+  }
+  return enterSound;
+}
 
 const ACTION_SOUNDS = {
   UP: "move",
@@ -228,6 +249,8 @@ function playKeyboardActionSound(event) {
 export function setBigPictureSoundsEnabled(value) {
   enabled = !!value;
   if (!enabled && ctx?.state === "running") ctx.suspend();
+  // Decode the startup sound ahead of time so it plays the moment it's asked for
+  if (enabled && audio()) loadEnterSound();
 }
 
 // Registered once when this module loads, before any Big Picture screen

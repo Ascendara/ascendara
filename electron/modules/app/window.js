@@ -663,7 +663,7 @@ function registerWindowHandlers() {
 
   // Get audio asset as base64 data URL
   ipcMain.handle("get-audio-asset", (_, filename) => {
-    if (typeof filename !== "string" || !/^sounds\/ascend[1-4]\.mp3$/.test(filename)) {
+    if (typeof filename !== "string" || !/^sounds\/(ascend[1-4]|bigpicture)\.mp3$/.test(filename)) {
       throw new Error("Unknown audio asset");
     }
     const fs = require("fs-extra");
