@@ -1127,6 +1127,7 @@ function registerGameHandlers() {
           executable,
         };
         runGameProcesses.set(game, runGame);
+        require("../app/protocol").markGamePlaying(game, true);
 
         runGame.once("spawn", () => {
           setPlayingActivity(game, `pc:${game}`);
@@ -1144,6 +1145,7 @@ function registerGameHandlers() {
           console.error(`Failed to start game ${game}:`, error);
           event.sender.send("game-launch-error", { game, error: error.message });
           runGameProcesses.delete(game);
+          require("../app/protocol").markGamePlaying(game, false);
           updateDiscordRPCToLibrary(`pc:${game}`);
           showWindow();
         });
@@ -1153,6 +1155,7 @@ function registerGameHandlers() {
           console.log(`Game ${game} exited with code ${code}`);
           runGameProcesses.delete(game);
           require("../app/livePing").refreshLivePing();
+          require("../app/protocol").markGamePlaying(game, false);
           if (settings.hideOnGameLaunch !== false && !runGame.sessionEnded) {
             showWindow();
           }
@@ -2710,4 +2713,5 @@ module.exports = {
   createGameShortcut,
   createStartMenuShortcut,
   validateGameExecutable,
+  findGameAssetDirectory,
 };

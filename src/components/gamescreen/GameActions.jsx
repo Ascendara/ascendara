@@ -30,6 +30,7 @@ import {
   LayoutGrid,
   Loader,
   Monitor,
+  Gamepad2,
   Pencil,
   Play,
   Puzzle,
@@ -77,6 +78,8 @@ export default function GameActions({
   onLaunchOptions,
   onCreateShortcut,
   onCreateStartMenuShortcut,
+  onAddToSteam,
+  isInSteam,
   showEditEntry,
   onEditEntry,
   isOnLinux,
@@ -355,6 +358,21 @@ export default function GameActions({
                 ? t("library.addToApplications")
                 : t("library.createStartMenuShortcut")}
             </DropdownMenuItem>
+            {onAddToSteam && (
+              <DropdownMenuItem
+                className="gap-2"
+                disabled={isInSteam}
+                onSelect={onAddToSteam}
+              >
+                <Gamepad2 className="h-4 w-4" />
+                {t("library.steamShortcuts.addToSteam")}
+                {isInSteam && (
+                  <span className="ml-auto text-xs opacity-60">
+                    {t("library.steamShortcuts.inSteam")}
+                  </span>
+                )}
+              </DropdownMenuItem>
+            )}
 
             <DropdownMenuSeparator />
 

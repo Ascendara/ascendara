@@ -46,18 +46,103 @@ function parseGameIdFromUrl(cleanUrl) {
  * shortcut. Links without this Mac's token are ignored, so a web page can't
  * start games.
  */
+function parsePlayLink(cleanUrl) {
+  if (typeof cleanUrl !== "string") return null;
+  const match = cleanUrl.match(
+    /^ascendara:\/\/play\/([^/?#]+)\?t=([0-9a-f]+)((?:&[bs]=1)*)$/i
+  );
+  if (!match) return null;
+  return {
+    name: match[1],
+    token: match[2],
+    // Steam shortcuts send the name as base64url and mark the launch as theirs
+    base64: /&b=1/i.test(match[3]),
+    fromSteam: /&s=1/i.test(match[3]),
+  };
+}
+
 function parsePlayGameFromUrl(cleanUrl) {
-  if (typeof cleanUrl !== "string") return "";
-  const match = cleanUrl.match(/^ascendara:\/\/play\/([^/?#]+)\?t=([0-9a-f]+)$/i);
-  if (!match) return "";
+  const link = parsePlayLink(cleanUrl);
+  if (!link) return "";
   let game;
   try {
-    game = decodeURIComponent(match[1]).trim();
+    game = (
+      link.base64
+        ? Buffer.from(link.name, "base64url").toString("utf8")
+        : decodeURIComponent(link.name)
+    ).trim();
   } catch {
     return "";
   }
   if (!game || /[/\\]|\.\./.test(game)) return "";
-  return require("../library/macShortcuts").isValidLaunchToken(match[2]) ? game : "";
+  return require("../library/macShortcuts").isValidLaunchToken(link.token) ? game : "";
+}
+
+// Steam tracks a shortcut's game for as long as the process it started runs.
+// Marker files tell a waiting instance when a game has started and ended.
+let steamSessionGame = null;
+
+function playingDir() {
+  return path.join(app.getPath("userData"), ".lock", "playing");
+}
+
+function playingMarker(game) {
+  const hash = require("crypto").createHash("sha1").update(game).digest("hex");
+  return path.join(playingDir(), hash);
+}
+
+function markGamePlaying(game, playing) {
+  try {
+    if (playing) {
+      fs.mkdirSync(playingDir(), { recursive: true });
+      fs.writeFileSync(playingMarker(game), String(process.pid));
+    } else if (fs.existsSync(playingMarker(game))) {
+      fs.unlinkSync(playingMarker(game));
+    }
+  } catch (error) {
+    console.warn("Could not update the playing marker:", error.message);
+  }
+  if (!playing) onGameSessionEnded(game);
+}
+
+/**
+ * Started cold by a Steam shortcut: quit once its game closes, so Steam sees
+ * the game end. The delay lets the renderer save playtime first.
+ */
+function onGameSessionEnded(game) {
+  if (!steamSessionGame || game !== steamSessionGame) return;
+  steamSessionGame = null;
+  setTimeout(() => {
+    if (require("../library/games").hasRunningGames()) return;
+    console.log(`Steam shortcut session for ${game} ended, quitting`);
+    app.isQuitting = true;
+    app.quit();
+  }, 5000);
+}
+
+/**
+ * Another instance already runs: keep this process (the one Steam started)
+ * alive while the game plays there, so Steam shows it running until it closes
+ */
+function waitForForwardedGame(game, primaryPid) {
+  const marker = playingMarker(game);
+  const started = Date.now();
+  let seen = false;
+  const timer = setInterval(() => {
+    let primaryAlive = true;
+    try {
+      process.kill(primaryPid, 0);
+    } catch {
+      primaryAlive = false;
+    }
+    const playing = fs.existsSync(marker);
+    if (playing) seen = true;
+    // Gave up waiting for the launch, the game ended, or Ascendara closed
+    if (!primaryAlive || (seen && !playing) || (!seen && Date.now() - started > 90000)) {
+      clearInterval(timer);
+      app.exit(0);
+    }
+  }, 1000);
 }
 
 /**
@@ -372,6 +457,13 @@ function setupSingleInstance() {
             : "Wrote show-window signal to file for existing instance"
         );
 
+        const forwardedGame =
+          parsePlayLink(protocolUrl)?.fromSteam && parsePlayGameFromUrl(protocolUrl);
+        if (forwardedGame) {
+          waitForForwardedGame(forwardedGame, existingPid);
+          return false;
+        }
+
         app.exit(0);
         return false;
       } else {
@@ -397,6 +489,13 @@ function setupSingleInstance() {
     }
   }
 
+  // Markers left behind by a crash would keep Steam waiting
+  try {
+    fs.rmSync(playingDir(), { recursive: true, force: true });
+  } catch (e) {
+    // Ignore
+  }
+
   // Write our PID to the lock file
   fs.writeFileSync(
     lockFile,
@@ -416,6 +515,9 @@ function setupSingleInstance() {
     const startupPlayGame = parsePlayGameFromUrl(startupProtocolUrl);
     if (startupPlayGame) {
       pendingPlayGames.add(startupPlayGame);
+      if (parsePlayLink(startupProtocolUrl)?.fromSteam) {
+        steamSessionGame = startupPlayGame;
+      }
     }
   }
 
@@ -520,4 +622,5 @@ module.exports = {
   clearPendingUrls,
   registerProtocolHandlers,
   setupSingleInstance,
+  markGamePlaying,
 };

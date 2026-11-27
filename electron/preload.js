@@ -444,6 +444,10 @@ contextBridge.exposeInMainWorld("electron", {
 
   // Game Shortcuts & Executables
   createGameShortcut: game => ipcRenderer.invoke("create-game-shortcut", game),
+  steamShortcutsSupported: () => ipcRenderer.invoke("steam-shortcuts-supported"),
+  getGamesInSteam: games => ipcRenderer.invoke("get-games-in-steam", games),
+  addGamesToSteam: (games, options) =>
+    ipcRenderer.invoke("add-games-to-steam", games, options),
   createStartMenuShortcut: game => ipcRenderer.invoke("create-start-menu-shortcut", game),
   modifyGameExecutable: (game, executable) =>
     ipcRenderer.invoke("modify-game-executable", game, executable),

@@ -28,6 +28,7 @@ import {
 } from "@/services/firebase/firebaseService";
 import gameService from "@/services/games/gameService";
 import { restoreCloudSave } from "@/services/cloud/restoreCloudSave";
+import { addGamesToSteam, canAddToSteam } from "@/lib/steamShortcuts";
 
 function useInstalledGameDetails({
   game,
@@ -778,6 +779,8 @@ function useInstalledGameDetails({
   // then "Update" when a newer version exists
   const stopMenuOffset = gameSession.canStop ? 1 : 0;
   const menuOffset = stopMenuOffset + (updateInfo && !isRunning ? 1 : 0);
+  // "Add to Steam" sits right after "Create shortcut" and shifts the rest
+  const steamOffset = canAddToSteam() ? 1 : 0;
   const handleManagementAction = menuIndex => {
     if (stopMenuOffset && menuIndex === 0) {
       openStopGameDialog();
@@ -787,7 +790,14 @@ function useInstalledGameDetails({
       startUpdate();
       return;
     }
-    const index = menuIndex - menuOffset;
+    let index = menuIndex - menuOffset;
+    if (steamOffset && index === 1) {
+      // Picked from a controller, so restart Steam without a second prompt
+      addGamesToSteam([game], t, { restartSteam: true });
+      setShowManagementMenu(false);
+      return;
+    }
+    if (steamOffset && index > 1) index -= 1;
     const lastIndex = folders.length + 4;
     if (isRunning && (index === 1 || index === lastIndex)) {
       toast.error(t("library.unavailableWhileRunning"));
@@ -1038,10 +1048,10 @@ function useInstalledGameDetails({
       if (showManagementMenu) {
         if (action === "DOWN") {
           // [Stop game], Shortcut, Executable, Launch options, Favorite, Folders, Delete
-          const menuItemCount = folders.length + 5 + menuOffset;
+          const menuItemCount = folders.length + 5 + menuOffset + steamOffset;
           setSelectedMenuItem(prev => (prev + 1) % menuItemCount);
         } else if (action === "UP") {
-          const menuItemCount = folders.length + 5 + menuOffset;
+          const menuItemCount = folders.length + 5 + menuOffset + steamOffset;
           setSelectedMenuItem(prev => (prev - 1 + menuItemCount) % menuItemCount);
         } else if (action === "CONFIRM") {
           // Execute selected menu item
@@ -1232,6 +1242,7 @@ function useInstalledGameDetails({
       showStopGameDialog,
       stopMenuOffset,
       menuOffset,
+      steamOffset,
       updateInfo,
       canAutoUpdateGame,
       gameSession,
@@ -1360,6 +1371,7 @@ function useInstalledGameDetails({
     handleStopGame,
     stopMenuOffset,
     menuOffset,
+    steamOffset,
     updateInfo,
     selectedButton,
     setShowBrowseExeWarning,

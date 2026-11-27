@@ -406,6 +406,7 @@ function registerCriticalHandlers() {
   require("./modules/downloads/usenet").registerUsenetHandlers();
   games.registerGameHandlers();
   require("./modules/library/libraryTransfer").registerLibraryTransferHandlers();
+  require("./modules/library/steamShortcuts").registerSteamShortcutHandlers();
   require("./modules/store-accounts").registerStoreAccountHandlers();
   require("./modules/retro").registerRetroHandlers();
   require("./modules/app/plugins").registerPluginHandlers();

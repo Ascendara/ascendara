@@ -101,6 +101,7 @@ import SoundtrackTab from "@/components/gamescreen/SoundtrackTab";
 import ModsTrainersTab from "@/components/gamescreen/ModsTrainersTab";
 import { useGameSession, formatSessionTime } from "@/hooks/useGameSession";
 import { API_URL } from "@/config/api";
+import { addGamesToSteam, canAddToSteam } from "@/lib/steamShortcuts";
 
 const ExecutableManagerDialog = ({ open, onClose, gameName, isCustom, t, onSave }) => {
   const [executables, setExecutables] = useState([]);
@@ -1442,6 +1443,7 @@ function InstalledGameScreen() {
   const [assetSearchOpen, setAssetSearchOpen] = useState(false);
   const [launchOptionsDialogOpen, setLaunchOptionsDialogOpen] = useState(false);
   const [launchCommand, setLaunchCommand] = useState("");
+  const [isInSteam, setIsInSteam] = useState(false);
   const { setTrack, play } = useAudioPlayer();
   const [isOnLinux, setIsOnLinux] = useState(false);
   const [prefixSize, setPrefixSize] = useState(null);
@@ -1998,6 +2000,24 @@ function InstalledGameScreen() {
     pendingLibrarySwapService.add(sanitizeText(importCatalogMatch.game), game.game);
     navigate("/download", { state: { gameData: importCatalogMatch } });
   };
+
+  // Whether this game already has a non-Steam shortcut from Ascendara
+  useEffect(() => {
+    const gameId = game?.game || game?.name;
+    if (!gameId || !canAddToSteam()) return;
+    let cancelled = false;
+    const check = () =>
+      window.electron
+        .getGamesInSteam([gameId])
+        .then(found => !cancelled && setIsInSteam(found.includes(gameId)))
+        .catch(() => {});
+    check();
+    window.addEventListener("ascendara:steam-shortcuts-updated", check);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("ascendara:steam-shortcuts-updated", check);
+    };
+  }, [game?.game, game?.name]);
 
   // Re-fetch Steam data when game changes
   // Steam API is always available (hardcoded), so we always fetch
@@ -3078,6 +3098,8 @@ function InstalledGameScreen() {
                 toast.error(t("library.shortcutError"));
               }
             }}
+            onAddToSteam={canAddToSteam() ? () => addGamesToSteam([game], t) : undefined}
+            isInSteam={isInSteam}
             onCreateStartMenuShortcut={async () => {
               const success = await window.electron.createStartMenuShortcut(game);
               if (success) {

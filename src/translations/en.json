@@ -2928,6 +2928,32 @@
     "addToFavorites": "Add to Favorites",
     "addedToApplications": "Added to Applications in the Ascendara folder",
     "alreadyRunning": "{{game}} is already running",
+    "steamShortcuts": {
+      "addAllToSteam": "Add All Games to Steam",
+      "addToSteam": "Add to Steam",
+      "addToSteamDescription": "Add as a non-Steam game with its artwork",
+      "addToSteamRestart": "Add to Steam (restarts Steam)",
+      "added_one": "Added {{count}} game to Steam",
+      "added_other": "Added {{count}} games to Steam",
+      "allAlreadyInSteam": "All of these games are already in Steam",
+      "alreadyInSteam": "This game is already in Steam",
+      "errors": {
+        "generic": "Could not add to Steam",
+        "steamDidNotClose": "Steam did not close, so the games were not added. Close Steam and try again",
+        "steamNotFound": "Steam is not installed, or Ascendara could not find it",
+        "userNotFound": "No Steam account found. Sign in to Steam once, then try again"
+      },
+      "inSteam": "In Steam",
+      "noGames": "No installed games to add",
+      "restartNeeded_one": "Steam needs to restart to add {{count}} game",
+      "restartNeeded_other": "Steam needs to restart to add {{count}} games",
+      "restartNeededDescription": "Steam only loads non-Steam games when it starts. Artwork is already in place.",
+      "restartSteam": "Restart Steam",
+      "restarting_one": "Restarting Steam to add {{count}} game",
+      "restarting_other": "Restarting Steam to add {{count}} games",
+      "restartingGameMode_one": "Restarting Steam to add {{count}} game. Ascendara closes with it and the game shows up in your library once Steam is back.",
+      "restartingGameMode_other": "Restarting Steam to add {{count}} games. Ascendara closes with it and the games show up in your library once Steam is back."
+    },
     "assetSearch": {
       "assetsDownloaded": "Downloaded {{count}} asset(s)",
       "description": "Search for and download new grid, logo, and banner images for this game",

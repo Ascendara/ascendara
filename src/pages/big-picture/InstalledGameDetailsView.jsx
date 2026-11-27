@@ -15,6 +15,7 @@ import {
   ChevronDown,
   FolderSync,
   Monitor,
+  Gamepad2,
   Pencil,
   AlertTriangle,
   Trash2,
@@ -101,6 +102,7 @@ function InstalledGameDetailsView({
     handleStopGame,
     stopMenuOffset,
     menuOffset,
+    steamOffset,
     updateInfo,
     selectedButton,
     setShowBrowseExeWarning,
@@ -674,11 +676,27 @@ function InstalledGameDetailsView({
                   {t("library.createShortcut")}
                 </span>
               </button>
+              {steamOffset > 0 && (
+                <button
+                  onClick={() => handleManagementAction(1 + menuOffset)}
+                  data-menu-selected={selectedMenuItem === 1 + menuOffset}
+                  className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
+                    selectedMenuItem === 1 + menuOffset
+                      ? "bg-primary text-secondary shadow-lg"
+                      : "bg-muted hover:bg-muted/80"
+                  }`}
+                >
+                  <Gamepad2 className="h-6 w-6" />
+                  <span className="text-lg font-semibold">
+                    {t("library.steamShortcuts.addToSteamRestart")}
+                  </span>
+                </button>
+              )}
               <button
-                onClick={() => handleManagementAction(1 + menuOffset)}
-                data-menu-selected={selectedMenuItem === 1 + menuOffset}
+                onClick={() => handleManagementAction(1 + menuOffset + steamOffset)}
+                data-menu-selected={selectedMenuItem === 1 + menuOffset + steamOffset}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 1 + menuOffset
+                  selectedMenuItem === 1 + menuOffset + steamOffset
                     ? "bg-primary text-secondary shadow-lg"
                     : "bg-muted hover:bg-muted/80"
                 }`}
@@ -694,10 +712,10 @@ function InstalledGameDetailsView({
                 </div>
               </button>
               <button
-                onClick={() => handleManagementAction(2 + menuOffset)}
-                data-menu-selected={selectedMenuItem === 2 + menuOffset}
+                onClick={() => handleManagementAction(2 + menuOffset + steamOffset)}
+                data-menu-selected={selectedMenuItem === 2 + menuOffset + steamOffset}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 2 + menuOffset
+                  selectedMenuItem === 2 + menuOffset + steamOffset
                     ? "bg-primary text-secondary shadow-lg"
                     : "bg-muted hover:bg-muted/80"
                 }`}
@@ -708,10 +726,10 @@ function InstalledGameDetailsView({
                 </span>
               </button>
               <button
-                onClick={() => handleManagementAction(3 + menuOffset)}
-                data-menu-selected={selectedMenuItem === 3 + menuOffset}
+                onClick={() => handleManagementAction(3 + menuOffset + steamOffset)}
+                data-menu-selected={selectedMenuItem === 3 + menuOffset + steamOffset}
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                  selectedMenuItem === 3 + menuOffset
+                  selectedMenuItem === 3 + menuOffset + steamOffset
                     ? "bg-primary text-secondary shadow-lg"
                     : "bg-muted hover:bg-muted/80"
                 }`}
@@ -728,10 +746,14 @@ function InstalledGameDetailsView({
                 return (
                   <button
                     key={folder.game}
-                    onClick={() => handleManagementAction(index + 4 + menuOffset)}
-                    data-menu-selected={selectedMenuItem === index + 4 + menuOffset}
+                    onClick={() =>
+                      handleManagementAction(index + 4 + menuOffset + steamOffset)
+                    }
+                    data-menu-selected={
+                      selectedMenuItem === index + 4 + menuOffset + steamOffset
+                    }
                     className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${
-                      selectedMenuItem === index + 4 + menuOffset
+                      selectedMenuItem === index + 4 + menuOffset + steamOffset
                         ? "bg-primary text-secondary shadow-lg"
                         : "bg-muted hover:bg-muted/80"
                     }`}
@@ -744,10 +766,14 @@ function InstalledGameDetailsView({
                 );
               })}
               <button
-                onClick={() => handleManagementAction(folders.length + 4 + menuOffset)}
-                data-menu-selected={selectedMenuItem === folders.length + 4 + menuOffset}
+                onClick={() =>
+                  handleManagementAction(folders.length + 4 + menuOffset + steamOffset)
+                }
+                data-menu-selected={
+                  selectedMenuItem === folders.length + 4 + menuOffset + steamOffset
+                }
                 className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-all ${isRunning ? "opacity-50" : ""} ${
-                  selectedMenuItem === folders.length + 4 + menuOffset
+                  selectedMenuItem === folders.length + 4 + menuOffset + steamOffset
                     ? "bg-red-500 text-white shadow-lg"
                     : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                 }`}

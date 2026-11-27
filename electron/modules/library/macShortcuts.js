@@ -161,4 +161,4 @@ async function createMacShortcut({ game, directory }, targetDirectory) {
   return app;
 }
 
-module.exports = { createMacShortcut, isValidLaunchToken, appName };
+module.exports = { createMacShortcut, isValidLaunchToken, launchToken, appName };
