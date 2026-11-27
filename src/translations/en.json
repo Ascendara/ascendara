@@ -4867,6 +4867,8 @@
     "communityThemesDescription": "Browse and apply themes created by the community. Want to submit your own?",
     "compactDockOnScroll": "Compact Navigation on Scroll",
     "compactDockOnScrollDescription": "Shrink the navigation bar to colored dots while scrolling.",
+    "dimMenuBarOnScroll": "Dim Title Bar on Scroll",
+    "dimMenuBarOnScrollDescription": "Darken the title bar while scrolling so its controls stay readable over page content.",
     "navigationOrderTitle": "Navigation bar order",
     "navigationOrderDescription": "Drag buttons or use the arrows to change their order. Optional buttons appear when their feature is enabled.",
     "navigationOrderReset": "Reset order",

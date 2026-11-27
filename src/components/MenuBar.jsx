@@ -94,9 +94,10 @@ const MenuBar = () => {
   const showSearchPill =
     !location.pathname.startsWith("/welcome") && location.pathname !== "/bigpicture";
   const dimsOnScroll =
-    location.pathname === "/" ||
-    location.pathname === "/gamescreen" ||
-    location.pathname === "/download";
+    settings.dimMenuBarOnScroll !== false &&
+    (location.pathname === "/" ||
+      location.pathname === "/gamescreen" ||
+      location.pathname === "/download");
 
   useEffect(() => {
     const updateMenuBarMode = () => {

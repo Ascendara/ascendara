@@ -73,6 +73,14 @@ export const settingsSearchData = [
     scrollTo: "compact-dock-on-scroll",
   },
   {
+    id: "dim-menu-bar-on-scroll",
+    title: "Dim Title Bar on Scroll",
+    description: "Darken the title bar while scrolling so its controls stay readable",
+    keywords: ["title bar", "menu bar", "top bar", "dim", "scroll", "darken"],
+    section: "General",
+    scrollTo: "dim-menu-bar-on-scroll",
+  },
+  {
     id: "navigation-order",
     title: "Navigation Bar Order",
     description: "Change the order of buttons in the navigation bar",

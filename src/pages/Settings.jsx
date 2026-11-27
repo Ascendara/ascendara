@@ -1336,6 +1336,24 @@ function Settings() {
                     />
                   </div>
 
+                  <div
+                    id="dim-menu-bar-on-scroll"
+                    className="flex items-center justify-between"
+                  >
+                    <div className="space-y-0.5">
+                      <Label>{t("settings.dimMenuBarOnScroll")}</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.dimMenuBarOnScrollDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.dimMenuBarOnScroll !== false}
+                      onCheckedChange={value =>
+                        handleSettingChange("dimMenuBarOnScroll", value)
+                      }
+                    />
+                  </div>
+
                   <div id="navigation-order" className="space-y-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="space-y-0.5">

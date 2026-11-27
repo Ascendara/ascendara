@@ -105,6 +105,7 @@ class SettingsManager {
       autoCreateShortcuts: true,
       smoothTransitions: true,
       compactDockOnScroll: true,
+      dimMenuBarOnScroll: true,
       reduceEffects: false,
       bigPictureHomeStyle: "ascendara",
       bigPictureSounds: true,
