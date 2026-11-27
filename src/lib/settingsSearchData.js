@@ -73,6 +73,14 @@ export const settingsSearchData = [
     scrollTo: "compact-dock-on-scroll",
   },
   {
+    id: "navigation-order",
+    title: "Navigation Bar Order",
+    description: "Change the order of buttons in the navigation bar",
+    keywords: ["navigation", "dock", "navbar", "buttons", "order", "reorder"],
+    section: "General",
+    scrollTo: "navigation-order",
+  },
+  {
     id: "reduce-effects",
     title: "Reduce Effects",
     description: "Turn off blur and looping animations to use less CPU and GPU",

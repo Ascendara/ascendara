@@ -106,6 +106,8 @@ import AchievementFolderSearch from "@/components/AchievementFolderSearch";
 import NotificationSoundSettings from "@/components/NotificationSoundSettings";
 import LibraryTransferSettings from "@/components/LibraryTransferSettings";
 import PluginSettings from "@/components/PluginSettings";
+import NavigationOrderList from "@/components/NavigationOrderList";
+import { DEFAULT_NAVIGATION_ORDER } from "@/lib/navigationOrder";
 import AppBranchPicker, { getAppBranch } from "@/components/AppBranchPicker";
 import { API_URL } from "@/config/api";
 import { clearLegacySideScrollbarPreference } from "@/lib/sideScrollbarPreference";
@@ -1332,6 +1334,42 @@ function Settings() {
                         handleSettingChange("compactDockOnScroll", value)
                       }
                     />
+                  </div>
+
+                  <div id="navigation-order" className="space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <Label>
+                          {t("settings.navigationOrderTitle", {
+                            defaultValue: "Navigation bar order",
+                          })}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.navigationOrderDescription", {
+                            defaultValue:
+                              "Drag buttons or use the arrows to change their order. Optional buttons appear when their feature is enabled.",
+                          })}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={
+                          JSON.stringify(
+                            settings.navigationOrder || DEFAULT_NAVIGATION_ORDER
+                          ) === JSON.stringify(DEFAULT_NAVIGATION_ORDER)
+                        }
+                        onClick={() =>
+                          handleSettingChange("navigationOrder", DEFAULT_NAVIGATION_ORDER)
+                        }
+                      >
+                        {t("settings.navigationOrderReset", {
+                          defaultValue: "Reset order",
+                        })}
+                      </Button>
+                    </div>
+                    <NavigationOrderList />
                   </div>
 
                   <div id="home-search" className="flex items-center justify-between">

@@ -38,6 +38,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { WindowControls } from "@/components/WindowControls";
 import { FEATURE_CENTER_EVENTS, openFeatureCenter } from "@/lib/featureCenterEvents";
 import { MENU_BAR_HEIGHT_STYLE } from "@/lib/appChromeGeometry";
+import "@/styles/menubar.css";
 import { getMenuBarLayoutOrder } from "@/lib/menuBarLayout";
 import {
   MENU_BAR_MIN_WIDTH_PX,
@@ -84,6 +85,7 @@ const MenuBar = () => {
   const [menuBarMode, setMenuBarMode] = useState(() =>
     getMenuBarMode(getViewportWidth())
   );
+  const [isPageScrolled, setIsPageScrolled] = useState(false);
   const mainContentRef = useRef(null);
 
   const responsivePolicy = getMenuBarResponsivePolicyForMode(menuBarMode);
@@ -91,6 +93,10 @@ const MenuBar = () => {
   const modifierKey = platform.toUpperCase().includes("MAC") ? "⌘" : "Ctrl";
   const showSearchPill =
     !location.pathname.startsWith("/welcome") && location.pathname !== "/bigpicture";
+  const dimsOnScroll =
+    location.pathname === "/" ||
+    location.pathname === "/gamescreen" ||
+    location.pathname === "/download";
 
   useEffect(() => {
     const updateMenuBarMode = () => {
@@ -215,6 +221,40 @@ const MenuBar = () => {
     mainContentRef.current = document.querySelector("main");
   }, []);
 
+  useEffect(() => {
+    if (!dimsOnScroll) {
+      setIsPageScrolled(false);
+      return;
+    }
+
+    const scrollContainer = document.querySelector("[data-route-scroll-container]");
+    if (!scrollContainer) return;
+
+    const updateScrolledState = () => {
+      const pageScrollTop = Math.max(
+        window.scrollY || 0,
+        document.documentElement.scrollTop || 0,
+        document.body?.scrollTop || 0,
+        scrollContainer.scrollTop || 0
+      );
+      setIsPageScrolled(pageScrollTop > 4);
+    };
+    updateScrolledState();
+    scrollContainer.addEventListener("scroll", updateScrolledState, { passive: true });
+    window.addEventListener("scroll", updateScrolledState, { passive: true });
+    return () => {
+      scrollContainer.removeEventListener("scroll", updateScrolledState);
+      window.removeEventListener("scroll", updateScrolledState);
+    };
+  }, [dimsOnScroll, location.pathname]);
+
+  const scrollDimStyle = isPageScrolled
+    ? {
+        backgroundColor: "rgba(10, 15, 25, 0.82)",
+        boxShadow: "0 4px 18px rgba(0, 0, 0, 0.42)",
+      }
+    : undefined;
+
   const handleStatusClick = () => {
     setIsDialogOpen(true);
   };
@@ -242,7 +282,7 @@ const MenuBar = () => {
 
   return (
     <div
-      className="fixed z-50 flex w-full select-none items-center"
+      className={`fixed z-50 flex w-full select-none items-center ${isPageScrolled ? "menubar-scroll-dim" : ""}`}
       style={{ ...MENU_BAR_HEIGHT_STYLE, WebkitAppRegion: "drag" }}
     >
       {/* data-boot-row / data-boot-pop: staggered pop-in as the boot logo lands (app.css) */}
@@ -289,12 +329,12 @@ const MenuBar = () => {
         </div>
 
         <div
-          className="flex shrink-0 cursor-pointer items-center gap-1"
+          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full p-1 transition-[background-color,box-shadow] duration-200"
           onClick={handleStatusClick}
           title={t("server-status.title")}
           data-tour="server-status"
           data-menubar-priority="critical"
-          style={{ WebkitAppRegion: "no-drag" }}
+          style={{ WebkitAppRegion: "no-drag", ...scrollDimStyle }}
         >
           {serverStatus.noInternet ? (
             <WifiOff className="h-4 w-4 text-red-500" />
@@ -568,8 +608,8 @@ const MenuBar = () => {
           <button
             type="button"
             onClick={() => openSearch("global")}
-            className={`flex h-7 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-muted/50 pl-2.5 pr-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${layoutOrder.search}`}
-            style={{ WebkitAppRegion: "no-drag" }}
+            className={`flex h-7 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-muted/50 pl-2.5 pr-1 text-xs text-muted-foreground transition-[color,background-color,box-shadow] duration-200 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${layoutOrder.search}`}
+            style={{ WebkitAppRegion: "no-drag", ...scrollDimStyle }}
             aria-label={t("globalSearch.placeholder.global")}
           >
             <Search className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -600,6 +640,7 @@ const MenuBar = () => {
               ? "order-first ml-2"
               : "mr-2"
         }
+        dimmed={isPageScrolled}
       />
       <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <AlertDialogContent className="max-w-2xl bg-background">
