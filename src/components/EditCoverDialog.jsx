@@ -18,6 +18,46 @@ import gameService from "@/services/games/gameService";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import imageCacheService from "@/services/images/imageCacheService";
+import { API_URL } from "@/config/api";
+
+// Portrait covers from SteamGridDB, so games outside the catalog (custom and
+// imported ones) still find art. One cover per matching game.
+const searchSteamGridCovers = async query => {
+  const response = await fetch(
+    `${API_URL}/api/proxy/steamgrid/search/autocomplete/${encodeURIComponent(query)}`
+  );
+  if (!response.ok) return [];
+  const data = await response.json();
+  if (!data.success || !Array.isArray(data.data)) return [];
+  const covers = await Promise.all(
+    data.data.slice(0, 9).map(async game => {
+      try {
+        const grids = await fetch(
+          `${API_URL}/api/proxy/steamgrid/grids/game/${game.id}?dimensions=600x900`
+        );
+        if (!grids.ok) return null;
+        const gridData = await grids.json();
+        const url = gridData.success && gridData.data?.[0]?.url;
+        return url
+          ? { id: `sgdb-${game.id}`, title: game.name, img: url, source: "steamgrid" }
+          : null;
+      } catch {
+        return null;
+      }
+    })
+  );
+  return covers.filter(Boolean);
+};
+
+const blobUrlToDataUrl = async url => {
+  const blob = await (await fetch(url)).blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
 
 const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
   const { t } = useLanguage();
@@ -70,8 +110,15 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
 
   // Add debounce timer ref
   const searchDebounceRef = useRef(null);
+  const searchIdRef = useRef(0);
   const fileInputRef = useRef(null);
   const minSearchLength = 2;
+
+  // Opening the dialog searches for the game right away
+  useEffect(() => {
+    if (open && gameName && !coverSearch.query) handleCoverSearch(gameName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, gameName]);
 
   const handleCoverSearch = async query => {
     // Update query immediately for UI responsiveness
@@ -90,18 +137,29 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
 
     // Set up new debounce timer
     searchDebounceRef.current = setTimeout(async () => {
-      setCoverSearch(prev => ({ ...prev, isLoading: true }));
-      try {
-        const results = await gameService.searchGameCovers(query);
-        setCoverSearch(prev => ({
-          ...prev,
-          results: results.slice(0, 9),
-          isLoading: false,
-        }));
-      } catch (error) {
-        console.error("Error searching covers:", error);
-        setCoverSearch(prev => ({ ...prev, isLoading: false }));
-      }
+      const searchId = ++searchIdRef.current;
+      setCoverSearch(prev => ({ ...prev, isLoading: true, selectedCover: null }));
+      // Catalog first, then SteamGridDB; either may fail without the other
+      const [catalog, steamGrid] = await Promise.all([
+        gameService.searchGameCovers(query).catch(error => {
+          console.error("Error searching catalog covers:", error);
+          return [];
+        }),
+        searchSteamGridCovers(query).catch(error => {
+          console.error("Error searching SteamGridDB covers:", error);
+          return [];
+        }),
+      ]);
+      // A newer search started while this one ran
+      if (searchId !== searchIdRef.current) return;
+      setCoverSearch(prev => ({
+        ...prev,
+        results: [
+          ...(catalog || []).slice(0, 6).map(cover => ({ ...cover, source: "catalog" })),
+          ...steamGrid,
+        ].slice(0, 12),
+        isLoading: false,
+      }));
     }, 300); // 300ms debounce
   };
 
@@ -111,16 +169,7 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
   const persistCover = async (dataUrl, imgID) => {
     if (!window.electron) return false;
     if (window.electron.saveGameAsset) {
-      let src = dataUrl;
-      if (!src.startsWith("data:")) {
-        const blob = await (await fetch(src)).blob();
-        src = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      }
+      const src = dataUrl.startsWith("data:") ? dataUrl : await blobUrlToDataUrl(dataUrl);
       const ext = src.startsWith("data:image/png") ? "png" : "jpg";
       const result = await window.electron.saveGameAsset(
         gameName,
@@ -149,13 +198,18 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
     if (activeTab === "search" && coverSearch.selectedCover) {
       // Fetch new image from search results
       try {
-        // Load the selected imgID from the local index or API
-        const dataUrl = await imageCacheService.getImage(coverSearch.selectedCover.imgID);
+        // SteamGridDB covers download from their URL, catalog covers load
+        // their imgID from the local index or API
+        const fromSteamGrid = coverSearch.selectedCover.source === "steamgrid";
+        const imgID = fromSteamGrid ? null : coverSearch.selectedCover.imgID;
+        const dataUrl = fromSteamGrid
+          ? await blobUrlToDataUrl(coverSearch.selectedCover.img)
+          : await imageCacheService.getImage(imgID);
         if (!dataUrl) throw new Error("Cover image not found");
         try {
           // 3. Update the image on disk via Electron IPC (no localStorage
           // caching - quota issues with base64 data URLs)
-          if (await persistCover(dataUrl, coverSearch.selectedCover.imgID)) {
+          if (await persistCover(dataUrl, imgID)) {
             toast.success("Cover image updated successfully");
           }
         } catch (e) {
@@ -163,12 +217,12 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
         }
 
         // 5. Notify parent component to update UI
-        onImageUpdate && onImageUpdate(dataUrl, coverSearch.selectedCover.imgID);
+        onImageUpdate && onImageUpdate(dataUrl, imgID);
 
         // 6. Dispatch a custom event to notify all components
         window.dispatchEvent(
           new CustomEvent("game-cover-updated", {
-            detail: { gameName, dataUrl, imgID: coverSearch.selectedCover.imgID },
+            detail: { gameName, dataUrl, imgID },
           })
         );
 
@@ -305,7 +359,7 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
                 <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
               </div>
             ) : coverSearch.results.length > 0 ? (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid max-h-[50vh] grid-cols-4 gap-3 overflow-y-auto pr-1">
                 {coverSearch.results.map((cover, index) => (
                   <div
                     key={index}
@@ -313,7 +367,7 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
                       setCoverSearch(prev => ({ ...prev, selectedCover: cover }))
                     }
                     className={cn(
-                      "relative aspect-video cursor-pointer overflow-hidden rounded-lg border-2 transition-all",
+                      "relative aspect-[2/3] cursor-pointer overflow-hidden rounded-lg border-2 transition-all",
                       coverSearch.selectedCover === cover
                         ? "border-primary shadow-lg"
                         : "border-transparent hover:border-primary/50"
@@ -321,9 +375,11 @@ const EditCoverDialog = ({ open, onOpenChange, gameName, onImageUpdate }) => {
                   >
                     <img
                       src={
-                        settings.usingLocalIndex && cover.imgID
-                          ? localCoverImageUrls[cover.imgID] || ""
-                          : gameService.getImageUrl(cover.imgID)
+                        cover.source === "steamgrid"
+                          ? cover.img
+                          : settings.usingLocalIndex && cover.imgID
+                            ? localCoverImageUrls[cover.imgID] || ""
+                            : gameService.getImageUrl(cover.imgID)
                       }
                       alt={cover.title}
                       className="h-full w-full object-cover"
