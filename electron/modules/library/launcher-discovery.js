@@ -570,7 +570,7 @@ function createLauncherDiscovery(options = {}) {
           if (
             Array.isArray(data.AppCategories) &&
             data.AppCategories.some(category =>
-              /^(dlc|addons?|mods?|plugins?|assets?|engine)$/i.test(category)
+              /^(dlc|addons?|mods?|plugins?|assets?|engines?|projects?)$/i.test(category)
             )
           )
             return;

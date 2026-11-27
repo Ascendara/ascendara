@@ -47,6 +47,31 @@ function safeId(value) {
     throw new Error("Invalid store game identifier");
   return id;
 }
+// Epic accounts that use Unreal Engine also own engine builds, Marketplace and
+// Fab assets, plugins and sample projects. Only some of those sit in the "ue"
+// namespace, so the catalog categories decide what counts as a game.
+const EPIC_NON_GAME_CATEGORIES = new Set([
+  "assets",
+  "engines",
+  "plugins",
+  "projects",
+  "addons",
+  "dlc",
+  "digitalextras",
+]);
+
+function isEpicGame(info) {
+  if (!info || info.mainGameItem) return false;
+  const paths = Array.isArray(info.categories)
+    ? info.categories
+        .map(category => String(category?.path || "").toLowerCase().split("/")[0])
+        .filter(Boolean)
+    : [];
+  if (paths.some(path => EPIC_NON_GAME_CATEGORIES.has(path))) return false;
+  // Listings with no categories are kept rather than dropped by guesswork
+  return !paths.length || paths.includes("games") || paths.includes("applications");
+}
+
 function game(store, id, name) {
   return { store, id: safeId(id), name: String(name || id).slice(0, 300) };
 }
@@ -360,7 +385,7 @@ async function syncLibrary(
         { headers }
       );
       const info = metadata[catalogId];
-      if (!info || info.mainGameItem) continue;
+      if (!isEpicGame(info)) continue;
       games.push(
         game(store, `${namespace}:${catalogId}:${safeId(item.appName)}`, info.title)
       );
@@ -397,4 +422,5 @@ module.exports = {
   epicToken,
   syncLibrary,
   gameUrl,
+  isEpicGame,
 };
