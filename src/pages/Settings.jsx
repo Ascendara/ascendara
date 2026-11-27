@@ -10,6 +10,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { useLocation } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { resetPageTours } from "@/components/PageTours";
 import { Input } from "@/components/ui/input";
@@ -258,6 +259,8 @@ const getThemeColors = themeId => {
 
 function Settings() {
   const [currentBranch, setCurrentBranch] = useState("main");
+  // Slider position while dragging, saved on release
+  const [bigPictureVolumeDraft, setBigPictureVolumeDraft] = useState(null);
   const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
   const [branchSwitchProgress, setBranchSwitchProgress] = useState(0);
   const [hasAscendSubscription, setHasAscendSubscription] = useState(false);
@@ -2392,6 +2395,31 @@ function Settings() {
                     }
                   />
                 </div>
+
+                {settings.bigPictureSounds !== false && (
+                  <div id="big-picture-sounds-volume" className="flex items-center gap-4">
+                    <Label className="w-28 shrink-0">
+                      {t("settings.bigPictureSoundsVolume")}
+                    </Label>
+                    <Slider
+                      value={[
+                        bigPictureVolumeDraft ?? settings.bigPictureSoundsVolume ?? 100,
+                      ]}
+                      min={0}
+                      max={100}
+                      step={5}
+                      onValueChange={([value]) => setBigPictureVolumeDraft(value)}
+                      onValueCommit={([value]) => {
+                        setBigPictureVolumeDraft(null);
+                        handleSettingChange("bigPictureSoundsVolume", value);
+                      }}
+                      className="flex-1"
+                    />
+                    <span className="w-10 text-right text-sm tabular-nums text-muted-foreground">
+                      {bigPictureVolumeDraft ?? settings.bigPictureSoundsVolume ?? 100}%
+                    </span>
+                  </div>
+                )}
 
                 <div
                   id="keyboard-layout"

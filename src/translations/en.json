@@ -4816,6 +4816,7 @@
     "bigPictureSettings": "Big Picture Mode",
     "bigPictureSounds": "Big Picture Interface Sounds",
     "bigPictureSoundsDescription": "Play soft sounds as you move, select and switch pages with a controller or keyboard in Big Picture.",
+    "bigPictureSoundsVolume": "Sound Volume",
     "categories": {
       "advanced": {
         "description": "Update branch, support and developer options.",
