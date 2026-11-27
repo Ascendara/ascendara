@@ -108,6 +108,11 @@ const categories = [
         "Play soft sounds as you move, select and switch pages with a controller or keyboard.",
       ],
       [
+        "bigPictureSoundsVolume",
+        "Sound volume",
+        "Select to step through volume levels for interface and startup sounds.",
+      ],
+      [
         "controller",
         "Controller & keyboard",
         "Choose button prompts and on-screen keyboard layout.",
@@ -142,6 +147,13 @@ const categories = [
 ];
 
 const LINKS = ["controller", "indexes", "openDesktop"];
+// Rows that show their current value instead of a switch
+const VALUES = ["bigPictureHomeStyle", "bigPictureSoundsVolume"];
+const VOLUME_STEPS = [20, 40, 60, 80, 100];
+
+function nextVolume(current) {
+  return VOLUME_STEPS.find(step => step > current) ?? VOLUME_STEPS[0];
+}
 
 export function PreferencesSurface({
   navigation,
@@ -199,13 +211,16 @@ export function PreferencesSurface({
   // Smooth transitions value is kept but shown off and locked
   const locked = key =>
     (key === "smoothTransitions" && settings.reduceEffects === true) ||
-    (key === "autoUpdate" && canAutoUpdate !== null && !canAutoUpdate.supported);
+    (key === "autoUpdate" && canAutoUpdate !== null && !canAutoUpdate.supported) ||
+    (key === "bigPictureSoundsVolume" && settings.bigPictureSounds === false);
   const lockedReason = key =>
     key === "autoUpdate"
       ? canAutoUpdate?.reason === "portable"
         ? "Portable copies do not update automatically. Download new versions from the release page."
         : "Automatic updates are not available for this build."
-      : "Turned off by Reduce effects. Your choice comes back when it is turned off.";
+      : key === "bigPictureSoundsVolume"
+        ? "Turn on Interface sounds to change the volume."
+        : "Turned off by Reduce effects. Your choice comes back when it is turned off.";
   const isLanguage = key => key.startsWith("lang-");
   const enabled = key =>
     isLanguage(key)
@@ -220,15 +235,20 @@ export function PreferencesSurface({
         ? changeLanguage(key.slice(5)).catch(() => {})
         : key === "bigPictureHomeStyle"
           ? updateSetting(key, settings[key] === "classic" ? "ascendara" : "classic")
-          : key === "indexes"
-            ? openIndexes()
-            : key === "controller"
-              ? openController()
-              : key === "openDesktop"
-                ? openDesktop?.()
-                : key === "startup"
-                  ? updateSetting("defaultOpenPage", enabled(key) ? "home" : "bigpicture")
-                  : updateSetting(key, !settings[key]);
+          : key === "bigPictureSoundsVolume"
+            ? updateSetting(key, nextVolume(settings[key] ?? 100))
+            : key === "indexes"
+              ? openIndexes()
+              : key === "controller"
+                ? openController()
+                : key === "openDesktop"
+                  ? openDesktop?.()
+                  : key === "startup"
+                    ? updateSetting(
+                        "defaultOpenPage",
+                        enabled(key) ? "home" : "bigpicture"
+                      )
+                    : updateSetting(key, !settings[key]);
   return (
     <BigPictureShell
       ref={root}
@@ -321,7 +341,7 @@ export function PreferencesSurface({
                   {...focus(key)}
                   {...(isLanguage(key)
                     ? { role: "radio", "aria-checked": enabled(key) }
-                    : ![...LINKS, "bigPictureHomeStyle"].includes(key)
+                    : ![...LINKS, ...VALUES].includes(key)
                       ? { role: "switch", "aria-checked": enabled(key) }
                       : {})}
                   aria-disabled={locked(key) || undefined}
@@ -337,6 +357,8 @@ export function PreferencesSurface({
                         ? "Classic"
                         : "Ascendara"}
                     </span>
+                  ) : key === "bigPictureSoundsVolume" ? (
+                    <span>{settings.bigPictureSoundsVolume ?? 100}%</span>
                   ) : LINKS.includes(key) ? (
                     <ChevronRight />
                   ) : isLanguage(key) ? (

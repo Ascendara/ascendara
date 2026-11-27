@@ -109,6 +109,7 @@ class SettingsManager {
       reduceEffects: false,
       bigPictureHomeStyle: "ascendara",
       bigPictureSounds: true,
+      bigPictureSoundsVolume: 100,
       windowControlsStyle: "icons",
       menuBarSide: "left",
       autoUpdate: true,

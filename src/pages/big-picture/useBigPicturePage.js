@@ -34,7 +34,11 @@ import { getControllerButtons } from "./controller";
 import { createFuzzyMatcher } from "./utils";
 import { useDebouncedValue } from "./useDebouncedValue";
 import { useControllerInput } from "./useControllerInput";
-import { playBigPictureSound, setBigPictureSoundsEnabled } from "./bigPictureSounds";
+import {
+  playBigPictureSound,
+  setBigPictureSoundsEnabled,
+  setBigPictureSoundsVolume,
+} from "./bigPictureSounds";
 import { sidebarItems } from "./SidebarMenu";
 import { pageLinks } from "./PageHeader";
 
@@ -51,6 +55,10 @@ function useBigPicturePage() {
   const [assetSearchOpen, setAssetSearchOpen] = useState(false);
   const [assetSearchGame, setAssetSearchGame] = useState(null);
   const soundsEnabled = settings.bigPictureSounds !== false;
+  const soundsVolume = settings.bigPictureSoundsVolume ?? 100;
+  useEffect(() => {
+    setBigPictureSoundsVolume(soundsVolume);
+  }, [soundsVolume]);
   useEffect(() => {
     setBigPictureSoundsEnabled(soundsEnabled);
   }, [soundsEnabled]);

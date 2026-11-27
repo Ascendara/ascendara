@@ -8,6 +8,7 @@ let ctx = null;
 let master = null;
 let reverb = null;
 let enabled = false;
+let volume = 1;
 let lastMoveAt = 0;
 
 // Overall level. These play constantly while navigating, so they sit well
@@ -36,7 +37,7 @@ function audio() {
   ctx = new AudioContext({ latencyHint: "interactive" });
 
   master = ctx.createGain();
-  master.gain.value = MASTER_GAIN;
+  master.gain.value = MASTER_GAIN * volume;
   const limiter = ctx.createDynamicsCompressor();
   limiter.threshold.value = -12;
   limiter.ratio.value = 6;
@@ -145,13 +146,16 @@ const sounds = {
       wet: 0.45,
     });
   },
-  // Startup sound when Big Picture opens, played straight to the output
+  // Startup sound when Big Picture opens. It skips the interface level so the
+  // file plays as mixed, scaled only by the user's volume
   async enter() {
     const buffer = await loadEnterSound();
     if (!buffer || !enabled) return;
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    source.connect(ctx.destination);
+    const level = ctx.createGain();
+    level.gain.value = volume;
+    source.connect(level).connect(ctx.destination);
     source.start();
   },
 };
@@ -251,6 +255,13 @@ export function setBigPictureSoundsEnabled(value) {
   if (!enabled && ctx?.state === "running") ctx.suspend();
   // Decode the startup sound ahead of time so it plays the moment it's asked for
   if (enabled && audio()) loadEnterSound();
+}
+
+// 0-100 from settings
+export function setBigPictureSoundsVolume(value) {
+  const number = Number(value);
+  volume = Number.isFinite(number) ? Math.min(Math.max(number, 0), 100) / 100 : 1;
+  if (master) master.gain.setValueAtTime(MASTER_GAIN * volume, ctx.currentTime);
 }
 
 // Registered once when this module loads, before any Big Picture screen
