@@ -46,10 +46,21 @@ function updateServerTimeFromDateHeader(dateHeader) {
   const nextOffset = Math.abs(offset) < MIN_SKEW_MS ? 0 : offset;
   if (Math.abs(nextOffset - serverOffsetMs) >= MIN_SKEW_MS) {
     console.warn(
-      `[Auth] System clock differs from server by ${Math.round(offset / 1000)}s, correcting`
+      nextOffset === 0
+        ? "[Auth] System clock matches server again, no longer correcting"
+        : `[Auth] System clock differs from server by ${Math.round(offset / 1000)}s, correcting`
     );
   }
   serverOffsetMs = nextOffset;
+}
+
+/**
+ * @param {Record<string, string[]>} [headers] - Response headers from a webRequest event
+ * @returns {string|undefined} The Date header
+ */
+function findDateHeader(headers = {}) {
+  const key = Object.keys(headers).find(name => name.toLowerCase() === "date");
+  return key ? headers[key][0] : undefined;
 }
 
 async function syncServerTime() {
@@ -70,17 +81,26 @@ async function syncServerTime() {
  */
 function startServerTimeSync(session) {
   const { API_URL } = require("./config");
+  const filter = { urls: [`${API_URL}/*`] };
+
+  // A response from the HTTP cache keeps the Date it was stored with, which
+  // reads as the clock being behind by however long it sat there
+  session.webRequest.onResponseStarted(filter, details => {
+    if (details.fromCache) return;
+    const dateHeader = findDateHeader(details.responseHeaders);
+    if (dateHeader) updateServerTimeFromDateHeader(dateHeader);
+  });
+
   // onHeadersReceived runs before the renderer sees the response, so a retry
-  // after a clock_skew rejection is already signed with the corrected time
-  session.webRequest.onHeadersReceived(
-    { urls: [`${API_URL}/*`] },
-    (details, callback) => {
-      const headers = details.responseHeaders || {};
-      const dateKey = Object.keys(headers).find(key => key.toLowerCase() === "date");
-      if (dateKey) updateServerTimeFromDateHeader(headers[dateKey][0]);
-      callback({});
+  // after a clock_skew rejection is already signed with the corrected time.
+  // It also fires for cache hits, so only 401s (never cached) are read here.
+  session.webRequest.onHeadersReceived(filter, (details, callback) => {
+    if (details.statusCode === 401) {
+      const dateHeader = findDateHeader(details.responseHeaders);
+      if (dateHeader) updateServerTimeFromDateHeader(dateHeader);
     }
-  );
+    callback({});
+  });
 
   syncServerTime();
   setInterval(syncServerTime, RESYNC_INTERVAL_MS).unref?.();
