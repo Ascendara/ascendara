@@ -568,7 +568,7 @@ impl Job {
                     let missing = error.downcast_ref::<MissingOutput>().unwrap().0.clone();
                     if attempt == 1 {
                         bail!(
-                            "Extracted files are still missing or incomplete after recovery ({}). Check security-software quarantine/history and whether another program removed or blocked the listed files. The downloaded source files were retained.",
+                            "Extracted files are still missing after a retry ({}). Security software probably removed them; the downloaded files were kept.",
                             missing.first().map(|e| e.file.clone()).unwrap_or_default()
                         );
                     }
@@ -736,6 +736,10 @@ impl Job {
                 bail!("Too many nested archive wrappers");
             }
         }
+        // Moving and checking thousands of files can take a while with antivirus
+        // scanning each one; say so instead of sitting at 100%.
+        self.state.set(json!({"extracting": true, "timeUntilComplete": "Moving files into place..."}));
+        self.state.save()?;
         manifest = install::flatten_payload(payload, manifest, &self.game)?;
         let errors = install::verify_manifest(payload, &manifest, &self.stop)?;
         if !errors.is_empty() {

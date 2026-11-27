@@ -85,7 +85,15 @@ pub fn flatten_payload(root: &Path, mut manifest: Manifest, game: &str) -> Resul
             if let Some(parent) = target.parent() {
                 fs::create_dir_all(parent)?;
             }
-            replace_file(&member_path(&aside, relative)?, &target, Duration::from_secs(10))?;
+            let source = member_path(&aside, relative)?;
+            if let Err(error) = replace_file(&source, &target, Duration::from_secs(10)) {
+                // Gone since extraction, usually quarantined by antivirus.
+                // Verification reports it so the person can recover instead of failing here.
+                if fs::symlink_metadata(&source).is_ok() {
+                    return Err(error);
+                }
+                log::warn!("{relative} was removed before it could be moved into place: {error:#}");
+            }
             mapped.insert(relative.to_string(), manifest[name]);
         }
         remove_path(&aside);
@@ -452,6 +460,23 @@ mod tests {
         let manifest = make(&payload2, &[("Data/a.pak", 5)]);
         let kept = flatten_payload(&payload2, manifest, "Game").unwrap();
         assert!(kept.contains_key("Data/a.pak"));
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn flatten_leaves_removed_files_to_verification() {
+        let base = std::env::temp_dir().join(format!("ascendara-flatten-removed-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let payload = base.join("payload");
+        let manifest = make(&payload, &[("Game/Game.exe", 10), ("Game/PlayGame.exe", 4), ("Game/data.pak", 5)]);
+        // Antivirus quarantines a file after extraction, before flattening.
+        fs::remove_file(payload.join("Game/PlayGame.exe")).unwrap();
+        let flat = flatten_payload(&payload, manifest, "Game").unwrap();
+        assert!(payload.join("Game.exe").is_file());
+        let errors = verify_manifest(&payload, &flat, &StopFlag::default()).unwrap();
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].file, "PlayGame.exe");
+        assert_eq!(errors[0].error, "File not found");
         let _ = fs::remove_dir_all(&base);
     }
 

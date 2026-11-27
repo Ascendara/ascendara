@@ -193,6 +193,11 @@ const formatFileBytes = bytes => {
 // Files this big take long enough on their own that progress inside them is shown.
 const LARGE_FILE_BYTES = 256 * 1024 * 1024;
 
+// A freshly extracted file vanished before it could be moved into place, almost
+// always because antivirus quarantined it. A known cause, not a bug to report.
+const FILE_REMOVED_PATTERN =
+  /^Could not move [\s\S]*(os error 2\b|cannot find the file specified)|^Extracted files are still missing/i;
+
 const IconAction = ({ label, icon: Icon, onClick, disabled, spinning, className }) => (
   <Tooltip>
     <TooltipTrigger asChild>
@@ -1931,7 +1936,10 @@ const DownloadCard = ({
 
   const isPredefinedError = message => {
     if (!message) return false;
-    return predefinedErrorPatterns.some(pattern => message.includes(pattern));
+    return (
+      predefinedErrorPatterns.some(pattern => message.includes(pattern)) ||
+      FILE_REMOVED_PATTERN.test(message)
+    );
   };
 
   const reportErrorKey = `${game.game}-${downloadingData?.message || "unknown"}`;
@@ -1971,12 +1979,7 @@ const DownloadCard = ({
     /\[WinError 22[56]\]|Windows error 22[56]|os error 22[56]\b|Security software blocked/.test(
       downloadingData?.message || ""
     );
-  // A freshly extracted file vanished before it could be moved into place,
-  // almost always because antivirus quarantined it mid-install.
-  const isFileRemoved =
-    /^Could not move [\s\S]*(os error 2\b|cannot find the file specified)/i.test(
-      downloadingData?.message || ""
-    );
+  const isFileRemoved = FILE_REMOVED_PATTERN.test(downloadingData?.message || "");
 
   // Get error message based on type
   const getErrorMessage = () => {
