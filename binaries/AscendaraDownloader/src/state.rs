@@ -407,7 +407,7 @@ pub struct ExtractMeter {
     io: VecDeque<(Instant, u64, u64, Duration)>,
     shown_percent: f64,
     last_marker: (u64, u64),
-    last_log: Instant,
+    last_log: Option<Instant>,
 }
 
 impl ExtractMeter {
@@ -417,7 +417,9 @@ impl ExtractMeter {
             io: VecDeque::new(),
             shown_percent: 0.0,
             last_marker: (u64::MAX, u64::MAX),
-            last_log: Instant::now() - Duration::from_secs(60),
+            // Not `now - 60s`: Instant counts from boot on Windows, so that
+            // subtraction panics when the PC started less than a minute ago.
+            last_log: None,
         }
     }
 
@@ -517,8 +519,8 @@ impl ExtractMeter {
                 "waitingOnDrive": waiting_on_drive,
             },
         }));
-        if now.duration_since(self.last_log) >= Duration::from_secs(15) {
-            self.last_log = now;
+        if self.last_log.is_none_or(|last| now.duration_since(last) >= Duration::from_secs(15)) {
+            self.last_log = Some(now);
             log::info!(
                 "Extraction: {}/{} files, {:.2}%, {}/s, {}",
                 snapshot.files_done,
