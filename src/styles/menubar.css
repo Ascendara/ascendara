@@ -5,3 +5,12 @@
 .no-drag {
   -webkit-app-region: no-drag;
 }
+
+.menubar-scroll-dim {
+  background-color: rgba(0, 0, 0, 0.72);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  transition:
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}

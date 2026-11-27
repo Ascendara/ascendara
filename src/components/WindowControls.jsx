@@ -107,6 +107,7 @@ export function WindowControls({
   mirrored = false,
   t,
   className = "",
+  dimmed = false,
 }) {
   const actions = {
     close: () => window.electron.closeWindow(),
@@ -120,7 +121,12 @@ export function WindowControls({
   if (variant === "traffic") {
     return (
       <div
-        className={`window-controls group/traffic flex shrink-0 items-center gap-2 ${className}`}
+        className={`window-controls group/traffic flex shrink-0 items-center gap-2 rounded-full transition-[background-color,box-shadow] duration-200 ${className}`}
+        style={{
+          backgroundColor: dimmed ? "rgba(10, 15, 25, 0.82)" : "transparent",
+          boxShadow: dimmed ? "0 4px 18px rgba(0, 0, 0, 0.42)" : "none",
+          padding: "6px 8px",
+        }}
       >
         {controlOrder.map(id => {
           const { color, ring } = TRAFFIC_LIGHT_BY_ID[id];
@@ -142,7 +148,14 @@ export function WindowControls({
   }
 
   return (
-    <div className={`window-controls flex shrink-0 items-center ${className}`}>
+    <div
+      className={`window-controls flex shrink-0 items-center rounded-full transition-[background-color,box-shadow] duration-200 ${className}`}
+      style={{
+        backgroundColor: dimmed ? "rgba(10, 15, 25, 0.82)" : "transparent",
+        boxShadow: dimmed ? "0 4px 18px rgba(0, 0, 0, 0.42)" : "none",
+        padding: "2px 4px",
+      }}
+    >
       <div className="flex items-center gap-0.5">
         {controlOrder.map(id => (
           <IconControl

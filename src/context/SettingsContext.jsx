@@ -12,6 +12,7 @@ import {
   applySideScrollbarPreference,
   migrateLegacySideScrollbarPreference,
 } from "@/lib/sideScrollbarPreference";
+import { DEFAULT_NAVIGATION_ORDER } from "@/lib/navigationOrder";
 
 export const SettingsContext = createContext();
 
@@ -22,6 +23,7 @@ export function SettingsProvider({ children }) {
     watchingFolders: [],
     showOldDownloadLinks: false,
     defaultOpenPage: "home",
+    navigationOrder: DEFAULT_NAVIGATION_ORDER,
     behaviorAfterDownload: "none",
     rpcEnabled: true,
     livePing: null,
@@ -269,6 +271,7 @@ const defaultSettings = {
   watchingFolders: [],
   showOldDownloadLinks: false,
   defaultOpenPage: "home",
+  navigationOrder: DEFAULT_NAVIGATION_ORDER,
   behaviorAfterDownload: "none",
   rpcEnabled: true,
   livePing: null,
