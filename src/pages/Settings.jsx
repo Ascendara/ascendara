@@ -120,6 +120,8 @@ const themes = [
   { id: "rose", name: "Rose", group: "light" },
   { id: "lagoon", name: "Lagoon", group: "light" },
   { id: "royal-pearl", name: "Royal Pearl", group: "light" },
+  { id: "paper", name: "Paper", group: "light" },
+  { id: "nord-light", name: "Nord Light", group: "light" },
 
   // Dark themes
   { id: "aurora", name: "Aurora", group: "dark" },
@@ -129,6 +131,13 @@ const themes = [
   { id: "forest", name: "Forest", group: "dark" },
   { id: "crimson", name: "Crimson", group: "dark" },
   { id: "royal-night", name: "Royal Night", group: "dark" },
+  { id: "nord", name: "Nord", group: "dark" },
+  { id: "tokyo-night", name: "Tokyo Night", group: "dark" },
+  { id: "catppuccin", name: "Catppuccin", group: "dark" },
+  { id: "dracula", name: "Dracula", group: "dark" },
+  { id: "rose-pine", name: "Rosé Pine", group: "dark" },
+  { id: "gruvbox", name: "Gruvbox", group: "dark" },
+  { id: "everforest", name: "Everforest", group: "dark" },
 
   // Classics: earlier themes, kept for anyone who still uses them
   { id: "light", name: "Arctic Sky", group: "classic" },
@@ -246,6 +255,60 @@ const getThemeColors = themeId => {
       primary: "bg-[#F85252]",
       secondary: "bg-[#241016]",
       text: "text-[#FEE2E2]",
+    },
+    nord: {
+      bg: "bg-[#2E3440]",
+      primary: "bg-[#88C0D0]",
+      secondary: "bg-[#3B4252]",
+      text: "text-[#D8DEE9]",
+    },
+    "tokyo-night": {
+      bg: "bg-[#1A1B26]",
+      primary: "bg-[#7AA2F7]",
+      secondary: "bg-[#16161E]",
+      text: "text-[#A9B1D6]",
+    },
+    catppuccin: {
+      bg: "bg-[#1E1E2E]",
+      primary: "bg-[#B4BEFE]",
+      secondary: "bg-[#181825]",
+      text: "text-[#CDD6F4]",
+    },
+    dracula: {
+      bg: "bg-[#282A36]",
+      primary: "bg-[#BD93F9]",
+      secondary: "bg-[#44475A]",
+      text: "text-[#F8F8F2]",
+    },
+    "rose-pine": {
+      bg: "bg-[#191724]",
+      primary: "bg-[#C4A7E7]",
+      secondary: "bg-[#1F1D2E]",
+      text: "text-[#E0DEF4]",
+    },
+    gruvbox: {
+      bg: "bg-[#282828]",
+      primary: "bg-[#FABD2F]",
+      secondary: "bg-[#32302F]",
+      text: "text-[#EBDBB2]",
+    },
+    everforest: {
+      bg: "bg-[#2D353B]",
+      primary: "bg-[#A7C080]",
+      secondary: "bg-[#232A2E]",
+      text: "text-[#D3C6AA]",
+    },
+    paper: {
+      bg: "bg-[#F2F1ED]",
+      primary: "bg-[#F54E00]",
+      secondary: "bg-[#EBEAE5]",
+      text: "text-[#26251E]",
+    },
+    "nord-light": {
+      bg: "bg-[#ECEFF4]",
+      primary: "bg-[#5E81AC]",
+      secondary: "bg-[#E5E9F0]",
+      text: "text-[#2E3440]",
     },
   };
 

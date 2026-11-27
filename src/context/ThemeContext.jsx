@@ -21,6 +21,13 @@ const DARK_THEMES = new Set([
   "aurora",
   "crimson",
   "royal-night",
+  "nord",
+  "tokyo-night",
+  "catppuccin",
+  "dracula",
+  "rose-pine",
+  "gruvbox",
+  "everforest",
 ]);
 
 /** Whether a built-in theme is dark; custom themes count as dark. */
@@ -188,6 +195,15 @@ export function ThemeProvider({ children }) {
         "lagoon",
         "royal-pearl",
         "royal-night",
+        "nord",
+        "tokyo-night",
+        "catppuccin",
+        "dracula",
+        "rose-pine",
+        "gruvbox",
+        "everforest",
+        "paper",
+        "nord-light",
         "custom",
       ]}
     >

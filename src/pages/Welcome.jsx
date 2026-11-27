@@ -198,6 +198,8 @@ const themes = [
   { id: "rose", name: "Rose", group: "light" },
   { id: "lagoon", name: "Lagoon", group: "light", isNew: true },
   { id: "royal-pearl", name: "Royal Pearl", group: "light", isNew: true },
+  { id: "paper", name: "Paper", group: "light", isNew: true },
+  { id: "nord-light", name: "Nord Light", group: "light", isNew: true },
 
   // Dark themes
   { id: "aurora", name: "Aurora", group: "dark", isNew: true },
@@ -207,6 +209,13 @@ const themes = [
   { id: "forest", name: "Forest", group: "dark" },
   { id: "crimson", name: "Crimson", group: "dark", isNew: true },
   { id: "royal-night", name: "Royal Night", group: "dark", isNew: true },
+  { id: "nord", name: "Nord", group: "dark", isNew: true },
+  { id: "tokyo-night", name: "Tokyo Night", group: "dark", isNew: true },
+  { id: "catppuccin", name: "Catppuccin", group: "dark", isNew: true },
+  { id: "dracula", name: "Dracula", group: "dark", isNew: true },
+  { id: "rose-pine", name: "Rosé Pine", group: "dark", isNew: true },
+  { id: "gruvbox", name: "Gruvbox", group: "dark", isNew: true },
+  { id: "everforest", name: "Everforest", group: "dark", isNew: true },
 ];
 
 // One soft band of full theme color with a brighter core sweeps across the
