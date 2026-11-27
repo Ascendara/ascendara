@@ -717,7 +717,9 @@ const Library = () => {
         !filters.favorites || favorites.includes(game.game || game.name);
       const matchesVr = !filters.vrOnly || game.isVr;
       const matchesOnline = !filters.onlineGames || game.online;
-      const matchesInstalled = !filters.installedOnly || !game._isStoreOwned;
+      // Installed only: hide games that are owned on a store or still queued
+      const matchesInstalled =
+        !filters.installedOnly || (!game._isStoreOwned && !game._isQueued);
       return (
         matchesSearch &&
         matchesFavorites &&
@@ -2793,37 +2795,35 @@ const Library = () => {
                       <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
                     )}
                   </DropdownMenuItem>
-                  {ownedStoreGames.length > 0 || filters.installedOnly ? (
-                    <DropdownMenuItem
-                      onClick={() =>
-                        setFilters(prev => ({
-                          ...prev,
-                          installedOnly: !prev.installedOnly,
-                        }))
-                      }
+                  <DropdownMenuItem
+                    onClick={() =>
+                      setFilters(prev => ({
+                        ...prev,
+                        installedOnly: !prev.installedOnly,
+                      }))
+                    }
+                    className={cn(
+                      "cursor-pointer",
+                      filters.installedOnly
+                        ? "bg-primary/10 font-medium text-primary"
+                        : "text-foreground"
+                    )}
+                  >
+                    <span
                       className={cn(
-                        "cursor-pointer",
+                        "mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
                         filters.installedOnly
-                          ? "bg-primary/10 font-medium text-primary"
-                          : "text-foreground"
+                          ? "bg-primary/20 text-primary"
+                          : "bg-muted/60 text-muted-foreground"
                       )}
                     >
-                      <span
-                        className={cn(
-                          "mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
-                          filters.installedOnly
-                            ? "bg-primary/20 text-primary"
-                            : "bg-muted/60 text-muted-foreground"
-                        )}
-                      >
-                        <HardDrive className="h-4 w-4" />
-                      </span>
-                      {t("library.filters.installedOnly")}
-                      {filters.installedOnly && (
-                        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
-                      )}
-                    </DropdownMenuItem>
-                  ) : null}
+                      <HardDrive className="h-4 w-4" />
+                    </span>
+                    {t("library.filters.installedOnly")}
+                    {filters.installedOnly && (
+                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                    )}
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
