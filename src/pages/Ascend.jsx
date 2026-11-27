@@ -25,6 +25,7 @@ import {
   CloudOff,
   Hammer,
   BadgeDollarSign,
+  CreditCard,
 } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 // The overview is what Ascend opens on, so it ships with the page instead of
@@ -165,6 +166,8 @@ const Ascend = () => {
     purchaseView,
     handleViewInvoices,
     handleManageSubscription,
+    verifyAccess,
+    verifyingAccess,
     showWelcomeTour,
     setShowWelcomeTour,
     showWelcomeTourPrompt,
@@ -536,6 +539,53 @@ const Ascend = () => {
               t={t}
             />
           </>
+        );
+      }
+
+      // A renewal charge failed and Stripe is still retrying it. Paying in the
+      // billing portal restores access, so a new subscription isn't offered.
+      const subscription = userData?.ascendSubscription;
+      if (!isTrialBlocked && subscription?.paymentFailed && !subscription.lifetime) {
+        return (
+          <div className="fixed inset-0 flex items-center justify-center bg-background/95 backdrop-blur-sm">
+            <div className="mx-auto max-w-md space-y-6 p-8 text-center">
+              <div className="bg-destructive/10 mx-auto flex h-20 w-20 items-center justify-center rounded-full">
+                <CreditCard className="text-destructive h-10 w-10" />
+              </div>
+              <h1 className="text-2xl font-bold">{t("ascend.access.paymentFailed")}</h1>
+              <p className="text-muted-foreground">
+                {t("ascend.access.paymentFailedMessage")}
+              </p>
+              <div className="space-y-3">
+                <Button
+                  onClick={handleManageSubscription}
+                  className="w-full text-secondary"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  {t("ascend.access.updatePaymentMethod")}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={verifyAccess}
+                  disabled={verifyingAccess}
+                  className="w-full"
+                >
+                  {verifyingAccess ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                  )}
+                  {t("ascend.access.checkPaymentAgain")}
+                </Button>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                {t("account.signOut")}
+              </button>
+            </div>
+          </div>
         );
       }
 

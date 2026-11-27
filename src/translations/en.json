@@ -394,8 +394,11 @@
   },
   "ascend": {
     "access": {
+      "checkPaymentAgain": "I've Paid, Check Again",
       "noTrialMessage": "You are not eligible for a free trial. Please subscribe to access Ascend features.",
       "noTrialTitle": "Subscription Required",
+      "paymentFailed": "Payment Failed",
+      "paymentFailedMessage": "The latest payment for your Ascend subscription didn't go through, so Ascend is paused. Update your payment method or pay the open invoice to pick up where you left off.",
       "reason": "Reason",
       "renewSubscription": "Renew Subscription",
       "subscriptionExpired": "Subscription Expired",
@@ -406,7 +409,8 @@
       "trialBlockedMessage": "A trial has already been used on this device. Subscribe to access Ascend features.",
       "trialEndingSoon": "Trial Ending Soon",
       "trialEndingSoonAction": "Subscribe now to keep your data safe and continue enjoying Ascend features.",
-      "trialEndingSoonMessage": "Your Ascend trial ends in {{days}} days. After your trial expires, your cloud library and synced data will be deleted within a few days."
+      "trialEndingSoonMessage": "Your Ascend trial ends in {{days}} days. After your trial expires, your cloud library and synced data will be deleted within a few days.",
+      "updatePaymentMethod": "Update Payment Method"
     },
     "adStats": {
       "title": "Ad Statistics"
